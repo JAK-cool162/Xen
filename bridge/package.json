@@ -1,0 +1,13 @@
+{
+  "name": "xen-bridge",
+  "version": "0.1.0",
+  "description": "Connects Xen's brain to a real Minecraft Java Edition world through a mineflayer bot",
+  "main": "xen_bridge.js",
+  "private": true,
+  "scripts": {
+    "start": "node xen_bridge.js"
+  },
+  "dependencies": {
+    "mineflayer": "^4.39.0"
+  }
+}

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xen"
+version = "0.1.0"
+description = "Light weight DMM (decision-making model) for Minecraft: learns, thinks and feels fear"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.22"]
+
+[project.optional-dependencies]
+screen = ["mss>=9", "pynput>=1.7"]
+
+[project.scripts]
+xen = "xen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["xen*"]

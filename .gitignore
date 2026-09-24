@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+*.npz
+!brains/*.npz
+*.egg-info/
+/server/
+xen_taste.json
+xen_redstone.json
