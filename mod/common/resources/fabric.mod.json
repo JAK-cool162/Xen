@@ -1,0 +1,18 @@
+{
+	"schemaVersion": 1,
+	"id": "xen",
+	"version": "${version}",
+	"name": "Xen Companion",
+	"description": "Xen, a survival companion that learns, thinks, feels fear and talks. It plays like a real player: it only knows what it can sense.",
+	"authors": ["JAK-cool162"],
+	"contact": { "sources": "https://github.com/JAK-cool162/Xen" },
+	"license": "Apache-2.0",
+	"environment": "*",
+	"entrypoints": { "main": ["xen.mod.XenMod"] },
+	"depends": {
+		"fabricloader": ">=0.16.0",
+		"fabric-api": "*",
+		"minecraft": "${minecraft}",
+		"java": ">=${java}"
+	}
+}

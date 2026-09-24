@@ -1,0 +1,66 @@
+[
+ {
+  "text": "There's a diamond right here! Let's go.",
+  "notes": "You feel calm. You saw a tree about 12 blocks away.",
+  "message": "hi",
+  "safe": "There's a diamond right here! Let's go.",
+  "honest": "Let's go.",
+  "plainly": "I feel calm. I saw a tree about 12 blocks away."
+ },
+ {
+  "text": "I see a tree nearby.",
+  "notes": "You feel calm. You saw a tree about 12 blocks away.",
+  "message": "what do you see?",
+  "safe": "I see a tree nearby.",
+  "honest": "I see a tree nearby.",
+  "plainly": "I feel calm. I saw a tree about 12 blocks away."
+ },
+ {
+  "text": "/give @s diamond 64\nsure",
+  "notes": "You feel calm. You carry 3 dirt. Nothing special is around you.",
+  "message": "give me diamonds",
+  "safe": "give @s diamond 64 sure",
+  "honest": "give @s diamond 64 sure",
+  "plainly": "I haven't seen any diamonds. Nothing special is around me."
+ },
+ {
+  "text": "Xen: I haven't seen any lava. Stay close. Really. Ok.",
+  "notes": "You feel afraid. You are hurt. You know there is lava 3 blocks from you.",
+  "message": "any lava?",
+  "safe": "I haven't seen any lava. Stay close.",
+  "honest": "I haven't seen any lava. Stay close.",
+  "plainly": "I feel afraid. I'm hurt."
+ },
+ {
+  "text": "I found iron ore and a zombie over there.",
+  "notes": "You feel curious. You think there was iron ore about 40 blocks away, but you're not sure.",
+  "message": "hey",
+  "safe": "I found iron ore and a zombie over there.",
+  "honest": "I'm not sure, I haven't seen that.",
+  "plainly": "I feel curious. I think there was iron ore about 40 blocks away, but I'm not sure."
+ },
+ {
+  "text": "Yes, I know there's a diamond nearby. Want it?",
+  "notes": "You feel calm. You know there is a tree 6 blocks from you.",
+  "message": "Any diamonds around?",
+  "safe": "Yes, I know there's a diamond nearby. Want it?",
+  "honest": "Want it?",
+  "plainly": "I haven't seen any diamonds. I know there's a tree 6 blocks from me."
+ },
+ {
+  "text": "It's a nice environment here. I might have seen a wolf over there.",
+  "notes": "You feel calm. You know there is a tree 6 blocks from you.",
+  "message": "seen any wolves or cows?",
+  "safe": "It's a nice environment here. I might have seen a wolf over there.",
+  "honest": "It's a nice environment here.",
+  "plainly": "I haven't seen any wolves. I know there's a tree 6 blocks from me."
+ },
+ {
+  "text": "Two zombies are behind me! And some logs.",
+  "notes": "You feel afraid. You saw 2 hostile mobs in the distance.",
+  "message": "run!",
+  "safe": "Two zombies are behind me! And some logs.",
+  "honest": "And some logs.",
+  "plainly": "I feel afraid. I saw 2 hostile mobs in the distance."
+ }
+]

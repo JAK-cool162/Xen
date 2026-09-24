@@ -42,7 +42,8 @@ class TestBlueprint(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "b.mcfunction")
             bp.to_mcfunction(path)
-            self.assertIn("fill ~2 ~0 ~2 ~11 ~0 ~2 stone", open(path).read())
+            with open(path) as f:
+                self.assertIn("fill ~2 ~0 ~2 ~11 ~0 ~2 stone", f.read())
 
 
 class TestTemplates(unittest.TestCase):

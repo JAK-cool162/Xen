@@ -72,8 +72,20 @@ class Emotions:
         return self.now.fear
 
     def notice(self, obs):
-        """Boredom builds while the view stays exactly the same."""
-        view = np.asarray(obs).tobytes()
+        """Boredom builds while nothing really changes around it.
+
+        Spinning on the spot or nodding doesn't count as something happening: the
+        summary compares what is around it (how much solid, lava, water, treasure
+        and mobs in its near window, whichever way it faces) and its body state.
+        """
+        obs = np.asarray(obs, np.float32)
+        view = None
+        if len(obs) > 750 + 13:
+            around = obs[:750].reshape(150, 5).sum(0)
+            body = np.delete(obs[-13:], [5, 6, 7])           # without which way it's looking up or down
+            view = np.round(np.concatenate([around, body]), 3).tobytes()
+        else:
+            view = obs.tobytes()
         self._same = self._same + 1 if view == self._last_view else 0
         self._last_view = view
         self.now.boredom = 1.0 - float(np.exp(-self._same / 3.0))

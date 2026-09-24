@@ -15,6 +15,11 @@ def flat_cube():
     return cube.ravel().tolist()
 
 
+def rays():
+    n = 16 * 16
+    return {"dist": [10.0] * n, "cat": [B.STONE] * n, "hit": [0, 60, -10] * n}
+
+
 class FakeMinecraft:
     def __init__(self, max_players=3):
         self.max_players = max_players
@@ -25,9 +30,10 @@ class FakeMinecraft:
 
     def state(self, name, dead=False):
         bot = self.bots[name]
-        return {"name": name, "cube": flat_cube(), "position": [0, 64, 0], "yaw": 0, "pitch": 0,
+        return {"name": name, "near": flat_cube(), "rays": rays(), "near_mobs": [], "far_mobs": [], "t": 0,
+                "position": [0, 64, 0], "yaw": 0, "pitch": 0,
                 "health": bot["health"], "food": 20, "night": False, "burning": False, "in_water": False,
-                "in_lava": False, "inventory": dict(bot["inventory"]), "mobs": [], "heard": bot.pop("heard", []),
+                "in_lava": False, "inventory": dict(bot["inventory"]), "heard": bot.pop("heard", []),
                 "dead": dead}
 
     def handle(self, msg):

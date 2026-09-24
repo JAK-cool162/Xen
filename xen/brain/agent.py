@@ -231,6 +231,47 @@ class Xen:
         with open(path, "wb") as f:
             np.savez_compressed(f, **state)
 
+    # --------------------------------------------------------- mod exchange
+    MAGIC = b"XEN1"
+
+    def export(self, path):
+        """Write the brain in the portable format the Minecraft mod reads (and writes back)."""
+        nets = [("striatum", self.striatum.net), ("amygdala", self.amygdala.net), ("world_model", self.world_model.net),
+                ("striatum_target", self.striatum.target), ("amygdala_target", self.amygdala.target)]
+        header = {"obs_dim": self.obs_dim, "n_actions": self.n_actions, "config": asdict(self.config),
+                  "steps": self.steps, "updates": self.updates, "lives": self.lives,
+                  "wm_updates": self.world_model.updates, "emotions": self.emotions.state(),
+                  "nets": [[name, list(net.sizes)] for name, net in nets]}
+        blob = json.dumps(header).encode()
+        with open(path, "wb") as f:
+            f.write(self.MAGIC)
+            f.write(len(blob).to_bytes(4, "little"))
+            f.write(blob)
+            for _, net in nets:
+                f.write(net.flat.astype("<f4").tobytes())
+
+    @classmethod
+    def load_exported(cls, path, seed=0):
+        with open(path, "rb") as f:
+            if f.read(4) != cls.MAGIC:
+                raise ValueError(f"{path} is not a Xen brain")
+            header = json.loads(f.read(int.from_bytes(f.read(4), "little")))
+            known = XenConfig.__dataclass_fields__
+            config = {k: v for k, v in header["config"].items() if k in known}
+            config["hidden"] = tuple(config["hidden"])
+            xen = cls(header["obs_dim"], header["n_actions"], XenConfig(**config), seed)
+            nets = {"striatum": xen.striatum.net, "amygdala": xen.amygdala.net, "world_model": xen.world_model.net,
+                    "striatum_target": xen.striatum.target, "amygdala_target": xen.amygdala.target}
+            for name, sizes in header["nets"]:
+                net = nets[name]
+                if tuple(sizes) != net.sizes:
+                    raise ValueError(f"{name}: expected layers {net.sizes}, got {tuple(sizes)}")
+                net.flat[:] = np.frombuffer(f.read(4 * len(net.flat)), "<f4")
+        xen.steps, xen.updates, xen.lives = header["steps"], header["updates"], header["lives"]
+        xen.world_model.updates = header["wm_updates"]
+        xen.emotions.load_state(header["emotions"])
+        return xen
+
     @classmethod
     def load(cls, path, seed=0, **overrides):
         with np.load(path) as data:

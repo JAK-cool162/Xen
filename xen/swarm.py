@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from .actions import Action
 from .life import LifeStats
-from .worlds.mineflayer import MineflayerWorld, encode_state, outcome
+from .worlds.mineflayer import MineflayerWorld, outcome
 
 MAX_NAME = 16
 
@@ -67,7 +67,7 @@ class Swarm:
         state["hurt"] = 0.0
         world = MineflayerWorld(name=name, bridge=self.bridge, speak=self.speak)
         world._last = state
-        member = Member(world, encode_state(state), self.xen.new_body())
+        member = Member(world, world.perceive(state), self.xen.new_body())
         self.bodies[name] = member
         self._next_spawn = time.time() + self.spawn_every
         self.log(f"[swarm] {name} joined ({len(self.bodies)} Xen online)")
@@ -96,7 +96,7 @@ class Swarm:
                 continue
             reward, harm, dead, events = outcome(member.world._last, state)
             member.world._last = state
-            next_obs = encode_state(state)
+            next_obs = member.world.perceive(state)
             self.xen.learn(member.obs, thoughts[name].action, reward, harm, next_obs, dead,
                            emotions=member.emotions, stream=name)
             s = member.stats
@@ -114,12 +114,15 @@ class Swarm:
                 self.xen.new_life(member.emotions)
             member.obs = next_obs
             heard += [(name, h) for h in state.get("heard", [])]
+        for name in thoughts:
+            if name in self.bodies:
+                self.bodies[name].world.feelings = thoughts[name].feelings
         for _, message in heard:
             key = (message["from"], message["text"])
-            if key in self._handled or not self.skills or not message["text"].lower().startswith(("xen", "!xen", "@xen")):
+            if key in self._handled or not self.skills or "xen" not in message["text"].lower():
                 continue
             self._handled.add(key)
-            self._request(message["text"])
+            self._request(message)
         if len(self._handled) > 500:
             self._handled.clear()
         return len(self.bodies)
@@ -135,15 +138,16 @@ class Swarm:
         from .worlds.mineflayer import Bridge
         bridge = Bridge(*self.bridge.address)
         while True:
-            text = self._requests.get()
-            if text is None:
+            message = self._requests.get()
+            if message is None:
                 break
             member = self.builder()
             body = MineflayerWorld(name=member.world.name, bridge=bridge) if member else None
             try:
                 if body:
                     body.reset()
-                answer = self.skills.handle(text, body, swarm=self)
+                    body.senses, body.feelings = member.world.senses, member.world.feelings
+                answer = self.skills.handle(message["text"], body, swarm=self, speaker=message["from"])
             except Exception as err:                    # a failed skill must not stop the swarm
                 answer = f"Sorry, that didn't work: {err}"
             if answer and body:

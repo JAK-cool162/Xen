@@ -7,6 +7,8 @@
     xen roofs | xen palettes   list the options
     xen redstone <task>        work out a circuit (not, or, and, nand, nor, wire, ...) and build it
     xen spawn <n>              (swarm) bring n more Xens into the world
+    xen <anything else>        Xen answers with its voice (a small local language model that only
+                               knows what Xen perceives), if talking is on
 """
 from .building.designer import Designer, tags_for
 from .building.rating import rate
@@ -17,13 +19,21 @@ from .redstone.sim import truth_table
 
 
 class Skills:
-    def __init__(self, taste=None, library=None, build_mode="commands"):
+    def __init__(self, taste=None, library=None, build_mode="commands", voice=False):
         self.taste = taste or Taste()
         self.library = library or Library()
         self.designer = Designer(self.taste)
         self.redstone = RedstoneLearner(self.library)
         self.build_mode = build_mode
         self.last_build = None           # (rating, tags) awaiting feedback
+        self.talk = voice
+        self._voice = None
+
+    def voice(self):
+        if self._voice is None:
+            from .talk.voice import Voice
+            self._voice = Voice()
+        return self._voice
 
     def blueprint(self, words):
         """Parse 'house gambrel spruce' / 'tower stone' / 'bridge' into (blueprint, tags, shelter)."""
@@ -40,10 +50,12 @@ class Skills:
         bp = TEMPLATES[kind](**kwargs)
         return bp, (f"template:{kind}",) + ((f"palette:{palette}",) if palette else ()), kind == "tower"
 
-    def handle(self, text, body=None, swarm=None):
+    def handle(self, text, body=None, swarm=None, speaker="Player"):
         """Run a chat command. Returns Xen's reply (or None if it isn't addressed to Xen)."""
         words = text.lower().replace(",", " ").split()
         if not words or words[0] not in ("xen", "!xen", "@xen"):
+            if self.talk and "xen" in words:                       # talking about/to Xen
+                return self.voice().reply(speaker, text, body.notes() if body is not None else "")
             return None
         cmd, args = (words[1], words[2:]) if len(words) > 1 else ("help", [])
         if cmd == "help":
@@ -103,4 +115,6 @@ class Skills:
             return f"Calling {n} more Xen{'s' if n != 1 else ''}!"
         if cmd in ("count", "status") and swarm is not None:
             return f"{len(swarm.bodies)} Xens online."
+        if self.talk:
+            return self.voice().reply(speaker, text, body.notes() if body is not None else "")
         return "Hm? Try 'xen help'."

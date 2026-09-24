@@ -26,6 +26,17 @@ DROPS = {GRASS: "dirt", DIRT: "dirt", STONE: "cobblestone", LOG: "log",
 ITEM_VALUE = {"dirt": 0.05, "cobblestone": 0.1, "log": 1.0, "coal": 1.5,
               "raw_iron": 3.0, "raw_gold": 4.0, "diamond": 10.0, "food": 0.3}
 
+# Common items lose their appeal as Xen piles them up (a stack of dirt is plenty);
+# ores, logs and food never do.
+COMMON = ("dirt", "cobblestone")
+
+
+def satisfaction(item, carried):
+    """How rewarding it is to get one more `item` when already carrying `carried` of it."""
+    value = ITEM_VALUE[item]
+    return value * 16.0 / (16.0 + carried) if item in COMMON else value
+
+
 # Items that can be placed back into the world, and the block they become.
 PLACEABLE = {"cobblestone": STONE, "dirt": DIRT}
 

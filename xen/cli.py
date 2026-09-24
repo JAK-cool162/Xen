@@ -1,4 +1,4 @@
-"""Command line: python -m xen {train,watch,play,swarm,build,rate,redstone,info}."""
+"""Command line: python -m xen {train,watch,play,swarm,build,rate,redstone,talk,evaluate,export,info}."""
 import argparse
 import os
 import signal
@@ -51,7 +51,8 @@ def _skills(args):
     from .building.taste import Taste
     from .redstone.learn import Library
     from .skills import Skills
-    return Skills(Taste(args.taste), Library(args.redstone), build_mode=args.build_mode)
+    return Skills(Taste(args.taste), Library(args.redstone), build_mode=args.build_mode,
+                  voice=getattr(args, "voice", False))
 
 
 # --------------------------------------------------------------------- living
@@ -118,13 +119,14 @@ def cmd_play(args):
     started = time.time()
 
     def on_step(world, xen, thought, reward, harm, info):
+        world.feelings = thought.feelings
         if args.verbose:
             print(f"[{Action(thought.action).name:<10}] {thought.feelings.mood:<9} {thought.text}", flush=True)
         if hasattr(world, "say") and (thought.feelings.pain > 0.15 or thought.feelings.fear > 0.6):
             world.say(f"[{thought.feelings.mood}] {thought.text}")
         for message in info.get("heard", ()):
             try:
-                answer = skills.handle(message["text"], world) if skills else None
+                answer = skills.handle(message["text"], world, speaker=message["from"]) if skills else None
             except Exception as err:                    # a failed skill must not stop Xen's life
                 answer = f"Sorry, that didn't work: {err}"
             if answer:
@@ -273,6 +275,34 @@ def evaluate(xen, lives=6, ticks=1500, seed=1000):
             "fear_near_lava": mean(near), "fear_elsewhere": mean(far)}
 
 
+def fear_probes(xen, worlds=12):
+    """How much harm the amygdala expects in controlled situations (dangerous vs the same made safe)."""
+    from . import blocks as B
+    from .worlds.simcraft import Mob, SimCraft
+    rows = []
+    for seed in range(worlds):
+        w = SimCraft(seed=seed)
+        x, y, z = w.pos
+        w.blocks[x - 5:x + 6, y:y + 6, z - 5:z + 6] = B.AIR
+        w.blocks[x - 5:x + 6, y - 3:y, z - 5:z + 6] = B.STONE
+        w.mobs, w.yaw, w.t = [], 2, 1
+        fear = lambda: xen.fears(w.observe()[None])[0]
+        ground = fear()[Action.FORWARD]
+        w.blocks[x, y, z + 1] = w.blocks[x, y - 1, z + 1] = B.LAVA
+        lava = fear()[Action.FORWARD]
+        w.blocks[x, y, z + 1], w.blocks[x, y - 1, z + 1] = B.AIR, B.STONE
+        w.pitch = -1
+        stone = fear()[Action.MINE]
+        w.blocks[x, y - 2, z] = B.LAVA
+        dig_lava = fear()[Action.MINE]
+        w.blocks[x, y - 2, z], w.pitch = B.STONE, 0
+        calm = fear().mean()
+        w.mobs = [Mob(x, y, z + 1)]
+        zombie = fear().mean()
+        rows.append((ground, lava, stone, dig_lava, calm, zombie))
+    return [float(sum(r[i] for r in rows) / len(rows)) for i in range(6)]
+
+
 def cmd_evaluate(args):
     from .worlds.simcraft import SimCraft
     minds = [("trained", _brain(args.brain, SimCraft.obs_dim, args.seed))]
@@ -282,8 +312,33 @@ def cmd_evaluate(args):
         r = evaluate(xen, lives=args.lives, ticks=args.ticks)
         causes = ", ".join(f"{k} x{v}" for k, v in r["causes"].items()) or "none"
         print(f"{label:8s} reward per life {r['reward']:6.2f} | survived {r['survived']}/{r['lives']} "
-              f"(deaths: {causes}) | fear near lava {r['fear_near_lava']:.2f} vs elsewhere {r['fear_elsewhere']:.2f}",
-              flush=True)
+              f"(deaths: {causes})", flush=True)
+        g, l, s, d, c, z = fear_probes(xen)
+        print(f"         fear of walking into lava {l:.3f} vs onto ground {g:.3f} | digging down onto lava {d:.3f} "
+              f"vs onto stone {s:.3f} | zombie in its face {z:.3f} vs nothing {c:.3f}", flush=True)
+
+
+def cmd_talk(args):
+    """Chat with Xen's voice, fed only what Xen perceives in a SimCraft world."""
+    from .talk.voice import Voice, carrying, notes
+    from .worlds.simcraft import SimCraft
+    world = SimCraft(seed=args.seed)
+    for _ in range(8):                                         # look around a little first
+        world.step(Action.TURN_RIGHT if _ % 2 else Action.IDLE)
+    context = notes("calm", False, world.health, world.hunger, carrying(world.inventory), world.senses.describe())
+    print(f"Xen's notes: {context}")
+    voice = Voice(path=args.model)
+    for message in args.message or ["Xen, what do you see?"]:
+        print(f"<{args.speaker}> {message}")
+        print(f"<Xen> {voice.reply(args.speaker, message, context, seed=args.seed)}")
+
+
+def cmd_export(args):
+    """Write a brain in the mod's format (<world>/xen/brain.bin in Minecraft)."""
+    from .worlds.simcraft import SimCraft
+    xen = _brain(args.brain, SimCraft.obs_dim, args.seed)
+    xen.export(args.out)
+    print(f"Wrote {args.out}. Copy it to <world>/xen/brain.bin (with the server stopped) to use it in the mod.")
 
 
 def cmd_info(args):
@@ -306,6 +361,8 @@ def main(argv=None):
         p.add_argument("--redstone", default=REDSTONE_FILE, help="where Xen keeps its redstone knowledge")
         p.add_argument("--build-mode", choices=("commands", "hands"), default="commands",
                        help="commands: /setblock (Xen needs op); hands: place blocks like a player (creative)")
+        p.add_argument("--voice", action="store_true",
+                       help="answer chat with Xen's voice (a 360M local language model; downloads ~390 MB once)")
 
     p = sub.add_parser("train", help="grow up in the SimCraft world")
     p.add_argument("--brain", default="xen_brain.npz")
@@ -377,12 +434,23 @@ def main(argv=None):
     p.add_argument("--out", help="write the circuit as a .mcfunction")
     p.set_defaults(func=cmd_redstone)
 
+    p = sub.add_parser("talk", help="talk with Xen's voice (downloads the 360M model on first use)")
+    p.add_argument("message", nargs="*", help="what you say")
+    p.add_argument("--speaker", default="You")
+    p.add_argument("--model", default=None, help="path to a GGUF model (default ~/.xen/models)")
+    p.set_defaults(func=cmd_talk)
+
     p = sub.add_parser("evaluate", help="measure what Xen has learned (no exploring, fixed worlds)")
     p.add_argument("--brain", default="xen_brain.npz")
     p.add_argument("--lives", type=int, default=6)
     p.add_argument("--ticks", type=int, default=1500)
     p.add_argument("--baseline", action="store_true", help="compare with a newborn Xen")
     p.set_defaults(func=cmd_evaluate)
+
+    p = sub.add_parser("export", help="save a brain for the Minecraft mod (Xen Companion)")
+    p.add_argument("--brain", default="xen_brain.npz")
+    p.add_argument("--out", default="brain.bin")
+    p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("info", help="show details about Xen or a saved brain")
     p.add_argument("--brain", default="xen_brain.npz")

@@ -7,3 +7,9 @@ __pycache__/
 /server/
 xen_taste.json
 xen_redstone.json
+/server*/
+mod/*/.gradle/
+mod/*/build/
+mod/*/run/
+*.gguf
+*.part

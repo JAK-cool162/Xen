@@ -8,13 +8,25 @@ learns from everything that happens. It **thinks**: it imagines what its
 options lead to before choosing. It **feels**: pain, fear, curiosity,
 satisfaction and boredom, because fear is how it learns to stay alive.
 
+It **plays fair**. It isn't handed the world like most game AIs. It knows
+everything within 6 blocks of itself, and beyond that only what it *sees* in
+its 90° field of view, up to 8 chunks away. Things behind walls, under the
+ground or behind its back stay unknown, and what it saw before is a belief
+whose confidence fades.
+
 On top of survival it has skills: it **builds** from templates (roofs, arches,
 houses, towers, bridges), **rates** builds and learns your taste in buildings,
-and **learns redstone** by experimenting. In real Minecraft you can bring in
-as many Xens as the server allows. Each one is a real player, and they all
-share one brain.
+and **learns redstone** by experimenting. It can **talk**, through a small
+local language model (SmolLM2-360M) that only knows what Xen knows. In real
+Minecraft you can bring in as many Xens as the server allows. Each one is a
+real player, and they all share one brain.
 
-Only needs Python 3.9+ and numpy. No GPU and no deep-learning framework.
+**Want it in your world?** Get the survival-companion mod from
+[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x). The mod has
+the trained brain inside and needs no Python.
+
+The Python side only needs Python 3.9+ and numpy. No GPU and no deep-learning
+framework.
 
 ```
 pip install -r requirements.txt
@@ -31,12 +43,37 @@ Every tick Xen goes through the same loop (`xen/brain/agent.py`):
 
 | step | brain part | what happens |
 |---|---|---|
-| perceive | `perception.py` | the blocks around it (a 17×13×17 cube), turned so "forward" is where it looks; pointers to the nearest treasure, lava and mob; its own body (health, hunger, burning...) |
+| perceive | `perception.py` | what it knows for sure (every block within 6 blocks, turned so "forward" is where it looks), what it sees (256 rays in a 90° view, up to 128 blocks), what it believes is out there (and how sure it is), and its own body (health, hunger, being hurt...) |
 | feel | `brain/emotions.py` | the **amygdala** predicts how much harm each action leads to; that becomes felt **fear** |
 | think | `brain/cortex.py` | if afraid (or unsure), it **imagines** its best options a few steps ahead with its world model and weighs imagined reward against imagined harm |
 | decide | `brain/agent.py` | picks the action with the best *reward − caution × fear*; when exploring it's curious but cautious |
 | act | `actions.py` | real Minecraft inputs: W/A/S/D, jump, turn, look, mine (hold left click), place, attack, eat |
 | learn | `brain/critic.py`, `brain/memory.py`, `brain/world_model.py` | stores what happened and trains everything, continuously |
+
+### What Xen can sense (it can't cheat)
+
+`xen/perception.py` gives Xen the senses of a player, not a map of the world:
+
+* **Up close it knows everything.** Every block within 6 blocks (a 13×13×13
+  cube), including what's under its feet and behind it. That's what a player
+  knows from walking around and hearing.
+* **Further away it has to look.** Its eyes cast 256 rays in a 90° field of
+  view, up to 8 chunks (128 blocks). Rays stop at solid blocks and lava and pass
+  through air, water and glass, so it can't see ores inside the hill, caves
+  under the ground or anything behind it. Unloaded chunks are unknown.
+* **Beliefs with confidence.** What it saw goes into a belief map ("coal
+  there, 20 blocks away"). The confidence fades once it looks away: blocks
+  lose half their confidence in 2 minutes, mobs in 3 seconds because they move.
+  When it looks again the belief is corrected, or forgotten if the thing is
+  gone.
+* Its observation is made from that: the full near cube, a coarse picture of
+  its view (distance and what each ray hit, per sector), pointers to the
+  nearest believed treasure, lava and mob with their confidence, and its body.
+
+The same senses run in SimCraft, in the mineflayer bridge (`bridge/xen_bridge.js`)
+and in the mod (`mod/common/java/xen/mod/WorldSenses.java`). The mod's
+`crossCheck` task checks that the Java version gives the same observation as
+the Python one.
 
 ### Why Xen needs fear
 
@@ -59,8 +96,10 @@ Fear is the signal that teaches it to survive:
 
 The other feelings: **curiosity** (its world model was surprised) pushes it to
 explore; **joy memory** replays big rewards (a diamond makes digging feel worth
-it); **boredom** builds up when nothing changes, so it never loops on a
-pointless action.
+it); **satisfaction** wears off for things it already has plenty of (the 30th
+cobblestone is worth much less than the first); **boredom** builds up when
+nothing changes around it (turning on the spot doesn't count as a change), so
+it never loops on a pointless action.
 
 Watching it (`python -m xen watch`) shows the feelings and the inner monologue:
 
@@ -84,34 +123,37 @@ python -m xen train --lives 200 --brain xen_brain.npz    # keeps learning where 
 python -m xen evaluate --brain xen_brain.npz --baseline
 ```
 
-A pre-trained brain comes with the repo (`brains/xen_simcraft.npz`, 200 lives,
-about 150k decisions). Every command starts from it when you don't have your
-own brain file yet (use `train --fresh` for a newborn).
+A pre-trained brain comes with the repo (`brains/xen_simcraft.npz`, 220 lives,
+about 214k decisions, all with the fair senses). Every command starts from it
+when you don't have your own brain file yet (use `train --fresh` for a
+newborn). The mod has the same brain inside.
 
-**What it learned** (reward = value of what it mined and collected in one life):
+**What it learned** (reward = value of what it mined and collected in one life,
+while still exploring):
 
-| lives | average reward per life |
-|---|---|
-| 1-40 | 13.4 |
-| 41-80 | 24.6 |
-| 81-120 | 30.3 |
-| 121-160 | 62.5 |
-| 161-200 | 85.3 |
+| lives | average reward per life | survived |
+|---|---|---|
+| 1-44 | 13.1 | 19/44 |
+| 45-88 | 15.2 | 20/44 |
+| 89-132 | 19.2 | 14/44 |
+| 133-176 | 20.2 | 26/44 |
+| 177-220 | 22.8 | 21/44 |
 
-`python -m xen evaluate --baseline` (8 fixed worlds, no exploring):
+`python -m xen evaluate --lives 8 --baseline` (8 fixed worlds, no exploring,
+and the 30th cobblestone is worth less than the first):
 
 ```
-trained  reward per life  74.08 | survived 3/8 (deaths: lava x2, starvation x1, zombie x2)
-newborn  reward per life   0.78 | survived 0/8 (deaths: starvation x2, zombie x6)
+trained  reward per life  33.78 | survived 7/8 (deaths: starvation x1)
+newborn  reward per life   3.96 | survived 1/8 (deaths: zombie x5, lava x2)
 ```
 
 Its fear is learned, and it's specific (how much harm the amygdala expects):
 
 | situation | trained Xen | newborn |
 |---|---|---|
-| walk forward into lava vs onto ground | 0.117 vs 0.003 | 0 vs 0 |
-| dig straight down onto lava vs onto stone | 0.041 vs 0.005 | 0 vs 0.008 |
-| a zombie in its face vs nothing there | 0.018 vs 0.001 | 0.010 vs 0.014 |
+| walk forward into lava vs onto ground | 0.167 vs 0.007 | 0.014 vs 0.003 |
+| dig straight down onto lava vs onto stone | 0.063 vs 0.000 | 0.000 vs 0.009 |
+| a zombie in its face vs nothing there | 0.014 vs 0.002 | 0.026 vs 0.032 |
 
 It still dies more often than a good player. Deep digging for ore means lava
 and zombies, and more training makes it better.
@@ -120,7 +162,28 @@ and zombies, and more training makes it better.
 
 ## Playing real Minecraft
 
-### As a real player (Java Edition, recommended)
+### Survival companion mod (Fabric, easiest)
+
+[`dist/`](dist/README.md) has the mod, with requirements, commands and
+settings:
+
+| jar | Minecraft | Java |
+|---|---|---|
+| `dist/xen-companion-1.0.0+mc1.21.11.jar` | 1.21.11 | 21+ |
+| `dist/xen-companion-1.0.0+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+
+Put it in `mods/` with Fabric API and run `/xen summon`. Xen joins as a real
+player next to you and plays survival with you. It follows you, stays or
+lives on its own; it mines, fights, eats and learns; it answers when you talk
+to it; and you can right-click it to open its bag. `/xen spawn 50` (operators)
+brings in a crowd of Xens across the world, all sharing one brain. Everything
+runs inside the server (brain, learning, senses and voice), with no Python
+and no bridge. It was tested on Fabric servers for 1.21.11, 26.1.2 and 26.3.
+
+A brain trained in Python can go into the mod: `python -m xen export --brain
+xen_brain.npz --out brain.bin`, then copy it to `<world>/xen/brain.bin`.
+
+### As a mineflayer player (Java Edition 1.21.11; mineflayer also joins 26.1)
 
 Each Xen is a [mineflayer](https://github.com/PrismarineJS/mineflayer) bot: a real
 player connection. The server treats it like anyone else: it shows up in the
@@ -159,7 +222,37 @@ python -m xen swarm --count 0 --spread 300
 
 ### Talk to Xen in chat
 
-Any player can type:
+Start Xen with `--voice` (`python -m xen play --voice`, `python -m xen swarm
+--voice`) and it answers chat in its own words, using SmolLM2-360M-Instruct
+(`xen/talk/`). It runs on the CPU, needs no GPU, and downloads about 390 MB
+once to `~/.xen/models` (or set `XEN_MODEL` to a GGUF file you have). It
+**can talk but can't cheat**:
+
+* its prompt is Xen's own notes: its feelings, body and inventory, and what it
+  perceives, worded with how sure it is ("You know there is lava 3 blocks from
+  you. You think there was iron about 40 blocks away, but you're not sure.");
+* a sentence that claims something that isn't in its notes (ores, lava, mobs,
+  villages...) is dropped before it's sent;
+* it only chats: one line, up to two sentences, never a command (a reply can't
+  start with `/`). It doesn't decide what Xen does.
+
+```
+$ python -m xen talk "Xen, what do you see?"      # try it in a SimCraft world
+Xen's notes: You feel calm. You know there is a tree 6 blocks from you.
+<You> Xen, what do you see?
+<Xen> I can see a tree about 6 blocks from me.
+```
+
+In the mod on a real server (a flat world full of slimes at night):
+
+```
+<Steve> Xen, what do you see?
+<Xen> I can see a hostile mob right next to me, but I'm not sure what kind of monster it is.
+<Steve> xen any diamonds around?
+<Xen> I can see two hostile mobs right next to me. I don't see any diamonds.
+```
+
+Chat commands work with or without the voice. Any player can type:
 
 | chat | what Xen does |
 |---|---|
@@ -304,7 +397,7 @@ rest kept playing.
 xen/
   actions.py          the actions and the keys/mouse behind them
   blocks.py           block categories, values, drops
-  perception.py       egocentric block cube -> observation
+  perception.py       fair senses: near cube, 90° raycast view, beliefs with confidence
   brain/
     agent.py          Xen: perceive, feel, think, decide, learn; save/load
     critic.py         TD critics (reward = striatum, harm = amygdala), dueling heads
@@ -318,14 +411,23 @@ xen/
     mineflayer.py     real Minecraft via the bridge (one Xen)
     screen.py         real Minecraft via keyboard, mouse and screen pixels
   swarm.py            many Xens, one brain
-  skills.py           chat commands: build, design, rate, redstone, spawn
+  skills.py           chat commands: build, design, rate, redstone, spawn (and the voice)
+  talk/
+    llm.py            GGUF reader, tokenizer and Llama forward pass in numpy (SmolLM2-360M)
+    voice.py          Xen's voice: notes from its own senses, honesty filter, safe chat
   building/           blueprints, templates, rating, taste, designer
   redstone/           simulator and learner
   life.py             the continuous life loop
   cli.py              python -m xen ...
 bridge/xen_bridge.js  mineflayer bots <-> Xen (hosts the whole swarm)
 brains/               pre-trained brain
-scripts/              real-server verification
+mod/                  Fabric mod: Xen Companion
+  common/java/        brain, senses, hands, voice (a Java port of the Python Xen)
+  common/test/        crossCheck: Java == Python for senses, brain and fear
+  mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
+  mc26/               build for Minecraft 26.x (Java 25)
+dist/                 the built mod jars, with install notes and requirements
+scripts/              real-server verification, mod test fixtures
 tests/                python -m unittest discover -s tests -t .
 ```
 
@@ -335,8 +437,16 @@ tests/                python -m unittest discover -s tests -t .
 python -m unittest discover -s tests -t .
 ```
 
-The tests cover the network (gradient checks), perception, the simulator,
+The tests cover the network (gradient checks), perception (the near cube,
+field of view, occlusion, beliefs and their confidence), the simulator,
 fear conditioning (Xen learns to fear walking into lava, and only that),
 shared-brain swarms, the real-world protocol against a fake bridge, the
 keyboard/mouse backend against a fake screen, building, taste, redstone rules
-and learning, and the command line.
+and learning, the voice (tokenizer, honesty filter, safe chat; generation
+when the model file is there) and the command line.
+
+The mod has its own check, which compares the Java port with the Python Xen:
+
+```
+cd mod/mc1.21.11 && ./gradlew crossCheck
+```

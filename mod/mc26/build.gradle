@@ -1,0 +1,43 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+base { archivesName = 'xen-companion' }
+version = "${project.version}+mc${project.mod_label}"
+
+sourceSets.main {
+	java.srcDirs = ['../common/java', 'src/main/java']
+	resources.srcDirs = ['../common/resources']
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+processResources {
+	def props = [version: project.version, minecraft: project.mc_range, java: project.java_version]
+	inputs.properties props
+	filesMatching("fabric.mod.json") { expand props }
+}
+
+tasks.withType(JavaCompile).configureEach { it.options.release = Integer.parseInt(project.java_version) }
+java {
+	sourceCompatibility = JavaVersion.toVersion(project.java_version)
+	targetCompatibility = JavaVersion.toVersion(project.java_version)
+}
+
+// Java == Python: the mod's senses and brain against fixtures written by scripts/make_mod_fixtures.py
+sourceSets {
+	crossCheck {
+		java.srcDirs = ['../common/test/java']
+		compileClasspath += sourceSets.main.output + configurations.compileClasspath
+		runtimeClasspath += sourceSets.main.output + configurations.runtimeClasspath
+	}
+}
+tasks.register('crossCheck', JavaExec) {
+	classpath = sourceSets.crossCheck.runtimeClasspath
+	mainClass = 'xen.mod.core.CrossCheck'
+	args file('../common/test/fixtures').absolutePath
+}

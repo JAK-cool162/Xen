@@ -21,7 +21,7 @@ import numpy as np
 
 from .. import blocks as B
 from ..actions import NUM_ACTIONS, Action
-from ..perception import CUBE_SHAPE, OBS_DIM, Body, encode
+from ..perception import CUBE_SHAPE, OBS_DIM, Body, Senses, Sight
 
 
 class Bridge:
@@ -55,14 +55,22 @@ class Bridge:
         self._sock.close()
 
 
-def encode_state(state):
-    cube = np.asarray(state["cube"], np.int8).reshape(CUBE_SHAPE)
+def sight_from(state):
+    """Turn a bridge state into what Xen's senses deliver (near cube, eyes, noticed mobs)."""
+    near = np.asarray(state["near"], np.int8).reshape(CUBE_SHAPE)
     inventory = state.get("inventory", {})
     body = Body(health=state["health"], hunger=state["food"], night=state["night"],
                 burning=state["burning"], hurt=state.get("hurt", 0.0), pitch=state["pitch"],
                 blocks=sum(inventory.get(item, 0) for item in B.PLACEABLE),
                 food=inventory.get("food", 0), in_water=state["in_water"], in_lava=state["in_lava"])
-    return encode(cube, state["yaw"], body, state.get("mobs", ()))
+    rays = state.get("rays") or {}
+    dist = np.asarray(rays.get("dist", []), float)
+    dist = np.where(dist < 0, np.inf, dist)
+    return Sight(near=near, yaw=state["yaw"], body=body, position=tuple(state.get("position", (0, 0, 0))),
+                 t=float(state.get("t", 0)), near_mobs=state.get("near_mobs", []),
+                 ray_dist=dist, ray_cat=np.asarray(rays.get("cat", []), np.int64),
+                 ray_hit=np.asarray(rays.get("hit", []), np.int64).reshape(-1, 3),
+                 far_mobs=state.get("far_mobs", []))
 
 
 def outcome(prev, state):
@@ -73,10 +81,11 @@ def outcome(prev, state):
     harm = lost / 20.0 + (1.0 if dead else 0.0)
     reward, events = 0.0, []
     if not dead:
-        for item, value in B.ITEM_VALUE.items():
-            gained = state["inventory"].get(item, 0) - prev["inventory"].get(item, 0)
+        for item in B.ITEM_VALUE:
+            had = prev["inventory"].get(item, 0)
+            gained = state["inventory"].get(item, 0) - had
             if gained > 0:
-                reward += value * gained
+                reward += sum(B.satisfaction(item, had + i) for i in range(gained))
                 events.append(f"got {item}")
         if state["food"] > prev["food"] and prev["food"] < 14:
             reward += 0.5 * (state["food"] - prev["food"]) / 6.0
@@ -95,6 +104,8 @@ class MineflayerWorld:
 
     def __init__(self, host="127.0.0.1", port=8765, name=None, speak=False, bridge=None):
         self.bridge = bridge or Bridge(host, port)
+        self.senses = Senses()                 # remembers the world across deaths
+        self.feelings = None                   # set by whoever drives this body (for talking)
         self.name = name
         self.speak = speak
         self._last = None
@@ -113,7 +124,10 @@ class MineflayerWorld:
         self.name = self.name or self._last.get("name")
         self._last["hurt"] = 0.0
         self.t = 0
-        return encode_state(self._last)
+        return self.perceive(self._last)
+
+    def perceive(self, state):
+        return self.senses.perceive(sight_from(state))
 
     def step(self, action):
         state = self.bridge.call(self._msg(op="act", action=Action(int(action)).name))["state"]
@@ -123,7 +137,7 @@ class MineflayerWorld:
         info = {"events": events, "terminal": dead, "health": state["health"], "hunger": state["food"],
                 "inventory": state["inventory"], "t": self.t, "heard": state.get("heard", []),
                 "position": state.get("position")}
-        return encode_state(state), reward, harm, dead, info
+        return self.perceive(state), reward, harm, dead, info
 
     @property
     def position(self):
@@ -142,6 +156,14 @@ class MineflayerWorld:
 
     def use(self, pos):
         return self.bridge.call(self._msg(op="use", pos=list(pos)))["state"]
+
+    def notes(self):
+        """What Xen may talk about: its own feelings, body and perception."""
+        from ..talk.voice import carrying, notes
+        s = self._last or {}
+        f = self.feelings
+        return notes(f.mood if f else "calm", bool(f and f.pain > 0.15), s.get("health", 20), s.get("food", 20),
+                     carrying(s.get("inventory", {})), self.senses.describe())
 
     def say(self, text, force=False):
         """Speak in game chat. Feelings are rate limited; forced replies always go out."""

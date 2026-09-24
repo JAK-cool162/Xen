@@ -4,7 +4,7 @@ import numpy as np
 
 from xen import blocks as B
 from xen.actions import Action
-from xen.perception import OBS_DIM
+from xen.perception import CHANNELS, N_CELLS, N_NEAR_RADAR, OBS_DIM
 from xen.worlds.simcraft import Mob, SimCraft
 
 
@@ -73,7 +73,23 @@ class TestSimCraft(unittest.TestCase):
         w.step(Action.TURN_RIGHT)
         self.assertEqual(w.yaw, 3)
         w.step(Action.TURN_LEFT)
-        np.testing.assert_array_equal(w.observe()[:-13], before[:-13])
+        near = N_CELLS * CHANNELS + N_NEAR_RADAR           # what it senses up close
+        np.testing.assert_array_equal(w.observe()[:near], before[:near])
+
+    def test_it_remembers_what_it_saw(self):
+        w = flat_world()
+        x, y, z = w.pos
+        w.blocks[x, y, z + 20] = B.DIAMOND                   # 20 blocks ahead, in plain sight
+        w.pitch = 1
+        for _ in range(4):                                   # look for a few ticks
+            w.step(Action.IDLE)
+        pos, cats, conf = w.senses.beliefs.known(w.t, B.DIAMOND)
+        self.assertIn((x, y, z + 20), {tuple(p) for p in pos})
+        w.step(Action.TURN_LEFT)
+        w.step(Action.TURN_LEFT)                              # now facing away
+        pos, cats, conf = w.senses.beliefs.known(w.t, B.DIAMOND)
+        self.assertEqual(len(pos), 1)                         # still remembered
+        self.assertLessEqual(conf[0], 1.0)
 
     def test_place_eat_and_fight(self):
         w = flat_world()

@@ -12,9 +12,10 @@ import numpy as np
 
 from .. import blocks as B
 from ..actions import NUM_ACTIONS, Action
-from ..perception import DOWN, OBS_DIM, R, UP, Body, encode, facing
+from ..perception import (EYE, NEAR, OBS_DIM, Body, Senses, Sight, cast_rays_grid, facing, in_view,
+                          line_of_sight)
 
-PAD = max(R, DOWN, UP) + 2
+PAD = NEAR + 2
 
 
 @dataclass
@@ -30,13 +31,14 @@ class SimCraft:
     obs_dim = OBS_DIM
     n_actions = NUM_ACTIONS
 
-    def __init__(self, size=32, height=24, max_steps=1500, day_length=800, seed=None):
+    def __init__(self, size=64, height=24, max_steps=1500, day_length=800, seed=None):
         self.size = size
         self.height = height
         self.max_steps = max_steps
         self.day_length = day_length
         self.rng = np.random.default_rng(seed)
         self.blocks = None
+        self.senses = Senses()
         self.reset()
 
     # ------------------------------------------------------------ world gen
@@ -55,6 +57,7 @@ class SimCraft:
         self.mobs = []
         self.cause = ""
         self._spawn_player()
+        self.senses.reset()                    # a new world: nothing known yet
         return self.observe()
 
     def _generate(self):
@@ -85,7 +88,7 @@ class SimCraft:
         world[diamonds] = B.DIAMOND
 
         # Caves: wandering tunnels, flooded with lava near the bottom.
-        for _ in range(rng.integers(2, 5)):
+        for _ in range(rng.integers(2, 5) * (X * Z) // 1024):
             p = np.array([rng.integers(3, X - 3), rng.integers(3, 9), rng.integers(3, Z - 3)], float)
             heading = rng.normal(size=3)
             for _ in range(rng.integers(25, 60)):
@@ -101,12 +104,12 @@ class SimCraft:
         for x, yv, z in np.argwhere(diamonds):
             if rng.random() < 0.5 and yv > 1:
                 world[x, yv - 1, z] = B.LAVA
-        for _ in range(rng.integers(3, 7)):
+        for _ in range(rng.integers(3, 7) * (X * Z) // 1024):
             cx, cy, cz = rng.integers(3, X - 3), rng.integers(1, 5), rng.integers(3, Z - 3)
             world[cx - 1:cx + 2, cy:cy + 1, cz - 1:cz + 2] = B.LAVA
 
         # Ponds of water on the surface.
-        for _ in range(rng.integers(0, 3)):
+        for _ in range(rng.integers(0, 3) * (X * Z) // 1024):
             cx, cz = rng.integers(4, X - 4), rng.integers(4, Z - 4)
             h = surface[cx, cz]
             world[cx - 1:cx + 2, h - 1:h + 1, cz - 1:cz + 2] = B.WATER
@@ -114,7 +117,7 @@ class SimCraft:
         world[:, 0, :] = B.BEDROCK
 
         # Trees.
-        for _ in range(rng.integers(5, 10)):
+        for _ in range(rng.integers(5, 10) * (X * Z) // 1024):
             x, z = rng.integers(3, X - 3), rng.integers(3, Z - 3)
             h = surface[x, z]
             if world[x, h, z] != B.GRASS:
@@ -273,9 +276,10 @@ class SimCraft:
             item = "food"
         if item is None:
             return 0.0, hardness
+        reward = B.satisfaction(item, self.inventory[item])
         self.inventory[item] += 1
         events.append(f"got {item}")
-        return B.ITEM_VALUE[item], hardness
+        return reward, hardness
 
     def _place(self, events):
         target = self._target()
@@ -422,8 +426,39 @@ class SimCraft:
 
     # ------------------------------------------------------------ perception
     def local_cube(self):
+        """What Xen fully senses: everything within NEAR blocks."""
         x, y, z = self.pos
-        return self.blocks[x - R:x + R + 1, y - DOWN:y + UP + 1, z - R:z + R + 1]
+        return self.blocks[x - NEAR:x + NEAR + 1, y - NEAR:y + NEAR + 1, z - NEAR:z + NEAR + 1]
+
+    def _lookup(self, cells):
+        cells = np.asarray(cells)
+        shape = np.array(self.blocks.shape)
+        inside = np.all((cells >= 0) & (cells < shape), axis=1)
+        out = np.full(len(cells), -1, np.int64)
+        c = cells[inside]
+        out[inside] = self.blocks[c[:, 0], c[:, 1], c[:, 2]]
+        return out
+
+    def eye(self):
+        x, y, z = self.pos
+        return np.array([x + 0.5, y + EYE, z + 0.5])
+
+    def sight(self):
+        """What Xen's senses deliver right now: near cube, what its eyes see, the mobs it notices."""
+        x, y, z = self.pos
+        eye = self.eye()
+        dist, cat, hit = cast_rays_grid(self.blocks, self.pos, self.yaw, self.pitch, phase=int(self.t))
+        near_mobs, far_mobs = [], []
+        for m in self.mobs:
+            rel = (m.x - x, m.y - y, m.z - z)
+            if max(abs(v) for v in rel) <= NEAR and np.linalg.norm(rel) <= NEAR:
+                near_mobs.append(rel)
+            else:
+                head = np.array([m.x + 0.5, m.y + 1.5, m.z + 0.5])
+                if in_view(eye, self.yaw, self.pitch, head) and line_of_sight(self._lookup, eye, head):
+                    far_mobs.append((m.x, m.y, m.z))
+        return Sight(near=self.local_cube(), yaw=self.yaw, body=self.body(), position=(x, y, z), t=self.t,
+                     near_mobs=near_mobs, ray_dist=dist, ray_cat=cat, ray_hit=hit, far_mobs=far_mobs)
 
     def body(self):
         x, y, z = self.pos
@@ -435,9 +470,7 @@ class SimCraft:
                     in_water=b[x, y, z] == B.WATER, in_lava=b[x, y, z] == B.LAVA)
 
     def observe(self):
-        x, y, z = self.pos
-        mobs = [(m.x - x, m.y - y, m.z - z) for m in self.mobs]
-        return encode(self.local_cube(), self.yaw, self.body(), mobs)
+        return self.senses.perceive(self.sight())
 
     # ------------------------------------------------------------- rendering
     GLYPHS = {B.AIR: " ", B.GRASS: '"', B.DIRT: ".", B.STONE: "#", B.LOG: "T", B.LEAVES: "*",

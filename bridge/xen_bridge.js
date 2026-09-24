@@ -30,9 +30,21 @@ const net = require('net')
 const readline = require('readline')
 
 // Must match xen/perception.py and xen/blocks.py.
-const R = 8
-const DOWN = 6
-const UP = 6
+// Xen fully senses NEAR blocks around it; beyond that it only knows what it sees:
+// rays inside a 90 degree field of view, up to 128 blocks (8 chunks), stopped by opaque blocks.
+const NEAR = 6
+const R = NEAR
+const DOWN = NEAR
+const UP = NEAR
+const VIEW = 128
+const FOV = Math.PI / 2
+const RAYS_H = 16
+const RAYS_V = 16
+const EYE = 1.62
+const JITTER = [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]
+const SAMPLES = []
+for (let t = 0.5; t < 16; t += 0.5) SAMPLES.push(t)
+for (let t = 16; t <= VIEW + 0.001; t += 1) SAMPLES.push(t)
 const B = { AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, LOG: 4, LEAVES: 5, COAL: 6, IRON: 7, GOLD: 8, DIAMOND: 9, LAVA: 10, WATER: 11, BEDROCK: 12 }
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]] // north, east, south, west
 const FACING = { north: 0, east: 1, south: 2, west: 3 }
@@ -69,6 +81,15 @@ function category (block) {
   return B.AIR // flowers, grass, torches... nothing to stand on
 }
 
+const SEE_THROUGH = /glass|^ice$|barrier|^light$|iron_bars/
+function opaque (block) {
+  const kind = category(block)
+  if (kind === B.LAVA) return true
+  if (!SOLID[kind]) return false
+  return !SEE_THROUGH.test(block.name)
+}
+const SOLID = [false, true, true, true, true, true, true, true, true, true, false, false, true]
+
 function isHostile (entity) {
   return Boolean(entity) && (entity.type === 'hostile' || HOSTILE.has(entity.name))
 }
@@ -104,6 +125,7 @@ class Body {
     this.name = name
     this.yaw = 0
     this.pitch = 0
+    this.phase = 0 // eye movement: the view rays shift a little every look
     this.died = false
     this.spawned = false
     this.heard = []
@@ -158,21 +180,96 @@ class Body {
     return inv
   }
 
+  // What Xen's eyes deliver: every ray's first opaque block, inside the field of view.
+  see (eye) {
+    const { Vec3 } = require('vec3')
+    const [fx, fz] = DIRS[this.yaw]
+    const [rx, rz] = DIRS[(this.yaw + 1) % 4]
+    const [jh, jv] = JITTER[this.phase % JITTER.length]
+    this.phase++
+    const cache = new Map()
+    const at = (x, y, z) => {
+      const key = `${x},${y},${z}`
+      if (!cache.has(key)) cache.set(key, this.bot.blockAt(new Vec3(x, y, z)))
+      return cache.get(key)
+    }
+    const dist = []
+    const cat = []
+    const hit = []
+    for (let i = 0; i < RAYS_V; i++) {
+      const v = -FOV / 2 + (i + 0.5 + jv) * FOV / RAYS_V
+      const up = Math.max(-Math.PI / 2 + 1e-3, Math.min(Math.PI / 2 - 1e-3, PITCH[this.pitch] + v))
+      for (let j = 0; j < RAYS_H; j++) {
+        const h = -FOV / 2 + (j + 0.5 + jh) * FOV / RAYS_H
+        const hx = Math.cos(h) * fx + Math.sin(h) * rx
+        const hz = Math.cos(h) * fz + Math.sin(h) * rz
+        const d = [Math.cos(up) * hx, Math.sin(up), Math.cos(up) * hz]
+        let found = false
+        for (const t of SAMPLES) {
+          const x = Math.floor(eye.x + d[0] * t)
+          const y = Math.floor(eye.y + d[1] * t)
+          const z = Math.floor(eye.z + d[2] * t)
+          const block = at(x, y, z)
+          if (!block) break                    // not loaded: unknown
+          if (opaque(block)) {
+            dist.push(t); cat.push(category(block)); hit.push(x, y, z)
+            found = true
+            break
+          }
+        }
+        if (!found) { dist.push(-1); cat.push(-1); hit.push(0, 0, 0) }
+      }
+    }
+    return { dist, cat, hit, at }
+  }
+
+  inView (eye, target) {
+    const [fx, fz] = DIRS[this.yaw]
+    const [rx, rz] = DIRS[(this.yaw + 1) % 4]
+    const dx = target.x - eye.x
+    const dy = target.y - eye.y
+    const dz = target.z - eye.z
+    const lat = dx * rx + dz * rz
+    const ahead = dx * fx + dz * fz
+    const flat = Math.hypot(lat, ahead)
+    if (ahead <= 0 || flat + Math.abs(dy) > VIEW) return false
+    return Math.abs(Math.atan2(lat, ahead)) <= FOV / 2 && Math.abs(Math.atan2(dy, flat) - PITCH[this.pitch]) <= FOV / 2
+  }
+
+  canSee (eye, target, at) {
+    const d = target.minus(eye)
+    const length = d.norm()
+    for (let t = 0.5; t < length - 0.5; t += 0.5) {
+      const block = at(Math.floor(eye.x + d.x * t / length), Math.floor(eye.y + d.y * t / length), Math.floor(eye.z + d.z * t / length))
+      if (!block || opaque(block)) return false
+    }
+    return true
+  }
+
   observe () {
     const bot = this.bot
     const p = this.feet()
-    const cube = new Array((2 * R + 1) * (DOWN + UP + 1) * (2 * R + 1))
+    const near = new Array((2 * NEAR + 1) ** 3)
     let i = 0
-    for (let dx = -R; dx <= R; dx++) {
-      for (let dy = -DOWN; dy <= UP; dy++) {
-        for (let dz = -R; dz <= R; dz++) cube[i++] = category(bot.blockAt(p.offset(dx, dy, dz)))
+    for (let dx = -NEAR; dx <= NEAR; dx++) {
+      for (let dy = -NEAR; dy <= NEAR; dy++) {
+        for (let dz = -NEAR; dz <= NEAR; dz++) near[i++] = category(bot.blockAt(p.offset(dx, dy, dz)))
       }
     }
-    const mobs = []
+    const eye = bot.entity.position.offset(0, EYE, 0)
+    const rays = this.see(eye)
+    const nearMobs = []
+    const farMobs = []
     for (const e of Object.values(bot.entities)) {
-      if (e === bot.entity || !isHostile(e) || e.position.distanceTo(bot.entity.position) > 16) continue
+      if (e === bot.entity || !isHostile(e)) continue
       const q = e.position.floored()
-      mobs.push([q.x - p.x, q.y - p.y, q.z - p.z])
+      const rel = [q.x - p.x, q.y - p.y, q.z - p.z]
+      if (Math.hypot(...rel) <= NEAR) {
+        nearMobs.push(rel)                     // felt, even behind it
+      } else {
+        const head = e.position.offset(0, (e.height || 1.8) * 0.85, 0)
+        if (this.inView(eye, head) && this.canSee(eye, head, rays.at)) farMobs.push([q.x, q.y, q.z])
+      }
     }
     let burning = false
     try { burning = Boolean(bot.entity.metadata[0] & 0x01) } catch (e) {}
@@ -182,7 +279,11 @@ class Body {
     this.heard = []
     return {
       name: this.name,
-      cube,
+      near,
+      t: Number(bot.time && bot.time.age !== undefined ? bot.time.age : Date.now() / 50),
+      rays: { dist: rays.dist, cat: rays.cat, hit: rays.hit },
+      near_mobs: nearMobs,
+      far_mobs: farMobs,
       position: [p.x, p.y, p.z],
       yaw: this.yaw,
       pitch: this.pitch,
@@ -193,7 +294,6 @@ class Body {
       in_water: Boolean(bot.entity.isInWater),
       in_lava: Boolean(bot.entity.isInLava),
       inventory: this.inventory(),
-      mobs,
       heard,
       dead: died
     }
@@ -499,4 +599,4 @@ function main () {
 
 if (require.main === module) main()
 
-module.exports = { category, isHostile, parseState, B, R, DOWN, UP }
+module.exports = { category, opaque, isHostile, parseState, B, R, DOWN, UP, NEAR, VIEW, RAYS_H, RAYS_V, SAMPLES, JITTER, PITCH }

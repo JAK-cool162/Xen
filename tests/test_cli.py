@@ -24,6 +24,10 @@ class TestCommandLine(unittest.TestCase):
             self.assertIn("Xen:", out.stdout)
             out = xen("info", "--brain", "b.npz", cwd=d)
             self.assertIn("steps", out.stdout)
+            out = xen("export", "--brain", "b.npz", "--out", "brain.bin", cwd=d)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            with open(os.path.join(d, "brain.bin"), "rb") as f:
+                self.assertEqual(f.read(4), b"XEN1")
             out = xen("build", "house", "--roof", "saltbox", "--out", "house.mcfunction", cwd=d)
             self.assertEqual(out.returncode, 0, out.stderr)
             self.assertIn("Xen rates it", out.stdout)
