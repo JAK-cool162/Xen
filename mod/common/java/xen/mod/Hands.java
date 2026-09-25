@@ -285,6 +285,78 @@ public final class Hands {
 		limit = 45;
 	}
 
+	// ------------------------------------------------------------------- aimed actions (chores)
+	/** Look straight at a point, like moving the mouse there (and face the nearest of the 4 directions). */
+	void face(Vec3 at) {
+		Vec3 d = at.subtract(p.getEyePosition());
+		float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
+		p.setYRot(yRot);
+		p.setYHeadRot(yRot);
+		p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
+		yaw = Math.floorMod(Math.round((yRot + 180f) / 90f), 4);
+	}
+
+	/** Why the last placeAt didn't place (for its status). */
+	String cantPlace = "";
+
+	/** Place a block it carries at pos, against a solid neighbour, if it can reach. */
+	boolean placeAt(BlockPos pos) {
+		ServerLevel level = (ServerLevel) p.level();
+		if (!level.getBlockState(pos).canBeReplaced()) {
+			cantPlace = "already a block there";
+			return false;
+		}
+		var there = level.getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(pos));
+		if (!there.isEmpty()) {
+			cantPlace = there.get(0).getName().getString() + " is in the way";
+			return false;
+		}
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) {
+			cantPlace = "too far to reach";
+			return false;
+		}
+		int slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		if (slot < 0) {
+			cantPlace = "no blocks left";
+			return false;
+		}
+		for (Direction d : Direction.values()) {
+			BlockPos against = pos.relative(d);
+			if (!level.getBlockState(against).isCollisionShapeFullBlock(level, against)) continue;
+			stop();
+			p.getInventory().setSelectedSlot(slot);
+			Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
+			face(hit);
+			p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
+					new BlockHitResult(hit, d.getOpposite(), against, false));
+			Compat.swing(p);
+			current = Action.PLACE;
+			ticks = 0;
+			limit = 4;
+			cantPlace = level.getBlockState(pos).canBeReplaced() ? "the block didn't stay" : "";
+			return cantPlace.isEmpty();
+		}
+		cantPlace = "nothing solid to place it against";
+		return false;
+	}
+
+	/** Hit a creature in reach (the normal attack, with the normal cooldown). */
+	void hit(LivingEntity e) {
+		stop();
+		face(e.getEyePosition());
+		Compat.swing(p);
+		p.attack(e);
+		current = Action.ATTACK;
+		ticks = 0;
+		limit = 2;
+	}
+
+	/** Toss items where it looks (a player's Q key); the other player picks them up. */
+	void toss(ItemStack stack) {
+		p.drop(stack, false, true);
+		Compat.swing(p);
+	}
+
 	/** A hotbar slot holding a matching item, moving one there from the backpack if needed. */
 	private int findHotbar(java.util.function.Predicate<ItemStack> want) {
 		Inventory inv = p.getInventory();

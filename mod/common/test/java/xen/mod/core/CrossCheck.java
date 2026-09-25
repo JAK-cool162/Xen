@@ -121,20 +121,62 @@ public final class CrossCheck {
 		check(worstNet < 1e-4, "networks differ by " + worstNet);
 		System.out.println("brain: max difference " + worstNet);
 
-		// The voice's rules: the same safe chat, honesty filter and plain answers as in Python.
-		JsonArray voice = gson.fromJson(Files.readString(dir.resolve("voice.json")), JsonArray.class);
-		int sameVoice = 0;
-		for (JsonElement e : voice) {
-			JsonObject v = e.getAsJsonObject();
-			String safe = xen.mod.talk.Voice.safe(v.get("text").getAsString());
-			String notes = v.get("notes").getAsString();
-			boolean same = safe.equals(v.get("safe").getAsString())
-					&& xen.mod.talk.Voice.honest(safe, notes).equals(v.get("honest").getAsString())
-					&& xen.mod.talk.Voice.plainly(notes, v.get("message").getAsString()).equals(v.get("plainly").getAsString());
-			check(same, "voice rules differ for: " + v.get("text").getAsString());
-			if (same) sameVoice++;
+		// Vivid memories travel with the brain: the same ones in Java, and unchanged after Java saves it again.
+		java.io.ByteArrayOutputStream again = new java.io.ByteArrayOutputStream();
+		brain.write(again);
+		Brain reread = Brain.read(new java.io.ByteArrayInputStream(again.toByteArray()));
+		JsonObject mems = bj.getAsJsonObject("memories");
+		for (String name : new String[] {"trauma", "joy"}) {
+			JsonArray want = mems.getAsJsonArray(name);
+			for (Brain b : new Brain[] {brain, reread}) {
+				Memory.Ring r = b.memory.ring(name);
+				long bytes = 0;
+				double harm = 0, reward = 0;
+				for (Memory.Entry e : Memory.recent(r, 1000)) {
+					for (byte v : e.obs) bytes += v;
+					harm += e.harm;
+					reward += e.reward;
+				}
+				boolean ok = r.size == want.get(0).getAsInt() && bytes == want.get(1).getAsLong()
+						&& Math.abs(harm - want.get(2).getAsDouble()) < 1e-3 && Math.abs(reward - want.get(3).getAsDouble()) < 1e-3;
+				check(ok, name + " memories differ (" + r.size + " entries)");
+			}
+			System.out.println(name + " memories: " + want.get(0).getAsInt() + " carried over, the same in Java and after saving again");
 		}
-		System.out.println("voice rules: " + sameVoice + "/" + voice.size() + " cases match");
+
+		// The chat's rules: the same understanding, safe chat, honesty filter, plain answers and prompts as in Python.
+		JsonObject chat = gson.fromJson(Files.readString(dir.resolve("chat.json")), JsonObject.class);
+		int same = 0, total = 0;
+		for (JsonElement e : chat.getAsJsonArray("answers")) {
+			JsonObject v = e.getAsJsonObject();
+			String safe = xen.mod.talk.Chat.safe(v.get("text").getAsString());
+			String notes = v.get("notes").getAsString();
+			boolean ok = safe.equals(v.get("safe").getAsString())
+					&& xen.mod.talk.Chat.honest(safe, notes).equals(v.get("honest").getAsString())
+					&& xen.mod.talk.Chat.plainly(notes, v.get("message").getAsString()).equals(v.get("plainly").getAsString());
+			check(ok, "chat rules differ for: " + v.get("text").getAsString());
+			same += ok ? 1 : 0;
+			total++;
+		}
+		for (JsonElement e : chat.getAsJsonArray("requests")) {
+			JsonArray v = e.getAsJsonArray();
+			var r = xen.mod.talk.Chat.understand(v.get(0).getAsString(), "xen");
+			boolean ok = r.intent().equals(v.get(1).getAsString()) && r.thing().equals(v.get(2).getAsString()) && r.amount() == v.get(3).getAsInt();
+			check(ok, "understood differently: " + v.get(0).getAsString() + " -> " + r);
+			same += ok ? 1 : 0;
+			total++;
+		}
+		for (String prompt : new String[] {"persona", "ears"}) {
+			String java = prompt.equals("persona") ? xen.mod.talk.Chat.persona() : xen.mod.talk.Chat.ears();
+			boolean ok = java.equals(chat.get(prompt).getAsString());
+			check(ok, "the " + prompt + " prompt differs from Python's");
+			same += ok ? 1 : 0;
+			total++;
+		}
+		System.out.println("chat rules: " + same + "/" + total + " cases match");
+
+		// Finding a way on foot through what it knows.
+		check(pathTest(), "path finding failed");
 
 		// Learning works in Java too: fear conditioning in a tiny lava room.
 		check(learnsToFearLava(), "Java brain did not learn to fear lava");
@@ -144,6 +186,37 @@ public final class CrossCheck {
 	}
 
 	/** obs[0] = lava ahead. Walking FORWARD into lava burns; elsewhere FORWARD finds treasure. */
+	static Perception.Sight ground() {
+		Perception.Sight s = new Perception.Sight();
+		for (int x = -6; x <= 6; x++) for (int y = -6; y <= 6; y++) for (int z = -6; z <= 6; z++)
+			s.near[((x + 6) * 13 + y + 6) * 13 + z + 6] = y < 0 ? Blocks.STONE : Blocks.AIR;
+		return s;
+	}
+
+	static void put(Perception.Sight s, int x, int y, int z, int c) {
+		s.near[((x + 6) * 13 + y + 6) * 13 + z + 6] = c;
+	}
+
+	static boolean pathTest() {
+		Perception.Sight flat = ground();
+		int[] a = Paths.firstStep(flat, 5, 0, 0);                      // east, on flat ground
+		Perception.Sight wall = ground();                               // a wall east of it, with a gap to the south
+		for (int z = -6; z <= 6; z++) if (z != 3) for (int y = 0; y <= 1; y++) put(wall, 1, y, z, Blocks.STONE);
+		int[] b = Paths.firstStep(wall, 5, 0, 0);
+		Perception.Sight step = ground();                               // higher ground east: jump up
+		for (int x = 1; x <= 6; x++) for (int z = -6; z <= 6; z++) put(step, x, 0, z, Blocks.DIRT);
+		int[] c = Paths.firstStep(step, 4, 1, 0);
+		Perception.Sight lava = ground();                               // lava right in front: go around it
+		put(lava, 1, -1, 0, Blocks.LAVA);
+		put(lava, 2, -1, 0, Blocks.LAVA);
+		int[] d = Paths.firstStep(lava, 5, 0, 0);
+		boolean ok = a != null && a[0] == 1 && a[1] == 0 && b != null && b[0] == 2 && c != null && c[0] == 1 && c[1] == 1
+				&& d != null && d[0] != 1;
+		System.out.println("paths: flat " + java.util.Arrays.toString(a) + ", around a wall " + java.util.Arrays.toString(b)
+				+ ", step up " + java.util.Arrays.toString(c) + ", around lava " + java.util.Arrays.toString(d) + (ok ? " ok" : " WRONG"));
+		return ok;
+	}
+
 	static boolean learnsToFearLava() {
 		Brain brain = new Brain(8);
 		brain.hidden = new int[] {32, 32};

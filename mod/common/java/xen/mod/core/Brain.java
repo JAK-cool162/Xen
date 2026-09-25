@@ -250,6 +250,12 @@ public final class Brain {
 			data.readFully(raw);
 			ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(net.flat);
 		}
+		if (h.has("memories")) {                                     // what hurt it and what delighted it
+			for (var entry : h.getAsJsonArray("memories")) {
+				JsonArray pair = entry.getAsJsonArray();
+				Memory.read(brain.memory.ring(pair.get(0).getAsString()), pair.get(1).getAsInt(), brain.obsDim, data);
+			}
+		}
 		return brain;
 	}
 
@@ -319,6 +325,19 @@ public final class Brain {
 			nets.add(pair);
 		}
 		h.add("nets", nets);
+		List<Memory.Entry> trauma, joy;
+		synchronized (memory) {
+			trauma = Memory.recent(memory.trauma, Memory.KEEP);
+			joy = Memory.recent(memory.joy, Memory.KEEP);
+		}
+		JsonArray memories = new JsonArray();
+		for (Object[] m : new Object[][] {{"trauma", trauma.size()}, {"joy", joy.size()}}) {
+			JsonArray pair = new JsonArray();
+			pair.add((String) m[0]);
+			pair.add((Integer) m[1]);
+			memories.add(pair);
+		}
+		h.add("memories", memories);
 		byte[] json = new Gson().toJson(h).getBytes(StandardCharsets.UTF_8);
 		ByteArrayOutputStream buf = new ByteArrayOutputStream();
 		buf.write(MAGIC);
@@ -330,6 +349,8 @@ public final class Brain {
 			bb.asFloatBuffer().put(flat);
 			buf.write(bb.array());
 		}
+		Memory.write(trauma, obsDim, buf);
+		Memory.write(joy, obsDim, buf);
 		out.write(buf.toByteArray());
 	}
 }

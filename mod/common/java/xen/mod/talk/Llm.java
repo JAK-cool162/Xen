@@ -58,8 +58,8 @@ public final class Llm implements AutoCloseable {
 	private final float[][] kCache, vCache;
 	private final float[] ropeCos, ropeSin;          // [position * headDim/2 + i]
 	private int pos;
-	private int savedPos = -1;
-	private float[][] savedK, savedV;
+	/** Remembered starts of prompts (the chat persona, the ears): their attention cache, to skip re-reading them. */
+	private final java.util.Map<String, float[][][]> prefixes = new java.util.LinkedHashMap<>();
 
 	public Llm(String path, int threads, int context) throws IOException {
 		Gguf g = new Gguf(path);
@@ -110,7 +110,7 @@ public final class Llm implements AutoCloseable {
 		}
 		this.threads = Math.max(1, threads);
 		pool = Executors.newFixedThreadPool(this.threads, r -> {
-			Thread t = new Thread(r, "xen-voice");
+			Thread t = new Thread(r, "xen-chat-model");
 			t.setDaemon(true);
 			t.setPriority(Thread.MIN_PRIORITY);
 			return t;
@@ -238,38 +238,68 @@ public final class Llm implements AutoCloseable {
 		return logits;
 	}
 
-	/** Process a fixed prefix once and remember it (the persona), to start every reply from there. */
-	public void savePrefix(String text) {
+	/** Process a fixed start of prompts once and remember it (the persona), to start from there. */
+	public synchronized void savePrefix(String text) {
 		pos = 0;
 		for (int id : tokenizer.encode(text)) forward(id);
-		savedPos = pos;
-		savedK = new float[layers][];
-		savedV = new float[layers][];
 		int n = pos * kvHeads * headDim;
+		float[][][] saved = new float[2][layers][];
 		for (int l = 0; l < layers; l++) {
-			savedK[l] = java.util.Arrays.copyOf(kCache[l], n);
-			savedV[l] = java.util.Arrays.copyOf(vCache[l], n);
+			saved[0][l] = java.util.Arrays.copyOf(kCache[l], n);
+			saved[1][l] = java.util.Arrays.copyOf(vCache[l], n);
 		}
+		prefixes.put(text, saved);
 	}
 
-	private void restorePrefix() {
+	/** Start a prompt: from a remembered prefix when it has one. Returns the part still to read. */
+	private String restore(String prompt) {
 		pos = 0;
-		if (savedPos < 0) return;
-		for (int l = 0; l < layers; l++) {
-			System.arraycopy(savedK[l], 0, kCache[l], 0, savedK[l].length);
-			System.arraycopy(savedV[l], 0, vCache[l], 0, savedV[l].length);
+		for (var e : prefixes.entrySet()) {
+			if (!prompt.startsWith(e.getKey()) || prompt.length() == e.getKey().length()) continue;
+			float[][][] saved = e.getValue();
+			for (int l = 0; l < layers; l++) {
+				System.arraycopy(saved[0][l], 0, kCache[l], 0, saved[0][l].length);
+				System.arraycopy(saved[1][l], 0, vCache[l], 0, saved[1][l].length);
+			}
+			pos = saved[0][0].length / (kvHeads * headDim);
+			return prompt.substring(e.getKey().length());
 		}
-		pos = savedPos;
+		return prompt;
 	}
 
-	/** Continue from the saved prefix with more text and generate up to maxTokens. */
-	public synchronized String generate(String text, int maxTokens, float temperature, float topP, long seed) {
-		restorePrefix();
-		List<Integer> ids = tokenizer.encode(text);
-		int room = context - pos - maxTokens;
-		if (ids.size() > room) ids = ids.subList(ids.size() - room, ids.size());
+	private float[] read(String prompt, int room) {
+		List<Integer> ids = tokenizer.encode(restore(prompt));
+		int space = context - pos - room;
+		if (ids.size() > space) ids = ids.subList(ids.size() - space, ids.size());
 		float[] logits = null;
 		for (int id : ids) logits = forward(id);
+		return logits;
+	}
+
+	/** Which option the model finds likeliest to come next: the log-probability of each whole option. */
+	public synchronized float[] choose(String prompt, String[] options) {
+		float[] start = read(prompt, 8);
+		int at = pos;
+		float[] scores = new float[options.length];
+		for (int o = 0; o < options.length; o++) {
+			float[] logits = start;
+			List<Integer> ids = tokenizer.encode(options[o]);
+			for (int j = 0; j < ids.size(); j++) {
+				float max = Float.NEGATIVE_INFINITY;
+				for (float v : logits) max = Math.max(max, v);
+				double sum = 0;
+				for (float v : logits) sum += Math.exp(v - max);
+				scores[o] += (float) (logits[ids.get(j)] - max - Math.log(sum));
+				if (j + 1 < ids.size()) logits = forward(ids.get(j));
+			}
+			pos = at;                                     // the cache before this position is untouched
+		}
+		return scores;
+	}
+
+	/** Continue a prompt with up to maxTokens (from a remembered prefix when the prompt starts with one). */
+	public synchronized String generate(String prompt, int maxTokens, float temperature, float topP, long seed) {
+		float[] logits = read(prompt, maxTokens);
 		Random rng = new Random(seed);
 		List<Integer> out = new ArrayList<>();
 		int end = tokenizer.id("<|im_end|>");

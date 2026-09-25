@@ -158,7 +158,7 @@ public final class Perception {
 		private final Map<Long, Integer> index = new HashMap<>();
 		public final List<double[]> mobs = new ArrayList<>();   // {x, y, z, timeSeen}
 
-		static long key(int x, int y, int z) {
+		public static long key(int x, int y, int z) {
 			return ((long) (x & 0x3FFFFFF) << 38) | ((long) (y & 0xFFF) << 26) | (z & 0x3FFFFFF);
 		}
 
@@ -246,6 +246,50 @@ public final class Perception {
 	public static final class Senses {
 		public Beliefs beliefs = new Beliefs();
 		public Sight last;
+
+		/**
+		 * The nearest place of one of these kinds that it knows about: for sure within 6 blocks, or from what it saw
+		 * (at least this sure). Returns {x, y, z, 1 if known for sure else 0, what it is}, or null when it knows of none.
+		 */
+		public int[] nearestKnown(int[] cats, double minConfidence, java.util.Set<Long> skip) {
+			return nearestKnown(cats, minConfidence, skip, 0);
+		}
+
+		/** The same, with high-up places (more than a block above its feet) counting as climb times further away. */
+		public int[] nearestKnown(int[] cats, double minConfidence, java.util.Set<Long> skip, double climb) {
+			Sight s = last;
+			if (s == null) return null;
+			boolean[] want = new boolean[Blocks.COUNT];
+			for (int c : cats) want[c] = true;
+			int[] best = null;
+			double bestScore = Double.MAX_VALUE;
+			for (int dx = -NEAR; dx <= NEAR; dx++) {
+				for (int dy = -NEAR; dy <= NEAR; dy++) {
+					for (int dz = -NEAR; dz <= NEAR; dz++) {
+						int x = s.position[0] + dx, y = s.position[1] + dy, z = s.position[2] + dz;
+						if (!want[s.near(dx, dy, dz)] || skip.contains(Beliefs.key(x, y, z))) continue;
+						double d = Math.sqrt(dx * dx + dy * dy + dz * dz) + climb * Math.max(0, dy - 1);
+						if (d < bestScore) {
+							bestScore = d;
+							best = new int[] {x, y, z, 1, s.near(dx, dy, dz)};
+						}
+					}
+				}
+			}
+			if (best != null) return best;
+			for (int i = 0; i < beliefs.n; i++) {
+				int[] p = beliefs.pos[i];
+				if (!want[beliefs.cat[i]] || skip.contains(Beliefs.key(p[0], p[1], p[2]))) continue;
+				double conf = beliefs.confidence(i, s.t);
+				if (conf < minConfidence) continue;
+				double score = (dist(p, s.position) + climb * Math.max(0, p[1] - s.position[1] - 1)) / conf;
+				if (score < bestScore) {
+					bestScore = score;
+					best = new int[] {p[0], p[1], p[2], 0, beliefs.cat[i]};
+				}
+			}
+			return best;
+		}
 
 		public float[] perceive(Sight s) {
 			beliefs.correct(s);

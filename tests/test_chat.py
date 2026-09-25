@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from xen.talk.voice import MODEL_DIR, MODEL_NAME, carrying, honest, notes, plainly, safe_chat
+from xen.talk.chat import MODEL_DIR, MODEL_NAME, carrying, honest, notes, plainly, safe_chat, understand
 
 MODEL = os.environ.get("XEN_MODEL") or os.path.join(MODEL_DIR, MODEL_NAME)
 
@@ -35,6 +35,23 @@ class TestChatRules(unittest.TestCase):
         self.assertEqual(plainly(n, "any diamonds?"), "I haven't seen any diamonds. I think there was iron ore about 40 "
                                                       "blocks away, but I'm not sure.")
 
+    def test_it_understands_requests(self):
+        self.assertEqual(understand("Xen, get me 5 logs"), ("wood", "", 5))
+        self.assertEqual(understand("xen follow me"), ("follow", "", 0))
+        self.assertEqual(understand("give me a stack of cobblestone"), ("give", "cobblestone", 64))
+        self.assertEqual(understand("Xen, build a shelter"), ("shelter", "", 0))
+        self.assertEqual(understand("have a snack"), ("eat", "", 0))
+        # Questions are just talk, even when they mention things it could fetch.
+        self.assertEqual(understand("do you have any wood?"), ("chat", "", 0))
+        self.assertEqual(understand("what do you see, xen?"), ("chat", "", 0))
+
+    def test_plans_in_its_own_words(self):
+        n = notes("calm", False, 20, 20, "", "Nothing special is around you.")
+        self.assertEqual(plainly(n + " Plan: You will get 8 wood from the tree you saw 14 blocks away."),
+                         "Okay! I'll get 8 wood from the tree I saw 14 blocks away.")
+        self.assertEqual(plainly(n + " Plan: Only Steve can tell you what to do, so you won't."),
+                         "Only Steve can tell me what to do, so I won't.")
+
     def test_notes_are_plain_words(self):
         n = notes("afraid", True, 5, 3, carrying({"dirt": 5, "coal": 0, "log": 2}), "You saw lava about 9 blocks away.")
         self.assertIn("You feel afraid.", n)
@@ -44,8 +61,14 @@ class TestChatRules(unittest.TestCase):
         self.assertNotIn("0 coal", n)
 
 
-@unittest.skipUnless(os.path.exists(MODEL), "voice model not downloaded (python -m xen talk fetches it)")
+@unittest.skipUnless(os.path.exists(MODEL), "chat model not downloaded (python -m xen chat fetches it)")
 class TestLanguageModel(unittest.TestCase):
+    def test_it_picks_what_is_asked(self):
+        from xen.talk.chat import ChatBot
+        bot = ChatBot(MODEL)
+        self.assertEqual(bot.understand("go see what's out there")[0], "explore")    # no keyword: the model decides
+        self.assertEqual(bot.understand("thanks xen")[0], "chat")
+
     def test_tokenizer_and_a_short_answer(self):
         from xen.talk.llm import LanguageModel
         lm = LanguageModel(MODEL)

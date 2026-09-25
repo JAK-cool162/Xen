@@ -56,6 +56,35 @@ class Replay:
     def __len__(self):
         return self.size
 
+    def recent(self, n):
+        """Indices of the most recent n entries, oldest first."""
+        n = min(n, self.size)
+        return [(self._next - k) % self.capacity for k in range(n, 0, -1)]
+
+    def write(self, n, f):
+        """The most recent n entries in the brain-file layout (as the mod reads and writes them)."""
+        idx = self.recent(n)
+        for arr in (self.obs, self.next_obs, self.next1):
+            f.write(arr[idx].astype(np.int8).tobytes())
+        f.write(self.action[idx].astype("<i4").tobytes())
+        for name in self.FIELDS[1:]:
+            f.write(getattr(self, name)[idx].astype("<f4").tobytes())
+        return len(idx)
+
+    def read(self, n, f):
+        d = self.obs.shape[1]
+        parts = [np.frombuffer(f.read(n * d), np.int8).reshape(n, d) for _ in range(3)]
+        action = np.frombuffer(f.read(4 * n), "<i4")
+        fields = [np.frombuffer(f.read(4 * n), "<f4") for _ in self.FIELDS[1:]]
+        for i in range(n):
+            j = self._next
+            self.obs[j], self.next_obs[j], self.next1[j] = parts[0][i], parts[1][i], parts[2][i]
+            self.action[j] = action[i]
+            for name, values in zip(self.FIELDS[1:], fields):
+                getattr(self, name)[j] = values[i]
+            self._next = (j + 1) % self.capacity
+            self.size = min(self.size + 1, self.capacity)
+
 
 class Memory:
     """Ordinary experience + trauma + joy, sampled together."""

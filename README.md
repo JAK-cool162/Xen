@@ -16,14 +16,18 @@ whose confidence fades.
 
 On top of survival it has skills: it **builds** from templates (roofs, arches,
 houses, towers, bridges), **rates** builds and learns your taste in buildings,
-and **learns redstone** by experimenting. It can **talk**, through a small
-local language model (SmolLM2-360M) that only knows what Xen knows. In real
-Minecraft you can bring in as many Xens as the server allows. Each one is a
-real player, and they all share one brain.
+and **learns redstone** by experimenting. It **chats**: ask it for things in
+plain words ("Xen, get me some wood", "build a shelter", "follow me") and it
+does them, with its own hands and senses. A small local chat model
+(SmolLM2-360M) helps it understand and answer, and it only knows what Xen
+knows. In real Minecraft you can bring in as many Xens as the server allows.
+Each one is a real player, and they all share one brain.
 
-**Want it in your world?** Get the survival-companion mod from
-[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x). The mod has
-the trained brain inside and needs no Python.
+**Want it in your world?** Get the survival-companion mod from the
+[Releases](https://github.com/JAK-cool162/Xen/releases) page or
+[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x, also on Android
+launchers). The mod has the trained brain inside and needs no Python. It's a
+prototype.
 
 The Python side only needs Python 3.9+ and numpy. No GPU and no deep-learning
 framework.
@@ -85,7 +89,10 @@ Fear is the signal that teaches it to survive:
   (walking *into* lava is terrifying, stepping away from it is not).
 * **Trauma memory**: moments that hurt, together with the moments that led up to
   them, are replayed far more often than ordinary memories. One burn is enough to
-  start fearing lava (fear conditioning).
+  start fearing lava (fear conditioning). The latest 1000 of these memories (and
+  of the best moments, its joy memory) are saved with the brain, so they go
+  wherever it goes. A brain that keeps learning in a world where it never meets
+  lava still replays the burns, and doesn't forget to fear it.
 * **Caution**: being hurt makes Xen more careful for a while (sensitisation); safe
   time calms it down again (habituation).
 * **Exposure**: it sometimes tries even what it fears. Without that, avoidance would
@@ -169,16 +176,40 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-1.0.0+mc1.21.11.jar` | 1.21.11 | 21+ |
-| `dist/xen-companion-1.0.0+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.2.0-alpha+mc1.21.11.jar` | 1.21.11 | 21+ |
+| `dist/xen-companion-0.2.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Put it in `mods/` with Fabric API and run `/xen summon`. Xen joins as a real
-player next to you and plays survival with you. It follows you, stays or
-lives on its own; it mines, fights, eats and learns; it answers when you talk
-to it; and you can right-click it to open its bag. `/xen spawn 50` (operators)
-brings in a crowd of Xens across the world, all sharing one brain. Everything
-runs inside the server (brain, learning, senses and voice), with no Python
-and no bridge. It was tested on Fabric servers for 1.21.11, 26.1.2 and 26.3.
+player next to you and plays survival with you. It follows you, stays or lives
+on its own. It mines, fights back, swims, eats and learns. Right-click it to
+open its bag. `/xen spawn 50` (operators) brings in a crowd of Xens across the
+world, all sharing one brain. Everything runs inside the game (brain,
+learning, senses and chat), with no Python and no bridge. It was tested on
+Fabric servers for 1.21.11, 26.1.2 and 26.3.
+
+**Ask it for things.** Say its name and what you want: follow, stay, explore,
+get wood / stone / coal / iron / ore, hunt for food, give you its items, build
+a shelter, eat, stop. It goes for blocks and animals it knows about (felt
+within 6 blocks or seen in its view) and looks around when it knows of none. It
+finds its way through the blocks it knows (pathfinding over its 13×13×13 cube)
+and digs only when there's no way. It says what it will do, or exactly why it
+can't. From test runs on a real 1.21.11 server:
+
+```
+<Steve> Xen, get me 2 logs
+<Xen> Okay! I'll get 2 wood from the tree I know is 3 blocks from me.
+<Xen> Got 2 wood!
+<Steve> xen build a shelter
+<Xen> Okay! I'll build a small shelter around myself with 8 blocks.
+<Xen> Done! I'm safe in my little shelter.
+
+<Steve> xen, kill a pig
+<Xen> Okay! I'll hunt the pig I see 3 blocks away for food.
+<Xen> Got some food!
+```
+
+The full list of requests, settings and phone launchers (PojavLauncher,
+Amethyst, Zalith) is in [`dist/README.md`](dist/README.md).
 
 A brain trained in Python can go into the mod: `python -m xen export --brain
 xen_brain.npz --out brain.bin`, then copy it to `<world>/xen/brain.bin`.
@@ -220,27 +251,45 @@ python -m xen swarm --count 0 --spread 300
   trains the same mind, so the swarm learns faster the bigger it gets. Each body
   still has its own feelings.
 
-### Talk to Xen in chat
+### Chat with Xen
 
-Start Xen with `--voice` (`python -m xen play --voice`, `python -m xen swarm
---voice`) and it answers chat in its own words, using SmolLM2-360M-Instruct
-(`xen/talk/`). It runs on the CPU, needs no GPU, and downloads about 390 MB
-once to `~/.xen/models` (or set `XEN_MODEL` to a GGUF file you have). It
-**can talk but can't cheat**:
+Chat is how you ask Xen for things, and it answers. The mod does all of it (see
+above). With the bridge, start Xen with `--chat` (`python -m xen play --chat`,
+`python -m xen swarm --chat`) to have it answer in its own words.
+
+It understands in two steps (`xen/talk/chat.py`, the same rules in the mod's
+`Chat.java`): clear keywords first, and when there are none, the chat model
+(SmolLM2-360M-Instruct, on the CPU, no GPU) picks one of the things it can do,
+but only when that's clearly likelier than just talking. Questions and thanks
+are always just talk. On 46 test phrases, keywords alone understood 32 and the
+two steps together 41. None of the 10 plain-chat phrases turned into an
+action. The rest of the misses became plain talk instead of a wrong action.
+
+It **can talk but can't cheat**:
 
 * its prompt is Xen's own notes: its feelings, body and inventory, and what it
   perceives, worded with how sure it is ("You know there is lava 3 blocks from
   you. You think there was iron about 40 blocks away, but you're not sure.");
 * a sentence that claims something that isn't in its notes (ores, lava, mobs,
-  villages...) is dropped before it's sent;
+  villages...) is dropped before it's sent, and so is a promise to do
+  something (talk can't make it act, only requests can);
+* for a request it says its plan in plain words, never the model's version of
+  it, so it can't misstate what it's doing;
 * it only chats: one line, up to two sentences, never a command (a reply can't
-  start with `/`). It doesn't decide what Xen does.
+  start with `/`).
+
+The model downloads once (about 390 MB) to `~/.xen/models`, or set
+`XEN_MODEL` to a GGUF file you have. Without it, Xen still understands
+keywords and answers in plain words from its notes.
 
 ```
-$ python -m xen talk "Xen, what do you see?"      # try it in a SimCraft world
+$ python -m xen chat "Xen, what do you see?" "go see what's out there"   # in a SimCraft world
 Xen's notes: You feel calm. You know there is a tree 6 blocks from you.
 <You> Xen, what do you see?
 <Xen> I can see a tree about 6 blocks from me.
+<You> go see what's out there
+  (understood: explore)
+<Xen> I can see a tree about 6 blocks away.
 ```
 
 In the mod on a real server (a flat world full of slimes at night):
@@ -252,7 +301,8 @@ In the mod on a real server (a flat world full of slimes at night):
 <Xen> I can see two hostile mobs right next to me. I don't see any diamonds.
 ```
 
-Chat commands work with or without the voice. Any player can type:
+Building and redstone commands work with the bridge, with or without the chat
+model. Any player can type:
 
 | chat | what Xen does |
 |---|---|
@@ -411,10 +461,10 @@ xen/
     mineflayer.py     real Minecraft via the bridge (one Xen)
     screen.py         real Minecraft via keyboard, mouse and screen pixels
   swarm.py            many Xens, one brain
-  skills.py           chat commands: build, design, rate, redstone, spawn (and the voice)
+  skills.py           chat commands: build, design, rate, redstone, spawn (and the chat model)
   talk/
     llm.py            GGUF reader, tokenizer and Llama forward pass in numpy (SmolLM2-360M)
-    voice.py          Xen's voice: notes from its own senses, honesty filter, safe chat
+    chat.py           understanding requests, notes from its own senses, honesty filter, safe chat
   building/           blueprints, templates, rating, taste, designer
   redstone/           simulator and learner
   life.py             the continuous life loop
@@ -422,11 +472,12 @@ xen/
 bridge/xen_bridge.js  mineflayer bots <-> Xen (hosts the whole swarm)
 brains/               pre-trained brain
 mod/                  Fabric mod: Xen Companion
-  common/java/        brain, senses, hands, voice (a Java port of the Python Xen)
-  common/test/        crossCheck: Java == Python for senses, brain and fear
+  common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen)
+  common/test/        crossCheck: Java == Python for senses, brain, fear and chat rules
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
   mc26/               build for Minecraft 26.x (Java 25)
 dist/                 the built mod jars, with install notes and requirements
+.github/workflows/    release.yml: a pushed version tag publishes a release (jars, brain, chat model)
 scripts/              real-server verification, mod test fixtures
 tests/                python -m unittest discover -s tests -t .
 ```
@@ -442,8 +493,9 @@ field of view, occlusion, beliefs and their confidence), the simulator,
 fear conditioning (Xen learns to fear walking into lava, and only that),
 shared-brain swarms, the real-world protocol against a fake bridge, the
 keyboard/mouse backend against a fake screen, building, taste, redstone rules
-and learning, the voice (tokenizer, honesty filter, safe chat; generation
-when the model file is there) and the command line.
+and learning, the chat (understanding requests, tokenizer, honesty filter,
+safe chat; generation and the model's choices when the model file is there)
+and the command line.
 
 The mod has its own check, which compares the Java port with the Python Xen:
 

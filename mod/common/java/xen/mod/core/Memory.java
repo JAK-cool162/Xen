@@ -63,6 +63,81 @@ public final class Memory {
 		return experience.size;
 	}
 
+	public int traumaSize() {
+		return trauma.size;
+	}
+
+	public int joySize() {
+		return joy.size;
+	}
+
+	/** Vivid memories go with the brain when it's saved, so it never forgets what hurt it (or delighted it). */
+	static final int KEEP = 1000;
+
+	/** The most recent n entries of a ring, oldest first. */
+	static List<Entry> recent(Ring r, int n) {
+		List<Entry> out = new ArrayList<>();
+		n = Math.min(n, r.size);
+		for (int k = n; k > 0; k--) out.add(r.items[Math.floorMod(r.next - k, r.items.length)]);
+		return out;
+	}
+
+	Ring ring(String name) {
+		return switch (name) {
+			case "trauma" -> trauma;
+			case "joy" -> joy;
+			default -> throw new IllegalArgumentException("unknown memory " + name);
+		};
+	}
+
+	/** Write entries (same layout as xen/brain/memory.py: int8 observations, then int32 actions, then float32s). */
+	static void write(List<Entry> entries, int obsDim, java.io.OutputStream out) throws java.io.IOException {
+		int n = entries.size();
+		for (int part = 0; part < 3; part++) {
+			byte[] b = new byte[n * obsDim];
+			for (int i = 0; i < n; i++) {
+				Entry e = entries.get(i);
+				System.arraycopy(part == 0 ? e.obs : part == 1 ? e.next : e.next1, 0, b, i * obsDim, obsDim);
+			}
+			out.write(b);
+		}
+		java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(n * 4 * 7).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+		for (Entry e : entries) bb.putInt(e.action);
+		for (Entry e : entries) bb.putFloat(e.reward);
+		for (Entry e : entries) bb.putFloat(e.done);
+		for (Entry e : entries) bb.putFloat(e.steps);
+		for (Entry e : entries) bb.putFloat(e.reward1);
+		for (Entry e : entries) bb.putFloat(e.harm);
+		for (Entry e : entries) bb.putFloat(e.done1);
+		out.write(bb.array());
+	}
+
+	static void read(Ring r, int n, int obsDim, java.io.DataInputStream in) throws java.io.IOException {
+		Entry[] es = new Entry[n];
+		for (int i = 0; i < n; i++) es[i] = new Entry();
+		for (int part = 0; part < 3; part++) {
+			byte[] b = new byte[n * obsDim];
+			in.readFully(b);
+			for (int i = 0; i < n; i++) {
+				byte[] o = java.util.Arrays.copyOfRange(b, i * obsDim, (i + 1) * obsDim);
+				if (part == 0) es[i].obs = o;
+				else if (part == 1) es[i].next = o;
+				else es[i].next1 = o;
+			}
+		}
+		byte[] raw = new byte[n * 4 * 7];
+		in.readFully(raw);
+		java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(raw).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+		for (Entry e : es) e.action = bb.getInt();
+		for (Entry e : es) e.reward = bb.getFloat();
+		for (Entry e : es) e.done = bb.getFloat();
+		for (Entry e : es) e.steps = bb.getFloat();
+		for (Entry e : es) e.reward1 = bb.getFloat();
+		for (Entry e : es) e.harm = bb.getFloat();
+		for (Entry e : es) e.done1 = bb.getFloat();
+		for (Entry e : es) r.add(e);
+	}
+
 	public void remember(float[] obs, int action, float reward, float harm, float[] next, boolean done, Object stream, boolean end) {
 		ArrayDeque<Object[]> q = recent.computeIfAbsent(stream, k -> new ArrayDeque<>());
 		q.addLast(new Object[] {obs, action, reward, harm, next, done});

@@ -21,6 +21,7 @@ import xen.mod.core.Action;
 import xen.mod.core.Blocks;
 import xen.mod.core.Brain;
 import xen.mod.core.Emotions;
+import xen.mod.core.Paths;
 import xen.mod.core.Perception;
 
 import java.util.LinkedHashMap;
@@ -30,11 +31,15 @@ import java.util.UUID;
 
 /**
  * One Xen in the world: a real player driven by the shared brain. Every few ticks it senses, feels, decides and
- * acts; then it learns from what happened. On top of the brain it has a companion's instincts: eat when hungry,
- * fight back when a monster is within reach, and follow its owner (or stay where it was told).
+ * acts; then it learns from what happened. On top of the brain it has a companion's instincts: swim up in water,
+ * eat when hungry, fight back when a monster is within reach, do what it was asked, and follow its owner (or stay
+ * where it was told).
  */
 public final class Companion {
 	public enum Mode { FOLLOW, STAY, FREE }
+
+	/** -Dxen.debug=true logs every decision (for troubleshooting). */
+	static final boolean DEBUG = Boolean.getBoolean("xen.debug");
 
 	static final Map<String, Float> ITEM_VALUE = Map.of("dirt", 0.05f, "cobblestone", 0.1f, "log", 1f, "coal", 1.5f,
 			"raw_iron", 3f, "raw_gold", 4f, "diamond", 10f, "food", 0.3f);
@@ -43,6 +48,9 @@ public final class Companion {
 	final MinecraftServer server;
 	public final String name;
 	public UUID owner;
+	final String ownerName;
+	/** Who it follows: its owner, or whoever asked an ownerless Xen to follow them. */
+	UUID leader;
 	public Mode mode = Mode.FOLLOW;
 	BlockPos anchor;
 	XenPlayer player;
@@ -57,13 +65,21 @@ public final class Companion {
 	private long lastChatter;
 	private boolean wasNight;
 	public String lastThought = "";
-	private boolean pillaring;                 // this decision: jump and place a block below (learned as a jump)
+	boolean pillaring;                         // this decision: jump and place a block below (learned as a jump)
+	boolean acted;                             // this decision: a chore already used its hands (placed, hit, gave)
+	final Chores chores = new Chores(this);
+	private Vec3 walkedFrom;
+	private int stuck;
+	private int lifeTicks;
+	private float lifeReward;
 
-	Companion(XenMod mod, MinecraftServer server, String name, UUID owner) {
+	Companion(XenMod mod, MinecraftServer server, String name, UUID owner, String ownerName) {
 		this.mod = mod;
 		this.server = server;
 		this.name = name;
 		this.owner = owner;
+		this.leader = owner;
+		this.ownerName = ownerName;
 		this.emotions = mod.brain.newBody();
 	}
 
@@ -89,6 +105,10 @@ public final class Companion {
 	}
 
 	void leave() {
+		if (player != null && lifeTicks > 0) {                         // the life so far goes into lives.csv too
+			mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, "left");
+			lifeTicks = 0;
+		}
 		if (player != null && !player.isRemoved()) {
 			hands.stop();
 			server.getPlayerList().remove(player);
@@ -104,6 +124,7 @@ public final class Companion {
 			if (--respawnIn < 0) respawn();
 			return;
 		}
+		lifeTicks++;
 		hands.tick();
 		if (hands.busy()) return;
 		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0) return;
@@ -133,14 +154,18 @@ public final class Companion {
 		for (int i = 0; i < inv.getContainerSize(); i++) {
 			ItemStack s = inv.getItem(i);
 			if (s.isEmpty()) continue;
-			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
-			String k = s.has(DataComponents.FOOD) ? "food"
-					: n.equals("cobbled_deepslate") ? "cobblestone"
-					: n.endsWith("_log") || n.endsWith("_stem") ? "log"
-					: n.equals("iron_ore") ? "raw_iron" : n.equals("gold_ore") ? "raw_gold" : n;
-			out.merge(k, s.getCount(), Integer::sum);
+			out.merge(itemKey(s), s.getCount(), Integer::sum);
 		}
 		return out;
+	}
+
+	/** The category an item counts as (for rewards and requests). */
+	String itemKey(ItemStack s) {
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		return s.has(DataComponents.FOOD) ? "food"
+				: n.equals("cobbled_deepslate") ? "cobblestone"
+				: n.endsWith("_log") || n.endsWith("_stem") ? "log"
+				: n.equals("iron_ore") ? "raw_iron" : n.equals("gold_ore") ? "raw_gold" : n;
 	}
 
 	private void decide() {
@@ -160,17 +185,21 @@ public final class Companion {
 			if (food > lastFood && lastFood < 14) reward += 0.5f * (food - lastFood) / 6f;
 			float harm = Math.max(0f, lastHealth - player.getHealth()) / 20f;
 			mod.learn(obs, lastAction, reward, harm, next, false, emotions, name);
+			lifeReward += reward;
 			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) chatter("Diamonds!!", true);
 		}
 		lastHealth = player.getHealth();
 		lastFood = player.getFoodData().getFoodLevel();
 		lastItems = items;
-		pillaring = false;
+		pillaring = acted = false;
 		Action instinct = instinct();
 		Brain.Thought thought = mod.brain.decide(next, emotions, mod.config.learn);
 		int action = instinct != null ? instinct.ordinal() : thought.action;
-		lastThought = instinct != null ? "Instinct: " + (pillaring ? "climb out" : instinct.verb) + "." : thought.text;
-		if (!pillaring) hands.start(Action.values()[action]);
+		lastThought = instinct != null ? (chores.busy() ? "Doing what I was asked (" + chores.doing + "): " : "Instinct: ")
+				+ (pillaring ? "climb up" : instinct.verb) + "." : thought.text;
+		if (!pillaring && !acted) hands.start(Action.values()[action]);
+		if (DEBUG) XenMod.LOG.info("[xen debug] {} at {} ground={} yaw={} pitch={} -> {} ({})", name, player.position(), player.onGround(),
+				hands.yaw, hands.pitch, Action.values()[action], lastThought);
 		obs = next;
 		lastAction = action;
 		react();
@@ -178,14 +207,21 @@ public final class Companion {
 
 	/** Companion instincts that come before the brain's own choice. */
 	private Action instinct() {
+		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
+			return Action.JUMP;                                       // hold space to swim up, like a player
+		}
 		if (player.getFoodData().getFoodLevel() <= 10 && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
 			return Action.EAT;
 		}
 		Action fight = fightBack();
 		if (fight != null) return fight;
+		if (chores.busy()) {
+			Action chore = chores.next();
+			if (chore != null || chores.busy()) return chore;
+		}
 		Vec3 goal = null;
-		if (mode == Mode.FOLLOW) {
-			ServerPlayer o = server.getPlayerList().getPlayer(owner);
+		if (mode == Mode.FOLLOW && leader != null) {
+			ServerPlayer o = server.getPlayerList().getPlayer(leader);
 			if (o != null && o.level() == player.level()) {
 				double d = o.position().distanceTo(player.position());
 				if (d > mod.config.followDistance && d < 96) goal = o.position();
@@ -194,6 +230,11 @@ public final class Companion {
 			goal = Vec3.atCenterOf(anchor);
 		}
 		if (goal == null) return null;
+		return walkTo(goal);
+	}
+
+	/** Walk towards a place like a player: turn, walk, jump up steps, dig through, pillar up. Null if lava is in the way. */
+	Action walkTo(Vec3 goal) {
 		double dx = goal.x - player.getX(), dz = goal.z - player.getZ();
 		ServerLevel level = (ServerLevel) player.level();
 		BlockPos feet = player.blockPosition();
@@ -202,6 +243,26 @@ public final class Companion {
 			pillaring = true;
 			return Action.JUMP;
 		}
+		// Stuck (walked or jumped but didn't move): like a player, dig at head height, then at the feet, then step aside.
+		boolean tried = lastAction == Action.FORWARD.ordinal() || lastAction == Action.JUMP.ordinal();
+		boolean moved = walkedFrom == null || player.position().distanceToSqr(walkedFrom) >= 0.01;
+		stuck = moved ? 0 : tried || stuck >= 4 ? stuck + 1 : stuck;
+		walkedFrom = player.position();
+		if (stuck > 13) stuck = 0;                                     // then try finding a way again
+		if (stuck >= 4) {
+			int phase = (stuck / 3) % 3;
+			if (phase == 0) return hands.pitch != 1 ? Action.LOOK_UP : Action.MINE;
+			if (phase == 1) return hands.pitch != 0 ? (hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP) : Action.MINE;
+			return Action.RIGHT;
+		}
+		// A way through what it knows (within 6 blocks): walk, step up, drop down, swim, around obstacles and lava.
+		int[] step = senses.last == null ? null
+				: Paths.firstStep(senses.last, goal.x - (feet.getX() + 0.5), goal.y - feet.getY(), goal.z - (feet.getZ() + 0.5));
+		if (step != null) {
+			if (step[0] != hands.yaw) return Math.floorMod(step[0] - hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
+			return step[1] == 1 ? Action.JUMP : Action.FORWARD;
+		}
+		// No known way gets closer: dig towards it.
 		int want = 0;
 		double best = -2;
 		for (int k = 0; k < 4; k++) {
@@ -227,12 +288,11 @@ public final class Companion {
 			pillaring = true;
 			return Action.JUMP;
 		}
-		if (Blocks.SOLID[head] || Blocks.SOLID[above]) {
-			if (hands.pitch != 1) return Action.LOOK_UP;
-			return Action.MINE;                                   // clear the way at head height
+		if (Blocks.SOLID[head]) return hands.pitch != 1 ? Action.LOOK_UP : Action.MINE;          // clear head height
+		if (Blocks.SOLID[ahead]) {                                                              // then the feet, and walk through
+			return hands.pitch != 0 ? (hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP) : Action.MINE;
 		}
-		if (hands.pitch != 0) return hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP;
-		return Action.MINE;                                       // clear the block in front
+		return Action.FORWARD;
 	}
 
 	/** A monster within reach (it knows everything within 6 blocks): face it and hit it once the attack is charged. */
@@ -281,7 +341,7 @@ public final class Companion {
 
 	void chatter(String text, boolean always) {
 		long now = System.currentTimeMillis();
-		if (!mod.config.talk || (!always && now - lastChatter < 20_000)) return;
+		if (!mod.config.chat || (!always && now - lastChatter < 20_000)) return;
 		lastChatter = now;
 		say(text);
 	}
@@ -298,6 +358,11 @@ public final class Companion {
 		}
 		obs = null;
 		mod.brain.lives++;
+		String cause = source.type().msgId() + (source.getEntity() != null
+				? ":" + BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath() : "");
+		mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, cause);
+		lifeTicks = 0;
+		lifeReward = 0;
 		emotions.reset();
 		respawnIn = 60;                                               // three seconds, like pressing "Respawn"
 	}
@@ -330,7 +395,64 @@ public final class Companion {
 			if (carrying.length() > 60) break;
 			carrying.append(carrying.length() > 0 ? ", " : "").append(e.getValue()).append(' ').append(e.getKey().replace('_', ' '));
 		}
-		return xen.mod.talk.Voice.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
+		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe());
+	}
+
+	/**
+	 * A player said something to it. A request: it does it (with its own hands and senses) and says its plan in plain
+	 * words, or why it can't. Only its owner can tell it what to do (anyone, if it has no owner). Just talk: returns its
+	 * notes for the chat to answer from.
+	 */
+	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from) {
+		if (player == null) return null;
+		String who = from.getName().getString();
+		String plan = null;
+		if (!r.intent().equals("chat") && owner != null && !owner.equals(from.getUUID())) {
+			plan = "Only " + ownerName + " can tell you what to do, so you won't.";
+		} else {
+			boolean wasBusy = chores.busy();
+			if (!r.intent().equals("chat")) {                           // a new request replaces what it was doing
+				chores.cancel();
+				hands.stop();
+			}
+			switch (r.intent()) {
+				case "follow" -> {
+					chores.cancel();
+					mode = Mode.FOLLOW;
+					leader = from.getUUID();
+					plan = "You will follow " + who + ".";
+				}
+				case "stay" -> {
+					chores.cancel();
+					mode = Mode.STAY;
+					anchor = player.blockPosition();
+					plan = "You will stay here.";
+				}
+				case "explore" -> {
+					chores.cancel();
+					mode = Mode.FREE;
+					plan = "You will go exploring on your own.";
+				}
+				case "stop" -> {
+					boolean busy = wasBusy;
+					if (!busy) {
+						mode = Mode.STAY;
+						anchor = player.blockPosition();
+					}
+					plan = busy ? "You will stop what you are doing." : "You will stop and wait here.";
+				}
+				case "wood", "stone", "coal", "iron", "mine" -> plan = chores.gather(r.intent(), r.amount());
+				case "food" -> plan = chores.hunt(r.amount());
+				case "give" -> plan = chores.give(from, r.thing(), r.amount());
+				case "shelter" -> plan = chores.shelter();
+				case "eat" -> plan = chores.eat();
+				default -> {}
+			}
+		}
+		if (plan == null) return notes();                             // just talk: the chat answers
+		lastThought = "Asked by " + who + ": " + plan;
+		say(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, ""));   // what it will do (or why not), right away
+		return null;
 	}
 }

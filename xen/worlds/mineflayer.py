@@ -159,7 +159,7 @@ class MineflayerWorld:
 
     def notes(self):
         """What Xen may talk about: its own feelings, body and perception."""
-        from ..talk.voice import carrying, notes
+        from ..talk.chat import carrying, notes
         s = self._last or {}
         f = self.feelings
         return notes(f.mood if f else "calm", bool(f and f.pain > 0.15), s.get("health", 20), s.get("food", 20),

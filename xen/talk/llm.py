@@ -174,6 +174,22 @@ class LanguageModel:
         self.cache = [(np.zeros((0, self.n_kv, self.head_dim), np.float32),) * 2 for _ in range(self.n_layers)]
         self.pos = 0
 
+    def keep_prefix(self, text):
+        """Remember the model's state after this text; prompts that start with it skip re-reading it."""
+        self.reset()
+        self.forward(self.tokenizer.encode(text))
+        self._prefixes = getattr(self, "_prefixes", {})
+        self._prefixes[text] = (list(self.cache), self.pos)
+
+    def _read(self, prompt, room):
+        """Start a prompt (from a kept prefix when there is one); returns the logits after it."""
+        for text, (cache, pos) in getattr(self, "_prefixes", {}).items():
+            if prompt.startswith(text) and len(prompt) > len(text):
+                self.cache, self.pos = list(cache), pos
+                return self.forward(self.tokenizer.encode(prompt[len(text):])[-(self.context - pos - room):])
+        self.reset()
+        return self.forward(self.tokenizer.encode(prompt)[-(self.context - room):])
+
     def _rope(self, x, positions):
         # Pairs of neighbouring dimensions rotate together (the GGUF/llama.cpp layout).
         angles = positions[:, None] * self.inv_freq[None, :]
@@ -217,9 +233,7 @@ class LanguageModel:
 
     def generate(self, prompt, max_tokens=60, temperature=0.7, top_p=0.9, seed=None, stop=("<|im_end|>",)):
         rng = np.random.default_rng(seed)
-        self.reset()
-        ids = self.tokenizer.encode(prompt)[-(self.context - max_tokens):]
-        logits = self.forward(ids)
+        logits = self._read(prompt, max_tokens)
         stop_ids = {self.tokenizer.ids[s] for s in stop if s in self.tokenizer.ids} | {self.tokenizer.eos}
         out = []
         for _ in range(max_tokens):
@@ -229,6 +243,22 @@ class LanguageModel:
             out.append(token)
             logits = self.forward([token])
         return self.tokenizer.decode(out)
+
+
+    def choose(self, prompt, options):
+        """Which option the model finds likeliest to come next (log-probabilities of each, whole option)."""
+        logits = self._read(prompt, 8)
+        cache, pos = list(self.cache), self.pos
+        scores = []
+        for option in options:
+            ids, l, total = self.tokenizer.encode(option), logits, 0.0
+            for j, token in enumerate(ids):
+                total += float(l[token] - l.max() - np.log(np.exp(l - l.max()).sum()))
+                if j + 1 < len(ids):
+                    l = self.forward([token])
+            self.cache, self.pos = list(cache), pos
+            scores.append(total)
+        return int(np.argmax(scores)), scores
 
 
 def _sample(logits, temperature, top_p, rng):

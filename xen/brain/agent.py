@@ -234,14 +234,17 @@ class Xen:
     # --------------------------------------------------------- mod exchange
     MAGIC = b"XEN1"
 
-    def export(self, path):
-        """Write the brain in the portable format the Minecraft mod reads (and writes back)."""
+    def export(self, path, memories=1000):
+        """Write the brain in the portable format the Minecraft mod reads (and writes back), with its most vivid
+        memories (the latest trauma and joy), so it never forgets what hurt it wherever it goes on learning."""
         nets = [("striatum", self.striatum.net), ("amygdala", self.amygdala.net), ("world_model", self.world_model.net),
                 ("striatum_target", self.striatum.target), ("amygdala_target", self.amygdala.target)]
         header = {"obs_dim": self.obs_dim, "n_actions": self.n_actions, "config": asdict(self.config),
                   "steps": self.steps, "updates": self.updates, "lives": self.lives,
                   "wm_updates": self.world_model.updates, "emotions": self.emotions.state(),
-                  "nets": [[name, list(net.sizes)] for name, net in nets]}
+                  "nets": [[name, list(net.sizes)] for name, net in nets],
+                  "memories": [["trauma", min(memories, len(self.memory.trauma))],
+                               ["joy", min(memories, len(self.memory.joy))]]}
         blob = json.dumps(header).encode()
         with open(path, "wb") as f:
             f.write(self.MAGIC)
@@ -249,6 +252,8 @@ class Xen:
             f.write(blob)
             for _, net in nets:
                 f.write(net.flat.astype("<f4").tobytes())
+            for name, n in header["memories"]:
+                getattr(self.memory, name).write(n, f)
 
     @classmethod
     def load_exported(cls, path, seed=0):
@@ -267,6 +272,8 @@ class Xen:
                 if tuple(sizes) != net.sizes:
                     raise ValueError(f"{name}: expected layers {net.sizes}, got {tuple(sizes)}")
                 net.flat[:] = np.frombuffer(f.read(4 * len(net.flat)), "<f4")
+            for name, n in header.get("memories", []):
+                getattr(xen.memory, name).read(n, f)
         xen.steps, xen.updates, xen.lives = header["steps"], header["updates"], header["lives"]
         xen.world_model.updates = header["wm_updates"]
         xen.emotions.load_state(header["emotions"])

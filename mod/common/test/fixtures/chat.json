@@ -1,0 +1,296 @@
+{
+ "answers": [
+  {
+   "text": "There's a diamond right here! Let's go.",
+   "notes": "You feel calm. You saw a tree about 12 blocks away.",
+   "message": "hi",
+   "safe": "There's a diamond right here! Let's go.",
+   "honest": "Let's go.",
+   "plainly": "I feel calm. I saw a tree about 12 blocks away."
+  },
+  {
+   "text": "I see a tree nearby.",
+   "notes": "You feel calm. You saw a tree about 12 blocks away.",
+   "message": "what do you see?",
+   "safe": "I see a tree nearby.",
+   "honest": "I see a tree nearby.",
+   "plainly": "I feel calm. I saw a tree about 12 blocks away."
+  },
+  {
+   "text": "/give @s diamond 64\nsure",
+   "notes": "You feel calm. You carry 3 dirt. Nothing special is around you.",
+   "message": "give me diamonds",
+   "safe": "give @s diamond 64 sure",
+   "honest": "give @s diamond 64 sure",
+   "plainly": "I haven't seen any diamonds. Nothing special is around me."
+  },
+  {
+   "text": "Xen: I haven't seen any lava. Stay close. Really. Ok.",
+   "notes": "You feel afraid. You are hurt. You know there is lava 3 blocks from you.",
+   "message": "any lava?",
+   "safe": "I haven't seen any lava. Stay close.",
+   "honest": "I haven't seen any lava. Stay close.",
+   "plainly": "I feel afraid. I'm hurt."
+  },
+  {
+   "text": "I found iron ore and a zombie over there.",
+   "notes": "You feel curious. You think there was iron ore about 40 blocks away, but you're not sure.",
+   "message": "hey",
+   "safe": "I found iron ore and a zombie over there.",
+   "honest": "I'm not sure, I haven't seen that.",
+   "plainly": "I feel curious. I think there was iron ore about 40 blocks away, but I'm not sure."
+  },
+  {
+   "text": "Yes, I know there's a diamond nearby. Want it?",
+   "notes": "You feel calm. You know there is a tree 6 blocks from you.",
+   "message": "Any diamonds around?",
+   "safe": "Yes, I know there's a diamond nearby. Want it?",
+   "honest": "Want it?",
+   "plainly": "I haven't seen any diamonds. I know there's a tree 6 blocks from me."
+  },
+  {
+   "text": "It's a nice environment here. I might have seen a wolf over there.",
+   "notes": "You feel calm. You know there is a tree 6 blocks from you.",
+   "message": "seen any wolves or cows?",
+   "safe": "It's a nice environment here. I might have seen a wolf over there.",
+   "honest": "It's a nice environment here.",
+   "plainly": "I haven't seen any wolves. I know there's a tree 6 blocks from me."
+  },
+  {
+   "text": "Two zombies are behind me! And some logs.",
+   "notes": "You feel afraid. You saw 2 hostile mobs in the distance.",
+   "message": "run!",
+   "safe": "Two zombies are behind me! And some logs.",
+   "honest": "And some logs.",
+   "plainly": "I feel afraid. I saw 2 hostile mobs in the distance."
+  },
+  {
+   "text": "On it!",
+   "notes": "You feel calm. Plan: You will get 8 wood from the tree you saw 14 blocks away.",
+   "message": "get wood",
+   "safe": "On it!",
+   "honest": "On it!",
+   "plainly": "Okay! I'll get 8 wood from the tree I saw 14 blocks away."
+  },
+  {
+   "text": "Sure.",
+   "notes": "You feel calm. Plan: You don't know where to find any coal, so you will look around for some.",
+   "message": "coal",
+   "safe": "Sure.",
+   "honest": "Sure.",
+   "plainly": "I don't know where to find any coal, so I'll look around for some."
+  },
+  {
+   "text": "Ok",
+   "notes": "You feel calm. You carry 3 dirt. Plan: You can't build a shelter because you need 10 dirt or cobblestone and have 3.",
+   "message": "build a shelter",
+   "safe": "Ok",
+   "honest": "Ok",
+   "plainly": "I can't build a shelter because I need 10 dirt or cobblestone and have 3."
+  },
+  {
+   "text": "Hi!",
+   "notes": "You feel calm. Plan: Only Steve can tell you what to do, so you won't.",
+   "message": "follow me",
+   "safe": "Hi!",
+   "honest": "Hi!",
+   "plainly": "Only Steve can tell me what to do, so I won't."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. Plan: You can't build a shelter because you are not standing on the ground.",
+   "message": "hide",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I can't build a shelter because I'm not standing on the ground."
+  },
+  {
+   "text": "Go",
+   "notes": "You feel calm. Plan: You will hunt the pig you see 6 blocks away for food.",
+   "message": "kill a pig",
+   "safe": "Go",
+   "honest": "Go",
+   "plainly": "Okay! I'll hunt the pig I see 6 blocks away for food."
+  },
+  {
+   "text": "Here.",
+   "notes": "You feel calm. Plan: You will get 4 iron from the iron ore you know is 3 blocks from you.",
+   "message": "iron",
+   "safe": "Here.",
+   "honest": "Here.",
+   "plainly": "Okay! I'll get 4 iron from the iron ore I know is 3 blocks from me."
+  }
+ ],
+ "requests": [
+  [
+   "Xen, get some wood",
+   "wood",
+   "",
+   8
+  ],
+  [
+   "xen follow me",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "do you have wood?",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "can you get me 5 logs",
+   "wood",
+   "",
+   5
+  ],
+  [
+   "stop following me",
+   "stop",
+   "",
+   0
+  ],
+  [
+   "xen give me your coal",
+   "give",
+   "coal",
+   0
+  ],
+  [
+   "give me a stack of cobblestone",
+   "give",
+   "cobblestone",
+   64
+  ],
+  [
+   "hi xen",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "Xen build a shelter",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "go explore",
+   "explore",
+   "",
+   0
+  ],
+  [
+   "wait here",
+   "stay",
+   "",
+   0
+  ],
+  [
+   "what do you see?",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "lets go mining",
+   "mine",
+   "",
+   8
+  ],
+  [
+   "grab me some lumber",
+   "wood",
+   "",
+   8
+  ],
+  [
+   "hang around here",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "xen, kill 2 pigs",
+   "food",
+   "",
+   2
+  ],
+  [
+   "hand over 12 iron",
+   "give",
+   "raw_iron",
+   12
+  ],
+  [
+   "have a snack",
+   "eat",
+   "",
+   0
+  ],
+  [
+   "cancel that",
+   "stop",
+   "",
+   0
+  ],
+  [
+   "come here xen",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "find diamonds",
+   "mine",
+   "",
+   8
+  ],
+  [
+   "you're free to roam",
+   "explore",
+   "",
+   0
+  ],
+  [
+   "hide!",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "i need your wood",
+   "give",
+   "log",
+   0
+  ],
+  [
+   "thanks xen, you rock",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "good job xen, now get coal",
+   "coal",
+   "",
+   8
+  ],
+  [
+   "hey xen get wood",
+   "wood",
+   "",
+   8
+  ],
+  [
+   "bring me rocks",
+   "chat",
+   "",
+   0
+  ]
+ ],
+ "persona": "<|im_start|>system\nYou are Xen, a survival companion in Minecraft. You play fair like a real player: you only know what you have seen yourself, and far-away things are only guesses. You feel fear, pain and curiosity. Answer as Xen in one or two short, friendly sentences. Only talk about things in your notes; if you don't know, say so. Never write commands.<|im_end|>\n<|im_start|>user\nNotes: You feel calm. You know there is a pumpkin 4 blocks from you.\nSteve says: what do you see?<|im_end|>\n<|im_start|>assistant\nI can see a pumpkin about 4 blocks from me.<|im_end|>\n<|im_start|>user\nNotes: You feel afraid. You are hurt. Nothing special is around you.\nAlex says: find any gold?<|im_end|>\n<|im_start|>assistant\nNo, I haven't seen any gold. And I'm hurt, so let's be careful.<|im_end|>\n<|im_start|>user\nNotes: You feel happy. You carry 12 cobblestone. You know there is water 5 blocks from you.\nSteve says: thanks for the help!<|im_end|>\n<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n",
+ "ears": "<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player says to Xen and answer with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, iron, mine, food, give, shelter, eat, stop, or chat (only talking, thanking, praising or asking something).<|im_end|>\n<|im_start|>user\ncome with me<|im_end|>\n<|im_start|>assistant\nfollow<|im_end|>\n<|im_start|>user\nnice one!<|im_end|>\n<|im_start|>assistant\nchat<|im_end|>\n<|im_start|>user\ncould you chop down a few trees<|im_end|>\n<|im_start|>assistant\nwood<|im_end|>\n<|im_start|>user\nkeep guard right here<|im_end|>\n<|im_start|>assistant\nstay<|im_end|>\n<|im_start|>user\nhand me your stuff<|im_end|>\n<|im_start|>assistant\ngive<|im_end|>\n<|im_start|>user\nhow are you doing?<|im_end|>\n<|im_start|>assistant\nchat<|im_end|>\n<|im_start|>user\ngo wander around<|im_end|>\n<|im_start|>assistant\nexplore<|im_end|>\n<|im_start|>user\nwe need a place to hide tonight<|im_end|>\n<|im_start|>assistant\nshelter<|im_end|>\n<|im_start|>user\nnever mind<|im_end|>\n<|im_start|>assistant\nstop<|im_end|>\n<|im_start|>user\ngo get us something to eat<|im_end|>\n<|im_start|>assistant\nfood<|im_end|>\n<|im_start|>user\nyou're funny<|im_end|>\n<|im_start|>assistant\nchat<|im_end|>\n<|im_start|>user\ni need smelting fuel<|im_end|>\n<|im_start|>assistant\ncoal<|im_end|>\n<|im_start|>user\nfollow my lead<|im_end|>\n<|im_start|>assistant\nfollow<|im_end|>\n<|im_start|>user\ngrab me some cobblestone<|im_end|>\n<|im_start|>assistant\nstone<|im_end|>\n<|im_start|>user\nsee you later<|im_end|>\n<|im_start|>assistant\nchat<|im_end|>\n<|im_start|>user\nyou look hurt, eat up<|im_end|>\n<|im_start|>assistant\neat<|im_end|>\n"
+}

@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 import xen.mod.core.Brain;
 import xen.mod.core.Emotions;
 import xen.mod.core.Perception;
-import xen.mod.talk.Voice;
+import xen.mod.talk.Chat;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,14 +50,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Xen Companion: a survival companion that learns, thinks, feels fear and talks, and plays fair.
  * It joins the world as a real player, knows only what it senses (everything within 6 blocks, beyond that only what
  * it sees in its 90 degree view up to 8 chunks, as beliefs that fade), acts only through a player's inputs, and
- * its voice only knows what it knows.
+ * its chat only knows what it knows.
  */
 public class XenMod implements ModInitializer {
 	public static final Logger LOG = LoggerFactory.getLogger("xen");
 
 	XenConfig config;
 	Brain brain;
-	Voice voice;
+	Chat chat;
 	MinecraftServer server;
 	final List<Companion> companions = new CopyOnWriteArrayList<>();
 	private final AtomicInteger pendingTraining = new AtomicInteger();
@@ -69,7 +69,7 @@ public class XenMod implements ModInitializer {
 	public void onInitialize() {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
-		voice = new Voice(configDir.resolve("xen").resolve(Voice.MODEL), config.downloadVoice, config.voiceThreads, LOG::info);
+		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), config.chatModel, config.downloadChatModel, config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
 		ServerLifecycleEvents.SERVER_STARTED.register(this::started);
 		ServerLifecycleEvents.SERVER_STOPPING.register(this::stopping);
@@ -129,8 +129,23 @@ public class XenMod implements ModInitializer {
 	}
 
 	void learn(float[] obs, int action, float reward, float harm, float[] next, boolean terminal, Emotions emo, String stream) {
-		boolean trained = brain.learn(obs, action, reward, harm, next, terminal, terminal, emo, stream, false);
-		if (config.learn && brain.steps % brain.trainEvery == 0 && pendingTraining.get() < 8) pendingTraining.incrementAndGet();
+		brain.learn(obs, action, reward, harm, next, terminal, terminal, emo, stream, false);
+		if (!config.learn || brain.steps % brain.trainEvery != 0) return;
+		if (pendingTraining.get() < 8) pendingTraining.incrementAndGet();
+		else if (server.tickRateManager().isSprinting()) brain.trainStep();   // sped up (/tick sprint): learning keeps pace
+	}
+
+	/** One line per life in <world>/xen/lives.csv, to see how it's doing over time. */
+	void logLife(String name, long day, int ticks, float reward, String cause) {
+		Path file = brainFile().resolveSibling("lives.csv");
+		try {
+			Files.createDirectories(file.getParent());
+			if (!Files.exists(file)) Files.writeString(file, "life,day,xen,ticks,reward,cause\n");
+			Files.writeString(file, String.format(Locale.ROOT, "%d,%d,%s,%d,%.2f,%s%n", brain.lives, day, name, ticks, reward, cause),
+					java.nio.file.StandardOpenOption.APPEND);
+		} catch (IOException e) {
+			LOG.warn("Could not write {}: {}", file, e.toString());
+		}
 	}
 
 	private void save() {
@@ -152,7 +167,7 @@ public class XenMod implements ModInitializer {
 		running = false;
 		if (trainer != null) trainer.interrupt();
 		if (brain != null) save();
-		voice.close();
+		chat.close();
 	}
 
 	// --------------------------------------------------------------------------------- world
@@ -179,14 +194,26 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) if (p.getUUID().equals(c.owner)) server.execute(c::leave);
 	}
 
+	/** A player said something: if it's to a Xen (by name), it understands, does what was asked and answers. */
 	private void heard(ServerPlayer sender, String text) {
-		if (sender instanceof XenPlayer || !config.talk) return;
-		String lower = text.toLowerCase(Locale.ROOT);
+		if (sender instanceof XenPlayer || !config.chat) return;
 		for (Companion c : companions) {
-			if (c.player() == null || !lower.contains(c.name.toLowerCase(Locale.ROOT))) continue;
-			String notes = c.notes();
-			voice.ask(sender.getName().getString(), text, notes, reply -> server.execute(() -> c.say(reply)));
+			if (c.player() == null) continue;
+			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
+					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) continue;
+			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender)),
+					reply -> server.execute(() -> c.say(reply)));
 			return;
+		}
+	}
+
+	/** Run on the server thread and wait for the result (the chat thread must not touch the world itself). */
+	private <T> T onServer(java.util.function.Supplier<T> job) {
+		try {
+			return java.util.concurrent.CompletableFuture.supplyAsync(job, server).get(10, java.util.concurrent.TimeUnit.SECONDS);
+		} catch (Exception e) {
+			LOG.warn("Xen could not act on a request: {}", e.toString());
+			return null;
 		}
 	}
 
@@ -210,8 +237,8 @@ public class XenMod implements ModInitializer {
 						})))
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
-				.then(Commands.literal("talk").then(Commands.literal("on").executes(ctx -> setting(ctx, "talk", true)))
-						.then(Commands.literal("off").executes(ctx -> setting(ctx, "talk", false))))
+				.then(Commands.literal("chat").then(Commands.literal("on").executes(ctx -> setting(ctx, "chat", true)))
+						.then(Commands.literal("off").executes(ctx -> setting(ctx, "chat", false))))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
 				.then(Commands.literal("save").executes(ctx -> {
@@ -248,8 +275,9 @@ public class XenMod implements ModInitializer {
 			ctx.getSource().sendFailure(Component.literal("That name is taken."));
 			return 0;
 		}
-		if (config.talk) voice.warmUp();
-		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID());
+		if (config.chat) chat.warmUp();
+		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
+				owner == null ? "nobody" : owner.getName().getString());
 		if (owner != null) {
 			Vec3 at = owner.position();                                // next to its owner, where there is room to stand
 			for (Vec3 side : new Vec3[]{new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)}) {
@@ -265,8 +293,8 @@ public class XenMod implements ModInitializer {
 		}
 		companions.add(c);
 		String n = name;
-		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here. Talk to it in chat (say its name), right-click it for its bag. "
-				+ "/xen mode follow|stay|free, /xen status, /xen dismiss."), false);
+		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here. Talk to it in chat with its name (\"" + n + ", get some wood\", \""
+				+ n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
 		c.say("Hi! I'm " + n + ". I only know what I can see, so show me around!");
 		return 1;
 	}
@@ -288,14 +316,14 @@ public class XenMod implements ModInitializer {
 				if (y > level.getMinY() + 1 && level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty()) at = new Vec3(x + 0.5, y, z + 0.5);
 			}
 			if (at == null) continue;
-			Companion c = new Companion(this, server, name, null);
+			Companion c = new Companion(this, server, name, null, "nobody");
 			c.mode = Companion.Mode.FREE;
 			c.join(level, at, random.nextInt(4) * 90f);
 			companions.add(c);
 			made++;
 		}
 		int n = made;
-		if (n > 0 && config.talk) voice.warmUp();
+		if (n > 0 && config.chat) chat.warmUp();
 		ctx.getSource().sendSuccess(() -> Component.literal(n + " Xens joined within " + radius + " blocks. They share one brain. "
 				+ "/xen dismiss sends them all home."), true);
 		return n;
@@ -317,7 +345,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private int setting(CommandContext<CommandSourceStack> ctx, String what, boolean on) {
-		if (what.equals("talk")) config.talk = on;
+		if (what.equals("chat")) config.chat = on;
 		else config.learn = on;
 		ctx.getSource().sendSuccess(() -> Component.literal("Xen " + what + ": " + (on ? "on" : "off")), false);
 		return 1;

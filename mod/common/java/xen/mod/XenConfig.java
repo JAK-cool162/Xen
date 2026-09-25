@@ -9,12 +9,17 @@ import java.nio.file.Path;
 
 /** config/xen.json */
 public final class XenConfig {
-	/** Xen may talk (short reactions, and answers from its small language model). */
-	public boolean talk = true;
-	/** Download the voice model (SmolLM2-360M, about 390 MB) on first use. */
-	public boolean downloadVoice = true;
-	/** CPU threads the voice may use (it runs in the background, at low priority). */
-	public int voiceThreads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+	/** Xen chats: it understands requests ("Xen, get some wood"), answers, and says how it feels. */
+	public boolean chat = true;
+	/**
+	 * The small chat model (SmolLM2-360M) that understands requests in any words and answers: "auto" (when the game has
+	 * 3 GB of memory or more), "on" or "off". Without it Xen still understands keywords and answers in plain words.
+	 */
+	public String chatModel = "auto";
+	/** Download the chat model (about 390 MB) to config/xen/ the first time it's needed. */
+	public boolean downloadChatModel = true;
+	/** CPU threads the chat model may use (it runs in the background). */
+	public int chatThreads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
 	/** Keep learning from everything it lives through. */
 	public boolean learn = true;
 	/** How many Xens one player may summon (0 = no limit; operators have no limit). */

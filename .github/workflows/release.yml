@@ -1,0 +1,38 @@
+# Publishes a (pre-)release when a version tag is pushed, e.g. `git tag v0.2.0-alpha && git push origin v0.2.0-alpha`.
+# Assets: the tested mod jars from dist/, Xen's trained brain, and the chat model (SmolLM2-360M-Instruct, Apache-2.0).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chat model (SmolLM2-360M-Instruct by Hugging Face, Apache-2.0)
+        run: |
+          curl -fL --retry 5 -o smollm2-360m-instruct-q8_0.gguf \
+            https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf
+
+      - name: Xen's brain and checksums
+        run: |
+          cp mod/common/resources/assets/xen/brain.bin xen-brain.bin
+          sha256sum dist/*.jar xen-brain.bin smollm2-360m-instruct-q8_0.gguf | sed 's| dist/| |' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *alpha*|*beta*|*rc*|v0.*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" $prerelease \
+            --title "Xen Companion $GITHUB_REF_NAME" \
+            --notes-file dist/RELEASE_NOTES.md \
+            dist/*.jar xen-brain.bin smollm2-360m-instruct-q8_0.gguf SHA256SUMS.txt

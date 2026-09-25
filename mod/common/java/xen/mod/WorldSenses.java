@@ -56,8 +56,8 @@ public final class WorldSenses {
 		if (n.endsWith("_leaves")) return Blocks.LEAVES;
 		if (n.equals("grass_block")) return Blocks.GRASS;
 		if (DIRT.contains(n)) return Blocks.DIRT;
-		if (state.isCollisionShapeFullBlock(level, pos)) return Blocks.STONE;
-		return Blocks.AIR;                                     // flowers, torches... nothing to stand on
+		if (!state.getCollisionShape(level, pos).isEmpty()) return Blocks.STONE;   // fences, walls, panes, slabs... (like the bridge)
+		return Blocks.AIR;                                     // flowers, grass, torches... nothing in the way
 	}
 
 	/** Can sight pass through it? (glass, ice...) */
@@ -80,6 +80,18 @@ public final class WorldSenses {
 		BlockState state = level.getBlockState(pos);
 		int c = category(level, pos, state);
 		return Blocks.OPAQUE[c] && !opaque(level, pos, state) ? Blocks.AIR : c;
+	}
+
+	/** Whether Xen senses this creature: felt within 6 blocks, or seen in its view (not through walls). */
+	public static boolean sees(ServerPlayer p, int yaw, int pitch, net.minecraft.world.entity.Entity e) {
+		double d = p.distanceTo(e);
+		if (d <= Perception.NEAR) return true;
+		if (d > Perception.VIEW) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		Vec3 eye = p.getEyePosition(), head = e.position().add(0, e.getBbHeight() * 0.85, 0);
+		double[] from = {eye.x, eye.y, eye.z}, to = {head.x, head.y, head.z};
+		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+		return Perception.inView(from, yaw, pitch, to) && Perception.lineOfSight((x, y, z) -> seen(level, m.set(x, y, z)), from, to);
 	}
 
 	public static Perception.Sight sense(ServerPlayer p, int yaw, int pitch, int phase, Perception.Body body) {

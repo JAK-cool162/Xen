@@ -110,6 +110,24 @@ class TestXen(unittest.TestCase):
         # A loaded brain keeps its skills: no random warm-up phase.
         self.assertFalse(twin._warming_up)
 
+    def test_its_fears_travel_with_the_brain(self):
+        # The mod's brain file carries the most vivid memories, so a brain that goes on learning somewhere safe
+        # still replays what hurt it (and doesn't forget to fear lava).
+        xen = Xen(8, NUM_ACTIONS, XenConfig(**SMALL), seed=3)
+        train(xen, LavaRoom(), 400)
+        self.assertGreater(len(xen.memory.trauma), 0)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "brain.bin")
+            xen.export(path)
+            twin = Xen.load_exported(path)
+        for name in ("trauma", "joy"):
+            mine, its = getattr(xen.memory, name), getattr(twin.memory, name)
+            self.assertEqual(len(its), min(len(mine), 1000))
+            np.testing.assert_array_equal(its.obs[its.recent(1000)], mine.obs[mine.recent(1000)])
+            np.testing.assert_allclose(its.harm[its.recent(1000)], mine.harm[mine.recent(1000)])
+        obs = np.random.default_rng(0).random((5, 8)).astype(np.float32)
+        np.testing.assert_allclose(twin.fears(obs), xen.fears(obs), rtol=1e-5, atol=1e-6)
+
     def test_many_bodies_share_one_brain(self):
         xen = Xen(8, NUM_ACTIONS, XenConfig(**SMALL), seed=4)
         a, b = xen.new_body(), xen.new_body()
