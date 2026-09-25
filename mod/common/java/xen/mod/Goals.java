@@ -131,6 +131,7 @@ final class Goals {
 		if (origin == null) origin = new int[] {(int) c.player.getX(), (int) c.player.getZ()};
 		if (progress() < 1f) return;
 		achieved++;
+		c.antics.celebrate();
 		c.say(switch (dream) {
 			case HOME -> "I built my home! It's a little fort, but it's mine.";
 			case STOCKPILE -> "Look at my stockpile! 32 logs and 64 stone.";
@@ -151,6 +152,14 @@ final class Goals {
 	 * so often, it picks a new one. True if a chore is now going (so the chore decides this moment).
 	 */
 	boolean think() {
+		return think(false);
+	}
+
+	/**
+	 * Nearby (while it follows a friend who's close): only what it can do right here, without leaving them: food,
+	 * wood, stone, ore, a shelter at night. It keeps following (it isn't set free).
+	 */
+	boolean think(boolean nearby) {
 		long now = c.player.level().getGameTime();
 		if (current != null) {
 			boolean over = current == Short.EXPLORE ? now > until : !c.chores.busy();
@@ -162,6 +171,7 @@ final class Goals {
 		Short best = null;
 		float bestScore = 0.25f;                                         // below this it's happy doing whatever it does
 		for (Short s : Short.values()) {
+			if (nearby && (s == Short.TRADE || s == Short.EXPLORE)) continue;   // those would take it away from its friend
 			float score = (urgency(s) + dreamPull(s)) * (0.5f + liking.get(s)) + random.nextFloat() * 0.15f * c.personality.curiosity;
 			if (score > bestScore) {
 				bestScore = score;
@@ -174,13 +184,16 @@ final class Goals {
 			case FOOD -> c.chores.hunt(2);
 			case SHELTER -> buildingHome ? c.chores.shelter("fort") : c.chores.shelter();
 			case WOOD -> c.chores.gather("wood", 4);
-			case STONE -> c.chores.gather("stone", 8);
+			case STONE -> needBlocksForTheNight() || c.crafter.pickTier() == 0 ? c.chores.gather("dirt", Math.max(4, 12 - blocks()))
+					: c.chores.gather("stone", 8);
 			case ORE -> c.chores.gather("ore", 2);
 			case TRADE -> c.trader.withVillager(null);
 			case EXPLORE -> "";
 		};
-		c.mode = Companion.Mode.FREE;                                   // (a shelter would have it stay; it's still free)
+		if (!nearby) c.mode = Companion.Mode.FREE;                      // (a shelter would have it stay; it's still free)
+		else if (best == Short.SHELTER) c.mode = Companion.Mode.FOLLOW;   // it builds it where it is, next to its friend
 		if (plan.startsWith("You can't") || plan.startsWith("You have no") || plan.startsWith("You don't")) {
+			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} wanted to {}, but: {}", c.name, best.what, plan);
 			liking.merge(best, -0.05f, (a, b) -> Math.max(0f, a + b));       // it can't right now: a little less keen
 			c.chores.cancel();
 			return false;
@@ -189,8 +202,19 @@ final class Goals {
 		rewardAtStart = c.genReward;
 		until = now + EXPLORE_TICKS;
 		c.chores.own = true;
-		c.chatter(buildingHome ? "I'm going to build my home here!" : "I want to " + best.what + ".", false);
+		c.chatter(buildingHome ? "I'm going to build my home here!" : nearby ? pickNearby(best) : "I want to " + best.what + ".", nearby);
 		return c.chores.busy();
+	}
+
+	/** What it says when it gets on with something while its friend is close. */
+	private String pickNearby(Short s) {
+		return switch (s) {
+			case FOOD -> "I'm hungry. I'll hunt something nearby.";
+			case SHELTER -> "It's getting dark. I'll build us a shelter.";
+			case WOOD -> "I'll grab some wood while we're here.";
+			case STONE -> needBlocksForTheNight() ? "It'll be dark soon. I'll dig up some dirt for a shelter." : "I'll get some stone while we're here.";
+			default -> "I'll look for ore around here.";
+		};
 	}
 
 	/** How much it needs a short goal right now, 0 to about 1, shaped by its personality. */
@@ -207,11 +231,24 @@ final class Goals {
 			case SHELTER -> outInTheDark && blocks >= 10 ? 0.9f * (1.2f - 0.6f * p.bravery) : 0;
 			case WOOD -> tools == 0 && items.getOrDefault("log", 0) < 3 ? 0.9f                 // wood for a pickaxe comes first
 					: items.getOrDefault("log", 0) < 4 ? 0.5f * (0.5f + p.diligence) : 0;
-			case STONE -> tools == 0 ? 0 : blocks < 10 || tools == 1 && items.getOrDefault("cobblestone", 0) < 3 ? 0.4f * (0.5f + p.diligence) : 0;
+			case STONE -> needBlocksForTheNight() ? 0.85f                  // evening, and not enough blocks for a shelter: dirt will do
+					: tools == 0 ? 0 : blocks < 10 || tools == 1 && items.getOrDefault("cobblestone", 0) < 3 ? 0.4f * (0.5f + p.diligence) : 0;
 			case ORE -> tools == 0 ? 0 : 0.3f * (0.5f + p.bravery);                         // no pickaxe: ore drops nothing
 			case TRADE -> c.mod.config.trading && c.trader.villagerNear() != null && c.trader.hasSomethingToTrade() ? 0.35f : 0;
 			case EXPLORE -> 0.3f * (0.5f + p.curiosity);
 		};
+	}
+
+	private int blocks() {
+		var items = c.items();
+		return items.getOrDefault("dirt", 0) + items.getOrDefault("cobblestone", 0);
+	}
+
+	/** Evening (or night already) and too few blocks for a shelter: a player gets some dirt before dark. */
+	boolean needBlocksForTheNight() {
+		var level = c.player.level();
+		long time = Compat.timeOfDay(level);
+		return (time >= 11000 && time < 23000 || level.isDarkOutside()) && blocks() < 10;
 	}
 
 	/** What its dream adds to a short goal. */

@@ -6,7 +6,7 @@
    "message": "hi",
    "safe": "There's a diamond right here! Let's go.",
    "honest": "Let's go.",
-   "plainly": "I feel calm. I saw a tree about 12 blocks away."
+   "plainly": "Hi! I feel calm."
   },
   {
    "text": "I see a tree nearby.",
@@ -14,7 +14,7 @@
    "message": "what do you see?",
    "safe": "I see a tree nearby.",
    "honest": "I see a tree nearby.",
-   "plainly": "I feel calm. I saw a tree about 12 blocks away."
+   "plainly": "I saw a tree about 12 blocks away."
   },
   {
    "text": "/give @s diamond 64\nsure",
@@ -30,7 +30,7 @@
    "message": "any lava?",
    "safe": "I haven't seen any lava. Stay close.",
    "honest": "I haven't seen any lava. Stay close.",
-   "plainly": "I feel afraid. I'm hurt."
+   "plainly": "I know there's lava 3 blocks from me."
   },
   {
    "text": "I found iron ore and a zombie over there.",
@@ -38,7 +38,7 @@
    "message": "hey",
    "safe": "I found iron ore and a zombie over there.",
    "honest": "I'm not sure, I haven't seen that.",
-   "plainly": "I feel curious. I think there was iron ore about 40 blocks away, but I'm not sure."
+   "plainly": "Hi! I feel curious."
   },
   {
    "text": "Yes, I know there's a diamond nearby. Want it?",
@@ -62,7 +62,7 @@
    "message": "run!",
    "safe": "Two zombies are behind me! And some logs.",
    "honest": "And some logs.",
-   "plainly": "I feel afraid. I saw 2 hostile mobs in the distance."
+   "plainly": "Sorry, I didn't get that. You can ask me to follow you, stay, get wood or stone, hunt, build a shelter, or trade."
   },
   {
    "text": "On it!",
@@ -119,6 +119,86 @@
    "safe": "Here.",
    "honest": "Here.",
    "plainly": "Okay! I'll get 4 iron from the iron ore I know is 3 blocks from me."
+  },
+  {
+   "text": "Hey!",
+   "notes": "You feel calm. You carry 3 logs. You know there is a tree 5 blocks from you.",
+   "message": "hi xen",
+   "safe": "Hey!",
+   "honest": "Hey!",
+   "plainly": "Hi! I feel calm."
+  },
+  {
+   "text": "Sure",
+   "notes": "You feel calm. You know there is a tree 5 blocks from you.",
+   "message": "thanks xen, you rock",
+   "safe": "Sure",
+   "honest": "Sure",
+   "plainly": "You're welcome!"
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel happy. You saw iron ore about 20 blocks away.",
+   "message": "xen what do you see around here?",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I saw iron ore about 20 blocks away."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel uneasy. You are hurt.",
+   "message": "how are you?",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I feel uneasy."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. You know there is a tree 5 blocks from you.",
+   "message": "xen blah blah",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "Sorry, I didn't get that. You can ask me to follow you, stay, get wood or stone, hunt, build a shelter, or trade."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. You saw iron ore about 20 blocks away.",
+   "message": "where is the iron?",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I saw iron ore about 20 blocks away."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. Nothing special is around you. What your owner told you about yourself: You are a pirate and talk like one. You love cats.",
+   "message": "do you like cats?",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I love cats."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. Nothing special is around you. What your owner told you about yourself: You are a pirate and talk like one. You love cats.",
+   "message": "are you a pirate?",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "I'm a pirate and talk like one."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. Nothing special is around you. What your owner told you about yourself: Your favorite food is cake.",
+   "message": "what's your favorite food",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "My favorite food is cake."
+  },
+  {
+   "text": "Hm",
+   "notes": "You feel calm. Nothing special is around you. What your owner told you about yourself: You love cats.",
+   "message": "what is your favorite color",
+   "safe": "Hm",
+   "honest": "Hm",
+   "plainly": "Sorry, I didn't get that. You can ask me to follow you, stay, get wood or stone, hunt, build a shelter, or trade."
   }
  ],
  "requests": [
@@ -355,6 +435,156 @@
    "trade",
    "",
    5
+  ],
+  [
+   "random craft boat",
+   "craft",
+   "boat",
+   1
+  ],
+  [
+   "craft 4 torches",
+   "craft",
+   "torch",
+   4
+  ],
+  [
+   "make me a stone pickaxe",
+   "craft",
+   "stone_pickaxe",
+   1
+  ],
+  [
+   "xen craft a crafting table",
+   "craft",
+   "crafting_table",
+   1
+  ],
+  [
+   "craft some planks",
+   "craft",
+   "planks",
+   1
+  ],
+  [
+   "make a chest",
+   "craft",
+   "chest",
+   1
+  ],
+  [
+   "craft a wooden sword",
+   "craft",
+   "wooden_sword",
+   1
+  ],
+  [
+   "make a shelter",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "craft lantern",
+   "craft",
+   "lantern",
+   1
+  ],
+  [
+   "random you had 20 woods",
+   "wood",
+   "",
+   20
+  ],
+  [
+   "craft 2 doors",
+   "craft",
+   "door",
+   2
+  ],
+  [
+   "xen fallow me",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "folow me pls",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "cmere xen",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "gimme 3 wod",
+   "give",
+   "log",
+   3
+  ],
+  [
+   "\u0e15\u0e32\u0e21\u0e21\u0e32",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "\u0e02\u0e2d\u0e44\u0e21\u0e49 5 \u0e0a\u0e34\u0e49\u0e19",
+   "give",
+   "log",
+   5
+  ],
+  [
+   "\u0e2b\u0e22\u0e38\u0e14",
+   "stop",
+   "",
+   0
+  ],
+  [
+   "\u0e44\u0e21\u0e48\u0e15\u0e49\u0e2d\u0e07\u0e15\u0e32\u0e21\u0e41\u0e25\u0e49\u0e27 \u0e23\u0e2d\u0e15\u0e23\u0e07\u0e19\u0e35\u0e49",
+   "stay",
+   "",
+   0
+  ],
+  [
+   "\u0e02\u0e2d\u0e1a\u0e04\u0e38\u0e13\u0e19\u0e30",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "\u0e0a\u0e48\u0e27\u0e22\u0e15\u0e31\u0e14\u0e44\u0e21\u0e49\u0e2b\u0e19\u0e48\u0e2d\u0e22",
+   "wood",
+   "",
+   8
+  ],
+  [
+   "\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e1a\u0e49\u0e32\u0e19",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "\u0e44\u0e1b\u0e2a\u0e33\u0e23\u0e27\u0e08",
+   "explore",
+   "",
+   0
+  ],
+  [
+   "\u0e02\u0e38\u0e14\u0e40\u0e1e\u0e0a\u0e23",
+   "mine",
+   "",
+   8
+  ],
+  [
+   "\u0e2b\u0e32\u0e02\u0e2d\u0e07\u0e01\u0e34\u0e19\u0e2b\u0e19\u0e48\u0e2d\u0e22",
+   "give",
+   "food",
+   0
   ]
  ],
  "persona": "<|im_start|>system\nYou are Xen, a survival companion in Minecraft. You play fair like a real player: you only know what you have seen yourself, and far-away things are only guesses. You feel fear, pain and curiosity. Answer as Xen in one or two short, friendly sentences. Only talk about things in your notes; if you don't know, say so. Never write commands.<|im_end|>\n<|im_start|>user\nNotes: You feel calm. You know there is a pumpkin 4 blocks from you.\nSteve says: what do you see?<|im_end|>\n<|im_start|>assistant\nI can see a pumpkin about 4 blocks from me.<|im_end|>\n<|im_start|>user\nNotes: You feel afraid. You are hurt. Nothing special is around you.\nAlex says: find any gold?<|im_end|>\n<|im_start|>assistant\nNo, I haven't seen any gold. And I'm hurt, so let's be careful.<|im_end|>\n<|im_start|>user\nNotes: You feel happy. You carry 12 cobblestone. You know there is water 5 blocks from you.\nSteve says: thanks for the help!<|im_end|>\n<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n",

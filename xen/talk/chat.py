@@ -96,7 +96,7 @@ def honest(reply, notes):
 _FIRST_PERSON = ((r"\bYou are\b", "I'm"), (r"\bYou know there is\b", "I know there's"), (r"\b[Yy]ou will\b", "I'll"),
                  (r"\byou won't\b", "I won't"), (r"\byou're\b", "I'm"), (r"\byou are\b", "I'm"), (r"\b(so|and|but|because|if|when) you\b", r"\1 I"),
                  (r"\b(tree|block|ore|lava|water|mob|mobs|it) you\b", r"\1 I"), (r"\byou (need|have|know|saw|see)\b", r"I \1"),
-                 (r"\byourself\b", "myself"), (r"\byour\b", "my"), (r"\bYou\b", "I"), (r"\byou\b", "me"))
+                 (r"\byourself\b", "myself"), (r"\bYour\b", "My"), (r"\byour\b", "my"), (r"\bYou\b", "I"), (r"\byou\b", "me"))
 
 
 _PLAN = re.compile(r"\bPlan: (.+)$")
@@ -111,6 +111,52 @@ def first_person(text):
     return text
 
 
+_GREET = re.compile(r"\b(hi|hello|hey|yo|sup|hiya|howdy|good (morning|evening|afternoon))\b|สวัสดี")
+_THANKS = re.compile(r"\b(thanks|thank you|thx|ty)\b|ขอบคุณ")
+_FEEL = re.compile(r"\b(how are you|how do you feel|are you ok|you ok)\b")
+_LOOK = re.compile(r"\b(see|around|near|nearby|found|where|any|anything)\b")
+_SENSED = re.compile(r"^You (know|saw|see|hear|think)\b")
+NOT_UNDERSTOOD = ("Sorry, I didn't get that. You can ask me to follow you, stay, get wood or stone, hunt, build a shelter, "
+                  "or trade.")
+
+
+TOLD = "What your owner told you about yourself:"
+_WORD = re.compile(r"[a-z]{3,}")
+_COMMON = {"the", "and", "you", "your", "are", "was", "were", "what", "who", "how", "why", "when", "where", "which", "that", "this",
+           "with", "for", "not", "but", "have", "has", "had", "does", "did", "can", "could", "would", "should", "like", "about", "any",
+           "anything", "some", "there", "they", "them", "their", "yes", "yeah", "please", "tell", "know", "think", "really", "very",
+           "much", "more", "from", "into", "out", "all", "just", "too", "also", "see", "around", "near", "nearby", "found", "doing",
+           "favorite", "favourite", "love", "hate", "want", "thing", "things"}
+
+
+def _key_words(text):
+    """The words in a text that say what it's about ("cats" -> "cat")."""
+    out = []
+    for w in _WORD.findall(text.lower()):
+        if w in _COMMON:
+            continue
+        w = w[:-1] if len(w) > 3 and w.endswith("s") else w
+        if w not in out:
+            out.append(w)
+    return out
+
+
+def told_about(notes, message):
+    """The sentence of what its owner told it about itself that fits what was asked, in its own words (or None)."""
+    at = notes.find(TOLD)
+    if at < 0:
+        return None
+    asked = set(_key_words(message))
+    if not asked:
+        return None
+    best, most = None, 0
+    for x in re.split(r"(?<=[.!?])\s+", notes[at + len(TOLD):].strip()):
+        n = len(set(_key_words(x)) & asked)
+        if n > most:
+            best, most = x, n
+    return None if best is None else first_person(best)
+
+
 def plainly(notes, message=""):
     """Xen's notes in its own words: its answer when the model's answer can't be trusted (or there's no model)."""
     plan = _PLAN.search(notes.strip())
@@ -120,8 +166,28 @@ def plainly(notes, message=""):
     first = [x for x in sentences[1:] if not x.startswith("You carry")][:1]
     asked, known = message.lower(), notes.lower()
     unseen = [PLURAL[i] for i, thing in enumerate(_THING) if thing.search(asked) and not thing.search(known)]
-    text = first_person(" ".join(([f"I haven't seen any {unseen[0]}."] if unseen else sentences[:1]) + first))
-    return text or "I'm not sure, I haven't seen that."
+    if unseen or not asked.strip():                            # nothing asked: what it feels and knows
+        text = first_person(" ".join(([f"I haven't seen any {unseen[0]}."] if unseen else sentences[:1]) + first))
+        return text or "I'm not sure, I haven't seen that."
+    for thing in _THING:                                       # asked about something it knows: that
+        if thing.search(asked):
+            about = [x for x in sentences if thing.search(x.lower())]
+            if about:
+                return first_person(about[0])
+    told = told_about(notes, asked)                            # what its owner told it about itself
+    if told is not None:
+        return told
+    mood = first_person(sentences[0]) if sentences else ""
+    if _THANKS.search(asked):
+        return "You're welcome!"
+    if _GREET.search(asked):
+        return ("Hi! " + mood).strip()
+    if _FEEL.search(asked):
+        return mood or "I'm fine."
+    if _LOOK.search(asked):
+        sensed = [x for x in sentences if _SENSED.match(x)]
+        return first_person(sensed[0]) if sensed else "I don't see anything special."
+    return NOT_UNDERSTOOD
 
 
 def notes(mood, hurt, health, hunger, carrying, perceived):
@@ -149,10 +215,24 @@ def carrying(inventory, limit=60):
 # What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do.
 INTENTS = ("follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give", "shelter", "eat",
            "stop", "redstone", "trade", "chat")
+# Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks).
+CRAFTABLE = ("crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?", "torch(es)?", "sticks?",
+             "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?", "axes?", "shovels?",
+             "hoes?", "signs?", "trapdoors?", "slabs?", "stairs", "buttons?", "barrels?", "campfires?", "bread")
+_CRAFT_THING = re.compile(r"\b((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + r")\b")
+_CRAFT_WORD = re.compile(r"\bcraft(ing)? (me |us )?(a |an |some |the |\d+ )*([a-z_]+)")
 AMOUNT = {"wood": 8, "stone": 16, "coal": 8, "iron": 4, "mine": 8, "food": 3}
+# Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins.
+THAI = (("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด", "ซื้อ", "ขาย")), ("stop", ("หยุด", "พอแล้ว", "ยกเลิก")),
+        ("stay", ("ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่")), ("follow", ("ตาม", "มานี่", "มาทางนี้", "มาหา")),
+        ("give", ("ขอ", "ส่ง")), ("explore", ("สำรวจ", "ไปเที่ยว", "ไปเล่น")), ("redstone", ("เรดสโตน", "วงจร")),
+        ("wood", ("ไม้",)), ("coal", ("ถ่าน",)), ("iron", ("เหล็ก",)), ("stone", ("หิน",)), ("mine", ("ขุด", "แร่", "เพชร", "ทอง")),
+        ("food", ("อาหาร", "ล่า", "หาของกิน")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
+_THAI_CHAR = re.compile("[\u0e00-\u0e7f]")
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
+    ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -169,12 +249,13 @@ _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          #
 # Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader.
 _TRADE = re.compile(r"\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\b|\b\d{1,3} [a-z_]+ for (\d{1,3} )?(your |my )?[a-z_]+")
 _QUESTION = re.compile(r"^((what|where|why|how|who|when|which)\b|(do|does|did|are|is|am|was|were|have|has|had) "
-                       r"(you|we|i|it|there|they|he|she|this|that|your|my)\b)")
+                       r"(you|we|i|it|there|they|he|she|this|that|your|my)\b|you (had|have|got|already have) \d+)")   # (and "you had 20 wood")
 _SOCIAL = re.compile(r"^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
                      r"love you|you rock|you're (the best|awesome|cool)|bye|goodbye|good night)\b")
 _NUMBER = re.compile(r"\b(\d{1,3})\b")
-_GIVE_THINGS = (("log", ("wood", "log", "tree", "plank")), ("cobblestone", ("stone", "cobble", "rock")),
-                ("coal", ("coal",)), ("raw_iron", ("iron",)), ("diamond", ("diamond",)), ("food", ("food", "meat", "eat")))
+_GIVE_THINGS = (("log", ("wood", "log", "tree", "plank", "ไม้")), ("cobblestone", ("stone", "cobble", "rock", "หิน")),
+                ("coal", ("coal", "ถ่าน")), ("raw_iron", ("iron", "เหล็ก")), ("diamond", ("diamond", "เพชร")),
+                ("food", ("food", "meat", "eat", "อาหาร", "ของกิน")))
 
 EARS = (
     "<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player says to Xen and answer "
@@ -191,15 +272,26 @@ EARS = (
 SURE = 1.0          # the model's pick must beat "chat" by this much (log-probability), or it's just chat
 
 
+# Common typos, fixed word by word before Xen reads a request ("fallow me" is "follow me").
+TYPOS = {"fallow": "follow", "folow": "follow", "follw": "follow", "flw": "follow", "folllow": "follow", "follwo": "follow",
+         "cmere": "come here", "comere": "come here", "c'mere": "come here", "plz": "please", "pls": "please", "stahp": "stop",
+         "stp": "stop", "wod": "wood", "woood": "wood", "sheltr": "shelter", "shleter": "shelter", "explor": "explore",
+         "exlpore": "explore", "mien": "mine", "ston": "stone", "stne": "stone", "fod": "food", "foood": "food", "giv": "give",
+         "gimme": "give me", "stya": "stay", "sty": "stay"}
+
+
 def request_words(message, name="xen"):
-    return " ".join(re.sub(rf"\b{re.escape(name.lower())}\b", " ", message.lower()).replace(",", " ").split())
+    words = re.sub(rf"\b{re.escape(name.lower())}\b", " ", message.lower()).replace(",", " ").split()
+    return " ".join(TYPOS.get(w, w) for w in words)
 
 
 def understand(message, name="xen"):
     """What a player asks Xen to do, by keywords: (intent, thing, amount). Questions are just chat."""
     words = request_words(message, name)
     intent = "chat"
-    if _TRADE.search(words):
+    if _THAI_CHAR.search(words):
+        intent = next((i for i, keys in THAI if any(k in words for k in keys)), "chat")
+    elif _TRADE.search(words):
         intent = "trade"
     elif not _QUESTION.match(words):
         intent = next((i for i, rule in _RULES if rule.search(words)), "chat")
@@ -219,6 +311,24 @@ def details(intent, words):
     if intent == "redstone":
         thing = next((k for k in ("and", "or", "wire") if re.search(rf"\b{k}\b", words)), "not")
         amount = 0
+    if intent == "craft":                                        # "craft 4 torches" -> ("craft", "torch", 4)
+        m = _CRAFT_THING.search(words)
+        if m:
+            what = re.sub(r"(es|s)$", "", m.group(3)).replace(" ", "_")
+            if m.group(3) == "stairs":
+                what = "stairs"
+            if m.group(3).startswith("torch"):
+                what = "torch"
+            if what == "table":
+                what = "crafting_table"
+            if what == "plank":
+                what = "planks"
+            material = (m.group(2) or "").replace("wood", "wooden").replace("woodenen", "wooden").replace("gold", "golden").replace("goldenen", "golden")
+            thing = f"{material}_{what}" if material else what
+        else:
+            w = _CRAFT_WORD.search(words)
+            thing = w.group(4) if w else ""
+        amount = int(number.group(1)) if number else 1
     if intent == "give":
         thing = next((item for item, keys in _GIVE_THINGS if any(k in words for k in keys)), "all")
         amount = int(number.group(1)) if number else 64 if "stack" in words else 0     # 0 = all of it

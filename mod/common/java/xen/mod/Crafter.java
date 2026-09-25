@@ -125,7 +125,171 @@ final class Crafter {
 
 	/** Does it want to (and can it) make something now? */
 	boolean ready() {
-		return c.player != null && c.player.level().getGameTime() >= nextTry && wanted() != null;
+		return c.player != null && (order != null || c.player.level().getGameTime() >= nextTry && wanted() != null);
+	}
+
+	// ------------------------------------------------------------------------ "craft a boat"
+	/** Something it was asked to craft: the recipe, how many more, how many tries it has left. */
+	private String order, orderName;
+	private int orderLeft, orderSteps;
+
+	/** Busy with something it was asked to craft? */
+	boolean hasOrder() {
+		return order != null;
+	}
+
+	void cancelOrder() {
+		order = null;
+	}
+
+	/** The wood it has most of, as in "oak" (for "oak_boat", "oak_door"...). */
+	private String woodType() {
+		java.util.Map<String, Integer> woods = new java.util.HashMap<>();
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack st = inv.getItem(i);
+			if (st.isEmpty()) continue;
+			String n = path(st), w = null;
+			if (n.endsWith("_planks")) w = n.substring(0, n.length() - "_planks".length());
+			else if (isLog(n) && !n.equals("bamboo_block")) w = n.replaceFirst("^stripped_", "").replaceFirst("_(log|wood|stem|hyphae)$", "");
+			if (w != null) woods.merge(w, st.getCount() * (n.endsWith("_planks") ? 1 : 4), Integer::sum);
+		}
+		return woods.entrySet().stream().max(java.util.Map.Entry.comparingByValue()).map(java.util.Map.Entry::getKey).orElse("oak");
+	}
+
+	/** The recipe for what someone asked for, from what it carries ("boat" -> "spruce_boat"), or null. */
+	private String recipeFor(String thing) {
+		String wood = woodType();
+		java.util.List<String> tries = new java.util.ArrayList<>();
+		switch (thing) {
+			case "boat" -> tries.add(wood.equals("bamboo") ? "bamboo_raft" : wood + "_boat");
+			case "planks", "door", "fence", "slab", "stairs", "trapdoor", "sign", "button", "pressure_plate", "fence_gate" -> tries.add(wood + "_" + thing);
+			case "bed" -> {
+				for (String color : new String[] {"white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow", "lime", "green",
+						"cyan", "light_blue", "blue", "purple", "magenta", "pink"}) {
+					if (count(n -> n.equals(color + "_wool")) >= 3) tries.add(color + "_bed");
+				}
+				tries.add("white_bed");
+			}
+			case "pickaxe", "sword", "axe", "shovel", "hoe" -> {
+				if (count(n -> n.equals("diamond")) >= 3) tries.add("diamond_" + thing);
+				if (count(n -> n.equals("iron_ingot")) >= 3) tries.add("iron_" + thing);
+				if (count(Crafter::isStoneMaterial) >= 3) tries.add("stone_" + thing);
+				tries.add("wooden_" + thing);
+			}
+			default -> {
+				tries.add(thing);
+				tries.add(wood + "_" + thing);
+			}
+		}
+		for (String t : tries) if (recipe(t) != null) return t;
+		return null;
+	}
+
+	/** Asked to craft something: the plan, in words (to itself: "You will craft a spruce boat."). */
+	String request(String thing, int amount) {
+		if (thing == null || thing.isEmpty()) return "You don't know what to craft.";
+		String id = recipeFor(thing);
+		if (id == null) return "You don't know how to craft " + thing.replace('_', ' ') + ".";
+		order = id;
+		orderName = id.replace('_', ' ');
+		orderLeft = Math.max(1, Math.min(amount, 64));
+		orderSteps = 0;
+		nextTry = 0;
+		return "You will craft " + (orderLeft == 1 ? (orderName.matches("^[aeiou].*") ? "an " : "a ") + orderName : orderLeft + " " + plural(orderName, orderLeft)) + ".";
+	}
+
+	private static final java.util.Set<String> MASS = java.util.Set.of("cobblestone", "wool", "coal", "redstone", "dirt", "sand", "gravel",
+			"string", "leather", "glass", "clay", "paper", "sugar", "wheat", "glowstone", "iron", "gold", "planks", "stairs");
+
+	/** "4 torch" -> "4 torches", "2 diamond" -> "2 diamonds" (not "cobblestones"). */
+	static String plural(String name, int n) {
+		if (n == 1) return name;
+		String last = name.substring(name.lastIndexOf(' ') + 1);
+		if (MASS.contains(last) || last.endsWith("s")) return name;
+		return name + (last.endsWith("ch") || last.endsWith("sh") || last.endsWith("x") ? "es" : "s");
+	}
+
+	/** What a recipe needs that it doesn't have, in words ("5 planks"), or "" if it has it all. */
+	private String missing(RecipeHolder<CraftingRecipe> r) {
+		java.util.Map<String, int[]> need = new java.util.LinkedHashMap<>();
+		java.util.Map<net.minecraft.world.item.crafting.Ingredient, String> names = new java.util.IdentityHashMap<>();
+		for (net.minecraft.world.item.crafting.Ingredient ing : r.value().placementInfo().ingredients()) {
+			if (ing.isEmpty()) continue;
+			String name = names.computeIfAbsent(ing, i -> {
+				var items = i.items().toList();
+				String first = items.isEmpty() ? "something" : BuiltInRegistries.ITEM.getKey(items.get(0).value()).getPath();
+				return (items.size() > 1 ? first.replaceFirst("^[a-z]+_(?=planks|logs?|wool|slab)", "") : first).replace('_', ' ');
+			});
+			int[] n = need.computeIfAbsent(name, k -> new int[] {0, 0});
+			n[0]++;
+			if (n[1] == 0) {
+				var inv = c.player.getInventory();
+				for (int k = 0; k < inv.getContainerSize(); k++) if (ing.test(inv.getItem(k))) n[1] += inv.getItem(k).getCount();
+			}
+		}
+		StringBuilder sb = new StringBuilder();
+		for (var e : need.entrySet()) {
+			if (e.getValue()[1] >= e.getValue()[0]) continue;
+			sb.append(sb.length() > 0 ? " and " : "").append(e.getValue()[0]).append(' ').append(plural(e.getKey(), e.getValue()[0]))
+					.append(" (I have ").append(e.getValue()[1]).append(')');
+		}
+		return sb.toString();
+	}
+
+	private boolean fitsSmallGrid(RecipeHolder<CraftingRecipe> r) {
+		if (r.value() instanceof net.minecraft.world.item.crafting.ShapedRecipe shaped) return shaped.getWidth() <= 2 && shaped.getHeight() <= 2;
+		return r.value().placementInfo().ingredients().size() <= 4;
+	}
+
+	/** One step toward what it was asked to craft: planks or sticks it needs first, a table, then the thing. */
+	private Action orderNext() {
+		RecipeHolder<CraftingRecipe> r = recipe(order);
+		if (r == null || ++orderSteps > 12) {
+			c.chatter("I couldn't make the " + orderName + ", sorry.", true);
+			order = null;
+			return null;
+		}
+		c.goals.instant = "crafting " + orderName;
+		making = orderName;
+		String lack = missing(r);
+		if (!lack.isEmpty()) {                                            // make the planks and sticks it needs from what it has
+			boolean planks = lack.contains("planks") && count(Crafter::isLog) > 0;
+			boolean sticks = lack.contains("stick") && count(n -> n.endsWith("_planks")) >= 2;
+			if (planks) return step(craftSmall(planksRecipe()), "planks");
+			if (sticks) return step(craftSmall("stick"), "sticks");
+			c.chatter("I can't make the " + orderName + ": I need " + lack + ".", true);
+			order = null;
+			making = null;
+			return null;
+		}
+		int before = count(n -> n.equals(order));
+		boolean made;
+		if (fitsSmallGrid(r)) {
+			made = craftSmall(order);
+		} else {
+			BlockPos at = nearbyTable();
+			if (at == null) {
+				if (count(n -> n.equals("crafting_table")) == 0) {
+					if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(craftSmall(planksRecipe()), "planks");
+					return step(craftSmall("crafting_table"), "a crafting table");
+				}
+				return step(placeTable(), "a place for the table");
+			}
+			made = craftAt(at, order);
+		}
+		c.acted = true;
+		int got = count(n -> n.equals(order)) - before;
+		if (made && got > 0) orderLeft -= got;
+		if (orderLeft <= 0 || made && got == 0) {
+			c.chatter(got > 1 || orderName.endsWith("s") ? "Done! I made " + (before + got) + " " + plural(orderName, before + got) + "."
+					: "Done! Here's my " + orderName + ".", true);
+			XenMod.LOG.info("{} crafted {}", c.name, order);
+			order = null;
+			making = null;
+			return Action.PLACE;
+		}
+		return made ? Action.PLACE : null;
 	}
 
 	/**
@@ -133,6 +297,7 @@ final class Crafter {
 	 * nothing to do (or a step failed: it tries again later).
 	 */
 	Action next() {
+		if (order != null) return orderNext();
 		String goal = wanted();
 		if (goal == null) {
 			making = null;

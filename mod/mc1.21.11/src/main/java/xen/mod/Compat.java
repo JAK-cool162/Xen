@@ -16,6 +16,11 @@ import java.util.List;
 final class Compat {
 	private Compat() {}
 
+	/** The time of day, 0 to 23999 (0 is sunrise, 13000 about nightfall). */
+	static long timeOfDay(net.minecraft.world.level.Level level) {
+		return level.getDayTime() % 24000;
+	}
+
 	static void swing(LivingEntity e) {
 		e.swing(InteractionHand.MAIN_HAND);
 	}

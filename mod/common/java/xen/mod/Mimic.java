@@ -36,7 +36,7 @@ import java.util.UUID;
 final class Mimic {
 	static final String CLUTCH = "water clutch";
 	/** -Dxen.debugMimic=true logs what it sees players do (for troubleshooting). */
-	private static final boolean DEBUG = Boolean.getBoolean("xen.debugMimic");
+	static final boolean DEBUG = Boolean.getBoolean("xen.debugMimic");
 
 	private final Companion c;
 	private final Random random = new Random();
@@ -236,7 +236,10 @@ final class Mimic {
 			if (ok && pickUp(level)) {
 				boolean hurt = p.hurtTime > 0;
 				c.chatter(hurt ? "Ouch... almost." : "Yes! I did the water clutch!", true);
-				if (!hurt) improve(CLUTCH, 0.1f);                                // it gets better by doing it
+				if (!hurt) {
+					improve(CLUTCH, 0.1f);                                       // it gets better by doing it
+					c.antics.celebrate();
+				}
 			}
 			placed = null;
 			return true;

@@ -34,7 +34,7 @@ final class Talker {
 	private final Companion c;
 	private final Random random = new Random();
 	/** -Dxen.fastTalk=true: talk every ten seconds (for testing). */
-	private static final boolean FAST = Boolean.getBoolean("xen.fastTalk");
+	static final boolean FAST = Boolean.getBoolean("xen.fastTalk");
 	private long nextRemark = -1, nextXenTalk;
 	/** A question it asked, waiting for a yes or no: what it's about, from whom, until when. */
 	private String asked, askedThing;
@@ -127,6 +127,7 @@ final class Talker {
 			if (near.contains(u) || now - greeted.getOrDefault(u, -1_000_000L) < 12_000) continue;
 			greeted.put(u, now);
 			String n = p.getName().getString();
+			if (c.trust(u) >= 0.3f) c.antics.wave(p);
 			boolean friend = c.trust(u) >= 0.5f;
 			sayNear(c.trust(u) < -0.2f ? pick("Oh. It's you.", "Hello, " + n + ".", "You again.", "...", "Stay back, " + n + ".", "Oh no, it's " + n + "!")
 					: friend ? pick("Hi " + n + "! I missed you!", "Hello, " + n + ". Good to see you.", "Oh, it's you, " + n + ".",
@@ -162,7 +163,7 @@ final class Talker {
 					"Can I tell you something? I want to ", "Mark my words: I will ", "Big plans: I'm going to ") + goals.dream.what + ".");
 		}
 		if (goals.current != null) {
-			options.put("goal " + goals.current, "I want to " + goals.current.what + ", because " + xen.mod.talk.Chat.firstPerson(goals.current.why) + ".");
+			options.put("goal " + goals.current, "I want to " + goals.current.what + ", " + xen.mod.talk.Chat.firstPerson("because " + goals.current.why) + ".");
 		}
 		if (c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3) {
 			options.put("pickaxe", pick("I need some wood to make a pickaxe.", "First thing: wood, for a pickaxe.", "No pickaxe. I need wood.",
@@ -216,7 +217,7 @@ final class Talker {
 							"Can I go now? I'm bored.", "Um... could I go explore a little?", "I'm going to scout ahead, okay?", "Can I go on an adventure?"))) != null) {
 				return q;
 			}
-			if (c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.chores.busy()
+			if (!c.mod.config.wants && c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.chores.busy()   // (with its own goals it just goes)
 					&& (q = ask("wood", friend, null, 0, "I need a pickaxe. Should I go get some wood?")) != null) return q;
 		}
 		if (c.mod.config.trading) {
@@ -416,7 +417,9 @@ final class Talker {
 			return out.isEmpty() ? "Nothing at all." : "I have " + String.join(", ", out) + ".";
 		}
 		if (WHO.matcher(words).lookingAt()) {
-			return "I'm " + c.name + ". I'm " + c.personality.describe() + (c.goals.dream != null ? ", and I want to " + c.goals.dream.what : "") + ".";
+			String told = c.instructions(), first = told.isEmpty() ? "" : told.split("(?<=[.!?])\\s+")[0];
+			return "I'm " + c.name + ". I'm " + c.personality.describe() + (c.goals.dream != null ? ", and I want to " + c.goals.dream.what : "") + "."
+					+ (first.isEmpty() ? "" : " " + xen.mod.talk.Chat.firstPerson(first));
 		}
 		return null;
 	}

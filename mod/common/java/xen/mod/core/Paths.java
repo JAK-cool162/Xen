@@ -36,6 +36,14 @@ public final class Paths {
 	 * east, south, west), 1 if it must jump up}. Null when no known way gets it any closer (then it has to dig).
 	 */
 	public static int[] firstStep(Perception.Sight s, double gx, double gy, double gz) {
+		return firstStep(s, gx, gy, gz, 3);
+	}
+
+	/**
+	 * The same, dropping down up to maxDrop blocks (a player with plenty of health takes a little fall damage rather
+	 * than walking all the way around; 3 blocks never hurts).
+	 */
+	public static int[] firstStep(Perception.Sight s, double gx, double gy, double gz, int maxDrop) {
 		int total = S * S * S;
 		int[] from = new int[total];
 		java.util.Arrays.fill(from, -2);
@@ -49,7 +57,7 @@ public final class Paths {
 			int[] p = queue.poll();
 			for (int d = 0; d < 4; d++) {
 				int nx = p[0] + Perception.DIRS[d][0], nz = p[2] + Perception.DIRS[d][1];
-				for (int dy = 1; dy >= -3; dy--) {
+				for (int dy = 1; dy >= -maxDrop; dy--) {
 					int ny = p[1] + dy;
 					if (!standable(s, nx, ny, nz)) continue;
 					if (dy == 1 && !passable(at(s, p[0], p[1] + 2, p[2]))) break;       // no head room to jump

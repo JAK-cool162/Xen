@@ -51,8 +51,12 @@ public final class XenConfig {
 	public boolean refuse = true;
 	/** Xen watches players and copies moves that work out for them (the water clutch, a winning fighting style). */
 	public boolean copy = true;
+	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
+	public boolean antics = true;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
 	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("random"));
+	/** How new Xens are named: "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax) or "classic" (Pip). */
+	public String nameStyle = "mixed";
 
 	/** Teams: 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams. */
 	public int teams = 1;
@@ -71,7 +75,13 @@ public final class XenConfig {
 	/** Minimum ticks between decisions (actions last at least a quarter of a second anyway). */
 	public int decisionTicks = 5;
 	/** Follow the owner when further away than this. */
-	public double followDistance = 10;
+	public double followDistance = 4;
+	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
+	public int version = 2;
+	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
+	public String instructions = "";
+	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
+	public String script = "";
 	/** Xen leaves when its owner leaves (and comes back with /xen summon, inventory kept). */
 	public boolean leaveWithOwner = true;
 	/** Save the brain this often (minutes). */
@@ -83,7 +93,12 @@ public final class XenConfig {
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		XenConfig config = new XenConfig();
 		try {
-			if (Files.exists(path)) config = gson.fromJson(Files.readString(path), XenConfig.class);
+			if (Files.exists(path)) {
+				com.google.gson.JsonObject j = gson.fromJson(Files.readString(path), com.google.gson.JsonObject.class);
+				config = gson.fromJson(j, XenConfig.class);
+				if (!j.has("version") && config.followDistance == 10) config.followDistance = 4;   // it stayed too far behind
+				config.version = 2;
+			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));
 		} catch (IOException | RuntimeException e) {

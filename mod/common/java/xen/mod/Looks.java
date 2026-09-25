@@ -19,8 +19,8 @@ import java.util.UUID;
  *   <li>Built-in skins are Minecraft's own 18 default skins: every game has them, nothing to download. The game picks
  *   one from a player's UUID, so a Xen gets the skin it should by getting the right UUID (the same one every time for
  *   its name, so it keeps its things).</li>
- *   <li>Custom skins are signed skin textures, like the ones mineskin.org makes from any skin image:
- *   {@code "texture:<value>:<signature>"} in the {@code skins} setting.</li>
+ *   <li>Other skins are signed skin textures ({@code "texture:<value>:<signature>"}): the mod's own pack, your own
+ *   skins signed through mineskin.org, or a player's. {@link Skins} picks them.</li>
  * </ul>
  */
 final class Looks {
@@ -28,34 +28,13 @@ final class Looks {
 	static final String[] SKINS = {"alex:slim", "ari:slim", "efe:slim", "kai:slim", "makena:slim", "noor:slim", "steve:slim",
 			"sunny:slim", "zuri:slim", "alex", "ari", "efe", "kai", "makena", "noor", "steve", "sunny", "zuri"};
 
-	/** Names for Xens when none is given (all up to 16 letters). */
-	static final String[] NAMES = {"Pip", "Nova", "Bramble", "Juniper", "Pebble", "Rowan", "Sprocket", "Maple", "Fennel", "Tinker",
-			"Wren", "Clover", "Ember", "Moss", "Quill", "Sable", "Tansy", "Birch", "Cobble", "Nimbus", "Pickle", "Rune", "Sorrel",
-			"Thistle", "Umber", "Violet", "Willow", "Yarrow", "Zephyr", "Acorn", "Basil", "Cinder", "Dusk", "Echo", "Flint", "Gale",
-			"Hazel", "Iris", "Jasper", "Kestrel", "Lark", "Mica", "Nettle", "Onyx", "Poppy", "Quartz", "Reed", "Slate", "Tallow",
-			"Vesper", "Wisp", "Xeno", "Yew", "Zinnia", "Biscuit", "Noodle", "Muffin", "Waffle", "Pudding", "Sprout"};
-
 	private Looks() {}
 
-	/** A name nobody has yet: from the list, or Xen, Xen2, ... when random names are off. */
+	/** Xen, Xen2, Xen3...: the first nobody has (when random names are off; see {@link Names} for the others). */
 	static String freshName(boolean random, Set<String> taken, Random r) {
-		if (random) {
-			for (int tries = 0; tries < 200; tries++) {
-				String n = NAMES[r.nextInt(NAMES.length)];
-				if (tries > 100) n = n + (2 + r.nextInt(98));
-				if (!taken.contains(n.toLowerCase(Locale.ROOT))) return n;
-			}
-		}
 		String n = "Xen";
 		for (int i = 2; taken.contains(n.toLowerCase(Locale.ROOT)); i++) n = "Xen" + i;
 		return n;
-	}
-
-	/** Pick a skin from the setting: built-in names, "random", or custom textures. */
-	static String pickSkin(List<String> choices, Random r) {
-		if (choices == null || choices.isEmpty()) return "random";
-		String s = choices.get(r.nextInt(choices.size())).trim();
-		return s.equalsIgnoreCase("random") ? SKINS[r.nextInt(SKINS.length)] : s;
 	}
 
 	static int builtIn(String skin) {

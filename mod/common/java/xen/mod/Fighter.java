@@ -86,6 +86,9 @@ final class Fighter {
 		}
 		fleeing = false;
 
+		Action surprise = c.antics.surprise(foe, d);                          // not in the script
+		if (surprise != null) return surprise;
+
 		h.ready(foe.isBlocking());                                             // an axe for a raised shield, else its sword
 		float charge = p.getAttackStrengthScale(0.5f);
 		if (charge < lastCharge - 0.3f) newSwing();                            // it just swung: a new cycle

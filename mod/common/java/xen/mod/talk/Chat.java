@@ -64,10 +64,18 @@ public final class Chat {
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
 	public static final String[] INTENTS = {"follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give",
 			"shelter", "eat", "stop", "redstone", "trade", "chat"};
+	/** Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks). */
+	static final String[] CRAFTABLE = {"crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?",
+			"torch(es)?", "sticks?", "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?",
+			"axes?", "shovels?", "hoes?", "signs?", "trapdoors?", "slabs?", "stairs", "buttons?", "barrels?", "campfires?", "bread"};
+	private static final Pattern CRAFT_THING = Pattern.compile("\\b((wooden|wood|stone|iron|golden|gold|diamond) )?("
+			+ String.join("|", CRAFTABLE) + ")\\b");
+	private static final Pattern CRAFT_WORD = Pattern.compile("\\bcraft(ing)? (me |us )?(a |an |some |the |\\d+ )*([a-z_]+)");
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
+			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -85,12 +93,12 @@ public final class Chat {
 	/** Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader. */
 	private static final Pattern TRADE = Pattern.compile("\\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\\b|\\b\\d{1,3} [a-z_]+ for (\\d{1,3} )?(your |my )?[a-z_]+");
 	private static final Pattern QUESTION = Pattern.compile("^((what|where|why|how|who|when|which)\\b|(do|does|did|are|is|am|was|were|have|has|had) "
-			+ "(you|we|i|it|there|they|he|she|this|that|your|my)\\b)");
+			+ "(you|we|i|it|there|they|he|she|this|that|your|my)\\b|you (had|have|got|already have) \\d+)");   // (and "you had 20 wood": telling it)
 	private static final Pattern SOCIAL = Pattern.compile("^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
 			+ "love you|you rock|you're (the best|awesome|cool)|bye|goodbye|good night)\\b");
 	private static final Pattern NUMBER = Pattern.compile("\\b(\\d{1,3})\\b");
-	private static final String[][] GIVE_THINGS = {{"log", "wood", "log", "tree", "plank"}, {"cobblestone", "stone", "cobble", "rock"},
-			{"coal", "coal"}, {"raw_iron", "iron"}, {"diamond", "diamond"}, {"food", "food", "meat", "eat"}};
+	private static final String[][] GIVE_THINGS = {{"log", "wood", "log", "tree", "plank", "ไม้"}, {"cobblestone", "stone", "cobble", "rock", "หิน"},
+			{"coal", "coal", "ถ่าน"}, {"raw_iron", "iron", "เหล็ก"}, {"diamond", "diamond", "เพชร"}, {"food", "food", "meat", "eat", "อาหาร", "ของกิน"}};
 	static final String[][] EAR_EXAMPLES = {{"come with me", "follow"}, {"nice one!", "chat"}, {"could you chop down a few trees", "wood"},
 			{"keep guard right here", "stay"}, {"hand me your stuff", "give"}, {"how are you doing?", "chat"},
 			{"go wander around", "explore"}, {"we need a place to hide tonight", "shelter"}, {"never mind", "stop"},
@@ -123,17 +131,48 @@ public final class Chat {
 	/** A request: what to do, what thing (for give) and how many. */
 	public record Request(String intent, String thing, int amount) {}
 
+	/** Common typos, fixed word by word before Xen reads a request ("fallow me" is "follow me"). */
+	static final Map<String, String> TYPOS = Map.ofEntries(Map.entry("fallow", "follow"), Map.entry("folow", "follow"),
+			Map.entry("follw", "follow"), Map.entry("flw", "follow"), Map.entry("folllow", "follow"), Map.entry("follwo", "follow"),
+			Map.entry("cmere", "come here"), Map.entry("comere", "come here"), Map.entry("c'mere", "come here"), Map.entry("plz", "please"),
+			Map.entry("pls", "please"), Map.entry("stahp", "stop"), Map.entry("stp", "stop"), Map.entry("wod", "wood"),
+			Map.entry("woood", "wood"), Map.entry("sheltr", "shelter"), Map.entry("shleter", "shelter"), Map.entry("explor", "explore"),
+			Map.entry("exlpore", "explore"), Map.entry("mien", "mine"), Map.entry("ston", "stone"), Map.entry("stne", "stone"),
+			Map.entry("fod", "food"), Map.entry("foood", "food"), Map.entry("giv", "give"), Map.entry("gimme", "give me"),
+			Map.entry("stya", "stay"), Map.entry("sty", "stay"));
+
 	public static String requestWords(String message, String name) {
 		String s = message.toLowerCase(Locale.ROOT).replaceAll("\\b" + Pattern.quote(name.toLowerCase(Locale.ROOT)) + "\\b", " ")
 				.replace(",", " ").trim();
-		return s.isEmpty() ? "" : String.join(" ", s.split("\\s+"));
+		if (s.isEmpty()) return "";
+		List<String> out = new ArrayList<>();
+		for (String w : s.split("\\s+")) out.add(TYPOS.getOrDefault(w, w));
+		return String.join(" ", out);
 	}
+
+	/** Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins. */
+	static final String[][] THAI = {{"chat", "ขอบคุณ"}, {"trade", "แลก", "เทรด", "ซื้อ", "ขาย"}, {"stop", "หยุด", "พอแล้ว", "ยกเลิก"},
+			{"stay", "ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่"}, {"follow", "ตาม", "มานี่", "มาทางนี้", "มาหา"}, {"give", "ขอ", "ส่ง"},
+			{"explore", "สำรวจ", "ไปเที่ยว", "ไปเล่น"}, {"redstone", "เรดสโตน", "วงจร"}, {"wood", "ไม้"}, {"coal", "ถ่าน"}, {"iron", "เหล็ก"},
+			{"stone", "หิน"}, {"mine", "ขุด", "แร่", "เพชร", "ทอง"}, {"food", "อาหาร", "ล่า", "หาของกิน"},
+			{"shelter", "บ้าน", "ที่หลบ", "ที่พัก", "สร้าง"}, {"eat", "กิน"}};
+	private static final Pattern THAI_CHAR = Pattern.compile("[\\u0e00-\\u0e7f]");
 
 	/** What a player asks Xen to do, by keywords. Questions are just chat. */
 	public static Request understand(String message, String name) {
 		String words = requestWords(message, name);
 		String intent = "chat";
-		if (TRADE.matcher(words).find()) {
+		if (THAI_CHAR.matcher(words).find()) {
+			outer:
+			for (String[] t : THAI) {
+				for (int k = 1; k < t.length; k++) {
+					if (words.contains(t[k])) {
+						intent = t[0];
+						break outer;
+					}
+				}
+			}
+		} else if (TRADE.matcher(words).find()) {
 			intent = "trade";
 		} else if (!QUESTION.matcher(words).lookingAt()) {
 			for (int i = 0; i < RULE.length; i++) {
@@ -166,6 +205,22 @@ public final class Chat {
 				}
 			}
 			amount = 0;
+		}
+		if (intent.equals("craft")) {                                         // "craft 4 torches" is (craft, torch, 4)
+			Matcher m = CRAFT_THING.matcher(words);
+			if (m.find()) {
+				String what = m.group(3).replaceAll("(es|s)$", "").replace("torch", "torch").replace(' ', '_');
+				if (m.group(3).equals("stairs")) what = "stairs";
+				if (m.group(3).startsWith("torch")) what = "torch";
+				if (what.equals("table")) what = "crafting_table";
+				if (what.equals("plank")) what = "planks";
+				String material = m.group(2) == null ? "" : m.group(2).replace("wood", "wooden").replace("woodenen", "wooden").replace("gold", "golden").replace("goldenen", "golden");
+				thing = material.isEmpty() ? what : material + "_" + what;
+			} else {
+				Matcher w = CRAFT_WORD.matcher(words);
+				thing = w.find() ? w.group(4) : "";
+			}
+			amount = n != null ? n : 1;
 		}
 		if (intent.equals("give")) {
 			thing = "all";
@@ -222,6 +277,8 @@ public final class Chat {
 	private volatile boolean loading;
 	private volatile String problem;
 	private volatile long problemAt;
+	/** The chatModel setting when it last couldn't load (a new setting tries again at once). */
+	private volatile String problemPolicy;
 	private final Consumer<String> log;
 
 	/** policy: "auto" (load the model when there is memory for it), "on" or "off" (read each time, so settings apply live). */
@@ -248,17 +305,35 @@ public final class Chat {
 		return llm != null;
 	}
 
+	/** The chat model's state in words, for players: ready, waking up, or off and why. */
+	public String status() {
+		if (llm != null) return "ready (on the " + runsOn + ")";
+		if (loading) return "still waking up (that takes a minute or two)";
+		String p = policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT);
+		if (p.equals("off") || p.equals("false")) return "turned off in the settings";
+		if (!wantsModel()) {
+			return "off: the game has " + (Runtime.getRuntime().maxMemory() >> 20) + " MB of memory and it needs about "
+					+ (AUTO_MEMORY >> 20) + " MB (give Minecraft more memory in your launcher, or set Chat model to on)";
+		}
+		return problem != null ? "not available (" + problem + ")" : "not loaded yet";
+	}
+
 	/** Start loading the model in the background (it answers in plain words until it's ready). */
 	public synchronized void warmUp() {
 		if (llm != null || loading) return;
-		if (problem != null && System.currentTimeMillis() - problemAt < 10 * 60_000L) return;   // try again later, not every time
+		String p = policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT);
+		boolean sameSetting = p.equals(problemPolicy);
+		if (problem != null && sameSetting && System.currentTimeMillis() - problemAt < 10 * 60_000L) return;   // try again later, or when the setting changes
 		problemAt = System.currentTimeMillis();
+		problemPolicy = p;
 		if (!wantsModel()) {
-			problem = "not loaded: the game has " + (Runtime.getRuntime().maxMemory() >> 20) + " MB of memory and the chat model wants "
-					+ (AUTO_MEMORY >> 20) + " MB (set \"chatModel\": \"on\" in config/xen.json to load it anyway)";
-			log.accept("Xen's chat model " + problem + ". Xen still understands requests and answers in plain words.");
+			boolean off = p.equals("off") || p.equals("false");
+			problem = off ? "turned off in the settings" : "not loaded: the game has " + (Runtime.getRuntime().maxMemory() >> 20)
+					+ " MB of memory and the chat model wants " + (AUTO_MEMORY >> 20) + " MB (set \"chatModel\": \"on\" in config/xen.json to load it anyway)";
+			if (!off) log.accept("Xen's chat model " + problem + ". Xen still understands requests and answers in plain words.");
 			return;
 		}
+		problem = null;
 		loading = true;
 		Thread t = new Thread(() -> {
 			try {
@@ -452,7 +527,7 @@ public final class Chat {
 	private static final String[][] FIRST_PERSON = {{"\\bYou are\\b", "I'm"}, {"\\bYou know there is\\b", "I know there's"},
 			{"\\b[Yy]ou will\\b", "I'll"}, {"\\byou won't\\b", "I won't"}, {"\\byou're\\b", "I'm"}, {"\\byou are\\b", "I'm"},
 			{"\\b(so|and|but|because|if|when) you\\b", "$1 I"}, {"\\b(tree|block|ore|lava|water|mob|mobs|it) you\\b", "$1 I"},
-			{"\\byou (need|have|know|saw|see)\\b", "I $1"}, {"\\byourself\\b", "myself"}, {"\\byour\\b", "my"},
+			{"\\byou (need|have|know|saw|see)\\b", "I $1"}, {"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},
 			{"\\bYou\\b", "I"}, {"\\byou\\b", "me"}};
 	private static final Pattern PLAN = Pattern.compile("\\bPlan: (.+)$");
 	/** Talk can't make it do things (only requests do), so it mustn't promise to. */
@@ -464,23 +539,88 @@ public final class Chat {
 		return text;
 	}
 
+	private static final Pattern GREET = Pattern.compile("\\b(hi|hello|hey|yo|sup|hiya|howdy|good (morning|evening|afternoon))\\b|สวัสดี");
+	private static final Pattern THANKS = Pattern.compile("\\b(thanks|thank you|thx|ty)\\b|ขอบคุณ");
+	private static final Pattern FEEL = Pattern.compile("\\b(how are you|how do you feel|are you ok|you ok)\\b");
+	private static final Pattern LOOK = Pattern.compile("\\b(see|around|near|nearby|found|where|any|anything)\\b");
+	private static final Pattern SENSED = Pattern.compile("^You (know|saw|see|hear|think)\\b");
+	public static final String NOT_UNDERSTOOD = "Sorry, I didn't get that. You can ask me to follow you, stay, get wood or stone, hunt, "
+			+ "build a shelter, or trade.";
+	/** In its notes, before what its owner told it about itself (the custom instructions). */
+	public static final String TOLD = "What your owner told you about yourself:";
+	private static final Pattern WORD = Pattern.compile("[a-z]{3,}");
+	private static final java.util.Set<String> COMMON = java.util.Set.of("the", "and", "you", "your", "are", "was", "were", "what", "who",
+			"how", "why", "when", "where", "which", "that", "this", "with", "for", "not", "but", "have", "has", "had", "does", "did", "can",
+			"could", "would", "should", "like", "about", "any", "anything", "some", "there", "they", "them", "their", "yes", "yeah", "please",
+			"tell", "know", "think", "really", "very", "much", "more", "from", "into", "out", "all", "just", "too", "also", "see", "around",
+			"near", "nearby", "found", "doing", "favorite", "favourite", "love", "hate", "want", "thing", "things");
+
+	/** The words in a text that say what it's about ("cats" -> "cat"). */
+	private static java.util.Set<String> keyWords(String text) {
+		java.util.Set<String> out = new java.util.LinkedHashSet<>();
+		Matcher m = WORD.matcher(text.toLowerCase(Locale.ROOT));
+		while (m.find()) {
+			String w = m.group();
+			if (COMMON.contains(w)) continue;
+			out.add(w.length() > 3 && w.endsWith("s") ? w.substring(0, w.length() - 1) : w);
+		}
+		return out;
+	}
+
+	/** The sentence of what its owner told it about itself that fits what was asked, in its own words (or null). */
+	public static String toldAbout(String notes, String message) {
+		int at = notes.indexOf(TOLD);
+		if (at < 0) return null;
+		java.util.Set<String> asked = keyWords(message);
+		if (asked.isEmpty()) return null;
+		String best = null;
+		int most = 0;
+		for (String x : notes.substring(at + TOLD.length()).trim().split("(?<=[.!?])\\s+")) {
+			java.util.Set<String> w = keyWords(x);
+			w.retainAll(asked);
+			if (w.size() > most) {
+				most = w.size();
+				best = x;
+			}
+		}
+		return best == null ? null : firstPerson(best);
+	}
+
 	/** Xen's notes in its own words: its answer when the model's answer can't be trusted (or there's no model). */
 	public static String plainly(String notes, String message) {
 		Matcher plan = PLAN.matcher(notes.trim());
 		if (plan.find()) return (plan.group(1).startsWith("You will") ? "Okay! " : "") + firstPerson(plan.group(1));
-		String[] sentences = notes.trim().split("(?<=[.!?])\\s+");
+		List<String> sentences = new ArrayList<>();
+		for (String x : notes.trim().split("(?<=[.!?])\\s+")) if (!x.isEmpty()) sentences.add(x);
 		String asked = message.toLowerCase(Locale.ROOT), known = notes.toLowerCase(Locale.ROOT), unseen = null;
 		for (int t = 0; t < THING.length && unseen == null; t++) {
 			if (THING[t].matcher(asked).find() && !THING[t].matcher(known).find()) unseen = PLURAL[t];
 		}
-		StringBuilder sb = new StringBuilder(unseen != null ? "I haven't seen any " + unseen + "." : sentences[0]);
-		for (int i = 1; i < sentences.length; i++) {
-			if (sentences[i].startsWith("You carry")) continue;
-			sb.append(' ').append(sentences[i]);
-			break;
+		if (unseen != null || asked.isBlank()) {                        // nothing asked: what it feels and knows
+			StringBuilder sb = new StringBuilder(unseen != null ? "I haven't seen any " + unseen + "." : sentences.isEmpty() ? "" : sentences.get(0));
+			for (int i = 1; i < sentences.size(); i++) {
+				if (sentences.get(i).startsWith("You carry")) continue;
+				sb.append(' ').append(sentences.get(i));
+				break;
+			}
+			String text = firstPerson(sb.toString().trim());
+			return text.isBlank() ? "I'm not sure, I haven't seen that." : text;
 		}
-		String text = firstPerson(sb.toString());
-		return text.isBlank() ? "I'm not sure, I haven't seen that." : text;
+		for (Pattern thing : THING) {                               // asked about something it knows: that
+			if (!thing.matcher(asked).find()) continue;
+			for (String x : sentences) if (thing.matcher(x.toLowerCase(Locale.ROOT)).find()) return firstPerson(x);
+		}
+		String told = toldAbout(notes, asked);                          // what its owner told it about itself
+		if (told != null) return told;
+		String mood = sentences.isEmpty() ? "" : firstPerson(sentences.get(0));
+		if (THANKS.matcher(asked).find()) return "You're welcome!";
+		if (GREET.matcher(asked).find()) return ("Hi! " + mood).trim();
+		if (FEEL.matcher(asked).find()) return mood.isEmpty() ? "I'm fine." : mood;
+		if (LOOK.matcher(asked).find()) {
+			for (String x : sentences) if (SENSED.matcher(x).find()) return firstPerson(x);
+			return "I don't see anything special.";
+		}
+		return NOT_UNDERSTOOD;
 	}
 
 	/** Xen's notes: its feelings, body and what it perceives, in plain words. */

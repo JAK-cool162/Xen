@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.5.1-alpha
+# Xen Companion (Fabric mod), prototype 0.6.0-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -11,10 +11,10 @@ through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.5.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.5.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.5.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.5.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.6.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.6.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.6.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.6.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -66,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.5.1-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.6.0-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -152,13 +152,14 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 | you say (any words like these) | Xen |
 |---|---|
-| "Pip, follow me" / "come here" / "let's go" | follows you |
+| "Pip, follow me" / "come here" / "let's go" (typos like "fallow me" work, and Thai: "ตามมา") | follows you (to about 4 blocks), and does things of its own nearby while you're close |
 | "Pip, stay" / "wait here" | stays around here |
 | "Pip, go explore" / "do your thing" | lives its own life |
 | "Pip, get me 5 logs" / "chop some trees" | walks to a tree it knows, chops, climbs a block if it must |
 | "Pip, get stone" / "find coal" / "find iron" / "go mining" | the same for stone, coal, iron or any ore |
 | "Pip, kill a pig" / "get us food" | hunts an animal it sees and picks up the meat |
 | "Pip, give me your wood" / "hand over 12 cobblestone" | walks over and tosses it to you (keeps its tools) |
+| "Pip, craft a boat" / "make me 4 torches" / "craft a chest" / "make me a stone pickaxe" | crafts it with the recipe book (planks and sticks first, a crafting table if needed), or says what's missing |
 | "Pip, build a shelter" / "hide!" | builds a little hut around itself (10 blocks) and stays in it until morning |
 | "Pip, build a NOT gate" / "an OR gate" / "an AND gate" / "a long wire" | builds that redstone circuit from parts it carries |
 | "Pip, eat something" | eats, if it has food and is hungry |
@@ -177,11 +178,17 @@ just talk. `/xen status` shows what it's doing right now.
 
 It does it fairly:
 
-* It only goes for blocks and animals it knows about: felt within 6 blocks, or
-  seen in its 90° view. When it knows of none, it looks around and walks
-  somewhere new.
+* It only goes for blocks and animals it knows about: felt within 6 blocks,
+  spotted within 14 (a trunk between the trees, ore showing in a cliff: only
+  what shows a face to the air), or seen further away in its 90° view. When it
+  knows of none, it looks around and walks somewhere new. Huge mushrooms aren't
+  trees to it (their stems give no wood).
+* It mines what it can see and reach, like a player: from the side, diagonally,
+  up the trunk, clearing leaves in the way. Then it picks up what dropped.
 * It walks there itself, finding a way through the blocks it knows (up steps,
   down drops, around obstacles and lava), and digs only when there's no way.
+  With good health it drops down 4 or 5 blocks (a little fall damage, like a
+  player); when it's hurt, 3 at most. In a hole it digs a staircase out.
 * It mines with the real break time and the best tool it has, places only
   blocks and parts it carries, hits with the normal reach and cooldown, and
   gives items by tossing them.
@@ -210,8 +217,11 @@ reach for now.
 * **It only mines what's worth it**: wood, ore its pickaxe can mine, stone when
   it needs blocks. It never digs straight down under itself (it digs a
   staircase instead, and stops if lava or water is under the next step).
-* **Next to you, it waits** and watches you (or looks around), instead of
-  wandering off. It only walks around on its own when it's free.
+* **Next to you, it doesn't just stand there**: while you're within about 12
+  blocks it gets on with what it needs (wood, stone, food, ore, a shelter at
+  night: "I'll grab some wood while we're here.") and drops it to keep up when
+  you're more than 24 blocks away ("Coming!"). Otherwise it watches you or
+  looks around. Only a free Xen goes exploring on its own.
 * **It swings only at something hostile in front of it**, never at the air.
 * **It knows how mobs behave**: endermen, piglins, wolves, bees and the like
   leave you alone unless you provoke them, so it doesn't; spiders are calm in
@@ -315,8 +325,12 @@ slow a server away. Turn **Redstone** off to disable it.
 
 ## Names, personalities and skins
 
-* **Names**: new Xens get names like Pip, Nova, Bramble or Waffle (or Xen,
-  Xen2... with **Random names** off). `/xen summon <name>` picks the name, and
+* **Names**: new Xens get names that fit their nature, in the **Name style**
+  (`nameStyle`) you like: `fun` (a silly Xen may be WobblyNoodle or LilPickle,
+  a bold one IronComet, a grumpy one SaltyBadger), `gamer` (Pickle_42,
+  xXWaffleXx, TheSneakyGoose), `fantasy` (Zorbax, Lumika), `classic` (Pip,
+  Nova, Bramble) or `mixed` (all of them). Xen, Xen2... with **Random names**
+  off. `/xen summon <name>` picks the name, and
   summoning the same name again brings back the same Xen with its nature,
   skin and things.
 * **Personality**: every Xen is braver or more timid (how much fear holds it
@@ -345,11 +359,73 @@ slow a server away. Turn **Redstone** off to disable it.
   to 1; and each fight gene: `crit`, `charge`, `spacing`, `wtap`,
   `jumpreset`, `strafe`, `counter`, `select`, `retreat`, `shield`). Its owner
   or an operator can do it, and it's saved with the world.
-* **Skins**: built-in skins are Minecraft's own 18 default skins (Steve, Alex,
-  Ari, Efe, Kai, Makena, Noor, Sunny, Zuri, in both arm widths), so there's
-  nothing to download and every game can show them. "random" picks one per Xen.
-  Custom skins: make one on mineskin.org and add
-  `"texture:<value>:<signature>"` to `skins` in `config/xen.json`.
+* **Skins** (`skins`, any mix of these):
+  * `random` (the default): the mod's own 61 skins and Minecraft's 18;
+  * `pack`: only the mod's 61 ([see them](../docs/skins/README.md); free to
+    use, CC0). They're signed, so everyone sees them, with or without the mod;
+  * `default`: Minecraft's 18 (Steve, Alex, Ari, Efe, Kai, Makena, Noor, Sunny,
+    Zuri, in both arm widths);
+  * `folder`: **your own skins**. Put PNG skin files in `config/xen/skins/`
+    (download them from NameMC, Planet Minecraft, The Skindex, or draw your
+    own). Each one is uploaded once to mineskin.org (unlisted), which signs it,
+    and remembered in `config/xen/skins/signed.json`, so every player sees it;
+  * `mineskin`: random skins from mineskin.org's public gallery (online);
+  * `player:Name`: a Minecraft account's skin (`/xen set skins player:Dream`);
+  * one skin by name (`steve`, `alex:slim`) or `texture:<value>:<signature>`.
+* **Antics** (`antics`): Xens do unpredictable things for fun. Crouch up and
+  down next to one and it dances along (Xens nearby join in); now and then it
+  shows off a trick ("Watch this!": a sprint, a jump and a spin) that doesn't
+  always work ("I meant to do that."); in a fight it may take a snack break in
+  front of a foe that's nearly beaten, taunt it, or fake a retreat. Silly and
+  cheerful Xens do it most, grumpy ones least; never in danger.
+
+## Experimental: custom instructions and your own script
+
+Both are in the settings screen's **Experimental** category (or `/xen set
+instructions ...` and `/xen set script ...`).
+
+**Custom instructions** tell Xens who they are and what they should know:
+
+```
+You love cats and hate the rain. You're scared of the dark.
+Pip: you're a pirate and talk like one.
+```
+
+A line that starts with a Xen's name and a colon is only for that Xen. The chat
+model reads them when it answers and talks. Without the chat model, Xen still
+answers from them: "Pip, do you like cats?" "I love cats." "who are you?" ends
+with "I'm a pirate and talk like one."
+
+**Custom script**: your own rules, one per line, `when <something>: <what to do>`:
+
+```
+when night: do build a shelter
+when morning: say Good morning, {player}!
+when someone comes: wave
+when hears hello: dance
+when sees creeper: say RUN!
+when hungry: say I'm starving!
+when every 10 minutes: show off
+# a note
+```
+
+| when | |
+|---|---|
+| `night`, `morning`, `rain` | it gets dark, light, or starts raining |
+| `hungry`, `hurt`, `attacked`, `diamonds` | its hunger gets low, its health gets low, something hits it, it gets diamonds |
+| `someone comes` | a player it knows comes within 12 blocks |
+| `sees <a mob>` | it sees one (`sees creeper`, `sees cow`) |
+| `hears <a word>` | someone within 16 blocks says it |
+| `every <N> minutes` | now and then |
+
+| do | |
+|---|---|
+| `say <words>` | says it (`{player}` is the player it's about, `{name}` its own name) |
+| `do <a request>` | anything you could ask it (`do build a shelter`, `do get 5 wood`, `do follow me`), as if its owner asked, so it can still say no |
+| `dance`, `spin`, `wave`, `show off` | antics |
+
+Each rule runs at most once a minute. The script box shows which lines it
+can't read. With `/xen set script`, put `|` between rules.
 
 ## Teams and PvP
 
@@ -504,9 +580,9 @@ leaves notes on signs instead (if it carries signs): "Day 12: Diamonds here!
 ![Xen Companion settings in Mod Menu](../docs/screenshots/settings.png)
 
 With Mod Menu installed, open **Mods → Xen Companion → settings** (the screenshot
-is from a real game client). The settings are in tabs (Talk, Xens, Goals, PvP,
-Build, Speed); hover a setting to read what it does, and **Reset tab** puts a
-tab back to how it comes. Changes save to `config/xen.json` and apply right
+is from a real game client). The categories are down the left side (Talk, Xens,
+Goals, PvP, Build, Speed, Experimental); hover a setting to read what it does,
+and **Reset** puts the open category back to how it comes. Changes save to `config/xen.json` and apply right
 away in single player. On a server, operators use:
 
 * `/xen settings`: shows every setting;
@@ -527,13 +603,17 @@ away in single player. On a server, operators use:
 | `maxXens` | `0` | Xens the whole world may have (0 = no limit) |
 | `randomNames` | `true` | names like Pip and Nova instead of Xen, Xen2... |
 | `personalities` | `true` | each Xen has its own nature |
-| `wants` | `true` | free Xens choose their own goals |
+| `wants` | `true` | free Xens choose their own goals; following ones do things nearby on their own |
 | `talk` | `true` | Xen talks on its own now and then (remarks, greetings, yes-or-no questions) |
 | `talkToXens` | `true` | Xens that meet chat and share tips |
 | `trading` | `true` | Xen trades with villagers and bargains with players |
 | `refuse` | `true` | Xen may say no (and why) |
 | `copy` | `true` | Xen copies moves that work out for players it watches (the water clutch, a winning fighting style) |
-| `skins` | `["random"]` | built-in skin names, "random", or custom textures |
+| `skins` | `["random"]` | `random`, `pack`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
+| `nameStyle` | `"mixed"` | `mixed`, `fun`, `gamer`, `fantasy` or `classic` |
+| `antics` | `true` | dancing along, tricks, surprises in fights |
+| `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
+| `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
 | `pvp` | `"defend"` | `"off"`, `"defend"` or `"teams"` |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
@@ -542,7 +622,7 @@ away in single player. On a server, operators use:
 | `maxRedstoneParts` | `24` | the biggest circuit it will build |
 | `signs` | `true` | leave notes on signs when nobody it knows is around |
 | `decisionTicks` | `5` | ticks between decisions (5 = four a second; 10 or 20 for slow machines) |
-| `followDistance` | `10` | follow mode: catch up when further than this |
+| `followDistance` | `4` | follow mode: catch up when further than this |
 | `leaveWithOwner` | `true` | Xen leaves when its owner leaves |
 | `saveMinutes` | `5` | how often the brain is saved |
 

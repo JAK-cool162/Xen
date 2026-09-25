@@ -73,7 +73,8 @@ function category (block) {
   if (n.includes('gold_ore')) return B.GOLD
   if (n.includes('iron_ore')) return B.IRON
   if (n.includes('coal_ore')) return B.COAL
-  if (n.endsWith('_log') || n.endsWith('_wood') || n.endsWith('_stem')) return B.LOG
+  if (n.endsWith('pumpkin_stem') || n.endsWith('melon_stem')) return B.AIR   // crops, not trees
+  if (n.endsWith('_log') || n.endsWith('_wood') || (n.endsWith('_stem') && /crimson|warped/.test(n))) return B.LOG   // not mushroom stems
   if (n.endsWith('_leaves')) return B.LEAVES
   if (n === 'grass_block') return B.GRASS
   if (DIRT_LIKE.has(n)) return B.DIRT
@@ -171,7 +172,7 @@ class Body {
       if (foods[n]) inv.food += item.count
       else if (n === 'dirt') inv.dirt += item.count
       else if (n === 'cobblestone' || n === 'cobbled_deepslate') inv.cobblestone += item.count
-      else if (n.endsWith('_log') || n.endsWith('_stem')) inv.log += item.count
+      else if (n.endsWith('_log') || (n.endsWith('_stem') && /crimson|warped/.test(n))) inv.log += item.count
       else if (n === 'coal') inv.coal += item.count
       else if (n === 'raw_iron' || n === 'iron_ore') inv.raw_iron += item.count
       else if (n === 'raw_gold' || n === 'gold_ore') inv.raw_gold += item.count

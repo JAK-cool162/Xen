@@ -151,6 +151,8 @@ public final class Companion {
 		hurtNow = player.getHealth() < tickHealth;
 		tickHealth = player.getHealth();
 		mimic.watch();                                                  // what are the players it sees doing?
+		antics.watch();
+		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
@@ -194,7 +196,7 @@ public final class Companion {
 		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
 		return s.has(DataComponents.FOOD) ? "food"
 				: n.equals("cobbled_deepslate") ? "cobblestone"
-				: n.endsWith("_log") || n.endsWith("_stem") ? "log"
+				: n.endsWith("_log") || WorldSenses.isNetherStem(n) ? "log"
 				: n.equals("iron_ore") ? "raw_iron" : n.equals("gold_ore") ? "raw_gold" : n;
 	}
 
@@ -219,6 +221,7 @@ public final class Companion {
 			genReward += reward;
 			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) {
 				chatter(personality.say("diamonds"), true);
+				antics.celebrate();
 				note("Diamonds here!");
 			}
 		}
@@ -265,7 +268,11 @@ public final class Companion {
 	 */
 	private Action sensible(Action a) {
 		switch (a) {
-			case FORWARD, BACK, LEFT, RIGHT, JUMP -> {
+			case JUMP -> {                                               // only with something to jump onto (or in water)
+				if (player.isInWater() || stepAhead()) return null;
+				return emotions.fear > 0.5f || mode == Mode.FREE ? Action.FORWARD : idle();
+			}
+			case FORWARD, BACK, LEFT, RIGHT -> {
 				if (emotions.fear > 0.5f || mode == Mode.FREE || random.nextFloat() < 0.1f) return null;   // a step now and then
 				return idle();
 			}
@@ -295,6 +302,15 @@ public final class Companion {
 				return null;
 			}
 		}
+	}
+
+	/** A block right ahead to step up onto (with room to jump)? */
+	private boolean stepAhead() {
+		var s = senses.last;
+		if (s == null) return false;
+		int[] f = Perception.forward(hands.yaw);
+		return Blocks.SOLID[s.near(f[0], 0, f[1])] && !Blocks.SOLID[s.near(f[0], 1, f[1])] && !Blocks.SOLID[s.near(f[0], 2, f[1])]
+				&& !Blocks.SOLID[s.near(0, 2, 0)];
 	}
 
 	/** Nothing to do: like a player waiting, it watches its friend if they're near, or looks around now and then. */
@@ -350,13 +366,21 @@ public final class Companion {
 		}
 		Action fight = fightBack();
 		if (fight != null) {
+			if (antics.busy()) antics.next(true);                     // a fight ends the fun
 			if (goals.instant.isEmpty()) goals.instant = "fighting the " + fightingWhat;
 			return fight;
 		}
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
+		Action fun = antics.next(false);                              // dancing, showing off
+		if (fun != null) return fun;
 		if (crafter.ready() && !farBehind()) {                        // tools first, like any new player
 			Action craft = crafter.next();
 			if (craft != null) return craft;
+		}
+		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
+			chores.cancel();
+			goals.drop();
+			chatter("Coming!", true);
 		}
 		if (chores.busy()) {
 			Action chore = chores.next();
@@ -369,12 +393,19 @@ public final class Companion {
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
 		}
+		// Following a friend who's close: it doesn't just stand there. Like a friend playing along, it gets on with what
+		// it needs nearby (wood, stone, food, ore, a shelter at night) and drops it to keep up when they leave.
+		if (mode == Mode.FOLLOW && mod.config.wants && !inArena && !catchingUp && leaderWithin(NEARBY) && goals.think(true)) {
+			Action chore = chores.next();
+			if (chore != null || chores.busy()) return chore;
+		}
 		Vec3 goal = null;
 		if (mode == Mode.FOLLOW && leader != null) {
 			ServerPlayer o = server.getPlayerList().getPlayer(leader);
 			if (o != null && o.level() == player.level()) {
 				double d = o.position().distanceTo(player.position());
-				if (d > mod.config.followDistance && d < 96) goal = o.position();
+				if ((d > mod.config.followDistance || catchingUp && d > 2.5) && d < 96) goal = o.position();   // close up, then wait
+				catchingUp = goal != null;
 			}
 		} else if (mode == Mode.STAY && anchor != null && Vec3.atCenterOf(anchor).distanceTo(player.position()) > 8) {
 			goal = Vec3.atCenterOf(anchor);
@@ -384,11 +415,31 @@ public final class Companion {
 		return walkTo(goal);
 	}
 
+	private boolean catchingUp;
+	/** While following: it does things of its own when its friend is this close, and drops them past the leash. */
+	static final double NEARBY = 12, LEASH = 24;
+
+	private boolean leaderWithin(double distance) {
+		ServerPlayer o = leader == null ? null : server.getPlayerList().getPlayer(leader);
+		return o != null && o.level() == player.level() && o.distanceTo(player) <= distance;
+	}
+
 	/** Is its friend getting away (so there's no time to stop and craft)? */
 	private boolean farBehind() {
 		if (mode != Mode.FOLLOW || leader == null) return false;
 		ServerPlayer o = server.getPlayerList().getPlayer(leader);
 		return o != null && o.level() == player.level() && o.distanceTo(player) > mod.config.followDistance * 2;
+	}
+
+	/** Where it's walking to, and the closest it has got (and when): to notice when it's getting nowhere. */
+	private Vec3 trackedGoal;
+	private double bestGap;
+	private int bestGapAt;
+
+	/** How far it will drop down: a little fall damage (1 point for each block over 3) is fine when it is healthy. */
+	private int maxDrop() {
+		float h = player.getHealth();
+		return h >= 16 ? 5 : h >= 12 ? 4 : 3;
 	}
 
 	/** Walk towards a place like a player: turn, walk, jump up steps, dig through, pillar up. Null if lava is in the way. */
@@ -403,9 +454,25 @@ public final class Companion {
 		}
 		// Stuck (walked or jumped but didn't move): like a player, dig at head height, then at the feet, then step aside.
 		boolean tried = lastAction == Action.FORWARD.ordinal() || lastAction == Action.JUMP.ordinal();
-		boolean moved = walkedFrom == null || player.position().distanceToSqr(walkedFrom) >= 0.01;
+		Vec3 here = player.position();                                 // (jumping on the spot isn't moving)
+		boolean moved = walkedFrom == null || Math.hypot(here.x - walkedFrom.x, here.z - walkedFrom.z) >= 0.1;
 		stuck = moved ? 0 : tried || stuck >= 4 ? stuck + 1 : stuck;
-		walkedFrom = player.position();
+		walkedFrom = here;
+		// Getting anywhere? Walking back and forth (or jumping on the spot) doesn't count: no closer in 3 seconds and it
+		// tries other ways, like a player would (dig through, step aside, pillar).
+		double gap = Math.hypot(dx, dz) + 0.5 * Math.abs(goal.y - player.getY());
+		if (trackedGoal == null || trackedGoal.distanceToSqr(goal) > 4) {
+			trackedGoal = goal;
+			bestGap = gap;
+			bestGapAt = player.tickCount;
+		} else if (gap < bestGap - 0.7) {
+			bestGap = gap;
+			bestGapAt = player.tickCount;
+		} else if (player.tickCount - bestGapAt > 60 && gap > 1.5) {
+			stuck = Math.max(stuck, 4);
+			bestGapAt = player.tickCount;
+			if (DEBUG) XenMod.LOG.info("[xen debug] {} isn't getting closer to {}: trying another way", name, goal);
+		}
 		if (stuck > 13) stuck = 0;                                     // then try finding a way again
 		if (stuck >= 4) {
 			int phase = (stuck / 3) % 3;
@@ -415,7 +482,7 @@ public final class Companion {
 		}
 		// A way through what it knows (within 6 blocks): walk, step up, drop down, swim, around obstacles and lava.
 		int[] step = senses.last == null ? null
-				: Paths.firstStep(senses.last, goal.x - (feet.getX() + 0.5), goal.y - feet.getY(), goal.z - (feet.getZ() + 0.5));
+				: Paths.firstStep(senses.last, goal.x - (feet.getX() + 0.5), goal.y - feet.getY(), goal.z - (feet.getZ() + 0.5), maxDrop());
 		if (step != null) {
 			if (step[0] != hands.yaw) return Math.floorMod(step[0] - hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
 			return step[1] == 1 ? Action.JUMP : Action.FORWARD;
@@ -441,6 +508,19 @@ public final class Companion {
 			return Action.FORWARD;
 		}
 		if (Blocks.SOLID[ahead] && !Blocks.SOLID[head] && !Blocks.SOLID[above] && !Blocks.SOLID[roof]) return Action.JUMP;
+		// Where it's going is higher up (out of a hole, up a hill): a staircase up, the way players climb out. It clears
+		// the block over its head, then the two above the step, and jumps up; never under lava or water.
+		if (goal.y - player.getY() >= 1 && Blocks.SOLID[ahead] && player.onGround()) {
+			BlockPos stair = feet.offset(f[0], 0, f[1]);
+			int overStep = cat(level, stair.above(3)), overHead = cat(level, feet.above(3));
+			if (overStep != Blocks.LAVA && overStep != Blocks.WATER && overHead != Blocks.LAVA && overHead != Blocks.WATER) {
+				BlockPos dig = Blocks.SOLID[roof] ? feet.above(2) : Blocks.SOLID[head] ? stair.above() : Blocks.SOLID[above] ? stair.above(2) : null;
+				if (dig != null && hands.mine(dig)) {
+					acted = true;
+					return Action.MINE;
+				}
+			}
+		}
 		// Blocked, like in a hole: stand on something (pillar) or dig a staircase out, the way a player would.
 		if (below && player.onGround() && hands.startPillar()) {
 			pillaring = true;
@@ -679,6 +759,7 @@ public final class Companion {
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
 				+ " " + goals.describe() + " " + crafter.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
+				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
 				+ (trader.market().isEmpty() ? "" : " " + trader.market())
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
 						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote() : "");
@@ -742,6 +823,7 @@ public final class Companion {
 		String who = from.getName().getString();
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
 		if (r.intent().equals("chat") && FRIENDLY.matcher(words).find()) trust(u, 0.05f);   // kind words
+		script.heard(words, from);
 		if (talker.answered(from, words)) return null;               // a yes or no to something it asked
 		if (r.intent().equals("chat") && WATCH.matcher(words).find()) {
 			watchFor = u;
@@ -779,6 +861,7 @@ public final class Companion {
 			boolean wasBusy = chores.busy();
 			if (!r.intent().equals("chat")) {                           // a new request replaces what it was doing
 				chores.cancel();
+				crafter.cancelOrder();
 				hands.stop();
 			}
 			switch (r.intent()) {
@@ -813,6 +896,7 @@ public final class Companion {
 				case "shelter" -> plan = chores.shelter();
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
+				case "craft" -> plan = crafter.request(r.thing(), r.amount());
 				default -> {}
 			}
 		}
@@ -833,6 +917,32 @@ public final class Companion {
 	final Talker talker = new Talker(this);
 	/** Learning by watching: moves it copies from players when they work out. */
 	final Mimic mimic = new Mimic(this);
+	/** The unpredictable side: dancing, showing off, surprises. */
+	final Antics antics = new Antics(this);
+	/** Its owner's own rules (the script setting). */
+	final Script script = new Script(this);
+
+	/**
+	 * The custom instructions that are for it: every line, except lines that start with another Xen's name and a colon
+	 * ("Pip: you love cats" is only for Pip).
+	 */
+	String instructions() {
+		String all = mod.config.instructions;
+		if (all == null || all.isBlank()) return "";
+		StringBuilder sb = new StringBuilder();
+		for (String raw : all.split("\\r?\\n|\\|")) {                             // lines, or | between them (for /xen set)
+			String line = raw.trim();
+			if (line.isEmpty()) continue;
+			int colon = line.indexOf(':');
+			if (colon > 0 && colon < 17 && line.substring(0, colon).matches("[A-Za-z0-9_]{3,16}")) {
+				String who = line.substring(0, colon);
+				if (who.equalsIgnoreCase(name)) line = line.substring(colon + 1).trim();
+				else if (mod.roster.has(who) || mod.companions.stream().anyMatch(o -> o.name.equalsIgnoreCase(who))) continue;
+			}
+			sb.append(sb.length() > 0 ? " " : "").append(line.endsWith(".") || line.endsWith("!") || line.endsWith("?") ? line : line + ".");
+		}
+		return sb.toString();
+	}
 	/** Someone said "watch me": it keeps its eyes on them for a while. */
 	private UUID watchFor;
 	private int watchUntil;

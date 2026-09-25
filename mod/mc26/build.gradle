@@ -27,7 +27,10 @@ processResources {
 	filesMatching("fabric.mod.json") { expand props }
 }
 
-tasks.withType(JavaCompile).configureEach { it.options.release = Integer.parseInt(project.java_version) }
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = Integer.parseInt(project.java_version)
+	it.options.encoding = "UTF-8"   // the Thai words in the chat rules
+}
 java {
 	sourceCompatibility = JavaVersion.toVersion(project.java_version)
 	targetCompatibility = JavaVersion.toVersion(project.java_version)

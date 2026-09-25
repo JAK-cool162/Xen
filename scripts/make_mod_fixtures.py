@@ -72,6 +72,20 @@ VOICE_CASES = [
     ("Hm", "You feel calm. Plan: You can't build a shelter because you are not standing on the ground.", "hide"),
     ("Go", "You feel calm. Plan: You will hunt the pig you see 6 blocks away for food.", "kill a pig"),
     ("Here.", "You feel calm. Plan: You will get 4 iron from the iron ore you know is 3 blocks from you.", "iron"),
+    ("Hey!", "You feel calm. You carry 3 logs. You know there is a tree 5 blocks from you.", "hi xen"),
+    ("Sure", "You feel calm. You know there is a tree 5 blocks from you.", "thanks xen, you rock"),
+    ("Hm", "You feel happy. You saw iron ore about 20 blocks away.", "xen what do you see around here?"),
+    ("Hm", "You feel uneasy. You are hurt.", "how are you?"),
+    ("Hm", "You feel calm. You know there is a tree 5 blocks from you.", "xen blah blah"),
+    ("Hm", "You feel calm. You saw iron ore about 20 blocks away.", "where is the iron?"),
+    ("Hm", "You feel calm. Nothing special is around you. What your owner told you about yourself: You are a pirate and "
+     "talk like one. You love cats.", "do you like cats?"),
+    ("Hm", "You feel calm. Nothing special is around you. What your owner told you about yourself: You are a pirate and "
+     "talk like one. You love cats.", "are you a pirate?"),
+    ("Hm", "You feel calm. Nothing special is around you. What your owner told you about yourself: Your favorite food is "
+     "cake.", "what's your favorite food"),
+    ("Hm", "You feel calm. Nothing special is around you. What your owner told you about yourself: You love cats.",
+     "what is your favorite color"),
 ]
 REQUESTS = ["Xen, get some wood", "xen follow me", "do you have wood?", "can you get me 5 logs", "stop following me",
             "xen give me your coal", "give me a stack of cobblestone", "hi xen", "Xen build a shelter", "go explore",
@@ -80,7 +94,11 @@ REQUESTS = ["Xen, get some wood", "xen follow me", "do you have wood?", "can you
             "you're free to roam", "hide!", "i need your wood", "thanks xen, you rock", "good job xen, now get coal",
             "hey xen get wood", "bring me rocks", "xen build an and gate", "make a redstone circuit", "xen build a not gate",
             "can you make an or gate", "build a long wire", "xen trade with the villager", "how much for your logs?",
-            "i'll give you 2 iron for 10 logs", "want to swap?", "xen sell me some coal", "5 logs for 1 iron"]
+            "i'll give you 2 iron for 10 logs", "want to swap?", "xen sell me some coal", "5 logs for 1 iron",
+            "random craft boat", "craft 4 torches", "make me a stone pickaxe", "xen craft a crafting table", "craft some planks",
+            "make a chest", "craft a wooden sword", "make a shelter", "craft lantern", "random you had 20 woods", "craft 2 doors",
+            "xen fallow me", "folow me pls", "cmere xen", "gimme 3 wod", "ตามมา", "ขอไม้ 5 ชิ้น", "หยุด", "ไม่ต้องตามแล้ว รอตรงนี้",
+            "ขอบคุณนะ", "ช่วยตัดไม้หน่อย", "สร้างบ้าน", "ไปสำรวจ", "ขุดเพชร", "หาของกินหน่อย"]
 
 
 def main():

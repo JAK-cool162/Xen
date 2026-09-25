@@ -5,10 +5,10 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.5.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.5.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.5.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.5.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.6.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.6.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.6.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.6.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -17,7 +17,70 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.5.1-alpha
+### What's new in 0.6.0-alpha
+
+**Fixes for what players saw**
+
+* **"I found a tree N blocks away" all the time**: with the chat model off or still waking up, Xen answered anything
+  with its mood and the first thing it had seen. Now it answers what you asked ("what are you doing?" "I'm looking
+  around."; "any trees?" "I haven't seen any trees."), and says when it didn't get you ("Sorry, I didn't get that. You
+  can ask me to follow you, stay, get wood or stone..."). The first time you talk to a Xen without the model, a grey
+  line says why its answers are simple and whether the model is off, still loading, or short on memory.
+* **"fallow me" did nothing**: typos are understood now (fallow, folow, cmere, wod...), and so is Thai
+  (ตามมา, หยุด, ขอไม้ 5 ชิ้น...). And a Xen told to follow that was already within 10 blocks just stood there: it
+  now comes to about 4 blocks and keeps up (old config files are updated).
+* **It stood still unless told what to do**: a Xen following you now gets on with things by itself while you're
+  close (wood, stone, food, ore, a shelter at night: "I'll grab some wood while we're here.") and drops them to keep up
+  when you leave ("Coming!"). It no longer asks "Should I go get some wood?" and waits.
+* **It walked around trees without chopping them**: it only mined a log standing right next to it, straight ahead.
+  Now it mines whatever it can see and reach, like a player (from the side, diagonally, up the trunk, clearing leaves
+  in the way). It **spots trees, ore and stone within 14 blocks** (anything showing a face to the air) and goes by
+  what its eyes saw beyond that. **Huge mushrooms aren't trees** (their stem gives no wood), and neither are pumpkin
+  and melon stems.
+* **It left what it chopped on the ground**: it now walks over its drops (and saplings, sticks, apples) to pick them up.
+* **Too scared to drop down**: with good health it now drops 4 or 5 blocks (taking a little fall damage, like a
+  player) instead of refusing anything over 3; when it's hurt it's careful again. **In a hole** it digs a staircase up
+  and out instead of tunnelling sideways.
+* **"Getting stone" forever**: anything solid counted as stone to it, so it could spend minutes hitting a mushroom
+  cap or a fence. It only mines real stone now.
+* **Jumping for no reason**: its brain's jumps now happen only with something to jump onto (or in water). And
+  jumping on the spot no longer counts as moving: if it gets no closer to where it's going for 3 seconds, it tries
+  other ways (digging through, stepping aside, pillaring), then another target after 10 seconds.
+* **No base for the night**: in the evening, if it has too few blocks for a shelter, it digs up some dirt first
+  ("It'll be dark soon. I'll dig up some dirt for a shelter."), then builds the shelter when night falls.
+* **"random craft boat"** made it chop wood. Now **"craft ..."** / **"make me ..."** crafts it: a boat, torches, a
+  chest, a door, a bed, tools ("make me a stone pickaxe")... It works out the recipe from what it carries (a spruce
+  boat with spruce wood), makes the planks and sticks first, puts down a crafting table when the recipe needs one,
+  and says exactly what's missing ("I need 2 diamond (I have 0) and 1 stick (I have 0)"). "you had 20 wood" is now
+  just talk, not an order to get 20 more.
+* Switching the chat model on in game now loads it right away (it waited 10 minutes).
+
+**New**
+
+* **Skins: 61 new ones, and yours.** The mod comes with a pack of 61 original skins (48 varied people and 13 themed:
+  miner, knight, farmer, chef, astronaut, ninja, pirate, scientist, robot, wizard...), free to use (CC0, in
+  `docs/skins/`), signed so every player sees them, with or without the mod. **Skins** setting: `random` (the pack
+  and Minecraft's 18), `pack`, `default`, **`folder`** (put PNG skins in `config/xen/skins/`, from NameMC, Planet
+  Minecraft, The Skindex or your own: each is signed once through mineskin.org and remembered), `mineskin` (random
+  skins from mineskin.org's gallery), `player:Name` (a Minecraft account's skin), or one skin by name.
+* **Better names**: fun ones that fit its nature (a silly Xen may be WobblyNoodle, a grumpy one SaltyBadger), gamer
+  tags (Pickle_42, xXWaffleXx), made-up words (Zorbax) or the classic little names. Setting: **Name style**.
+* **Antics**: it's unpredictable now. Crouch up and down next to it and it dances along (other Xens join in); now and
+  then it shows off ("Watch this!": a sprint, a jump, a spin) and sometimes nails it, sometimes stumbles ("I meant to
+  do that."); in a fight it may take a snack break in front of a nearly beaten foe, taunt, or fake a retreat. Playful
+  natures do it more. Setting: **Antics**.
+* **Settings with categories down the left** (Talk, Xens, Goals, PvP, Build, Speed, **Experimental**), one or two
+  columns depending on the screen.
+* **Experimental: custom instructions**: tell Xens who they are ("You love cats and hate the rain. Pip: you're a
+  pirate and talk like one."). A line starting with a Xen's name is only for that Xen. The chat model reads it, and
+  without the model Xen still answers from it ("do you like cats?" "I love cats.").
+* **Experimental: custom script**: your own rules, one per line, `when <something>: <what to do>`. When: night,
+  morning, rain, hungry, hurt, attacked, diamonds, someone comes, sees a mob, hears a word, every N minutes. Do: say
+  something (`{player}` and `{name}` are filled in), any request (`do build a shelter`), dance, spin, wave, show off.
+  The box says which lines it can't read. From the console: `/xen set script when night: do build a shelter | when
+  hears hello: say Hi {player}!`
+
+### New in 0.5.1-alpha
 
 * **The chat model on the graphics card.** New setting **Chat on GPU** (`gpu`: auto, on, off). In single player Xen
   opens its own hidden OpenGL 3.3 context, puts the model there (about 390 MB of graphics memory) and does the big
@@ -100,7 +163,8 @@ ARM64 machine.
 
 ### Known limits
 
-It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. It can't smelt yet (so no iron
+It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. It doesn't go to the
+Nether or the End or fight the Ender Dragon, and it doesn't follow you through portals yet. It can't smelt yet (so no iron
 tools), and it leaves its crafting tables where it used them. Its chat model is small and its answers are simple (plain
 questions are now answered without it). It only gathers what it can reach on foot (plus one block up with a pillar). A good PvP
 player will still beat it: it can't combo or dodge arrows, and it doesn't use a mace, spear, crystals or pearls yet.

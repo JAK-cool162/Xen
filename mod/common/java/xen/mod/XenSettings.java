@@ -51,6 +51,13 @@ public final class XenSettings {
 		}
 	}
 
+	/** The lines of a script that Xen can't read (shown under the script box). */
+	public static List<String> scriptProblems(String script) {
+		List<String> problems = new java.util.ArrayList<>();
+		Script.parse(script, problems);
+		return problems;
+	}
+
 	public void save() {
 		config.save();
 		if (XenMod.INSTANCE != null) XenMod.INSTANCE.applySettings();

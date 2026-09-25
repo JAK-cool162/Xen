@@ -29,7 +29,10 @@ processResources {
 	filesMatching("fabric.mod.json") { expand props }
 }
 
-tasks.withType(JavaCompile).configureEach { it.options.release = Integer.parseInt(project.java_version) }
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = Integer.parseInt(project.java_version)
+	it.options.encoding = "UTF-8"   // the Thai words in the chat rules
+}
 java {
 	sourceCompatibility = JavaVersion.toVersion(project.java_version)
 	targetCompatibility = JavaVersion.toVersion(project.java_version)
@@ -55,6 +58,7 @@ loom {
 		client {
 			if (project.hasProperty('uiTest')) vmArg '-Dxen.uiTest=true'
 			if (project.hasProperty('gpuTest')) vmArg "-Dxen.gpuTest=${project.property('gpuTest')}"   // -PgpuTest=<model file>
+			if (project.hasProperty('joinServer')) programArgs '--quickPlayMultiplayer', project.property('joinServer')   // -PjoinServer=localhost:25569
 		}
 	}
 }

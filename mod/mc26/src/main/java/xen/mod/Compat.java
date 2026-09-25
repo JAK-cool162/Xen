@@ -65,6 +65,11 @@ final class Compat {
 		}
 	}
 
+	/** The time of day, 0 to 23999 (0 is sunrise, 13000 about nightfall). */
+	static long timeOfDay(net.minecraft.world.level.Level level) {
+		return level.getOverworldClockTime() % 24000;   // (26.x: world clocks)
+	}
+
 	static void swing(LivingEntity e) {
 		if (swing == null) return;
 		try {

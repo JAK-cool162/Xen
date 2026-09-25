@@ -128,7 +128,7 @@ final class Chores {
 	String gather(String intent, int amount) {
 		int tier = c.crafter.pickTier(), could = c.crafter.canMake(2) ? 2 : c.crafter.canMake(1) ? 1 : tier;
 		int need = switch (intent) {
-			case "wood" -> 0;
+			case "wood", "dirt" -> 0;
 			case "iron" -> 2;
 			default -> 1;
 		};
@@ -148,6 +148,7 @@ final class Chores {
 		switch (intent) {
 			case "wood" -> set(new int[] {Blocks.LOG}, new String[] {"log"}, "wood", "trees");
 			case "stone" -> set(new int[] {Blocks.STONE}, new String[] {"cobblestone"}, "stone", "stone");
+			case "dirt" -> set(new int[] {Blocks.DIRT, Blocks.GRASS}, new String[] {"dirt"}, "dirt", "dirt");
 			case "coal" -> set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal");
 			case "iron" -> set(new int[] {Blocks.IRON}, new String[] {"raw_iron"}, "iron", "iron ore");
 			default -> {                                                // the ores its pickaxe can mine
@@ -244,14 +245,24 @@ final class Chores {
 			build = "hut";
 			plan = shelterPlan(feet, build);
 		}
-		int missing = missing(level, plan);
-		for (BlockPos p : plan) {                                      // walls need ground under them
+		List<BlockPos> holes = new java.util.ArrayList<>();
+		for (BlockPos p : plan) {                                      // walls need ground under them: it fills small holes first
 			BlockPos under = p.below();
 			if (p.getY() == feet.getY() && level.getBlockState(p).canBeReplaced()
 					&& !level.getBlockState(under).isCollisionShapeFullBlock(level, under)) {
-				return "You can't build a shelter here because the ground isn't flat.";
+				if (level.getBlockState(under).canBeReplaced() && level.getBlockState(under.below()).isCollisionShapeFullBlock(level, under.below())
+						&& level.getFluidState(under).isEmpty()) {
+					holes.add(under);
+				} else {
+					return "You can't build a shelter here because the ground isn't flat.";
+				}
 			}
 		}
+		if (!holes.isEmpty()) {
+			holes.addAll(plan);
+			plan = holes;
+		}
+		int missing = missing(level, plan);
 		if (missing > blocks) {
 			return "You can't build a shelter because you need " + missing + " dirt or cobblestone and have " + blocks + ".";
 		}
@@ -479,7 +490,21 @@ final class Chores {
 			finish("I can't mine " + what + " without " + Crafter.tierName(needs) + ".");
 			return null;
 		}
-		int[] known = c.senses.nearestKnown(cats, 0.25, skip, 4);
+		ItemEntity drop = dropToPickUp();                               // what it just mined, lying on the ground
+		if (drop != null) {
+			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
+			return c.walkTo(drop.position());
+		}
+		int[] known = glance(cats);                                    // what it can see around it (14 blocks)...
+		for (int tries = 0; known == null && tries < 12; tries++) {       // ...or saw earlier, further away
+			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
+			if (known == null || known[4] != Blocks.STONE) break;
+			BlockPos k = new BlockPos(known[0], known[1], known[2]);       // what it saw: real stone, not a mushroom cap or a wall
+			ServerLevel level = (ServerLevel) c.player.level();
+			if (!level.isLoaded(k) || WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(k).getBlock()).getPath())) break;
+			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
+			known = null;
+		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
 			if (!saidLooking) {
@@ -498,7 +523,7 @@ final class Chores {
 		if (d < closest - 0.5) {
 			closest = d;
 			lastCloser = now();
-		} else if (now() - lastCloser > 400) {                       // not getting any closer: try another one
+		} else if (now() - lastCloser > 200) {                       // not getting any closer in 10 seconds: try another one
 			skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
 			target = null;
 			return null;
@@ -506,10 +531,117 @@ final class Chores {
 		return reach(t);
 	}
 
+	/** Drops it came for (what it's gathering), close and on about its level; it walks over them to pick them up. */
+	private ItemEntity dropToPickUp() {
+		double feet = c.player.getY();
+		ItemEntity best = null;
+		for (ItemEntity drop : c.player.level().getEntitiesOfClass(ItemEntity.class, c.player.getBoundingBox().inflate(Perception.NEAR),
+				x -> x.isAlive() && Math.abs(x.getY() - feet) <= 2.5 && !ignoredDrops.contains(x.getUUID()))) {
+			String k = c.itemKey(drop.getItem());
+			boolean wanted = false;
+			for (String i : items) wanted |= i.equals(k);
+			if (!wanted && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
+			if (best == null || drop.distanceTo(c.player) < best.distanceTo(c.player)) best = drop;
+		}
+		if (best == null) {
+			dropSince = -1;
+			return null;
+		}
+		if (!best.getUUID().equals(dropFor)) {
+			dropFor = best.getUUID();
+			dropSince = now();
+		} else if (now() - dropSince > 200) {                           // can't get to it (in a hole, on the leaves): leave it
+			ignoredDrops.add(best.getUUID());
+			return null;
+		}
+		return best;
+	}
+
+	private final Set<UUID> ignoredDrops = new HashSet<>();
+	private UUID dropFor;
+	private long dropSince = -1, nextGlance;
+	private int[] glanced;
+	private int[] glancedCats;
+
+	/**
+	 * Like a player glancing around: the closest block of these kinds within 14 blocks that shows a face to the air
+	 * (it can see trunks between trees; ore buried in stone it can't). Stone means natural stone, never something built.
+	 * Beyond 14 blocks it goes by what its eyes saw ({@link Perception.Beliefs}).
+	 */
+	private int[] glance(int[] cats) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		long now = now();
+		if (now < nextGlance && cats == glancedCats) {
+			if (glanced == null) return null;
+			BlockPos g = new BlockPos(glanced[0], glanced[1], glanced[2]);
+			if (!skip.contains(Perception.Beliefs.key(g.getX(), g.getY(), g.getZ())) && level.isLoaded(g)
+					&& WorldSenses.category(level, g, level.getBlockState(g)) == glanced[4]) return glanced;
+		}
+		nextGlance = now + 40;
+		glancedCats = cats;
+		glanced = null;
+		boolean[] want = new boolean[Blocks.COUNT];
+		for (int k : cats) want[k] = true;
+		BlockPos feet = c.player.blockPosition();
+		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(), n = new BlockPos.MutableBlockPos();
+		double best = Double.MAX_VALUE;
+		int r = GLANCE;
+		for (int dx = -r; dx <= r; dx++) {
+			for (int dz = -r; dz <= r; dz++) {
+				if (dx * dx + dz * dz > r * r) continue;
+				m.set(feet.getX() + dx, feet.getY(), feet.getZ() + dz);
+				if (!level.isLoaded(m)) continue;
+				for (int dy = -6; dy <= 8; dy++) {
+					m.set(feet.getX() + dx, feet.getY() + dy, feet.getZ() + dz);
+					var state = level.getBlockState(m);
+					int cat = WorldSenses.category(level, m, state);
+					if (!want[cat]) continue;
+					if (cat == Blocks.STONE && !WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath())) continue;
+					double d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.max(0, dy - 1);   // high up counts as further
+					if (d >= best || skip.contains(Perception.Beliefs.key(m.getX(), m.getY(), m.getZ()))) continue;
+					boolean shows = false;
+					for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+						n.setWithOffset(m, side);
+						shows |= level.getBlockState(n).canBeReplaced() || level.getBlockState(n).is(net.minecraft.tags.BlockTags.LEAVES);
+					}
+					if (!shows) continue;
+					best = d;
+					glanced = new int[] {m.getX(), m.getY(), m.getZ(), 1, cat};
+				}
+			}
+		}
+		return glanced;
+	}
+
+	/** How far it looks around for what it's gathering. */
+	static final int GLANCE = 14;
+
+	/**
+	 * Can it mine this from where it stands, like a player: within reach, and the first thing its eyes meet on the way
+	 * there (leaves in the way it clears first). Then the block to hit, else null.
+	 */
+	private BlockPos hitFromHere(BlockPos t) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		Vec3 eye = c.player.getEyePosition(), center = Vec3.atCenterOf(t);
+		double reach = c.player.blockInteractionRange() - 0.3;
+		if (eye.distanceTo(center) > reach) return null;
+		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, center, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));
+		if (hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.getBlockPos().equals(t)) return t;
+		BlockPos in = hit.getBlockPos();
+		if (level.getBlockState(in).is(net.minecraft.tags.BlockTags.LEAVES) && eye.distanceTo(Vec3.atCenterOf(in)) <= reach) return in;
+		return null;
+	}
+
 	/** Get to a block and mine it, the way a player would (dig down to it, climb one block to reach it). */
 	private Action reach(BlockPos t) {
 		Hands hands = c.hands;
 		BlockPos feet = c.player.blockPosition();
+		BlockPos hit = t.getY() >= feet.getY() ? hitFromHere(t) : null;   // (below its feet: the staircase way, never straight down)
+		if (hit != null) {
+			Action a = mine(hit);
+			if (a != null) return a;
+		}
 		int dx = t.getX() - feet.getX(), dy = t.getY() - feet.getY(), dz = t.getZ() - feet.getZ();
 		if (Math.abs(dx) + Math.abs(dz) == 1) {
 			int want = dx == 0 ? (dz < 0 ? 0 : 2) : (dx > 0 ? 1 : 3);
@@ -742,8 +874,10 @@ final class Chores {
 			}
 		}
 		if (done) {
-			finish("Done! I'm safe in my little " + shape + ".");
+			cancel();
+			c.chatter("Done! I'm safe in my little " + shape + ".", true);   // (always said: you'll want to know where it is)
 			shelterBuilt = true;
+			doing = "hiding in its " + shape + " until morning";
 			kind = Kind.HIDE;
 			until = now() + 1200;
 			return Action.IDLE;

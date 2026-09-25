@@ -52,12 +52,23 @@ public final class WorldSenses {
 		if (n.contains("gold_ore")) return Blocks.GOLD;
 		if (n.contains("iron_ore")) return Blocks.IRON;
 		if (n.contains("coal_ore")) return Blocks.COAL;
-		if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_stem") || n.endsWith("_hyphae")) return Blocks.LOG;
+		if (n.endsWith("pumpkin_stem") || n.endsWith("melon_stem")) return Blocks.AIR;   // crops, not trees
+		if (n.endsWith("_log") || n.endsWith("_wood") || n.endsWith("_hyphae") || isNetherStem(n)) return Blocks.LOG;   // not mushroom stems
 		if (n.endsWith("_leaves")) return Blocks.LEAVES;
 		if (n.equals("grass_block")) return Blocks.GRASS;
 		if (DIRT.contains(n)) return Blocks.DIRT;
 		if (!state.getCollisionShape(level, pos).isEmpty()) return Blocks.STONE;   // fences, walls, panes, slabs... (like the bridge)
 		return Blocks.AIR;                                     // flowers, grass, torches... nothing in the way
+	}
+
+	/** Crimson and warped stems are the Nether's trees (a mushroom_stem is part of a huge mushroom: no wood in it). */
+	static boolean isNetherStem(String n) {
+		return n.endsWith("_stem") && (n.contains("crimson") || n.contains("warped"));
+	}
+
+	/** Stone to mine for cobblestone (not a mushroom cap, a fence or someone's wall, which are "stone" to its senses too). */
+	static boolean isNaturalStone(String n) {
+		return n.equals("stone") || n.equals("deepslate") || n.equals("cobblestone");
 	}
 
 	/** Can sight pass through it? (glass, ice...) */

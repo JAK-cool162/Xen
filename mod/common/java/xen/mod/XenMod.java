@@ -58,8 +58,12 @@ public class XenMod implements ModInitializer {
 	static XenMod INSTANCE;
 	final Roster roster = new Roster();
 	final Arena arena = new Arena(this);
+	/** Where skins come from: the pack, your folder, mineskin.org, players. */
+	final Skins skins = new Skins();
 	final java.util.Random random = new java.util.Random();
 	private long lastChatNeed, lastEvolvedDay = -1;
+	/** Players who were told why Xens' answers are simple (once each). */
+	private final java.util.Set<java.util.UUID> toldAboutModel = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
 	XenConfig config;
 	Brain brain;
@@ -81,6 +85,7 @@ public class XenMod implements ModInitializer {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
 		Chat.gpuSetting = () -> config.gpu;
+		skins.prepare(configDir, config.skins);
 		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> config.chatModel, () -> config.downloadChatModel,
 				config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
@@ -298,6 +303,15 @@ public class XenMod implements ModInitializer {
 		if (sender instanceof XenPlayer || !config.chat) return;
 		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
 		chat.warmUp();
+		boolean toXen = false;
+		for (Companion c : companions) {
+			if (c.player() != null && java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
+					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) toXen = true;
+		}
+		if (toXen && !chat.hasModel() && toldAboutModel.add(sender.getUUID())) {   // once: why its answers are simple
+			sender.sendSystemMessage(Component.literal("[Xen] The chat model is " + chat.status()
+					+ ". Until it's ready, Xens understand requests and answer simply.").withStyle(net.minecraft.ChatFormatting.GRAY));
+		}
 		for (Companion c : companions) {
 			if (c.player() == null) continue;
 			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
@@ -305,6 +319,9 @@ public class XenMod implements ModInitializer {
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> c.say(reply)));
 			return;
+		}
+		for (Companion c : companions) {                                 // "when hears ..." rules: anything said close by
+			if (c.player() != null && c.player().level() == sender.level() && c.player().distanceTo(sender) <= 16) c.script.heard(text, sender);
 		}
 		// No name: an answer to a Xen close by that asked this player something, or is in a trade with them ("yes", "deal").
 		Companion nearest = null;
@@ -465,11 +482,13 @@ public class XenMod implements ModInitializer {
 	Companion create(String wanted, ServerPlayer owner, Personality nature) {
 		java.util.Set<String> taken = takenNames();
 		if (wanted == null) taken.addAll(roster.names());                 // a new Xen gets a new name
-		String name = wanted != null ? wanted : Looks.freshName(config.randomNames, taken, random);
+		Personality born = nature != null ? nature : config.personalities ? Personality.random(random) : Personality.plain();
+		String name = wanted;
+		if (name == null && config.randomNames) name = Names.fresh(config.nameStyle, born.tone, taken, random);   // fits its nature
+		if (name == null) name = Looks.freshName(false, taken, random);
 		com.google.gson.JsonObject known = roster.get(name);
 		Personality p = nature != null ? nature
-				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality"))
-				: config.personalities ? Personality.random(random) : Personality.plain();
+				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality")) : born;
 		if (nature == null && known == null && config.personalities) {           // born with an arena champion's fighting
 			float[] champion = Arena.championGenes(brainFile().getParent(), random);
 			if (champion != null) {
@@ -477,7 +496,7 @@ public class XenMod implements ModInitializer {
 				p.fight = Personality.nearest(champion);
 			}
 		}
-		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : Looks.pickSkin(config.skins, random);
+		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : skins.pick(config.skins, random);
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (known != null && known.has("known")) {
@@ -661,6 +680,7 @@ public class XenMod implements ModInitializer {
 
 	/** After settings change (command or settings screen): teams, and the chat model. */
 	void applySettings() {
+		skins.prepare(FabricLoader.getInstance().getConfigDir(), config.skins);
 		if (server == null) return;
 		server.execute(() -> {
 			for (Companion c : companions) if (c.player() != null) joinTeam(c);

@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.5.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.5.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.6.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.6.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -241,9 +241,11 @@ learning, senses and chat), with no Python and no bridge. It was tested on
 Fabric servers for 1.21.11, 26.1.2 and 26.3.
 
 **Ask it for things.** Say its name and what you want: follow, stay, explore,
-get wood / stone / coal / iron / ore, hunt for food, give you its items, build
-a shelter, eat, stop. It goes for blocks and animals it knows about (felt
-within 6 blocks or seen in its view) and looks around when it knows of none. It
+get wood / stone / coal / iron / ore, hunt for food, give you its items, craft
+something ("craft a boat"), build a shelter, eat, stop (typos like "fallow me" and Thai work too). It goes for
+blocks and animals it knows about (felt within 6 blocks, spotted within 14, or
+seen further away in its view), mines whatever it can see and reach like a
+player, picks up what drops, and looks around when it knows of none. It
 finds its way through the blocks it knows (pathfinding over its 13×13×13 cube)
 and digs only when there's no way. It says what it will do, or exactly why it
 can't. From test runs on a real 1.21.11 server:
@@ -261,10 +263,15 @@ can't. From test runs on a real 1.21.11 server:
 <Xen> Got some food!
 ```
 
-**Every Xen is someone.** New Xens get a random name (Pip, Nova, Waffle...), a
-personality (brave or timid, curious, chatty or quiet, patient or impatient,
-and a tone of voice: cheerful, calm, grumpy, shy, bold or silly) and a skin
-(Minecraft's 18 built-in skins, or your own from mineskin.org). The genes
+**Every Xen is someone.** New Xens get a personality (brave or timid,
+curious, chatty or quiet, patient or impatient, and a tone of voice: cheerful,
+calm, grumpy, shy, bold or silly), a name that fits it (a silly one may be
+WobblyNoodle, a grumpy one SaltyBadger; or a gamer tag like Pickle_42, a
+made-up word like Zorbax, or a classic like Pip) and a skin: one of the mod's
+own 61 ([`docs/skins`](docs/skins/README.md), free to use), Minecraft's 18,
+your own PNGs in `config/xen/skins/` (from NameMC, Planet Minecraft or drawn
+yourself: signed once through mineskin.org so everyone sees them), random ones
+from mineskin.org's gallery, or a player's (`/xen set skins player:Name`). The genes
 really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
 tries new things up to 1.5x as often, a patient one keeps at a chore longer.
 
@@ -306,8 +313,15 @@ places, three friends). When a dream comes true it's proud and picks a new one.
 
 **It crafts its tools** like a new player, with the recipe book: planks,
 sticks, a crafting table, a wooden pickaxe, then stone tools. It mines only
-what's worth it and never digs straight down (it digs a staircase). Next to
-you it waits and watches you instead of wandering off.
+what's worth it and never digs straight down (it digs a staircase, and one up
+to get out of a hole). **Next to you it gets on with things by itself** (wood,
+stone, food, ore, a shelter at night) and drops them to keep up when you
+leave. With good health it drops down 4 or 5 blocks like a player would.
+
+**It's unpredictable.** Crouch up and down next to it and it dances along
+(other Xens join in); now and then it shows off a trick ("Watch this!") that
+doesn't always work ("I meant to do that."); in a fight it may take a snack
+break in front of a nearly beaten foe.
 
 **It knows how mobs behave.** It leaves endermen, piglins and other neutral
 mobs alone unless they come after it, never hits villagers, golems or pets,
@@ -350,12 +364,28 @@ within 32 blocks, or someone talks to it. It unloads after 10 quiet minutes.
 When nobody it knows is around, Xen leaves notes on signs instead ("Day 12:
 Diamonds here! -Pip").
 
-**Settings in Mod Menu** (or `/xen set` on servers), in tabs: Talk (chat, the
-chat model, talking on its own and with Xens, trading, saying no), Xens (how
-many, names, personalities, skins), Goals (own goals, learning, evolution),
-PvP, Build (redstone, signs) and Speed.
+**Settings in Mod Menu** (or `/xen set` on servers), with the categories down
+the left: Talk (chat, the chat model, talking on its own and with Xens,
+trading, saying no), Xens (how many, names, personalities, skins), Goals (own
+goals, antics, learning by watching, evolution), PvP, Build (redstone, signs),
+Speed (GPU, decisions, threads) and **Experimental**:
+
+* **Custom instructions**: who your Xens are ("You love cats and hate the
+  rain. Pip: you're a pirate and talk like one."). A line starting with a
+  Xen's name is only for that Xen. The chat model reads them; without it, Xen
+  still answers from them ("do you like cats?" "I love cats.").
+* **Custom script**: your own rules, `when <something>: <what to do>`, one per
+  line: `when night: do build a shelter`, `when someone comes: wave`,
+  `when hears hello: say Hi {player}!`, `when sees creeper: say RUN!`,
+  `when every 10 minutes: show off`. When: night, morning, rain, hungry, hurt,
+  attacked, diamonds, someone comes, sees a mob, hears a word, every N
+  minutes. Do: say, any request (`do ...`), dance, spin, wave, show off. The
+  box tells you which lines it can't read. (With `/xen set script`, put `|`
+  between rules.)
 
 ![Xen Companion settings in Mod Menu](docs/screenshots/settings.png)
+
+![The Experimental category: custom instructions and a custom script](docs/screenshots/settings_experimental.png)
 
 The full list of requests, settings and phone launchers (Zalith Launcher 2,
 PojavLauncher, Amethyst) is in [`dist/README.md`](dist/README.md).
