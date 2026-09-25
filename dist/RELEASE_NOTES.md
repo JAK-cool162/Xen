@@ -31,7 +31,7 @@ Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen)
   trait by hand (also build, material, tone, bravery, curiosity, chattiness, diligence).
 * **Teams and PvP.** One team or 2-6 colored teams (no friendly fire). PvP `off`, `defend` (default: fights back
   against players who hurt it or its owner) or `teams` (teams fight each other). It times its swings, jumps for
-  critical hits and sprints in. It's a companion, not a PvP bot: it can't block, strafe or combo.
+  critical hits and sprints in. It's a companion, not a PvP bot: it can't combo or dodge arrows.
 * **Evolution.** Every few days the worst ownerless Xens are replaced by children of the best, whose genes mix and
   mutate. Logged in `<world>/xen/evolution.csv`. Your own Xens are never replaced.
 * **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire): circuits Xen worked out itself in
