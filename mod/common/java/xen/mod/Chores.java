@@ -68,6 +68,7 @@ final class Chores {
 	private boolean saidLooking;
 	private LivingEntity prey;
 	private List<BlockPos> walls;
+	private String shape = "hut";
 	private int waited;
 	private List<Part> circuit;
 	private String circuitName;
@@ -170,30 +171,72 @@ final class Chores {
 		return n != 1 && (item.equals("log") || item.equals("diamond")) ? name + "s" : name;
 	}
 
+	/**
+	 * The shelter in its own style: walls around where it stands (2 high for a hut, with the corners filled in for a
+	 * fort, 3 high for a tower), then something to place the roof against, then the roof.
+	 */
+	static List<BlockPos> shelterPlan(BlockPos feet, String build) {
+		List<BlockPos> plan = new java.util.ArrayList<>();
+		int height = build.equals("tower") ? 3 : 2;
+		for (int y = 0; y < height; y++) {
+			BlockPos at = feet.above(y);
+			plan.add(at.north());
+			plan.add(at.east());
+			plan.add(at.south());
+			plan.add(at.west());
+			if (build.equals("fort")) {
+				plan.add(at.north().east());
+				plan.add(at.south().east());
+				plan.add(at.south().west());
+				plan.add(at.north().west());
+			}
+		}
+		plan.add(feet.above(height).north());
+		plan.add(feet.above(height));
+		return plan;
+	}
+
 	String shelter() {
 		BlockPos feet = c.player.blockPosition();
-		List<BlockPos> plan = List.of(feet.north(), feet.east(), feet.south(), feet.west(), feet.above().north(), feet.above().east(),
-				feet.above().south(), feet.above().west(), feet.above(2).north(), feet.above(2));
 		ServerLevel level = (ServerLevel) c.player.level();
-		int missing = 0;
-		for (BlockPos p : plan) if (level.getBlockState(p).canBeReplaced()) missing++;
-		int blocks = count("dirt", "cobblestone");
 		if (!c.player.onGround()) return "You can't build a shelter because you are not standing on the ground.";
-		for (BlockPos p : plan.subList(0, 4)) {                        // walls need ground under them
+		String build = c.personality.build;
+		List<BlockPos> plan = shelterPlan(feet, build);
+		int blocks = count("dirt", "cobblestone");
+		if (missing(level, plan) > blocks && !build.equals("hut")) {       // not enough for its style: a plain hut will do
+			build = "hut";
+			plan = shelterPlan(feet, build);
+		}
+		int missing = missing(level, plan);
+		for (BlockPos p : plan) {                                      // walls need ground under them
 			BlockPos under = p.below();
-			if (level.getBlockState(p).canBeReplaced() && !level.getBlockState(under).isCollisionShapeFullBlock(level, under)) {
+			if (p.getY() == feet.getY() && level.getBlockState(p).canBeReplaced()
+					&& !level.getBlockState(under).isCollisionShapeFullBlock(level, under)) {
 				return "You can't build a shelter here because the ground isn't flat.";
 			}
 		}
 		if (missing > blocks) {
 			return "You can't build a shelter because you need " + missing + " dirt or cobblestone and have " + blocks + ".";
 		}
+		int liked = switch (c.personality.material) {
+			case "stone" -> count("cobblestone");
+			case "earth" -> count("dirt");
+			default -> 0;
+		};
+		String of = liked >= missing ? (c.personality.material.equals("stone") ? "stone " : "dirt ") : "";
 		begin(Kind.SHELTER);
 		walls = plan;
+		shape = build;
 		waited = 0;
 		c.mode = Companion.Mode.STAY;
 		c.anchor = feet;
-		return "You will build a small shelter around yourself with " + missing + " blocks.";
+		return "You will build a small " + of + build + " around yourself with " + missing + " blocks.";
+	}
+
+	private static int missing(ServerLevel level, List<BlockPos> plan) {
+		int n = 0;
+		for (BlockPos p : plan) if (level.getBlockState(p).canBeReplaced()) n++;
+		return n;
 	}
 
 	/** Build one of the circuits it learned, in front of it, from redstone parts it carries. */
@@ -558,24 +601,24 @@ final class Chores {
 		boolean done = true;
 		int left = 0;
 		for (BlockPos p : walls) if (level.getBlockState(p).canBeReplaced()) left++;
-		doing = "building a shelter, " + left + " blocks to go";
+		doing = "building a " + shape + ", " + left + " blocks to go";
 		for (BlockPos p : walls) {
 			if (!level.getBlockState(p).canBeReplaced()) continue;
 			done = false;
-			if (c.hands.placeAt(p)) {
+			if (c.hands.placeAt(p, c.personality.material)) {
 				c.acted = true;
 				return Action.PLACE;
 			}
 		}
 		if (done) {
-			finish("Done! I'm safe in my little shelter.");
+			finish("Done! I'm safe in my little " + shape + ".");
 			kind = Kind.HIDE;
 			until = now() + 1200;
 			return Action.IDLE;
 		}
-		doing = "building a shelter, " + left + " blocks to go, stuck: " + c.hands.cantPlace;
+		doing = "building a " + shape + ", " + left + " blocks to go, stuck: " + c.hands.cantPlace;
 		if (++waited < 30) return Action.IDLE;                          // someone in the way? wait a little
-		finish("I couldn't finish the shelter: " + c.hands.cantPlace + ".");
+		finish("I couldn't finish the " + shape + ": " + c.hands.cantPlace + ".");
 		return null;
 	}
 }

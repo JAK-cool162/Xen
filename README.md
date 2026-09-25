@@ -200,11 +200,12 @@ sooner. Every life is logged in `<world>/xen/lives.csv`.
   it hardly met any. That's why its trauma and joy memories are now saved with
   the brain and keep being replayed. With them, a second run kept the fear
   (0.146 for walking into lava vs 0.013 onto ground).
-* **30 real days with evolution (8 Xens)**: see
-  [the results](#evolution-30-days-in-real-minecraft) below.
+* **30 real days with evolution (8 Xens)**: evolution picked brave Xens,
+  and the brain learned to fear zombies but got worse at SimCraft's tests
+  ([the results](#evolution-30-days-in-real-minecraft)).
 
 The bundled brain is still the SimCraft one, since it's the best at SimCraft's
-tests. The 30-day brain is an optional download on the release page.
+tests. The 30-day brain is an experimental download on the release page.
 
 ---
 
@@ -261,12 +262,21 @@ and a tone of voice: cheerful, calm, grumpy, shy, bold or silly) and a skin
 really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
 tries new things up to 1.5x as often, a patient one keeps at a chore longer.
 
+Each Xen also gets a **fighting style** (brawler, rusher, skirmisher, guard or
+dancer: how often it jumps for critical hits, whether it presses in, steps
+back or circles while its sword recharges, whether it chases, when it backs
+off to recover) and a **building style** (the shelter it builds is a hut, a
+fort or a tower, of stone, dirt or whatever it has). Children inherit them.
+Set them by hand with `/xen style Pip fight guard`.
+
 **Teams and PvP.** Xens can be one team or split into 2-6 colored teams. PvP is
 `off`, `defend` (fights back against a player who hurts it or its owner) or
 `teams`. It times its swings for full damage, jumps for critical hits and
 sprints in, but it's a companion, not a PvP bot: against a scripted fighter
-with the same sword that struck first it lost 5 of 5, leaving the attacker
-at 2-9 of 20 health in 4 of them.
+with the same sword that strikes first it loses, leaving it at 2-14 of 20
+health. Style against style (Xen vs Xen, 60 fights, both sides), fights won
+of 24: brawler 20, rusher 18, skirmisher 12, dancer 9, guard 1. But a guard
+with a shield beat brawlers and rushers without one in 9 of 12.
 
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by
@@ -303,9 +313,37 @@ average genes of the Xens alive:
 | 9 | 2 | 0.62 | 0.48 | 0.57 | 0.64 |
 | 12 | 3 | 0.60 | 0.50 | 0.52 | 0.58 |
 | 15 | 3 | 0.84 | 0.57 | 0.54 | 0.60 |
+| 18 | 3 | 0.86 | 0.51 | 0.47 | 0.64 |
+| 21 | 4 | 0.84 | 0.47 | 0.45 | 0.59 |
+| 24 | 2 | 0.85 | 0.57 | 0.52 | 0.51 |
+| 27 | 4 | 0.84 | 0.52 | 0.52 | 0.53 |
+| 30 | 5 | 0.75 | 0.50 | 0.55 | 0.49 |
 
-Bravery is what gets selected: brave Xens explore and gather more, and that
-outweighs dying a bit more often. (Run in progress; the table grows to day 30.)
+* **Bravery is what gets selected**: from 0.37 to about 0.85 in 15 days, and
+  it stayed there. Brave Xens explore and gather more, and that outweighed
+  dying a bit more often.
+* Curiosity and chattiness drifted around 0.5: they don't change how well a
+  Xen does, so nothing selects them. Patience rose while there were chores to
+  finish, then drifted back.
+* All 15 deaths were in the first 10 days (11 drowned, 2 skeletons, 2
+  zombies), none in the last 20. But the Xens also gathered less and less: they
+  learned to stay safe more than to work.
+
+**What 30 real days did to the shared brain** (the same fixed SimCraft
+worlds, no exploring):
+
+| | bundled brain | after 30 real days |
+|---|---|---|
+| reward per life | 32.6 | 2.3 |
+| survived | 6 of 8 | 3 of 8 |
+| fear of walking into lava vs onto ground | 0.167 vs 0.007 | 0.045 vs 0.015 |
+| fear of a zombie in its face vs nothing | 0.014 vs 0.002 | **0.177** vs 0.013 |
+
+It learned to fear zombies (they and skeletons killed it in the real game).
+But real Minecraft pays for mining and little else, so it now mines almost
+anything, even digging down toward lava. So the bundled brain stays the
+SimCraft one. The 30-day brain is on the release page as an experiment
+(`xen-brain-30days-experimental.bin`).
 
 A brain trained in Python can go into the mod: `python -m xen export --brain
 xen_brain.npz --out brain.bin`, then copy it to `<world>/xen/brain.bin`.

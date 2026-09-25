@@ -47,6 +47,11 @@ public final class Hands {
 		return ticks < limit;
 	}
 
+	/** Can what it's doing be dropped at once (like letting go of a key)? Not a jump or a swing (crits need them), or eating. */
+	boolean interruptible() {
+		return current != Action.JUMP && current != Action.ATTACK && current != Action.EAT;
+	}
+
 	/** Jump and put a block under its feet (a player's way out of a hole). Returns false without blocks. */
 	boolean startPillar() {
 		if (findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath())) < 0) return false;
@@ -76,7 +81,18 @@ public final class Hands {
 		limit = Math.min(limit, ticks + 3);
 	}
 
+	/** In a fight it keeps its eyes on the foe (like a player's mouse), even while it steps back or strafes. */
+	LivingEntity watching;
+
 	void look() {
+		if (watching != null && watching.isAlive() && watching.level() == p.level()) {
+			Vec3 d = watching.getEyePosition().subtract(p.getEyePosition());
+			float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
+			p.setYRot(yRot);
+			p.setYHeadRot(yRot);
+			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
+			return;
+		}
 		p.setYRot(YAW[yaw]);
 		p.setYHeadRot(YAW[yaw]);
 		p.setXRot((float) -Math.toDegrees(Perception.LOOK_PITCH[pitch + 1]));
@@ -301,6 +317,20 @@ public final class Hands {
 
 	/** Place a block it carries at pos, against a solid neighbour, if it can reach. */
 	boolean placeAt(BlockPos pos) {
+		return placeAt(pos, "any");
+	}
+
+	/** The blocks each building material means (the rest of what it can place comes after). */
+	private static Set<String> favorite(String material) {
+		return switch (material) {
+			case "stone" -> Set.of("cobblestone", "cobbled_deepslate");
+			case "earth" -> Set.of("dirt");
+			default -> PLACEABLE;
+		};
+	}
+
+	/** Place a block it carries at pos, its favorite material first. */
+	boolean placeAt(BlockPos pos, String material) {
 		ServerLevel level = (ServerLevel) p.level();
 		if (!level.getBlockState(pos).canBeReplaced()) {
 			cantPlace = "already a block there";
@@ -315,7 +345,9 @@ public final class Hands {
 			cantPlace = "too far to reach";
 			return false;
 		}
-		int slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		Set<String> liked = favorite(material);
+		int slot = findHotbar(s -> liked.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		if (slot < 0) slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
 		if (slot < 0) {
 			cantPlace = "no blocks left";
 			return false;
@@ -403,9 +435,37 @@ public final class Hands {
 		if (weapon >= 0 && weapon != p.getInventory().getSelectedSlot()) p.getInventory().setSelectedSlot(weapon);
 	}
 
+	/**
+	 * Raise a shield it carries and hold it up (right mouse button on the off hand). A shield in its bag goes to the off
+	 * hand first, like the swap-hands key. False if it has no shield.
+	 */
+	boolean raiseShield() {
+		if (!isShield(p.getOffhandItem())) {
+			Inventory inv = p.getInventory();
+			int slot = -1;
+			for (int i = 0; i < 36 && slot < 0; i++) if (isShield(inv.getItem(i))) slot = i;
+			if (slot < 0) return false;
+			ItemStack off = p.getOffhandItem();
+			p.setItemInHand(InteractionHand.OFF_HAND, inv.getItem(slot));
+			inv.setItem(slot, off);
+		}
+		if (!p.isUsingItem()) p.gameMode.useItem(p, p.level(), p.getOffhandItem(), InteractionHand.OFF_HAND);
+		return true;
+	}
+
+	/** Let go of the right mouse button (a raised shield comes down). */
+	void lowerShield() {
+		if (p.isUsingItem() && isShield(p.getUseItem())) p.releaseUsingItem();
+	}
+
+	private static boolean isShield(ItemStack s) {
+		return !s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("shield");
+	}
+
 	/** Hit a creature in reach (the normal attack, with the normal cooldown), with its best weapon. */
 	void hit(LivingEntity e) {
 		stop();
+		lowerShield();
 		ready();
 		face(e.getEyePosition());
 		p.attack(e);                                                   // attack, then swing: a swing resets the charge

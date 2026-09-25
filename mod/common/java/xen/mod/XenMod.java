@@ -233,7 +233,7 @@ public class XenMod implements ModInitializer {
 		pool.sort(java.util.Comparator.comparingDouble(fitness).reversed());
 		int replace = Math.max(1, pool.size() / 4), gen = 0;
 		List<Companion> parents = pool.subList(0, pool.size() / 2);
-		StringBuilder gone = new StringBuilder(), born = new StringBuilder();
+		StringBuilder gone = new StringBuilder(), born = new StringBuilder(), styles = new StringBuilder();
 		double best = fitness.applyAsDouble(pool.get(0));
 		for (int i = 0; i < replace; i++) {
 			Companion loser = pool.get(pool.size() - 1 - i);
@@ -249,6 +249,7 @@ public class XenMod implements ModInitializer {
 			child.join(level, at, random.nextInt(4) * 90f);
 			companions.add(child);
 			born.append(born.length() > 0 ? " " : "").append(child.name);
+			styles.append(styles.length() > 0 ? ", " : "").append(child.name).append(": ").append(nature.style());
 		}
 		double[] mean = new double[4];
 		for (Companion c : companions) {
@@ -270,7 +271,7 @@ public class XenMod implements ModInitializer {
 		} catch (IOException e) {
 			LOG.warn("Could not write {}: {}", file, e.toString());
 		}
-		LOG.info("Xen evolution, day {}: {} left, {} born (generation {})", day, gone, born, gen);
+		LOG.info("Xen evolution, day {}: {} left, {} born (generation {}; {})", day, gone, born, gen, styles);
 	}
 
 	void forget(Companion c) {
@@ -339,11 +340,59 @@ public class XenMod implements ModInitializer {
 								})
 								.then(Commands.argument("value", StringArgumentType.greedyString()).executes(ctx ->
 										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
+				.then(Commands.literal("style")
+						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
+									for (Companion c : companions) b.suggest(c.name);
+									return b.buildFuture();
+								})
+								.then(Commands.argument("trait", StringArgumentType.word()).suggests((ctx, b) -> {
+											for (String t : TRAITS) b.suggest(t);
+											return b.buildFuture();
+										})
+										.then(Commands.argument("value", StringArgumentType.word()).suggests((ctx, b) -> {
+													String[] values = switch (StringArgumentType.getString(ctx, "trait")) {
+														case "fight" -> Personality.FIGHTS;
+														case "build" -> Personality.BUILDS;
+														case "material" -> Personality.MATERIALS;
+														case "tone" -> Personality.TONES;
+														default -> new String[] {"0", "0.5", "1"};
+													};
+													for (String v : values) b.suggest(v);
+													return b.buildFuture();
+												})
+												.executes(ctx -> style(ctx, StringArgumentType.getString(ctx, "xen"),
+														StringArgumentType.getString(ctx, "trait"), StringArgumentType.getString(ctx, "value")))))))
 				.then(Commands.literal("save").executes(ctx -> {
 					save();
 					ctx.getSource().sendSuccess(() -> Component.literal("Xen's brain saved (" + brain.steps + " steps lived)."), false);
 					return 1;
 				})));
+	}
+
+	private static final String[] TRAITS = {"fight", "build", "material", "tone", "bravery", "curiosity", "chattiness", "diligence"};
+
+	/** /xen style: set one of a Xen's traits by hand (its owner, or an operator). */
+	private int style(CommandContext<CommandSourceStack> ctx, String who, String trait, String value) {
+		ServerPlayer p = ctx.getSource().getPlayer();
+		for (Companion c : companions) {
+			if (!c.name.equalsIgnoreCase(who)) continue;
+			if (p != null && !p.getUUID().equals(c.owner) && !op(ctx)) {
+				ctx.getSource().sendFailure(Component.literal(c.name + " isn't yours."));
+				return 0;
+			}
+			String error = c.personality.set(trait, value);
+			if (error != null) {
+				ctx.getSource().sendFailure(Component.literal(error));
+				return 0;
+			}
+			c.applyPersonality();
+			roster.remember(c, teamOf(c));
+			roster.save();
+			ctx.getSource().sendSuccess(() -> Component.literal(c.name + ": " + c.personality.describe() + "; " + c.personality.style() + "."), false);
+			return 1;
+		}
+		ctx.getSource().sendFailure(Component.literal("No Xen called " + who + " here."));
+		return 0;
 	}
 
 	private boolean op(CommandContext<CommandSourceStack> ctx) {
@@ -463,7 +512,7 @@ public class XenMod implements ModInitializer {
 		}
 		companions.add(c);
 		String n = name;
-		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here (" + c.personality.describe() + "). Talk to it in chat with its name (\""
+		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here (" + c.personality.describe() + "; " + c.personality.style() + "). Talk to it in chat with its name (\""
 				+ n + ", get some wood\", \"" + n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
 		c.say("Hi! I'm " + n + ". I only know what I can see, so show me around!");
 		return 1;

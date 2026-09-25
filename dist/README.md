@@ -144,7 +144,26 @@ slow a server away. Turn **Redstone** off to disable it.
   patient or impatient (how long it keeps at a chore), and has a tone of voice
   (cheerful, calm, grumpy, shy, bold, silly) that shows in what it says.
   `/xen status` and the summon message tell you who it is: "Rune (shy, timid
-  and impatient)".
+  and impatient; a skirmisher (hits and steps back), builds stone forts)".
+* **Fighting style** (random for each Xen, and inherited):
+  * `brawler`: trades blows, jumps for critical hits a lot;
+  * `rusher`: rushes in and keeps pressing, jumps for criticals most;
+  * `skirmisher`: hits, then steps back while its sword recharges, and backs
+    off to recover when badly hurt;
+  * `guard`: doesn't chase, holds its ground behind its shield (give it one)
+    and waits for full-power swings;
+  * `dancer`: circles around its foe between swings.
+  It keeps its eyes on its foe while it steps back or strafes, like a player
+  with a mouse.
+* **Building style** (random, and inherited): the shelter it builds when you
+  ask, a `hut` (2-high walls and a roof, 10 blocks), a `fort` (corners filled
+  in, 18 blocks) or a `tower` (3-high walls, 14 blocks), in its favorite
+  material: `stone` (cobblestone), `earth` (dirt) or `any`. With too few blocks
+  for its style, it builds a hut.
+* **Set them yourself**: `/xen style Pip fight guard` (also `build`,
+  `material`, `tone`, and `bravery`, `curiosity`, `chattiness`, `diligence`
+  from 0 to 1). Its owner or an operator can do it, and it's saved with the
+  world.
 * **Skins**: built-in skins are Minecraft's own 18 default skins (Steve, Alex,
   Ari, Efe, Kai, Makena, Noor, Sunny, Zuri, in both arm widths), so there's
   nothing to download and every game can show them. "random" picks one per Xen.
@@ -162,10 +181,21 @@ slow a server away. Turn **Redstone** off to disable it.
     when an armed stranger comes close.
   * `teams`: Xens of different teams also fight each other.
 * **How good is it?** A companion, not a PvP bot. It swings when its attack is
-  charged, jumps for critical hits and sprints in. It can't block with a
-  shield, strafe or combo. Against a simple scripted fighter with the same
-  iron sword that attacks first, it lost 5 of 5 fights, but brought the
-  attacker down to 2-9 of 20 health in 4 of them. A good player will beat it.
+  charged, jumps for critical hits, sprints in, keeps its eyes on its foe and
+  fights back at once when hit, even from behind (it knows everything within 6
+  blocks). It can't combo or dodge arrows. Against a simple scripted fighter
+  with the same iron sword that strikes first, it loses: that fighter was
+  left at 2-14 of 20 health (under 10 in 9 of 10 fights). A good player will beat it.
+* **Style against style** (Xen vs Xen, iron swords, 60 fights, each pairing
+  from both sides), fights won of 24:
+
+  | brawler | rusher | skirmisher | dancer | guard | guard with a shield |
+  |---|---|---|---|---|---|
+  | 20 | 18 | 12 | 9 | 1 | won 9 of 12 against brawlers and rushers (2 draws) |
+
+  With the same sword, pressing on wins. A guard only shines with a shield:
+  it holds the shield up while its sword recharges, like a player holding
+  right-click, and lowers it to swing.
 
 ## Evolution
 
@@ -233,6 +263,7 @@ away in single player. On a server, operators use:
 | `/xen spawn <count> [radius]` | operators: many ownerless Xens, scattered on the surface up to `radius` blocks away (default 300) |
 | `/xen mode follow\|stay\|free` | the same as asking it to follow, stay or explore |
 | `/xen status` | who it is, health, hunger, mood, what it knows and what it's doing |
+| `/xen style <xen> <trait> <value>` | its owner or operators: set a trait by hand, e.g. `/xen style Pip fight skirmisher`, `/xen style Pip build tower`, `/xen style Pip material stone`, `/xen style Pip bravery 0.9` |
 | `/xen chat on\|off`, `/xen learn on\|off` | quick switches |
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
@@ -263,9 +294,11 @@ The trained brain is inside the jar. It carries its latest 1000 trauma and joy
 memories, so learning in a safe world doesn't make it forget what hurt it.
 The world's brain is saved in `<world>/xen/brain.bin`, with `lives.csv` (every
 life), `companions.json` (who each Xen is) and `evolution.csv`. Delete
-`brain.bin` to start over from the pre-trained brain. The release also has a
-brain trained 30 more days in real Minecraft (with evolution): copy it to
-`<world>/xen/brain.bin` to try it.
+`brain.bin` to start over from the pre-trained brain. The release also has
+`xen-brain-30days-experimental.bin`, the same brain after 30 more days in real
+Minecraft with evolution: it fears zombies much more, but it mines almost
+anything (even down toward lava) and does worse on SimCraft's tests. Copy it
+to `<world>/xen/brain.bin` if you want to experiment.
 
 Troubleshooting: start the game with `-Dxen.debug=true` to log every decision.
 
