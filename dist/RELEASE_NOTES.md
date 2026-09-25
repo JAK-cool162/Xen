@@ -23,7 +23,6 @@ Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optio
   talks with nothing else to download. The first time it's needed, the mod unpacks it once into `config/xen/` (read
   from a file there, which saves memory). Every unpacked or downloaded copy is checked against the model's SHA-256,
   and a damaged one is never loaded. The model takes a minute or two to warm up; until then Xen answers in plain words.
-* Backing off to heal no longer repeats its "I'm getting out of here!" line over and over.
 
 ### New in 0.4.0-alpha
 
