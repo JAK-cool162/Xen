@@ -1,4 +1,5 @@
-# Publishes a (pre-)release when a version tag is pushed, e.g. `git tag v0.2.0-alpha && git push origin v0.2.0-alpha`.
+# Publishes a (pre-)release when a version tag is pushed (`git tag v0.3.0-alpha && git push origin v0.3.0-alpha`),
+# or when started by hand with a tag name.
 # Assets: the tested mod jars from dist/, Xen's trained brain (and the optional ones in brains/*.bin), and the chat model
 # (SmolLM2-360M-Instruct, Apache-2.0).
 name: Release
@@ -6,6 +7,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # Or start it by hand (Actions -> Release -> Run workflow): it makes the tag on the commit it runs on.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to make and publish, e.g. v0.3.0-alpha"
+        required: true
 
 permissions:
   contents: write
@@ -31,10 +38,12 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
+          [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || { echo "not a version tag: $TAG"; exit 1; }
           prerelease=""
-          case "$GITHUB_REF_NAME" in *alpha*|*beta*|*rc*|v0.*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" $prerelease \
-            --title "Xen Companion $GITHUB_REF_NAME" \
+          case "$TAG" in *alpha*|*beta*|*rc*|v0.*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" $prerelease --target "$GITHUB_SHA" \
+            --title "Xen Companion $TAG" \
             --notes-file dist/RELEASE_NOTES.md \
             dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SHA256SUMS.txt
