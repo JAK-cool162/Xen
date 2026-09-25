@@ -23,6 +23,24 @@ import java.util.regex.Pattern;
  * e.g. SmolLM2-360M-Instruct) and generates text. Port of xen/talk/llm.py.
  */
 public final class Llm implements AutoCloseable {
+	/**
+	 * Something that does the big matrix products faster than the CPU: the GPU ({@code xen.mod.client.GlAccelerator},
+	 * only in a game client). It keeps the weights; the model sends it inputs and gets the products back.
+	 */
+	public interface Accelerator extends AutoCloseable {
+		/** What it runs on, for the log: "NVIDIA GeForce RTX 3060 (OpenGL 4.6)". */
+		String name();
+
+		/** Keep a matrix: rows of cols int8 values, one scale per 32 of them. Returns its handle. */
+		int upload(int rows, int cols, byte[] q, float[] scale) throws Exception;
+
+		/** out = W x for n inputs at once: x holds n rows of cols values, out gets n rows of rows values. */
+		void matmul(int handle, float[] x, int n, float[] out) throws Exception;
+
+		@Override
+		void close();
+	}
+
 	// ------------------------------------------------------------------------------ weights
 	/** A Q8_0 matrix: rows x cols, blocks of 32 int8 values sharing one scale. */
 	static final class Q8 {
@@ -120,6 +138,206 @@ public final class Llm implements AutoCloseable {
 	@Override
 	public void close() {
 		pool.shutdownNow();
+		if (gpu != null) gpu.close();
+	}
+
+	// -------------------------------------------------------------------------------- the GPU
+	/** Up to this many prompt tokens go through the GPU together. */
+	public static final int BATCH = 32;
+	private Accelerator gpu;
+	/** Per layer on the GPU: q, k and v stacked (one product), the attention output, gate and up stacked, down. */
+	private int[] gQkv, gO, gGu, gDown;
+	private int gOut;
+
+	/** Stack matrices with the same width (their products come out one after the other). */
+	private static Q8 stack(Q8... parts) {
+		int rows = 0;
+		for (Q8 p : parts) rows += p.rows;
+		int cols = parts[0].cols;
+		byte[] q = new byte[rows * cols];
+		float[] s = new float[rows * cols / 32];
+		int at = 0;
+		for (Q8 p : parts) {
+			System.arraycopy(p.q, 0, q, at * cols, p.rows * cols);
+			System.arraycopy(p.scale, 0, s, at * cols / 32, p.rows * cols / 32);
+			at += p.rows;
+		}
+		return new Q8(rows, cols, q, s);
+	}
+
+	/**
+	 * Run the matrix products on an accelerator from now on (the weights go to it once). False, and it stays on the CPU,
+	 * if that fails (not enough graphics memory, for example).
+	 */
+	public synchronized boolean useGpu(Accelerator a) {
+		try {
+			int[] qkv = new int[layers], o = new int[layers], gu = new int[layers], d = new int[layers];
+			for (int l = 0; l < layers; l++) {
+				qkv[l] = upload(a, stack(wq[l], wk[l], wv[l]));
+				o[l] = upload(a, wo[l]);
+				gu[l] = upload(a, stack(gate[l], up[l]));
+				d[l] = upload(a, down[l]);
+			}
+			gOut = upload(a, output);
+			gQkv = qkv;
+			gO = o;
+			gGu = gu;
+			gDown = d;
+			gpu = a;
+			return true;
+		} catch (Throwable e) {
+			gpuProblem = e.toString();
+			a.close();
+			return false;
+		}
+	}
+
+	/** Why the GPU couldn't take the model (for the log). */
+	public String gpuProblem = "";
+
+	private static int upload(Accelerator a, Q8 m) throws Exception {
+		return a.upload(m.rows, m.cols, m.q, m.scale);
+	}
+
+	public boolean onGpu() {
+		return gpu != null;
+	}
+
+	/** The logits after reading a whole prompt from the start (for checks). */
+	public synchronized float[] logitsAfter(String prompt) {
+		pos = 0;
+		return feed(tokenizer.encode(prompt));
+	}
+
+	/** out = W x for n rows at once, on the accelerator. */
+	private void gpuMatmul(int handle, float[] x, int n, float[] out) {
+		try {
+			gpu.matmul(handle, x, n, out);
+		} catch (Exception e) {
+			throw new RuntimeException("GPU: " + e, e);
+		}
+	}
+
+	/** Attention for one query row at a position (all heads), the same maths as in forward(). */
+	private void attend(int l, float[] q, int qOff, int position, float[] out, int outOff) {
+		int kvDim = kvHeads * headDim, group = heads / kvHeads;
+		float scale = (float) (1 / Math.sqrt(headDim));
+		float[] scores = new float[position + 1];
+		for (int hd = 0; hd < heads; hd++) {
+			int kvh = hd / group, qo = qOff + hd * headDim;
+			float max = Float.NEGATIVE_INFINITY;
+			for (int t = 0; t <= position; t++) {
+				int ko = t * kvDim + kvh * headDim;
+				float s = 0;
+				for (int i = 0; i < headDim; i++) s += q[qo + i] * kCache[l][ko + i];
+				scores[t] = s * scale;
+				max = Math.max(max, scores[t]);
+			}
+			float sum = 0;
+			for (int t = 0; t <= position; t++) sum += scores[t] = (float) Math.exp(scores[t] - max);
+			int ao = outOff + hd * headDim;
+			for (int i = 0; i < headDim; i++) out[ao + i] = 0;
+			for (int t = 0; t <= position; t++) {
+				float p = scores[t] / sum;
+				int vo = t * kvDim + kvh * headDim;
+				for (int i = 0; i < headDim; i++) out[ao + i] += p * vCache[l][vo + i];
+			}
+		}
+	}
+
+	/**
+	 * Feed m tokens at the current position with the matrix products on the GPU, for all of them at once. Returns the
+	 * logits after the last one (null if not wanted).
+	 */
+	private float[] forwardGpu(int[] tokens, int from, int m, boolean wantLogits) {
+		if (pos + m > context) throw new IllegalStateException("context full");
+		int kvDim = kvHeads * headDim, qkvW = dim + 2 * kvDim;
+		float[] x = new float[m * dim], h = new float[m * dim], qkv = new float[m * qkvW], att = new float[m * dim];
+		float[] tmp = new float[m * dim], gu = new float[m * 2 * hidden], g = new float[m * hidden];
+		float[] row = new float[dim], nrm = new float[dim], qRow = new float[dim], kRow = new float[kvDim];
+		for (int t = 0; t < m; t++) {
+			embed.row(tokens[from + t], row);
+			System.arraycopy(row, 0, x, t * dim, dim);
+		}
+		for (int l = 0; l < layers; l++) {
+			normRows(x, attnNorm[l], h, m, row, nrm);
+			gpuMatmul(gQkv[l], h, m, qkv);
+			for (int t = 0; t < m; t++) {                           // rope, then k and v into the cache
+				int base = t * qkvW;
+				System.arraycopy(qkv, base, qRow, 0, dim);
+				System.arraycopy(qkv, base + dim, kRow, 0, kvDim);
+				rope(qRow, heads, pos + t);
+				rope(kRow, kvHeads, pos + t);
+				System.arraycopy(qRow, 0, qkv, base, dim);
+				System.arraycopy(kRow, 0, kCache[l], (pos + t) * kvDim, kvDim);
+				System.arraycopy(qkv, base + dim + kvDim, vCache[l], (pos + t) * kvDim, kvDim);
+			}
+			int layer = l;
+			parallel(m, t -> attend(layer, qkv, t * qkvW, pos + t, att, t * dim));
+			gpuMatmul(gO[l], att, m, tmp);
+			for (int i = 0; i < m * dim; i++) x[i] += tmp[i];
+			normRows(x, ffnNorm[l], h, m, row, nrm);
+			gpuMatmul(gGu[l], h, m, gu);
+			for (int t = 0; t < m; t++) {
+				int gb = t * 2 * hidden;
+				for (int i = 0; i < hidden; i++) {
+					float a = gu[gb + i];
+					g[t * hidden + i] = a / (1f + (float) Math.exp(-a)) * gu[gb + hidden + i];
+				}
+			}
+			gpuMatmul(gDown[l], g, m, tmp);
+			for (int i = 0; i < m * dim; i++) x[i] += tmp[i];
+		}
+		pos += m;
+		if (!wantLogits) return null;
+		System.arraycopy(x, (m - 1) * dim, row, 0, dim);
+		rmsnorm(row, outNorm, nrm);
+		float[] logits = new float[vocab];
+		gpuMatmul(gOut, nrm, 1, logits);
+		return logits;
+	}
+
+	private void normRows(float[] x, float[] w, float[] out, int m, float[] row, float[] nrm) {
+		for (int t = 0; t < m; t++) {
+			System.arraycopy(x, t * dim, row, 0, dim);
+			rmsnorm(row, w, nrm);
+			System.arraycopy(nrm, 0, out, t * dim, dim);
+		}
+	}
+
+	/** job(0..n-1) on the model's threads. */
+	private void parallel(int n, java.util.function.IntConsumer job) {
+		if (n == 1 || threads == 1) {
+			for (int i = 0; i < n; i++) job.accept(i);
+			return;
+		}
+		List<Future<?>> jobs = new ArrayList<>();
+		for (int i = 0; i < n; i++) {
+			int k = i;
+			jobs.add(pool.submit(() -> job.accept(k)));
+		}
+		for (Future<?> f : jobs) {
+			try {
+				f.get();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+
+	/** Feed tokens one after another (on the GPU, many at once); the logits after the last. */
+	private float[] feed(List<Integer> ids) {
+		float[] logits = null;
+		if (gpu == null) {
+			for (int id : ids) logits = forward(id);
+			return logits;
+		}
+		int[] all = ids.stream().mapToInt(Integer::intValue).toArray();
+		for (int start = 0; start < all.length; start += BATCH) {
+			int m = Math.min(BATCH, all.length - start);
+			logits = forwardGpu(all, start, m, start + m == all.length);
+		}
+		return logits;
 	}
 
 	// --------------------------------------------------------------------------- the maths
@@ -187,6 +405,7 @@ public final class Llm implements AutoCloseable {
 
 	/** Feed one token at the current position; returns the logits for the next one. */
 	public float[] forward(int token) {
+		if (gpu != null) return forwardGpu(new int[] {token}, 0, 1, true);
 		if (pos >= context) throw new IllegalStateException("context full");
 		float[] x = new float[dim], h = new float[dim], q = new float[dim], att = new float[dim], tmp = new float[dim];
 		int kvDim = kvHeads * headDim, group = heads / kvHeads;
@@ -241,7 +460,7 @@ public final class Llm implements AutoCloseable {
 	/** Process a fixed start of prompts once and remember it (the persona), to start from there. */
 	public synchronized void savePrefix(String text) {
 		pos = 0;
-		for (int id : tokenizer.encode(text)) forward(id);
+		feed(tokenizer.encode(text));
 		int n = pos * kvHeads * headDim;
 		float[][][] saved = new float[2][layers][];
 		for (int l = 0; l < layers; l++) {
@@ -271,9 +490,7 @@ public final class Llm implements AutoCloseable {
 		List<Integer> ids = tokenizer.encode(restore(prompt));
 		int space = context - pos - room;
 		if (ids.size() > space) ids = ids.subList(ids.size() - space, ids.size());
-		float[] logits = null;
-		for (int id : ids) logits = forward(id);
-		return logits;
+		return feed(ids);
 	}
 
 	/** Which option the model finds likeliest to come next: the log-probability of each whole option. */

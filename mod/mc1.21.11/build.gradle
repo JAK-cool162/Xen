@@ -54,6 +54,7 @@ loom {
 	runs {
 		client {
 			if (project.hasProperty('uiTest')) vmArg '-Dxen.uiTest=true'
+			if (project.hasProperty('gpuTest')) vmArg "-Dxen.gpuTest=${project.property('gpuTest')}"   // -PgpuTest=<model file>
 		}
 	}
 }

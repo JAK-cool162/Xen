@@ -55,3 +55,13 @@ tasks.register('llmCheck', JavaExec) {
 			file('../common/test/fixtures').absolutePath)
 	maxHeapSize = '2g'
 }
+
+// ./gradlew runClient -PuiTest (settings screenshots) or -PgpuTest=<model file> (the chat model on CPU and GPU, compared)
+loom {
+	runs {
+		client {
+			if (project.hasProperty('uiTest')) vmArg '-Dxen.uiTest=true'
+			if (project.hasProperty('gpuTest')) vmArg "-Dxen.gpuTest=${project.property('gpuTest')}"
+		}
+	}
+}

@@ -5,10 +5,10 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.5.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.5.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.5.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.5.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.5.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.5.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.5.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.5.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -17,7 +17,17 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.5.0-alpha
+### What's new in 0.5.1-alpha
+
+* **The chat model on the graphics card.** New setting **Chat on GPU** (`gpu`: auto, on, off). In single player Xen
+  opens its own hidden OpenGL 3.3 context, puts the model there (about 390 MB of graphics memory) and does the big
+  maths with ordinary shaders, reading prompts 32 words at a time. It doesn't touch the game's rendering, so it works
+  with vanilla, Sodium, Iris or a Vulkan renderer, on any PC or Mac with OpenGL 3.3. `auto` uses it only with a real
+  graphics card; if anything is missing it says why in the log and stays on the CPU. On the test machine (no graphics
+  card, Mesa's software renderer) it already read prompts about twice as fast as the CPU path; a real card should be
+  much faster, but that wasn't measured. Checked in real 1.21.11 and 26.1.2 clients; the 26.3 path couldn't be tried.
+
+### New in 0.5.0-alpha
 
 * **It acts like a player, not a digging machine.** Xen used to punch stone with bare hands (it had no way to make
   tools, so it got nothing), dig pits under itself, swing at the air and wander off. Now:

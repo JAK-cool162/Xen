@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.5.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.5.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.5.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.5.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -339,6 +339,11 @@ straight from what it knows, not by the chat model.
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by
 hand. Capped at 24 parts by default so nothing big slows the server.
+
+**The chat model can run on your graphics card** (setting `gpu`, auto by
+default): its own hidden OpenGL 3.3 context and plain shaders, so it works with
+vanilla, Sodium, Iris or Vulkan renderer mods alike, and falls back to the CPU
+by itself.
 
 **The chat model only wakes when it's needed**: when someone the Xen knows is
 within 32 blocks, or someone talks to it. It unloads after 10 quiet minutes.

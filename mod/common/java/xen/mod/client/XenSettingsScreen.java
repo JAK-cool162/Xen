@@ -74,6 +74,8 @@ public class XenSettingsScreen extends Screen {
 				onOff("Chat", "chat", "Xen answers and understands chat.");
 				choice("Chat model", "chatModel", List.of("auto", "on", "off"), s -> s,
 						"The small chat model: auto = only with about 3 GB of memory for the game. It only wakes when someone Xen knows is near or talks.");
+				choice("Chat on GPU", "gpu", List.of("auto", "on", "off"), s -> s,
+						"Run the chat model on the graphics card (much faster answers). auto: when there's a real graphics card with OpenGL 3.3, in single player. Works with Sodium, Iris and Vulkan mods. Applies the next time the model loads.");
 				onOff("Talks on its own", "talk", "Xen says what's on its mind now and then, greets people it knows and asks things you can answer with yes or no.");
 				onOff("Talks with Xens", "talkToXens", "Xens that meet have a short chat and tell each other where they saw trees and ore.");
 				onOff("Trading", "trading", "Xen trades with villagers (on their trading screen) and bargains with players.");

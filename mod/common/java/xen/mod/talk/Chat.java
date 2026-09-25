@@ -211,6 +211,14 @@ public final class Chat {
 	});
 	private final java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger();
 	private volatile Llm llm;
+	/**
+	 * The GPU for the chat model, set by the game client (a dedicated server has none): given "force" and a log, an
+	 * accelerator or null. The setting: "auto" (a real graphics card if there is one), "on" or "off".
+	 */
+	public static volatile java.util.function.BiFunction<Boolean, Consumer<String>, Llm.Accelerator> gpu;
+	public static java.util.function.Supplier<String> gpuSetting = () -> "auto";
+	/** Where the chat model runs, for /xen status and the settings: "CPU" or the graphics card's name. */
+	public volatile String runsOn = "CPU";
 	private volatile boolean loading;
 	private volatile String problem;
 	private volatile long problemAt;
@@ -327,9 +335,31 @@ public final class Chat {
 		}
 		log.accept("Loading Xen's chat model (" + modelPath.getFileName() + ")...");
 		Llm model = new Llm(modelPath.toString(), threads, 1024);
+		String setting = gpuSetting.get();
+		runsOn = "CPU";
+		var makeGpu = gpu;
+		if (makeGpu != null && !"off".equals(setting)) {                // on the graphics card, if there's a good one
+			try {
+				Llm.Accelerator a = makeGpu.apply("on".equals(setting), log);
+				if (a != null) {
+					long t0 = System.nanoTime();
+					if (model.useGpu(a)) {
+						runsOn = a.name();
+						log.accept(String.format(java.util.Locale.ROOT, "Xen's chat model runs on the GPU: %s (weights uploaded in %.1f s).",
+								a.name(), (System.nanoTime() - t0) / 1e9));
+					} else {
+						log.accept("The GPU couldn't take the chat model (" + model.gpuProblem + "), so it runs on the CPU.");
+					}
+				}
+			} catch (Throwable e) {
+				log.accept("The chat model stays on the CPU: " + e);
+			}
+		}
+		long t0 = System.nanoTime();
 		model.savePrefix(PERSONA);
 		model.savePrefix(EARS);
-		log.accept("Xen's chat model is ready.");
+		log.accept(String.format(java.util.Locale.ROOT, "Xen's chat model is ready (read its prompts in %.1f s on the %s).",
+				(System.nanoTime() - t0) / 1e9, model.onGpu() ? "GPU" : "CPU"));
 		return model;
 	}
 

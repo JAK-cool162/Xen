@@ -80,6 +80,7 @@ public class XenMod implements ModInitializer {
 		INSTANCE = this;
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
+		Chat.gpuSetting = () -> config.gpu;
 		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> config.chatModel, () -> config.downloadChatModel,
 				config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
@@ -635,7 +636,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private int showSettings(CommandContext<CommandSourceStack> ctx) {
-		StringBuilder sb = new StringBuilder("Xen settings:");
+		StringBuilder sb = new StringBuilder("Xen settings (the chat model runs on the " + chat.runsOn + "):");
 		for (var f : XenConfig.class.getFields()) {
 			try {
 				sb.append("\n  ").append(f.getName()).append(" = ").append(f.get(config));

@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.5.0-alpha
+# Xen Companion (Fabric mod), prototype 0.5.1-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -11,10 +11,10 @@ through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.5.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.5.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.5.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.5.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.5.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.5.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.5.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.5.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -66,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.5.0-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.5.1-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -114,6 +114,36 @@ Measured on a 4-core cloud PC (x86-64):
     model can take 8192).
 * **Phones** weren't measured. Their cores are slower: the brain is light
   enough, and the chat model stays off below about 3 GB anyway.
+
+### The chat model on the graphics card
+
+In single player (and on a LAN world you host) the chat model can run on your
+graphics card: setting **Chat on GPU** (`gpu`), in the Talk tab. `auto`
+(the default) uses it when there's a real graphics card with OpenGL 3.3;
+`on` uses it even with a software renderer; `off` never does.
+
+* **How**: Xen opens its own small hidden OpenGL 3.3 context, puts the model's
+  weights there once (about 390 MB of graphics memory), and does the big
+  matrix products with ordinary shaders (no compute shaders, so Macs and older
+  cards work too). It reads the prompt 32 words at a time. The game's own
+  rendering isn't touched, so it works the same with **vanilla, Sodium, Iris or
+  a Vulkan renderer mod**: all it needs is a graphics driver with OpenGL 3.3
+  (almost every PC and Mac). It uses the game's window library (GLFW up to
+  26.2, SDL in 26.3).
+* **When it can't** (no OpenGL 3.3, only a software renderer, not enough
+  graphics memory, a dedicated server, or anything else going wrong), it says
+  why in the log and the model stays on the CPU. `/xen settings` shows where
+  it runs.
+* **How fast**: measured here only on Mesa's software renderer (no graphics
+  card in the test machine): reading a 285-token prompt took 39-42 s on it
+  against 73-79 s on the CPU path, so a real graphics card should be a lot
+  faster. Both give the same next word; the numbers differ a little
+  (at most 0.53 of about 19) because the CPU path rounds its inputs to 8 bits.
+  Checked in real 1.21.11 and 26.1.2 clients. The 26.3 path (SDL) couldn't be
+  tried here: 26.3 itself wouldn't open a window on the test machine.
+* **Phones**: PojavLauncher's usual renderer (GL4ES) has no OpenGL 3.3, so it
+  stays on the CPU; a renderer with OpenGL 3.3 or newer (on Zink/Vulkan) may
+  work, but it's untested.
 
 ## Talking to Xen: it understands and does it
 
@@ -491,6 +521,7 @@ away in single player. On a server, operators use:
 | `chatIdleMinutes` | `10` | unload it after this long with nobody around |
 | `downloadChatModel` | `true` | download the chat model the first time it's needed |
 | `chatThreads` | half the CPU cores (1-4) | CPU threads for the chat model |
+| `gpu` | `"auto"` | the chat model on the graphics card: `"auto"`, `"on"` or `"off"` ([more](#the-chat-model-on-the-graphics-card)) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
 | `maxXens` | `0` | Xens the whole world may have (0 = no limit) |

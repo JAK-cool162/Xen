@@ -16,6 +16,8 @@ public final class XenConfig {
 	 * 3 GB of memory or more), "on" or "off". Without it Xen still understands keywords and answers in plain words.
 	 */
 	public String chatModel = "auto";
+	/** Chat model on the graphics card: "auto" (when there's a real one, in a game client), "on" (even a software one) or "off". */
+	public String gpu = "auto";
 	/** Download the chat model (about 390 MB) to config/xen/ the first time it's needed. */
 	public boolean downloadChatModel = true;
 	/** CPU threads the chat model may use (it runs in the background). */

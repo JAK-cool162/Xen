@@ -1,8 +1,8 @@
 """Make the all-in-one mod jar: the mod with its chat model inside.
 
-    python scripts/bundle_chat_model.py dist/xen-companion-0.5.0-alpha+mc1.21.11.jar smollm2-360m-instruct-q8_0.gguf
+    python scripts/bundle_chat_model.py dist/xen-companion-0.5.1-alpha+mc1.21.11.jar smollm2-360m-instruct-q8_0.gguf
 
-writes dist/xen-companion-0.5.0-alpha+mc1.21.11-with-chat.jar: every entry of the mod jar as it is, plus the model at
+writes dist/xen-companion-0.5.1-alpha+mc1.21.11-with-chat.jar: every entry of the mod jar as it is, plus the model at
 assets/xen/model/ (stored, not compressed, so the mod unpacks it with a plain copy). The mod checks the model's SHA-256
 when it unpacks it, so a wrong or damaged file is refused here already.
 """
