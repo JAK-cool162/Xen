@@ -63,7 +63,7 @@ public final class Chat {
 	// ------------------------------------------------------------------------------ requests
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
 	public static final String[] INTENTS = {"follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give",
-			"shelter", "eat", "stop", "redstone", "chat"};
+			"shelter", "eat", "stop", "redstone", "trade", "chat"};
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
@@ -82,6 +82,8 @@ public final class Chat {
 			{"follow", "\\b(follow|come|with me|let'?s go|over here|this way|keep up|to me)\\b"},
 	};
 	private static final Pattern[] RULE = new Pattern[RULES.length];
+	/** Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader. */
+	private static final Pattern TRADE = Pattern.compile("\\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\\b|\\b\\d{1,3} [a-z_]+ for (\\d{1,3} )?(your |my )?[a-z_]+");
 	private static final Pattern QUESTION = Pattern.compile("^((what|where|why|how|who|when|which)\\b|(do|does|did|are|is|am|was|were|have|has|had) "
 			+ "(you|we|i|it|there|they|he|she|this|that|your|my)\\b)");
 	private static final Pattern SOCIAL = Pattern.compile("^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
@@ -94,7 +96,8 @@ public final class Chat {
 			{"go wander around", "explore"}, {"we need a place to hide tonight", "shelter"}, {"never mind", "stop"},
 			{"go get us something to eat", "food"}, {"you're funny", "chat"}, {"i need smelting fuel", "coal"},
 			{"follow my lead", "follow"}, {"grab me some cobblestone", "stone"}, {"see you later", "chat"},
-			{"you look hurt, eat up", "eat"}, {"put together a little logic thing with levers", "redstone"}};
+			{"you look hurt, eat up", "eat"}, {"put together a little logic thing with levers", "redstone"},
+			{"let's make a deal, my iron for your wood", "trade"}, {"watch this!", "chat"}};
 	static final String EARS;
 	/** The model's pick must beat "chat" by this much (log-probability), or it's just chat. */
 	static final float SURE = 1.0f;
@@ -102,7 +105,7 @@ public final class Chat {
 		for (int i = 0; i < RULES.length; i++) RULE[i] = Pattern.compile(RULES[i][1]);
 		StringBuilder sb = new StringBuilder("<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player "
 				+ "says to Xen and answer with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, "
-				+ "iron, mine, food, give, shelter, eat, stop, redstone, or chat (only talking, thanking, praising or asking something).<|im_end|>\n");
+				+ "iron, mine, food, give, shelter, eat, stop, redstone, trade, or chat (only talking, thanking, praising or asking something).<|im_end|>\n");
 		for (String[] e : EAR_EXAMPLES) {
 			sb.append("<|im_start|>user\n").append(e[0]).append("<|im_end|>\n<|im_start|>assistant\n").append(e[1]).append("<|im_end|>\n");
 		}
@@ -130,7 +133,9 @@ public final class Chat {
 	public static Request understand(String message, String name) {
 		String words = requestWords(message, name);
 		String intent = "chat";
-		if (!QUESTION.matcher(words).lookingAt()) {
+		if (TRADE.matcher(words).find()) {
+			intent = "trade";
+		} else if (!QUESTION.matcher(words).lookingAt()) {
 			for (int i = 0; i < RULE.length; i++) {
 				if (RULE[i].matcher(words).find()) {
 					intent = RULES[i][0];

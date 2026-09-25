@@ -35,6 +35,8 @@ public final class Hands {
 	private Action lastMove = Action.IDLE;
 	private int ticks, limit;
 	private BlockPos digging;
+	/** A block it aims at with the mouse (a step of a staircase), instead of straight ahead or down. */
+	private BlockPos aim;
 	private float progress;
 	private boolean pillar;
 	private BlockPos pillarFrom;
@@ -86,6 +88,7 @@ public final class Hands {
 	LivingEntity watching;
 
 	void look() {
+		if (aim != null) return;                                      // eyes on the block it's mining
 		if (watching != null && watching.isAlive() && watching.level() == p.level()) {
 			Vec3 d = watching.getEyePosition().subtract(p.getEyePosition());
 			float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
@@ -100,6 +103,7 @@ public final class Hands {
 	}
 
 	BlockPos target() {
+		if (aim != null) return aim;
 		BlockPos feet = p.blockPosition();
 		int[] f = Perception.forward(yaw);
 		if (pitch < 0) return feet.below();
@@ -176,6 +180,7 @@ public final class Hands {
 
 	void stop() {
 		pillar = false;
+		aim = null;
 		if (digging != null) {
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP,
 					p.level().getMaxY(), 0);
@@ -194,8 +199,7 @@ public final class Hands {
 		int c = WorldSenses.category(level, pos, state);
 		if (state.isAir() || c == Blocks.AIR || c == Blocks.LAVA || c == Blocks.WATER || c == Blocks.BEDROCK
 				|| state.getDestroySpeed(level, pos) < 0) {
-			Compat.swing(p);
-			limit = 2;
+			limit = 2;                                                // nothing to mine there
 			return;
 		}
 		selectBestTool(state);
@@ -230,6 +234,12 @@ public final class Hands {
 	}
 
 	private Direction face() {
+		if (aim != null) {                                            // the side of the block that faces its eyes
+			Vec3 d = p.getEyePosition().subtract(Vec3.atCenterOf(aim));
+			double ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z);
+			return ay >= ax && ay >= az ? (d.y > 0 ? Direction.UP : Direction.DOWN)
+					: ax >= az ? (d.x > 0 ? Direction.EAST : Direction.WEST) : (d.z > 0 ? Direction.SOUTH : Direction.NORTH);
+		}
 		if (pitch < 0) return Direction.UP;
 		return switch (yaw) {
 			case 0 -> Direction.SOUTH;                                // facing north, it hits the south face
@@ -252,6 +262,19 @@ public final class Hands {
 			}
 		}
 		inv.setSelectedSlot(best);
+	}
+
+	/** Mine a block it can reach by looking at it (not just ahead or under its feet): for staircases. */
+	boolean mine(BlockPos pos) {
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
+		stop();
+		face(Vec3.atCenterOf(pos));
+		aim = pos.immutable();
+		current = Action.MINE;
+		ticks = 0;
+		limit = 5;
+		startMining();
+		return true;
 	}
 
 	// -------------------------------------------------------------------------------- placing
@@ -282,7 +305,7 @@ public final class Hands {
 		Vec3 eye = p.getEyePosition();
 		int[] f = Perception.forward(yaw);
 		for (LivingEntity e : p.level().getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(reach + 1),
-				x -> x instanceof Enemy && x.isAlive())) {
+				x -> x.isAlive() && (p.companion != null ? p.companion.hostile(x) : x instanceof Enemy))) {
 			Vec3 d = e.position().add(0, e.getBbHeight() / 2, 0).subtract(eye);
 			double flat = Math.hypot(d.x, d.z);
 			if (flat > 0.01 && (d.x * f[0] + d.z * f[1]) / flat < 0.5) continue;      // must be in front (within 60 deg)
@@ -297,8 +320,8 @@ public final class Hands {
 			p.setYRot((float) Math.toDegrees(Math.atan2(-d.x, d.z)));
 			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
 			p.attack(best);                                            // attack, then swing: a swing resets the charge
-		}
-		Compat.swing(p);
+			Compat.swing(p);
+		}                                                              // nothing there: no swinging at the air
 	}
 
 	// -------------------------------------------------------------------------------- eating
@@ -561,6 +584,10 @@ public final class Hands {
 	void toss(ItemStack stack) {
 		if (!Compat.drop(p, stack)) p.getInventory().add(stack);
 		Compat.swing(p);
+	}
+
+	int hotbar(java.util.function.Predicate<ItemStack> want) {
+		return findHotbar(want);
 	}
 
 	/** A hotbar slot holding a matching item, moving one there from the backpack if needed. */

@@ -37,8 +37,18 @@ public final class XenConfig {
 	public boolean randomNames = true;
 	/** Give each Xen its own personality (brave or timid, curious, chatty, patient, and a tone of voice). */
 	public boolean personalities = true;
-	/** Free Xens choose their own goals (food, shelter, wood, stone, ore, exploring) and learn which ones they like. */
+	/** Free Xens choose their own goals (instant, short and long ones) and learn which ones they like. */
 	public boolean wants = true;
+	/** Xens say things on their own: what they see, want and feel, greetings, and questions you can answer. */
+	public boolean talk = true;
+	/** Xens near each other talk, and tell each other where things are. */
+	public boolean talkToXens = true;
+	/** Xens trade: with villagers (the real trading screen) and with players (they bargain). */
+	public boolean trading = true;
+	/** Xens may say no: when it's dangerous, when they need the thing themselves, or to someone who hurt them. */
+	public boolean refuse = true;
+	/** Xen watches players and copies moves that work out for them (the water clutch, a winning fighting style). */
+	public boolean copy = true;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
 	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("random"));
 
@@ -108,6 +118,18 @@ public final class XenConfig {
 			return key + " needs a number";
 		} catch (IllegalAccessException e) {
 			return "can't set " + key;
+		}
+	}
+
+	/** Every setting back to its default (the settings screen's Defaults button). */
+	void reset() {
+		XenConfig defaults = new XenConfig();
+		for (java.lang.reflect.Field f : XenConfig.class.getFields()) {
+			try {
+				f.set(this, f.get(defaults));
+			} catch (IllegalAccessException ignored) {
+				// every setting is public
+			}
 		}
 	}
 

@@ -39,6 +39,16 @@ final class Compat {
 		return true;
 	}
 
+	/** Right-click an entity, like a player (a villager opens its trades). */
+	static void interact(ServerPlayer p, net.minecraft.world.entity.Entity e) {
+		p.interactOn(e, InteractionHand.MAIN_HAND);
+	}
+
+	/** Click a slot of the open screen (shift-click with quick), like a player's mouse. */
+	static void click(net.minecraft.world.inventory.AbstractContainerMenu menu, int slot, boolean quick, ServerPlayer p) {
+		menu.clicked(slot, 0, quick ? net.minecraft.world.inventory.ClickType.QUICK_MOVE : net.minecraft.world.inventory.ClickType.PICKUP, p);
+	}
+
 	static void teamColor(PlayerTeam team, ChatFormatting color) {
 		team.setColor(color);
 	}

@@ -34,6 +34,23 @@ public final class XenSettings {
 		if (error != null) XenMod.LOG.warn("Setting {}: {}", key, error);
 	}
 
+	public void reset() {
+		config.reset();
+	}
+
+	/** These settings back to how they come. */
+	public void reset(List<String> keys) {
+		XenConfig fresh = new XenConfig();
+		for (String key : keys) {
+			try {
+				var f = XenConfig.class.getField(key);
+				f.set(config, f.get(fresh));
+			} catch (ReflectiveOperationException e) {
+				XenMod.LOG.warn("Setting {}: {}", key, e.toString());
+			}
+		}
+	}
+
 	public void save() {
 		config.save();
 		if (XenMod.INSTANCE != null) XenMod.INSTANCE.applySettings();

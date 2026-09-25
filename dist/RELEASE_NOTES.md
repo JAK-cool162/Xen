@@ -5,10 +5,10 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.4.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.4.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.4.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.4.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.5.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.5.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.5.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.5.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -17,7 +17,40 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.4.1-alpha
+### What's new in 0.5.0-alpha
+
+* **It acts like a player, not a digging machine.** Xen used to punch stone with bare hands (it had no way to make
+  tools, so it got nothing), dig pits under itself, swing at the air and wander off. Now:
+  * **It crafts its tools** like a new player, with the recipe book: planks, sticks, a crafting table, a wooden
+    pickaxe (three logs), then a stone pickaxe, sword and axe. Ask for stone without a pickaxe and it gets wood first.
+  * It **mines only what's worth it** (wood, ore its pickaxe can mine, stone when it needs blocks), and **never digs
+    straight down**: it digs a staircase and stops if lava or water is under the next step.
+  * Next to you it **waits and watches you** instead of wandering; it swings only at something hostile.
+* **It knows how mobs behave.** It leaves endermen, piglins, wolves and other neutral mobs alone unless they come after
+  it, never hits villagers, golems or pets, hunts only farm animals (never named ones), and **runs from a hissing
+  creeper** (about 4 blocks in the 1.5 seconds before the blast).
+* **Trading.** With villagers on their real trading screen (it picks the offers that are good for it), and with
+  players: it names prices, bargains (a high first offer, then halfway, then its last offer), walks away from bad deals,
+  gives friends a better price, and never trades away what it needs. It remembers whom it trusts.
+* **It can say no**, and says why: badly hurt, scared of the dark, needs what you ask for, or you hurt it. "Please"
+  changes its mind (unless you hurt it).
+* **Goals in three tiers**: what it's doing now, what it wants in the next minutes, and a **dream** it works toward for
+  days (a home, a stockpile, diamonds, being a trader, far places, three friends). It's proud when one comes true.
+* **It talks on its own**, only about what's true for it, greets people it knows, and asks yes-or-no questions it acts
+  on ("I have lots of wood. Want some?" "yes"). **Two Xens that meet chat** and tell each other where they saw trees and
+  ore. Everyday questions ("what are you doing?", "what do you have?") are answered from what it knows, not by the
+  chat model, so nothing is made up.
+* **It learns by watching you.** When a move works out for a player it can see, it copies it, clumsily at first and
+  better each time: a **water-bucket clutch** (then it clutches when it falls with a water bucket, and scoops the water
+  back up), and **how you fight when you win** (crits, full-charge swings, S-taps, jump resets, spacing, the shield pull
+  its fight genes your way). Say "Pip, watch this!" first. Setting: **Learns by watching**.
+* **A tabbed settings screen**: Talk, Xens, Goals, PvP, Build, Speed, with a line about each tab and Reset tab. New
+  settings: **Talks on its own**, **Talks with Xens**, **Trading**, **Can say no**, **Learns by watching**.
+
+Tested on real 1.21.11 and 26.1.2 servers with a scripted player (crafting, a villager trade, a full bargain, refusals,
+questions, Xen-to-Xen chat, an enderman left alone, creepers), and the 26.x jar is checked against 26.3.
+
+### New in 0.4.1-alpha
 
 * **All in one: the chat model inside the mod.** The `-with-chat` jars carry Xen's chat model (SmolLM2-360M), so it
   talks with nothing else to download. The first time it's needed, the mod unpacks it once into `config/xen/` (read
@@ -57,8 +90,9 @@ ARM64 machine.
 
 ### Known limits
 
-It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. Its chat model is small and
-its answers are simple. It only gathers what it can reach on foot (plus one block up with a pillar). A good PvP
+It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. It can't smelt yet (so no iron
+tools), and it leaves its crafting tables where it used them. Its chat model is small and its answers are simple (plain
+questions are now answered without it). It only gathers what it can reach on foot (plus one block up with a pillar). A good PvP
 player will still beat it: it can't combo or dodge arrows, and it doesn't use a mace, spear, crystals or pearls yet.
 More days in the real game didn't make the brain better at SimCraft's tests, which is why the bundled brain stays
 the SimCraft one.

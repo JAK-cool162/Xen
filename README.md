@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.4.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.4.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.5.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.5.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -297,10 +297,44 @@ The champion it evolved beats the careful styles, but not yet the best
 aggressive ones: self-play confirmed what works with these skills, without
 yet finding anything better.
 
-**Its own goals.** A free Xen decides what it wants: food, a shelter for the
-night, wood, stone, ore, or to explore. It weighs what it needs right now, its
-personality, and how well each goal worked out before. It says what it wants
-("I want to get some wood."), does it, and learns which goals it likes.
+**Goals in three tiers.** What it's doing this moment (eating, fighting,
+getting away from a creeper), what it wants in the next minutes when it's free
+(food, a shelter for the night, wood, stone, ore, a trade, exploring: weighed
+by what it needs, its personality and what worked before), and a dream it
+works toward for days (a home, a stockpile, diamonds, being a trader, far
+places, three friends). When a dream comes true it's proud and picks a new one.
+
+**It crafts its tools** like a new player, with the recipe book: planks,
+sticks, a crafting table, a wooden pickaxe, then stone tools. It mines only
+what's worth it and never digs straight down (it digs a staircase). Next to
+you it waits and watches you instead of wandering off.
+
+**It knows how mobs behave.** It leaves endermen, piglins and other neutral
+mobs alone unless they come after it, never hits villagers, golems or pets,
+and runs from a hissing creeper.
+
+**It trades and bargains.** "Xen, trade with the villager": it opens the
+villager's trading screen and takes the offers that are good for it, with a
+player's clicks. With players it names prices, answers low offers with
+counter-offers (high first, then halfway, then its last offer), walks away
+from bad deals, and gives friends a better price. It remembers whom it trusts:
+someone who hit it or didn't pay gets no deals.
+
+**It can say no**, and says why: when it's badly hurt, scared, needs what you
+ask for, or you hurt it ("No, not now: I'm badly hurt and need to heal
+first."). "Please" changes its mind, unless you hurt it.
+
+**It learns by watching you.** When a move works out for you, it copies it,
+clumsily at first and better each time: land a water-bucket clutch in front of
+it and it starts doing water clutches when it falls; win a fight and it fights
+a bit more like you (crits, S-taps, jump resets, the shield).
+
+**It talks on its own and with other Xens**, only about what's true for it: it
+greets you, says how its dream is going, and asks yes-or-no questions it acts
+on ("I have lots of wood. Want some?" "yes"). Two Xens that meet chat and tell
+each other where they saw trees and ore, and the other one then knows it.
+Everyday questions ("what are you doing?", "what do you have?") are answered
+straight from what it knows, not by the chat model.
 
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by
@@ -311,8 +345,10 @@ within 32 blocks, or someone talks to it. It unloads after 10 quiet minutes.
 When nobody it knows is around, Xen leaves notes on signs instead ("Day 12:
 Diamonds here! -Pip").
 
-**Settings in Mod Menu** (or `/xen set` on servers): how many Xens, teams,
-PvP, evolution, redstone and its limit, names, personalities, skins, chat.
+**Settings in Mod Menu** (or `/xen set` on servers), in tabs: Talk (chat, the
+chat model, talking on its own and with Xens, trading, saying no), Xens (how
+many, names, personalities, skins), Goals (own goals, learning, evolution),
+PvP, Build (redstone, signs) and Speed.
 
 ![Xen Companion settings in Mod Menu](docs/screenshots/settings.png)
 
@@ -632,8 +668,10 @@ brains/               pre-trained brain
 mod/                  Fabric mod: Xen Companion
   common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen),
                       personalities, names and skins, teams, evolution, redstone, signs, settings,
-                      Fighter (1.9+ PvP), Arena (red vs blue self-play), Wants (its own goals)
-  common/java/.../client/  the Mod Menu settings screen
+                      Fighter (1.9+ PvP), Arena (red vs blue self-play), Goals (now, soon, its dream),
+                      Crafter (tools with the recipe book), Trader (villagers, bargaining, trust),
+                      Talker (talking on its own and with other Xens), Mimic (learning by watching)
+  common/java/.../client/  the Mod Menu settings screen (tabs)
   common/test/        crossCheck: Java == Python for senses, brain, memories, paths and chat rules
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
   mc26/               build for Minecraft 26.x (Java 25); Compat looks up what differs in 26.1 - 26.3

@@ -301,9 +301,21 @@ public class XenMod implements ModInitializer {
 			if (c.player() == null) continue;
 			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
 					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) continue;
-			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender)),
+			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> c.say(reply)));
 			return;
+		}
+		// No name: an answer to a Xen close by that asked this player something, or is in a trade with them ("yes", "deal").
+		Companion nearest = null;
+		for (Companion c : companions) {
+			if (c.player() == null || c.player().level() != sender.level() || c.player().distanceTo(sender) > 16) continue;
+			if (!c.talker.waitingFor(sender.getUUID()) && !c.trader.dealWith(sender.getUUID())) continue;
+			if (nearest == null || c.player().distanceTo(sender) < nearest.player().distanceTo(sender)) nearest = c;
+		}
+		if (nearest != null) {
+			Companion c = nearest;
+			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
+					reply -> server.execute(() -> c.say(reply)));
 		}
 	}
 
@@ -470,7 +482,13 @@ public class XenMod implements ModInitializer {
 		if (known != null && known.has("known")) {
 			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
 		}
-		if (known != null && known.has("likes")) c.wants.load(known.getAsJsonObject("likes"));
+		if (known != null) {
+			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
+			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
+			if (known.has("trust")) {
+				for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
+			}
+		}
 		return c;
 	}
 
@@ -600,11 +618,15 @@ public class XenMod implements ModInitializer {
 				at = surface(level, x, z);
 			}
 			if (at == null) continue;
-			Companion c = create(null, null, null);
-			c.mode = Companion.Mode.FREE;
-			c.join(level, at, random.nextInt(4) * 90f);
-			companions.add(c);
-			made++;
+			try {                                                        // one that can't join doesn't stop the rest
+				Companion c = create(null, null, null);
+				c.mode = Companion.Mode.FREE;
+				c.join(level, at, random.nextInt(4) * 90f);
+				companions.add(c);
+				made++;
+			} catch (RuntimeException e) {
+				LOG.warn("A Xen could not join at {}", at, e);
+			}
 		}
 		int n = made;
 		ctx.getSource().sendSuccess(() -> Component.literal(n + " Xens joined within " + radius + " blocks. They share one brain. "

@@ -79,7 +79,8 @@ REQUESTS = ["Xen, get some wood", "xen follow me", "do you have wood?", "can you
             "xen, kill 2 pigs", "hand over 12 iron", "have a snack", "cancel that", "come here xen", "find diamonds",
             "you're free to roam", "hide!", "i need your wood", "thanks xen, you rock", "good job xen, now get coal",
             "hey xen get wood", "bring me rocks", "xen build an and gate", "make a redstone circuit", "xen build a not gate",
-            "can you make an or gate", "build a long wire"]
+            "can you make an or gate", "build a long wire", "xen trade with the villager", "how much for your logs?",
+            "i'll give you 2 iron for 10 logs", "want to swap?", "xen sell me some coal", "5 logs for 1 iron"]
 
 
 def main():

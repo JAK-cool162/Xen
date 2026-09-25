@@ -11,8 +11,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.animal.golem.AbstractGolem;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.npc.villager.AbstractVillager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
@@ -23,6 +28,7 @@ import xen.mod.core.Emotions;
 import xen.mod.core.Paths;
 import xen.mod.core.Perception;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -144,6 +150,12 @@ public final class Companion {
 		hands.tick();
 		hurtNow = player.getHealth() < tickHealth;
 		tickHealth = player.getHealth();
+		mimic.watch();                                                  // what are the players it sees doing?
+		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
+		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
+				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
+			trust(by.getUUID(), -0.3f);                                     // it remembers who hit it
+		}
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
 		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0 && !fighting) return;   // in a fight, every tick
 		decide();
@@ -214,17 +226,28 @@ public final class Companion {
 		lastFood = player.getFoodData().getFoodLevel();
 		lastItems = items;
 		pillaring = acted = false;
+		goals.instant = "";
+		if (!inArena) goals.everyDecision();
 		Action instinct = instinct();
 		Brain.Thought thought = mod.brain.decide(next, emotions, mod.config.learn);
-		int action = instinct != null ? instinct.ordinal() : thought.action;
+		Action sensible = instinct == null ? sensible(Action.values()[thought.action]) : null;
+		if (sensible != null && sensible.ordinal() == thought.action) sensible = null;
+		int action = instinct != null ? instinct.ordinal() : sensible != null ? sensible.ordinal() : thought.action;
 		lastThought = instinct != null ? (chores.busy() ? "Doing what I was asked (" + chores.doing + "): " : "Instinct: ")
-				+ (pillaring ? "climb up" : instinct.verb) + "." : thought.text;
+				+ (pillaring ? "climb up" : instinct.verb) + "." : sensible != null ? "Nothing worth doing there, so: " + sensible.verb + "."
+				: thought.text;
+		if (goals.instant.isEmpty()) goals.instant = mode == Mode.FREE ? "exploring" : "looking around";
+		if (hands.watching == null && watchFor != null && watchUntil > player.tickCount) {   // "watch me": eyes on them
+			ServerPlayer w = server.getPlayerList().getPlayer(watchFor);
+			if (w != null && w.level() == player.level()) hands.watching = w;
+		}
 		if (!pillaring && !acted) hands.start(Action.values()[action]);
 		if (DEBUG) XenMod.LOG.info("[xen debug] {} at {} ground={} yaw={} pitch={} -> {} ({})", name, player.position(), player.onGround(),
 				hands.yaw, hands.pitch, Action.values()[action], lastThought);
 		obs = next;
 		lastAction = action;
 		react();
+		talker.tick(fighting);
 	}
 
 	/** What its genes do to how it feels (again after /xen style changes them). */
@@ -233,23 +256,116 @@ public final class Companion {
 		emotions.curiosityDrive = personality.curiosityScale();                            // curious ones try new things more
 	}
 
+	/**
+	 * The brain's own choice, checked the way a player would: it mines only what's worth it (wood, ore its pickaxe can
+	 * mine, stone when it needs blocks) and never straight down under itself; it swings only at something hostile in
+	 * front of it; it places blocks only when it's scared (to wall off a mob or lava); and next to the friend it follows
+	 * (or where it was told to stay) it doesn't wander off, unless something scares it. Otherwise it waits and watches
+	 * its friend, or looks around. Null: the brain's choice is fine.
+	 */
+	private Action sensible(Action a) {
+		switch (a) {
+			case FORWARD, BACK, LEFT, RIGHT, JUMP -> {
+				if (emotions.fear > 0.5f || mode == Mode.FREE || random.nextFloat() < 0.1f) return null;   // a step now and then
+				return idle();
+			}
+			case MINE -> {
+				ServerLevel level = (ServerLevel) player.level();
+				BlockPos t = hands.target();
+				int cat = cat(level, t);
+				var items = items();
+				int blocks = items.getOrDefault("dirt", 0) + items.getOrDefault("cobblestone", 0);
+				int tier = crafter.pickTier();
+				boolean worth = cat == Blocks.LOG
+						|| cat >= Blocks.COAL && cat <= Blocks.DIAMOND && tier >= Crafter.tierFor(cat)
+						|| cat == Blocks.STONE && tier >= 1 && blocks < 32
+						|| (cat == Blocks.DIRT || cat == Blocks.GRASS) && blocks < 4;
+				boolean down = hands.pitch < 0;
+				if (worth && !(down && (cat == Blocks.STONE || cat == Blocks.DIRT || cat == Blocks.GRASS))) return null;
+				if (hands.pitch != 0) return hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP;
+				return idle();
+			}
+			case ATTACK -> {
+				return hostileInFront() ? null : idle();
+			}
+			case PLACE -> {
+				return emotions.fear > 0.5f || player.isInWater() ? null : idle();
+			}
+			default -> {
+				return null;
+			}
+		}
+	}
+
+	/** Nothing to do: like a player waiting, it watches its friend if they're near, or looks around now and then. */
+	private Action idle() {
+		ServerPlayer friend = leader == null ? null : server.getPlayerList().getPlayer(leader);
+		if (friend != null && friend.level() == player.level() && friend.distanceTo(player) < 16) {
+			hands.watching = friend;
+			return Action.IDLE;
+		}
+		return random.nextFloat() < 0.2f ? (random.nextBoolean() ? Action.TURN_LEFT : Action.TURN_RIGHT) : Action.IDLE;
+	}
+
+	private final java.util.Random random = new java.util.Random();
+
+	private boolean hostileInFront() {
+		double reach = player.entityInteractionRange() + 0.5;
+		for (LivingEntity e : player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(reach), this::hostile)) {
+			if (player.distanceTo(e) <= reach && player.hasLineOfSight(e)) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Is this a mob to fight? One that's after it or its owner, or a monster that attacks on sight. It knows how mobs
+	 * behave: endermen, piglins, wolves, bees, golems and the like leave you alone unless you provoke them (so it
+	 * doesn't), spiders are calm in daylight, and villagers, golems and pets are never hit.
+	 */
+	boolean hostile(LivingEntity e) {
+		if (e == player || !e.isAlive() || e instanceof ServerPlayer) return false;
+		if (e instanceof AbstractVillager || e instanceof TamableAnimal t && t.isTame()) return false;
+		ServerPlayer o = owner == null ? null : server.getPlayerList().getPlayer(owner);
+		if (e instanceof Mob m && m.getTarget() != null && (m.getTarget() == player || m.getTarget() == o)) {
+			return !(e instanceof AbstractGolem);                    // a golem after it: better run than fight
+		}
+		if (!(e instanceof Enemy) || e instanceof NeutralMob) return false;
+		String n = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
+		return switch (n) {
+			case "piglin", "spider", "cave_spider" -> false;           // calm until provoked (or in the dark: then they target it)
+			default -> true;
+		};
+	}
+
 	/** Companion instincts that come before the brain's own choice. */
 	private Action instinct() {
 		hands.watching = null;
 		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
+			goals.instant = "swimming up for air";
 			return Action.JUMP;                                       // hold space to swim up, like a player
 		}
 		if (player.getFoodData().getFoodLevel() <= 10 && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
+			goals.instant = "eating";
 			return Action.EAT;
 		}
 		Action fight = fightBack();
-		if (fight != null) return fight;
+		if (fight != null) {
+			if (goals.instant.isEmpty()) goals.instant = "fighting the " + fightingWhat;
+			return fight;
+		}
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
+		if (crafter.ready() && !farBehind()) {                        // tools first, like any new player
+			Action craft = crafter.next();
+			if (craft != null) return craft;
+		}
 		if (chores.busy()) {
 			Action chore = chores.next();
+			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;
 			if (chore != null || chores.busy()) return chore;
 		}
-		if (mode == Mode.FREE && mod.config.wants && !inArena && wants.think()) {   // free: what does it want?
+		Action deal = trader.next();
+		if (deal != null) return deal;
+		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.think()) {   // free: what does it want?
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
 		}
@@ -264,7 +380,15 @@ public final class Companion {
 			goal = Vec3.atCenterOf(anchor);
 		}
 		if (goal == null) return null;
+		goals.instant = mode == Mode.STAY ? "going back to where you were told to stay" : "keeping up with your friend";
 		return walkTo(goal);
+	}
+
+	/** Is its friend getting away (so there's no time to stop and craft)? */
+	private boolean farBehind() {
+		if (mode != Mode.FOLLOW || leader == null) return false;
+		ServerPlayer o = server.getPlayerList().getPlayer(leader);
+		return o != null && o.level() == player.level() && o.distanceTo(player) > mod.config.followDistance * 2;
 	}
 
 	/** Walk towards a place like a player: turn, walk, jump up steps, dig through, pillar up. Null if lava is in the way. */
@@ -345,12 +469,40 @@ public final class Companion {
 			fighter.reset();
 			return null;
 		}
+		fightingWhat = foe.getName().getString();
+		if (!(foe instanceof ServerPlayer)) fightingWhat = fightingWhat.toLowerCase(java.util.Locale.ROOT);
 		return fighter.next(foe, hurtNow);
 	}
 
+	private String fightingWhat = "";
+
 	private final Fighter fighter = new Fighter(this);
-	/** What it wants to do when nobody has asked it for anything. */
-	final Wants wants = new Wants(this);
+	/** What it's after: this moment, the next minutes, and its dream. */
+	final Goals goals = new Goals(this);
+	/** Trading with villagers and players. */
+	final Trader trader = new Trader(this);
+	/** Making its tools. */
+	final Crafter crafter = new Crafter(this);
+	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
+	final Map<UUID, Float> trust = new HashMap<>();
+
+	float trust(UUID who) {
+		if (who == null) return 0;
+		if (who.equals(owner)) return 1f;
+		return trust.getOrDefault(who, known.contains(who) ? 0.3f : 0.2f);
+	}
+
+	void trust(UUID who, float change) {
+		if (who == null || who.equals(owner)) return;
+		trust.put(who, Math.max(-1f, Math.min(1f, trust(who) + change)));
+	}
+
+	/** Friends: players and Xens it trusts (its owner counts). */
+	int friends() {
+		int n = owner != null ? 1 : 0;
+		for (var e : trust.entrySet()) if (e.getValue() >= 0.5f && !e.getKey().equals(owner)) n++;
+		return n;
+	}
 	/** In the PvP arena: its duel partner (the only one it fights), and no learning into the shared brain. */
 	boolean inArena;
 	LivingEntity duelFoe;
@@ -386,11 +538,14 @@ public final class Companion {
 	private LivingEntity foe() {
 		if (inArena) return duelFoe != null && duelFoe.isAlive() && duelFoe.level() == player.level() && player.distanceTo(duelFoe) < 32
 				? duelFoe : null;
+		for (var creeper : player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class,
+				player.getBoundingBox().inflate(5), x -> x.isAlive() && x.getSwellDir() > 0)) {
+			if (player.distanceTo(creeper) < 5) return creeper;           // hissing close by: it hears that (and runs)
+		}
 		double reach = player.entityInteractionRange() + 0.5;
 		LivingEntity best = null;
 		double bestD = reach;
-		for (LivingEntity e : player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(reach),
-				x -> x instanceof Enemy && x.isAlive())) {
+		for (LivingEntity e : player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(reach), this::hostile)) {
 			double d = player.distanceTo(e);
 			if (d <= bestD && player.hasLineOfSight(e)) {
 				bestD = d;
@@ -403,6 +558,7 @@ public final class Companion {
 			if (victim == null || victim.level() != player.level()) continue;
 			LivingEntity a = victim.getLastHurtByMob();
 			if (a == null || !a.isAlive() || a == player || a == o || player.isAlliedTo(a)) continue;
+			if (a instanceof AbstractVillager || a instanceof AbstractGolem || a instanceof TamableAnimal t && t.isTame()) continue;
 			if (victim.tickCount - victim.getLastHurtByMobTimestamp() > 200 || player.distanceTo(a) > 16) continue;
 			if (player.distanceTo(a) <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, a)) return a;   // near: it feels them
 		}
@@ -507,10 +663,10 @@ public final class Companion {
 
 	public String status() {
 		if (player == null) return name + " is not here.";
-		return String.format("%s (%s; %s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. %s%s Last thought: %s",
-				name, personality.describe(), personality.style(), wants.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
-				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), senses.describe(),
-				wants.current != null ? " Wants to " + wants.current.what + "." : "", lastThought);
+		return String.format("%s (%s; %s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. Goals: %s. %s Last thought: %s",
+				name, personality.describe(), personality.style(), goals.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
+				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), goals.status(),
+				senses.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe()), lastThought);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */
@@ -522,25 +678,104 @@ public final class Companion {
 		}
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
-				+ (wants.current != null ? " " + wants.describe() : "")
+				+ " " + goals.describe() + " " + crafter.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
+				+ (trader.market().isEmpty() ? "" : " " + trader.market())
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
 						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote() : "");
 	}
 
+	private static final java.util.regex.Pattern PLEASE = java.util.regex.Pattern.compile("\\b(please|pls|plz|i insist|i really need|it'?s important)\\b");
+	private static final java.util.regex.Pattern FRIENDLY = java.util.regex.Pattern.compile(
+			"\\b(thanks|thank you|thx|good (job|work)|nice|well done|love you|you rock|awesome|great|hi|hello|hey)\\b");
+	private static final java.util.regex.Pattern WATCH = java.util.regex.Pattern.compile(
+			"(watch|look at) (me|this)|see this|copy me|learn from me|do what i do|check this out");
+	private static final java.util.regex.Pattern VILLAGER = java.util.regex.Pattern.compile("\\b(villagers?|trader|merchant)\\b");
+	/** Soft refusals when asked for something while hurt, scared or needing what's asked for; "please" gets past them. */
+	private static final java.util.Set<String> OUT = java.util.Set.of("explore", "wood", "stone", "coal", "iron", "mine", "food");
+
+	/**
+	 * Why it says no to a request, or null. Someone who hurt it gets a no, full stop. The rest are soft: when it's
+	 * badly hurt it wants to heal before going out, a timid one won't explore in the dark, and it won't give away the
+	 * food it needs, what its dream needs, or its things to a stranger. "Please" (or insisting) changes its mind.
+	 */
+	private String refusal(xen.mod.talk.Chat.Request r, ServerPlayer from, String words) {
+		if (!mod.config.refuse) return null;
+		String who = from.getName().getString();
+		float t = trust(from.getUUID());
+		if (t < -0.2f) return "No, you won't, because " + who + " hurt you.";
+		if (PLEASE.matcher(words).find()) return null;
+		String intent = r.intent();
+		float health = player.getHealth() / player.getMaxHealth();
+		if (OUT.contains(intent) && health < 0.3f) return "No, not now: you are badly hurt and need to heal first.";
+		if (intent.equals("explore") && personality.bravery < 0.3f && player.level().isDarkOutside()) {
+			return "No, you won't go exploring now, because it's dark and you are scared.";
+		}
+		if (intent.equals("give")) {
+			if (owner == null && t < 0.4f) return "No, you won't give your things to a stranger.";
+			String key = switch (r.thing()) {
+				case "raw_iron" -> "iron";
+				case "all" -> "food";
+				default -> r.thing();
+			};
+			if (key.equals("food") && player.getFoodData().getFoodLevel() <= 12 && items().getOrDefault("food", 0) <= 3
+					&& items().getOrDefault("food", 0) > 0) {
+				return "No, you won't give your food away, because you are hungry.";
+			}
+			String why = trader.neededFor(key, r.amount());
+			if (why != null && !r.thing().equals("all")) {
+				return "No, you won't give your " + Chores.named(r.thing(), 2) + " away, because you need them " + why.replaceFirst("^for its", "for your")
+						.replaceFirst("^because diamonds are its dream", "for your dream").replaceFirst("^because it's hungry", "to eat") + ".";
+			}
+		}
+		return null;
+	}
+
 	/**
 	 * A player said something to it. A request: it does it (with its own hands and senses) and says its plan in plain
-	 * words, or why it can't. Only its owner can tell it what to do (anyone, if it has no owner). Just talk: returns its
-	 * notes for the chat to answer from.
+	 * words, or why it won't. Only its owner can tell it what to do (anyone, if it has no owner), and it can say no.
+	 * Trading is its own business: anyone can make it an offer. Just talk: returns its notes for the chat to answer from.
 	 */
-	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from) {
-		if (!r.intent().equals("chat")) wants.drop();                // being asked for something comes before its own wants
+	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from, String said) {
 		if (player == null) return null;
-		known.add(from.getUUID());                                    // now it knows them
+		UUID u = from.getUUID();
+		known.add(u);                                                 // now it knows them
 		String who = from.getName().getString();
+		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
+		if (r.intent().equals("chat") && FRIENDLY.matcher(words).find()) trust(u, 0.05f);   // kind words
+		if (talker.answered(from, words)) return null;               // a yes or no to something it asked
+		if (r.intent().equals("chat") && WATCH.matcher(words).find()) {
+			watchFor = u;
+			watchUntil = player.tickCount + 1200;                     // a minute
+			say(mod.config.copy ? "I'm watching! If it works, I'll try it too." : "I'm watching!");
+			return null;
+		}
+		boolean trade = r.intent().equals("trade");
+		if (trade && VILLAGER.matcher(words).find() && (owner == null || owner.equals(u))) {
+			goals.drop();
+			chores.cancel();
+			String plan = trader.withVillager(null);
+			lastThought = "Asked by " + who + ": " + plan;
+			say(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, ""));
+			return null;
+		}
+		if (trade || trader.dealWith(u)) {                           // a trade: its own answer, in its own words
+			String reply = trader.talk(from, words);
+			if (reply != null) {
+				lastThought = "Trading with " + who + ": " + reply;
+				say(reply);
+				return null;
+			}
+			if (trade) r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		}
 		String plan = null;
-		if (!r.intent().equals("chat") && owner != null && !owner.equals(from.getUUID())) {
+		boolean refused = false;
+		if (!r.intent().equals("chat") && owner != null && !owner.equals(u)) {
 			plan = "Only " + ownerName + " can tell you what to do, so you won't.";
+		} else if (!r.intent().equals("chat") && (plan = refusal(r, from, words)) != null) {
+			refused = true;
+			lastThought = "Said no to " + who + ": " + plan;
 		} else {
+			if (!r.intent().equals("chat")) goals.drop();            // being asked for something comes before its own goals
 			boolean wasBusy = chores.busy();
 			if (!r.intent().equals("chat")) {                           // a new request replaces what it was doing
 				chores.cancel();
@@ -581,9 +816,28 @@ public final class Companion {
 				default -> {}
 			}
 		}
-		if (plan == null) return notes();                             // just talk: the chat answers
-		lastThought = "Asked by " + who + ": " + plan;
+		if (plan == null) {
+			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
+			if (straight != null) {
+				say(straight);
+				return null;
+			}
+			return notes();                                           // just talk: the chat answers
+		}
+		if (!refused) lastThought = "Asked by " + who + ": " + plan;
 		say(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, ""));   // what it will do (or why not), right away
 		return null;
+	}
+
+	/** Talking on its own: remarks, questions and chats with other Xens. */
+	final Talker talker = new Talker(this);
+	/** Learning by watching: moves it copies from players when they work out. */
+	final Mimic mimic = new Mimic(this);
+	/** Someone said "watch me": it keeps its eyes on them for a while. */
+	private UUID watchFor;
+	private int watchUntil;
+
+	boolean watchingYou(ServerPlayer p) {
+		return p.getUUID().equals(watchFor) && watchUntil > player.tickCount;
 	}
 }

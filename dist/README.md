@@ -1,18 +1,20 @@
-# Xen Companion (Fabric mod), prototype 0.4.1-alpha
+# Xen Companion (Fabric mod), prototype 0.5.0-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
-wood", "build a NOT gate") and it does them. Every Xen has its own name,
+wood", "build a NOT gate") and it does them, or tells you why it won't. It
+makes its own tools, trades with villagers and bargains with you, has goals
+of its own, and talks on its own and with other Xens. Every Xen has its own name,
 skin and personality, and with evolution the ones that do well pass their
 nature on. It plays fair: it only knows what it can sense, and it acts only
 through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.4.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.4.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.4.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.4.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.5.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.5.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.5.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.5.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -64,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.4.1-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.5.0-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -96,7 +98,11 @@ Measured on a 4-core cloud PC (x86-64):
 * **Its brain**: a decision takes about 0.3 ms. A Xen decides 4 times a second
   (every tick in a fight). Learning (about 60 ms a step, one step every 4
   decisions) runs on its own thread, not the game's. With 8 Xens, a sped-up
-  server still ran at 110-210 ticks per second (normal speed is 20).
+  server still ran at 110-210 ticks per second (normal speed is 20). With
+  **100 Xens** (`/xen spawn 100`), a tick took about 25 ms on average (the
+  limit is 50), with a catch-up pause of several seconds about every 25
+  seconds; 0.4.1 measured the same, so the new goals, trading, talking and
+  watching cost little (under 3% of the server's time).
 * **The chat model** (SmolLM2-360M, 8-bit, 360 million parameters):
   * loading takes 1-4 seconds; then it reads its two fixed prompts once (242
     and 367 tokens) at about 4, 7 or 9 tokens a second with 1, 2 or 3 threads,
@@ -127,7 +133,12 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "Pip, build a NOT gate" / "an OR gate" / "an AND gate" / "a long wire" | builds that redstone circuit from parts it carries |
 | "Pip, eat something" | eats, if it has food and is hungry |
 | "Pip, stop" / "cancel that" | stops what it's doing |
+| "Pip, trade with the villager" | walks up to a villager, opens its trades and takes the good ones ([trading](#trading-villagers-and-you)) |
+| "Pip, how much for your logs?" / "I'll give you 2 iron for 16 logs" | names a price, bargains, and trades with you |
+| "Pip, what are you doing?" / "how are you?" / "what's your dream?" / "what do you have?" / "who are you?" | answers straight from what it knows (no chat model, so nothing made up) |
 | "Pip, what do you see?" / "thanks!" | just talks |
+| "yes" / "no" (no name needed) | answers a question it just asked you, or its trade offer |
+| "Pip, watch this!" / "watch me" / "copy me" | keeps its eyes on you for a minute, to [learn from you](#learning-by-watching) |
 
 How it understands: clear keywords decide first. When there are none ("go see
 what's out there"), the chat model picks one of the things above, and only if
@@ -148,6 +159,117 @@ It does it fairly:
   it can't ("I need 10 dirt or cobblestone and have 3", "the ground isn't
   flat", "I need 2 more redstone"). In conversation, anything it claims must
   be in its own notes. It can't promise things, and it never writes commands.
+* It needs the right tools, like you: stone and coal need a pickaxe, iron a
+  stone one. Ask for stone without one and it gets wood first, makes the
+  pickaxe, then gets the stone.
+
+## Tools: it crafts like a new player
+
+Xen makes its own tools the way a new player does: logs into planks, planks
+into sticks and a crafting table, then a wooden pickaxe (three logs are
+enough), and with cobblestone a stone pickaxe, a stone sword and a stone axe.
+It crafts with the recipe book, like you: it clicks the recipe (which puts the
+ingredients in the grid), shift-clicks the result, and puts back what's left.
+Small things in its own 2x2 grid; tools at a crafting table it places next to
+itself (or one that's already there), opened with a right-click. One step at a
+time, so it takes a few seconds. It can't smelt yet, so iron tools are out of
+reach for now.
+
+## It acts like a player, not a digging machine
+
+* **It only mines what's worth it**: wood, ore its pickaxe can mine, stone when
+  it needs blocks. It never digs straight down under itself (it digs a
+  staircase instead, and stops if lava or water is under the next step).
+* **Next to you, it waits** and watches you (or looks around), instead of
+  wandering off. It only walks around on its own when it's free.
+* **It swings only at something hostile in front of it**, never at the air.
+* **It knows how mobs behave**: endermen, piglins, wolves, bees and the like
+  leave you alone unless you provoke them, so it doesn't; spiders are calm in
+  daylight; a mob that's after it or its owner is fought. It never hits
+  villagers, golems or pets, and hunts only cows, pigs, sheep, chickens and
+  rabbits (never a named one or one on a lead).
+* **Creepers**: when one hisses close by, it turns and sprints away (about 4
+  blocks in the 1.5 seconds before the blast, in tests). After hitting one, it
+  always steps back.
+
+## Learning by watching
+
+Xen watches the players it can see and copies moves that **work out** for
+them, clumsily at first and better each time it sees one done well (and each
+time it pulls it off itself). Say "Pip, watch this!" first, so it keeps its
+eyes on you.
+
+* **The water clutch (MLG).** Jump from high up with a water bucket and empty
+  it just before you land. If you land in the water unhurt, Xen saw it work:
+  "Whoa, Steve, a water clutch! I want to learn that." From then on, when it
+  falls with a water bucket, it looks down and uses it before it hits the
+  ground, then scoops the water back up. How late it starts clicking depends
+  on its skill, so at first it's often too late ("Too late! I'll get it next
+  time.").
+* **Your fighting style.** When you win a fight in front of it, how you fought
+  (crits on the way down, full-charge swings, S-taps, jump resets, spacing,
+  the shield) pulls its [fight genes](#teams-and-pvp) your way, more for a
+  clean win: "Nice fight, Steve! I'll crit more, on the way down, like you."
+
+It learns only from what it could see you do (your moves, what you hold, a mob
+flinching), never from anything hidden, and it keeps what it learned.
+`/xen status` shows it. Setting: **Learns by watching** (`copy`).
+
+## Trading: villagers and you
+
+**Villagers.** "Pip, trade with the villager" (or on its own, when it wants
+to): it walks up, right-clicks the villager, reads the offers on the trading
+screen, and takes the ones that are good for it, with the same clicks a
+player makes. It knows about what things are worth (an emerald is about 15
+coal or 5 bread) and what they're worth to *it* right now (food when it's
+hungry, a tool it lacks, what its dream needs, less for what it has plenty
+of). From a test on a real server:
+
+```
+<Steve> Clover, go trade with the villager
+<Clover> Okay! I'll trade with the farmer 2 blocks away.
+<Clover> I traded with the farmer: gave 30 coal and got 6 bread, 1 emerald.
+```
+
+**You.** Make it an offer, ask its price, or say yes or no to its offer. It
+takes a fair deal, answers a poor one with a counter-offer (a bit high first,
+then halfway, then its last offer), walks away from a bad one, gives friends a
+better price, and never trades away what it needs. With someone it trusts, it
+hands over its part first; otherwise it waits for yours (toss it over).
+
+```
+<Steve> Clover, how much for your logs?
+<Clover> I'd trade 16 logs for 3 emeralds. Deal?
+<Steve> Clover, i'll give you 2 iron for 16 logs
+<Clover> Let's meet halfway: 16 logs for 6 iron?
+<Steve> ok deal
+<Clover> Deal! I trust you, so here are the 16 logs first. Toss me the 6 iron.
+<Clover> Here you go!
+<Clover> Thanks! Nice doing business with you.
+```
+
+**Trust.** Every Xen remembers how much it trusts each player and Xen it has
+met: kind words, fair deals and chats make it trust them more; hitting it,
+or taking its part of a deal and never paying, makes it trust them less. It
+won't trade with someone who hurt it. Setting: **Trading** (`trading`).
+
+## Saying no
+
+Xen can refuse, and it says why:
+
+* someone who hurt it: "No, I won't, because Alex hurt me." (no matter what;
+  an ownerless Xen takes requests from anyone, an owned one only from its
+  owner, and nobody who hurt it gets a trade);
+* badly hurt: "No, not now: I'm badly hurt and need to heal first.";
+* a timid Xen asked to explore in the dark: "No, I won't go exploring now,
+  because it's dark and I'm scared.";
+* asked for what it needs: its food when it's hungry, the blocks for its home,
+  its emeralds when it dreams of trading ("No, I won't give my cobblestone
+  away, because I need them for my home.");
+* an ownerless Xen asked for its things by a stranger.
+
+Saying **please** (or "I insist") changes its mind, except when you hurt it.
+Only its owner can give it orders at all. Setting: **Can say no** (`refuse`).
 
 ## Redstone (small circuits)
 
@@ -285,18 +407,58 @@ one of two parents, with a small mutation. All Xens keep sharing one brain
 in `<world>/xen/evolution.csv`. Your own Xens (with an owner) are never
 replaced.
 
-## Its own goals
+## Its goals: now, soon, and its dream
 
-A Xen that's free (nobody to follow, nothing asked of it) chooses what it wants
-to do, every 20 seconds or so: find food, build a shelter for the night, get
-wood, get stone, look for ore, or just explore. It weighs three things: what it
-needs right now (hungry with no food? dark with no roof? few blocks?), its
-personality (patient Xens like work, brave ones go for ore, curious ones
-explore), and how well each goal has turned out for it before. It says what it
-wants ("I want to get some wood."), does it with the same chores you can ask
-for, and learns: goals that pay off become ones it likes. `/xen status` shows
-what it wants and likes, and when you chat with it, it knows its own goal.
-Your requests always come first. Turn it off with **Own goals** (`wants`).
+Every Xen has goals in three tiers (`/xen status` shows all three, and when you
+chat with it, it knows them):
+
+* **Instant** (seconds): staying alive and what it's doing this moment:
+  swimming up for air, eating, fighting, getting away from a creeper, making a
+  tool, keeping up with you.
+* **Short** (minutes), when it's free (nobody to follow, nothing asked of it):
+  find food, build a shelter for the night, get wood, get stone, look for ore,
+  trade with a villager, or explore. It weighs what it needs right now (hungry
+  with no food? dark with no roof? no pickaxe?), its personality (patient Xens
+  like work, brave ones go for ore, curious ones explore), how well each goal
+  has turned out for it before (it learns which it likes), and what its dream
+  needs.
+* **Long** (days): its dream, picked from its personality: build a home, a big
+  stockpile of wood and stone, find diamonds, become a trader with 5
+  emeralds, see places 300 blocks away, or make three friends. The dream
+  steers its short goals (a Xen dreaming of a home gathers blocks, then builds
+  a fort in daylight and remembers where it is). When a dream comes true, it's
+  proud of it, says so, and picks a new one. Dreams are kept with the Xen.
+
+Your requests always come first. Turn short goals off with **Own goals**
+(`wants`).
+
+## Talking on its own, and with other Xens
+
+With **Talks on its own** (`talk`), a Xen says what's on its mind now and
+then, and only what's true for it: that it's hungry, how far along its dream
+is, that it needs wood for a pickaxe, that there's a villager. It greets people
+it knows when they come near. And it asks things you can answer with a plain
+**yes** or **no** in chat (no name needed): "It's dark. Should I build us a
+shelter?", "I have lots of wood. Want some?", "Can I go exploring for a bit?",
+"Want to trade?". Say yes and it does it.
+
+With **Talks with Xens** (`talkToXens`), two Xens that meet have a short chat:
+who they are, what they dream of, and tips about where they saw trees and ore,
+which the other one then knows too (a little less sure than if it had seen it
+itself). They trust each other a bit more after (that counts toward the
+"three friends" dream):
+
+```
+<Clover> Hi! I'm Clover. Who are you?
+<Bramble> I'm Bramble. Nice to meet you, Clover!
+<Clover> I saw coal ore about 48 blocks north of here.
+<Bramble> Thanks! I'll remember that.
+<Clover> See you around!
+```
+
+How often it talks depends on how chatty it is (every minute or two for a
+chatty one), with a limit for all Xens together so chat never floods. Only
+players within 48 blocks hear it.
 
 ## The chat model only wakes when it's needed
 
@@ -312,7 +474,9 @@ leaves notes on signs instead (if it carries signs): "Day 12: Diamonds here!
 ![Xen Companion settings in Mod Menu](../docs/screenshots/settings.png)
 
 With Mod Menu installed, open **Mods → Xen Companion → settings** (the screenshot
-is from a real game client). Changes save to `config/xen.json` and apply right
+is from a real game client). The settings are in tabs (Talk, Xens, Goals, PvP,
+Build, Speed); hover a setting to read what it does, and **Reset tab** puts a
+tab back to how it comes. Changes save to `config/xen.json` and apply right
 away in single player. On a server, operators use:
 
 * `/xen settings`: shows every setting;
@@ -333,6 +497,11 @@ away in single player. On a server, operators use:
 | `randomNames` | `true` | names like Pip and Nova instead of Xen, Xen2... |
 | `personalities` | `true` | each Xen has its own nature |
 | `wants` | `true` | free Xens choose their own goals |
+| `talk` | `true` | Xen talks on its own now and then (remarks, greetings, yes-or-no questions) |
+| `talkToXens` | `true` | Xens that meet chat and share tips |
+| `trading` | `true` | Xen trades with villagers and bargains with players |
+| `refuse` | `true` | Xen may say no (and why) |
+| `copy` | `true` | Xen copies moves that work out for players it watches (the water clutch, a winning fighting style) |
 | `skins` | `["random"]` | built-in skin names, "random", or custom textures |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
 | `pvp` | `"defend"` | `"off"`, `"defend"` or `"teams"` |
@@ -362,8 +531,9 @@ away in single player. On a server, operators use:
 | `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 
 * **Its bag**: right-click your Xen to open its inventory.
-* **Instincts**: it swims up in water, fights back against monsters within
-  reach, and eats when it gets hungry.
+* **Instincts**: it swims up in water, fights back against hostile monsters
+  within reach (not neutral ones), runs from hissing creepers, makes its tools,
+  and eats when it gets hungry.
 * **Death**: it drops its items like a player, respawns at its bed or the
   world spawn, and remembers what hurt it.
 * **Falling** hurts it like any player (before 0.4.0 it didn't count, which

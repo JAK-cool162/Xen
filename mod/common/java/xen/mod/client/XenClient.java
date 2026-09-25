@@ -9,7 +9,7 @@ import xen.mod.XenMod;
 
 /**
  * Client side. Only used for testing the settings screen without a person: with {@code -Dxen.uiTest=true} the game
- * opens Mod Menu's list, then Xen's settings, then closes (the test takes screenshots in between).
+ * opens Mod Menu's list, then Xen's settings and each of its tabs, then closes (the test takes screenshots in between).
  */
 public class XenClient implements ClientModInitializer {
 	private int ticks = -1;
@@ -30,7 +30,11 @@ public class XenClient implements ClientModInitializer {
 				boolean viaModMenu = FabricLoader.getInstance().isModLoaded("modmenu");
 				XenMod.LOG.info("xen ui test: settings{}", viaModMenu ? " (opened through Mod Menu)" : "");
 				Screens.open(client, viaModMenu ? ModMenuScreens.settings(screen) : new XenSettingsScreen(screen));
-			} else if (ticks == 500) {
+			} else if (ticks > 300 && ticks % 100 == 0 && ticks <= 800) {   // then each tab
+				int tab = (ticks - 300) / 100;
+				XenMod.LOG.info("xen ui test: tab {}", tab);
+				Screens.open(client, XenSettingsScreen.onTab(null, tab));
+			} else if (ticks == 900) {
 				XenMod.LOG.info("xen ui test: done");
 				client.stop();
 			}

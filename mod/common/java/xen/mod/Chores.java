@@ -24,7 +24,7 @@ import java.util.UUID;
  * digs there with its own hands, and looks around when it knows of none.
  */
 final class Chores {
-	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE }
+	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE }
 
 	/** The small redstone circuits Xen learned (xen/redstone, exported by scripts/export_circuits.py). */
 	static final com.google.gson.JsonObject CIRCUITS;
@@ -54,6 +54,9 @@ final class Chores {
 	private int[] cats;
 	private String[] items;
 	private String what, lookFor;
+	/** What to gather next, once this is done (stone after the wood for a pickaxe). */
+	private String after;
+	private int afterAmount;
 	private int want, had;
 	private long until;
 	private UUID forWhom;
@@ -123,15 +126,39 @@ final class Chores {
 
 	// ----------------------------------------------------------------------------- requests
 	String gather(String intent, int amount) {
+		int tier = c.crafter.pickTier(), could = c.crafter.canMake(2) ? 2 : c.crafter.canMake(1) ? 1 : tier;
+		int need = switch (intent) {
+			case "wood" -> 0;
+			case "iron" -> 2;
+			default -> 1;
+		};
+		if (Math.max(tier, could) < need) {                           // stone and ore drop nothing without the right pickaxe
+			if (need == 2 && Math.max(tier, could) == 1) {
+				String plan = gather("stone", 3);
+				after = intent;
+				afterAmount = amount;
+				return plan.replace("You will get 3 stone", "You need a stone pickaxe for iron, so first you will get 3 stone");
+			}
+			int logs = Math.max(1, 3 - c.items().getOrDefault("log", 0));
+			String plan = gather("wood", logs);
+			after = intent;
+			afterAmount = amount;
+			return "You have no pickaxe, so first you will get wood to make one. " + plan;
+		}
 		switch (intent) {
 			case "wood" -> set(new int[] {Blocks.LOG}, new String[] {"log"}, "wood", "trees");
 			case "stone" -> set(new int[] {Blocks.STONE}, new String[] {"cobblestone"}, "stone", "stone");
 			case "coal" -> set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal");
 			case "iron" -> set(new int[] {Blocks.IRON}, new String[] {"raw_iron"}, "iron", "iron ore");
-			default -> set(new int[] {Blocks.DIAMOND, Blocks.GOLD, Blocks.IRON, Blocks.COAL},
-					new String[] {"diamond", "raw_gold", "raw_iron", "coal"}, "ore", "ore");
+			default -> {                                                // the ores its pickaxe can mine
+				int t = Math.max(tier, could);
+				if (t >= 3) set(new int[] {Blocks.DIAMOND, Blocks.GOLD, Blocks.IRON, Blocks.COAL}, new String[] {"diamond", "raw_gold", "raw_iron", "coal"}, "ore", "ore");
+				else if (t == 2) set(new int[] {Blocks.IRON, Blocks.COAL}, new String[] {"raw_iron", "coal"}, "ore", "iron or coal ore");
+				else set(new int[] {Blocks.COAL}, new String[] {"coal"}, "ore", "coal ore");
+			}
 		}
 		begin(Kind.GATHER);
+		after = null;
 		want = Math.max(1, amount);
 		had = count(items);
 		int[] known = c.senses.nearestKnown(cats, 0.25, skip, 4);
@@ -203,10 +230,14 @@ final class Chores {
 	}
 
 	String shelter() {
+		return shelter(c.personality.build);
+	}
+
+	/** A shelter of a given shape ("hut", "fort", "tower"): a fort for its home. */
+	String shelter(String build) {
 		BlockPos feet = c.player.blockPosition();
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (!c.player.onGround()) return "You can't build a shelter because you are not standing on the ground.";
-		String build = c.personality.build;
 		List<BlockPos> plan = shelterPlan(feet, build);
 		int blocks = count("dirt", "cobblestone");
 		if (missing(level, plan) > blocks && !build.equals("hut")) {       // not enough for its style: a plain hut will do
@@ -392,6 +423,7 @@ final class Chores {
 			case GIVE -> giveNext();
 			case SHELTER -> shelterNext();
 			case REDSTONE -> redstoneNext();
+			case TRADE -> c.trader.villagerStep();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
 					cancel();
@@ -411,6 +443,17 @@ final class Chores {
 		c.chatter(say, !own);
 	}
 
+	/** Trading with a villager ({@link Trader} walks it there and does the clicking). */
+	void beginTrade() {
+		begin(Kind.TRADE);
+		doing = "going to trade";
+	}
+
+	/** A chore someone else runs (trading) is over. */
+	void done(String say) {
+		finish(say);
+	}
+
 	private double distance(int[] p) {
 		Vec3 feet = c.player.position();
 		return Math.sqrt(Math.pow(p[0] + 0.5 - feet.x, 2) + Math.pow(p[1] - feet.y, 2) + Math.pow(p[2] + 0.5 - feet.z, 2));
@@ -420,6 +463,20 @@ final class Chores {
 		int got = count(items) - had;
 		if (got >= want) {
 			finish("Got " + got + " " + what + "!");
+			if (after != null) {                                        // and now what it was asked for
+				String next = after;
+				after = null;
+				boolean mine = own;
+				String plan = gather(next, afterAmount);
+				own = mine;
+				c.chatter(xen.mod.talk.Chat.firstPerson(plan), !own);
+			}
+			return null;
+		}
+		int needs = 0;
+		for (int k : cats) needs = Math.max(needs, Crafter.tierFor(k));
+		if (needs > c.crafter.pickTier() && !c.crafter.canMake(needs)) {   // its pickaxe broke, or it never had one
+			finish("I can't mine " + what + " without " + Crafter.tierName(needs) + ".");
 			return null;
 		}
 		int[] known = c.senses.nearestKnown(cats, 0.25, skip, 4);
@@ -467,34 +524,95 @@ final class Chores {
 				c.pillaring = true;
 				return Action.JUMP;
 			}
-			if (dy < 0) return digDown();
+			if (dy < 0) return digDown(t);
 			if (dy > 1) {                                                // out of reach up there: another one
 				skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
 				return null;
 			}
 		}
-		if (dx == 0 && dz == 0 && dy < 0) return digDown();
+		if (dx == 0 && dz == 0 && dy < 0) return digDown(t);
 		if (dx == 0 && dz == 0 && dy > 1) {                              // straight above: step aside
 			skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
 			return null;
 		}
-		if (Math.abs(dx) + Math.abs(dz) <= 1 && dy < 0) return digDown();
+		if (Math.abs(dx) + Math.abs(dz) <= 1 && dy < 0) return digDown(t);
 		return c.walkTo(Vec3.atCenterOf(t));
 	}
 
 	/** Dig the block under its feet, unless it knows there is lava or water right below. */
-	private Action digDown() {
-		Perception.Sight s = c.senses.last;
-		for (int k = 1; k <= 3; k++) {
-			int below = s.near(0, -k, 0);
-			if (below == Blocks.LAVA || below == Blocks.WATER) {
-				if (target != null) skip.add(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()));
-				target = null;
-				return null;
+	/**
+	 * Down to a block below it: a staircase, never straight down (a hole under your feet can drop you into lava or a
+	 * cave). The block itself, once it's within reach and it can see a side of it, it just mines.
+	 */
+	private Action digDown(BlockPos t) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		int dx = t.getX() - feet.getX(), dz = t.getZ() - feet.getZ();
+		boolean under = dx == 0 && dz == 0;
+		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) <= c.player.blockInteractionRange() - 0.5 && open(level, t)
+				&& !(under && t.getY() < feet.getY() - 1)) {
+			if (under && dangerBelow(level, t)) return giveUp(t);
+			return mine(t);
+		}
+		int k = c.hands.yaw;
+		if (!under) {
+			double best = -2;
+			for (int i = 0; i < 4; i++) {
+				int[] f = Perception.forward(i);
+				double dot = (dx * f[0] + dz * f[1]) / Math.max(1e-6, Math.hypot(dx, dz));
+				if (dot > best) {
+					best = dot;
+					k = i;
+				}
 			}
 		}
-		if (c.hands.pitch != -1) return Action.LOOK_DOWN;
+		int[] f = Perception.forward(k);
+		BlockPos ahead = feet.offset(f[0], 0, f[1]), step = ahead.below();
+		if (dangerBelow(level, step)) return giveUp(t);
+		for (BlockPos b : new BlockPos[] {ahead.above(), ahead, step}) {
+			if (level.getBlockState(b).canBeReplaced()) continue;
+			if (lavaNext(level, b)) return giveUp(t);
+			return mine(b);
+		}
+		if (k != c.hands.yaw) return Math.floorMod(k - c.hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
+		if (c.hands.pitch != 0) return c.hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP;
+		return Action.FORWARD;                                           // one step down
+	}
+
+	private Action mine(BlockPos b) {
+		if (!c.hands.mine(b)) return null;
+		c.acted = true;
 		return Action.MINE;
+	}
+
+	private Action giveUp(BlockPos t) {
+		skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
+		target = null;
+		return null;
+	}
+
+	/** Can it see a side of the block (something open next to it)? */
+	private static boolean open(ServerLevel level, BlockPos b) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) if (level.getBlockState(b.relative(d)).canBeReplaced()) return true;
+		return false;
+	}
+
+	/** Lava or water right under where it would stand, or a long drop. */
+	private static boolean dangerBelow(ServerLevel level, BlockPos at) {
+		int air = 0;
+		for (int k = 1; k <= 3; k++) {
+			var st = level.getBlockState(at.below(k));
+			if (!st.getFluidState().isEmpty()) return true;
+			if (st.canBeReplaced()) air++;
+		}
+		return air == 3;
+	}
+
+	private static boolean lavaNext(ServerLevel level, BlockPos b) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+		}
+		return false;
 	}
 
 	/** Knows of nothing to go for: look all around (its view is only 90 degrees), then walk somewhere new. */
@@ -514,11 +632,18 @@ final class Chores {
 		return c.walkTo(wander);
 	}
 
+	/** Animals people eat: never a pet, a named one, or one on a lead (someone's). */
+	static boolean food(LivingEntity a) {
+		String n = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(a.getType()).getPath();
+		boolean eaten = n.equals("cow") || n.equals("pig") || n.equals("sheep") || n.equals("chicken") || n.equals("rabbit") || n.equals("mooshroom");
+		return eaten && !a.hasCustomName() && !(a instanceof net.minecraft.world.entity.Mob m && m.isLeashed());
+	}
+
 	private LivingEntity nearestAnimal() {
 		LivingEntity best = null;
 		double bestD = Double.MAX_VALUE;
 		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(48),
-				x -> x.isAlive() && !x.isBaby())) {
+				x -> x.isAlive() && !x.isBaby() && food(x))) {
 			double d = c.player.distanceTo(a);
 			if (d < bestD && WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, a)) {
 				bestD = d;

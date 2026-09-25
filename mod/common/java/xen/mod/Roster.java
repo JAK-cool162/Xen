@@ -51,7 +51,12 @@ final class Roster {
 		JsonArray known = new JsonArray();
 		for (UUID u : c.known) known.add(u.toString());
 		o.add("known", known);
-		o.add("likes", c.wants.toJson());
+		o.add("likes", c.goals.toJson());
+		o.add("goals", c.goals.dreamJson());
+		JsonObject trust = new JsonObject();
+		c.trust.forEach((u, t) -> trust.addProperty(u.toString(), t));
+		o.add("trust", trust);
+		o.add("skills", c.mimic.toJson());
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

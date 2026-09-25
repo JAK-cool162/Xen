@@ -148,7 +148,7 @@ def carrying(inventory, limit=60):
 # ------------------------------------------------------------------------------ requests
 # What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do.
 INTENTS = ("follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give", "shelter", "eat",
-           "stop", "redstone", "chat")
+           "stop", "redstone", "trade", "chat")
 AMOUNT = {"wood": 8, "stone": 16, "coal": 8, "iron": 4, "mine": 8, "food": 3}
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
@@ -166,6 +166,8 @@ _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          #
     ("explore", r"\b(explore|wander|roam|adventure|do your (own )?thing|go play|look around|have fun|free)\b"),
     ("follow", r"\b(follow|come|with me|let'?s go|over here|this way|keep up|to me)\b"),
 ))
+# Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader.
+_TRADE = re.compile(r"\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\b|\b\d{1,3} [a-z_]+ for (\d{1,3} )?(your |my )?[a-z_]+")
 _QUESTION = re.compile(r"^((what|where|why|how|who|when|which)\b|(do|does|did|are|is|am|was|were|have|has|had) "
                        r"(you|we|i|it|there|they|he|she|this|that|your|my)\b)")
 _SOCIAL = re.compile(r"^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
@@ -177,14 +179,15 @@ _GIVE_THINGS = (("log", ("wood", "log", "tree", "plank")), ("cobblestone", ("sto
 EARS = (
     "<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player says to Xen and answer "
     "with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, iron, mine, food, give, "
-    "shelter, eat, stop, redstone, or chat (only talking, thanking, praising or asking something).<|im_end|>\n"
+    "shelter, eat, stop, redstone, trade, or chat (only talking, thanking, praising or asking something).<|im_end|>\n"
     + "".join(f"<|im_start|>user\n{said}<|im_end|>\n<|im_start|>assistant\n{intent}<|im_end|>\n" for said, intent in (
         ("come with me", "follow"), ("nice one!", "chat"), ("could you chop down a few trees", "wood"),
         ("keep guard right here", "stay"), ("hand me your stuff", "give"), ("how are you doing?", "chat"),
         ("go wander around", "explore"), ("we need a place to hide tonight", "shelter"), ("never mind", "stop"),
         ("go get us something to eat", "food"), ("you're funny", "chat"), ("i need smelting fuel", "coal"),
         ("follow my lead", "follow"), ("grab me some cobblestone", "stone"), ("see you later", "chat"),
-        ("you look hurt, eat up", "eat"), ("put together a little logic thing with levers", "redstone"))))
+        ("you look hurt, eat up", "eat"), ("put together a little logic thing with levers", "redstone"),
+        ("let's make a deal, my iron for your wood", "trade"), ("watch this!", "chat"))))
 SURE = 1.0          # the model's pick must beat "chat" by this much (log-probability), or it's just chat
 
 
@@ -196,7 +199,9 @@ def understand(message, name="xen"):
     """What a player asks Xen to do, by keywords: (intent, thing, amount). Questions are just chat."""
     words = request_words(message, name)
     intent = "chat"
-    if not _QUESTION.match(words):
+    if _TRADE.search(words):
+        intent = "trade"
+    elif not _QUESTION.match(words):
         intent = next((i for i, rule in _RULES if rule.search(words)), "chat")
     return details(intent, words)
 

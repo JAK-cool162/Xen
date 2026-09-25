@@ -66,6 +66,12 @@ final class Fighter {
 		double d = p.distanceTo(foe);
 		boolean sprintable = p.getFoodData().getFoodLevel() > 6;             // like a player, it can't sprint when starving
 
+		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && creeper.getSwellDir() > 0 && d < 5) {
+			c.goals.instant = "getting away from the creeper";                 // it's hissing: run, like anyone would
+			if (!c.inArena) c.chatter("Creeper! Run!", false);
+			return runFrom(foe, sprintable);
+		}
+
 		float retreat = 0.4f * gene(8);
 		float health = p.getHealth() / p.getMaxHealth();
 		if (retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
@@ -119,7 +125,7 @@ final class Fighter {
 				Action moved = h.lastMove();
 				if (sprintable && (moved == Action.FORWARD || moved == Action.JUMP)) p.setSprinting(true);   // a sprint hit
 				Action a = hit(foe);
-				if (random.nextFloat() < gene(3)) sTap = 3;                     // S-tap: the next hit is a sprint hit again
+				if (random.nextFloat() < gene(3) || foe instanceof net.minecraft.world.entity.monster.Creeper) sTap = 3;   // S-tap (from a creeper: always)
 				return a;
 			}
 			h.watching = foe;                                                  // eyes on it while the swing charges
@@ -146,6 +152,24 @@ final class Fighter {
 		}
 		p.setSprinting(sprintable && d > 2);
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
+	}
+
+	/** Turn its back on it and sprint away (jumping up a step if one is in the way): no pathfinding, no time lost. */
+	private Action runFrom(LivingEntity foe, boolean sprintable) {
+		XenPlayer p = c.player;
+		Hands h = c.hands;
+		h.lowerShield();
+		h.watching = null;
+		Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
+		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
+		h.face(p.getEyePosition().add(away.normalize().scale(6)));             // a flick of the mouse
+		h.pitch = 0;
+		p.setSprinting(sprintable);
+		int[] f = xen.mod.core.Perception.forward(h.yaw);
+		var level = p.level();
+		net.minecraft.core.BlockPos ahead = p.blockPosition().offset(f[0], 0, f[1]);
+		boolean wall = !level.getBlockState(ahead).getCollisionShape(level, ahead).isEmpty();
+		return wall && p.onGround() ? Action.JUMP : Action.FORWARD;
 	}
 
 	private Action hit(LivingEntity foe) {
