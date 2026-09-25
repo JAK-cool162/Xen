@@ -20,7 +20,7 @@ public class XenSettingsScreen extends Screen {
 	private final Screen parent;
 	private final XenSettings settings = XenSettings.get();
 	private int row, columns, buttonWidth, rowHeight, top;
-	private static final int OPTIONS = 16;
+	private static final int OPTIONS = 17;
 
 	public XenSettingsScreen(Screen parent) {
 		super(Component.literal("Xen Companion"));
@@ -47,6 +47,7 @@ public class XenSettingsScreen extends Screen {
 		choice("Xens in the world", "maxXens", List.of(0, 5, 10, 20, 50, 100), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all.");
 		onOff("Random names", "randomNames", "New Xens get names like Pip, Nova or Bramble.");
 		onOff("Personalities", "personalities", "Each Xen is braver or more timid, curious, chatty or quiet, patient, and has its own tone.");
+		onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, exploring) and learn which they like.");
 		choice("Skins", "skins", skinChoices(), s -> s, "Built-in skins (every game has them). Custom skins: add texture:<value>:<signature> from mineskin.org in config/xen.json.");
 		choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams (no friendly fire).");
 		choice("PvP", "pvp", List.of("off", "defend", "teams"), s -> s,

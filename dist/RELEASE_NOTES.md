@@ -5,8 +5,8 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.3.0-alpha+mc1.21.11.jar` | the mod for Minecraft 1.21.11 (Java 21). **Use this one on phones** |
-| `xen-companion-0.3.0-alpha+mc26.x.jar` | the mod for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.4.0-alpha+mc1.21.11.jar` | the mod for Minecraft 1.21.11 (Java 21). **Use this one on phones** |
+| `xen-companion-0.4.0-alpha+mc26.x.jar` | the mod for Minecraft 26.1 - 26.3 (Java 25) |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model (optional, about 390 MB): put it in `config/xen/`. Otherwise it downloads by itself the first time it's needed |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -15,34 +15,28 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.3.0-alpha
+### What's new in 0.4.0-alpha
 
-* **Runs on x86-64 and ARM64.** The mod and its chat model are plain Java with no native code, so one jar runs on
-  PCs, phones, Raspberry Pi and Apple Silicon. Every push is now checked on an x86-64 and an ARM64 machine (tests,
-  both builds, the Java == Python checks and the chat model).
-* **Settings screen in Mod Menu** (Mods → Xen Companion): how many Xens, teams, PvP, evolution, redstone and its
-  size limit, names, personalities, skins, chat. On servers: `/xen settings` and `/xen set <setting> <value>`.
-* **Names, personalities and skins.** New Xens get a random name (Pip, Nova, Waffle...), a personality (brave or
-  timid, curious, chatty or quiet, patient or impatient, and a tone of voice that shows in what it says) and one of
-  Minecraft's 18 built-in skins. Custom skins from mineskin.org work too. The same name brings back the same Xen.
-* **Fighting and building styles.** Every Xen also gets a fighting style: brawler, rusher, skirmisher (hits and
-  steps back), guard (holds its ground behind a shield) or dancer (circles its foe). It also gets a building style: its shelter is a
-  hut, a fort or a tower, of stone, dirt or anything. Children inherit them. `/xen style Pip fight guard` sets any
-  trait by hand (also build, material, tone, bravery, curiosity, chattiness, diligence).
-* **Teams and PvP.** One team or 2-6 colored teams (no friendly fire). PvP `off`, `defend` (default: fights back
-  against players who hurt it or its owner) or `teams` (teams fight each other). It times its swings, jumps for
-  critical hits and sprints in. It's a companion, not a PvP bot: it can't combo or dodge arrows.
-* **Evolution.** Every few days the worst ownerless Xens are replaced by children of the best, whose genes mix and
-  mutate. Logged in `<world>/xen/evolution.csv`. Your own Xens are never replaced.
-* **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire): circuits Xen worked out itself in
-  its redstone lessons, placed part by part by hand. Capped at 24 parts by default so nothing big slows the server.
-* **The chat model only wakes when it's needed**: when someone the Xen knows is within 32 blocks or someone talks to
-  it. After 10 quiet minutes it unloads. When nobody it knows is around, Xen leaves notes on signs instead ("Day 12:
-  Diamonds here! -Pip").
-* A mod icon, `/xen status` shows each Xen's personality and styles, and console-summoned Xens now land on the surface.
-* Fixes: a Xen that was mining or walking when attacked now fights back at once. It notices attackers within 6 blocks
-  even behind its back (it knows everything that close). Dismissing a Xen while it was dead no longer leaves a ghost
-  player online. On 26.3, teams, sign notes, tossing items and the settings screen now work.
+* **PvP like a 1.9+ player.** Xen now fights by the server's own rules with a player's inputs: critical hits on the
+  way down with sprint released, full-charge swings, sprint hits with S-taps in between, jump resets, spacing at the
+  edge of its reach, stepping out of the foe's crit jump, hit selecting, shields (raised while its sword recharges,
+  an axe against the foe's shield, or going around it), and golden apples when badly hurt. How much of each it does is
+  set by ten **fight genes**, and the five fighting styles are starting points. Against a scripted fighter with the
+  same sword that strikes first, a brawler Xen now wins about half its fights (the last version won none).
+* **The PvP arena: red against blue.** `/xen arena start [xens per team] [generations] [sword|shield|axe]` builds an
+  arena in the sky and trains Xens against each other in duels. Each team evolves its fight genes, a team that falls
+  behind learns from the enemy, and new Xens are born with the champions' genes. Logged in `<world>/xen/arena.csv`.
+  Arena Xens don't learn into the shared brain. In a 40-generation run both teams found the same way to fight (always crit, swing as soon as possible,
+  fight at the edge of reach, S-tap and jump-reset, never wait or back off); the team that fell behind caught up by
+  learning from the other. The evolved champion beats the careful styles but not yet the best aggressive ones.
+* **Its own goals.** A free Xen chooses what it wants (food, a shelter for the night, wood, stone, ore, or to
+  explore) from what it needs, its personality and what worked for it before; it says so, does it, and learns which
+  goals it likes. `/xen status` shows its goal and likes. Your requests come first. Setting: **Own goals** (`wants`).
+* **Falling counts now.** Xen's fall distance wasn't tracked (the server does that from a game client's moves, and
+  Xen has none), so it took no fall damage and **its critical hits never landed**. Fixed: it falls like any player.
+* Fixes: a Xen in a fight kept letting go of its movement keys and could get stuck in place; it now keeps them held.
+  Xens act in a random order each tick, so none always gets the first hit. `/xen style` sets single fight genes
+  (`/xen style Pip crit 0.9`).
 
 ### Phones (Zalith Launcher 2, PojavLauncher / Amethyst)
 
@@ -55,10 +49,10 @@ ARM64 machine.
 ### Known limits
 
 It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. Its chat model is small and
-its answers are simple. It only gathers what it can reach on foot (plus one block up with a pillar). In PvP it loses
-to a simple scripted fighter that strikes first with the same sword (leaving it at 2-14 of 20 health). Xen vs Xen,
-brawlers and rushers win most fights, and a guard needs a shield. More days in the real game didn't make the brain
-better at SimCraft's tests, which is why the bundled brain stays the SimCraft one.
+its answers are simple. It only gathers what it can reach on foot (plus one block up with a pillar). A good PvP
+player will still beat it: it can't combo or dodge arrows, and it doesn't use a mace, spear, crystals or pearls yet.
+More days in the real game didn't make the brain better at SimCraft's tests, which is why the bundled brain stays
+the SimCraft one.
 
 The chat model is [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) by Hugging
 Face (Apache-2.0).

@@ -119,7 +119,7 @@ public final class Companion {
 	}
 
 	void leave() {
-		if (player != null && lifeTicks > 0) {                         // the life so far goes into lives.csv too
+		if (player != null && lifeTicks > 0 && !inArena) {             // the life so far goes into lives.csv too
 			mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, "left");
 			lifeTicks = 0;
 		}
@@ -142,7 +142,7 @@ public final class Companion {
 		lifeTicks++;
 		genTicks++;
 		hands.tick();
-		boolean hurtNow = player.getHealth() < tickHealth;
+		hurtNow = player.getHealth() < tickHealth;
 		tickHealth = player.getHealth();
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
 		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0 && !fighting) return;   // in a fight, every tick
@@ -202,7 +202,7 @@ public final class Companion {
 			float food = player.getFoodData().getFoodLevel();
 			if (food > lastFood && lastFood < 14) reward += 0.5f * (food - lastFood) / 6f;
 			float harm = Math.max(0f, lastHealth - player.getHealth()) / 20f;
-			mod.learn(obs, lastAction, reward, harm, next, false, emotions, name);
+			if (!inArena) mod.learn(obs, lastAction, reward, harm, next, false, emotions, name);
 			lifeReward += reward;
 			genReward += reward;
 			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) {
@@ -244,7 +244,12 @@ public final class Companion {
 		}
 		Action fight = fightBack();
 		if (fight != null) return fight;
+		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
 		if (chores.busy()) {
+			Action chore = chores.next();
+			if (chore != null || chores.busy()) return chore;
+		}
+		if (mode == Mode.FREE && mod.config.wants && !inArena && wants.think()) {   // free: what does it want?
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
 		}
@@ -326,9 +331,8 @@ public final class Companion {
 
 	/**
 	 * Fighting: a monster within reach (it knows everything within 6 blocks); with PvP on, whoever hurt it or its owner
-	 * in the last ten seconds (never its owner or a teammate); with team PvP, Xens of other teams it sees. It faces
-	 * them and hits once its attack is charged, like a player. Its fighting style (a gene) decides the rest: how often
-	 * it jumps for critical hits, what it does while its swing charges, whether it chases, and when it backs off.
+	 * in the last ten seconds (never its owner or a teammate); with team PvP, Xens of other teams it sees; in the arena,
+	 * its duel partner. How it fights is up to its fight genes ({@link Fighter}).
 	 */
 	private Action fightBack() {
 		if (!mod.config.pvp.equals("off") && armedStranger()) hands.ready();   // someone armed comes close: sword out
@@ -338,68 +342,35 @@ public final class Companion {
 		if (foe == null) {
 			hands.lowerShield();
 			player.setSprinting(false);
-			fleeing = false;
-			lastFoe = null;
+			fighter.reset();
 			return null;
 		}
-		Personality.Fight style = Personality.fight(personality.fight);
-		if (foe != lastFoe && foe instanceof net.minecraft.world.entity.player.Player) chatter(personality.say("fight"), false);
-		lastFoe = foe;
-		float health = player.getHealth() / player.getMaxHealth();
-		if (style.flee() > 0 && (health < style.flee() || fleeing && health < style.flee() + 0.2f)) {
-			if (!fleeing) chatter(personality.say("flee"), true);
-			fleeing = true;                                                // back off until it has healed a bit
-			hands.lowerShield();
-			player.setSprinting(true);
-			Vec3 away = player.position().subtract(foe.position()).multiply(1, 0, 1);
-			if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
-			return walkTo(player.position().add(away.normalize().scale(8)));
-		}
-		fleeing = false;
-		double d = player.distanceTo(foe);
-		player.setSprinting(d > 2);
-		hands.ready();
-		if (d <= player.entityInteractionRange()) {
-			if (player.getAttackStrengthScale(0.5f) < style.charge()) {
-				hands.watching = foe;                                      // eyes on it while the swing charges
-				Action move = style.recharge();
-				if (move == Action.LEFT && random.nextFloat() < 0.1f) strafeRight = !strafeRight;
-				if (move == Action.LEFT && strafeRight) move = Action.RIGHT;
-				if (move == null) {
-					if (personality.fight.equals("guard")) hands.raiseShield();   // a guard waits behind its shield
-					hands.pause(1);                                        // wait for the swing to charge, but only a tick
-					acted = true;
-					return Action.IDLE;
-				}
-				return move;
-			}
-			boolean falling = !player.onGround() && player.getDeltaMovement().y < 0;
-			if (!falling && player.onGround() && foe instanceof net.minecraft.world.entity.player.Player && random.nextFloat() < style.crit()) {
-				hands.watching = foe;
-				return Action.JUMP;                                        // jump, and strike on the way down (a critical hit)
-			}
-			hands.hit(foe);
-			acted = true;
-			return Action.ATTACK;
-		}
-		if (!style.chase() && d > 4) {                                     // a guard doesn't chase: it goes on with what it did
-			hands.lowerShield();
-			fighting = false;
-			player.setSprinting(false);
-			return null;
-		}
-		return walkTo(foe.position());                                  // go after it
+		return fighter.next(foe, hurtNow);
+	}
+
+	private final Fighter fighter = new Fighter(this);
+	/** What it wants to do when nobody has asked it for anything. */
+	final Wants wants = new Wants(this);
+	/** In the PvP arena: its duel partner (the only one it fights), and no learning into the shared brain. */
+	boolean inArena;
+	LivingEntity duelFoe;
+	/** Its arena team ("red" or "blue"). */
+	String arenaTeam;
+
+	/** Moved by the arena to its lane. */
+	void teleport(ServerLevel level, Vec3 at, float yaw) {
+		hands.stop();
+		player.teleportTo(level, at.x, at.y, at.z, Set.<Relative>of(), yaw, 0, true);
+		hands = new Hands(player);
+		walkedFrom = null;
+		stuck = 0;
 	}
 
 	/** It knows everything within 6 blocks (like a player who hears and feels what's close), seen or not. */
 	private static final double NEAR = 6;
 
-	private boolean fleeing, strafeRight;
 	private float tickHealth;
-	private LivingEntity lastFoe;
-
-	private final java.util.Random random = new java.util.Random();
-	private boolean fighting;
+	private boolean fighting, hurtNow;
 
 	/** A player (not its owner, not a teammate) close by with a sword or axe in hand: it can see that. */
 	private boolean armedStranger() {
@@ -413,6 +384,8 @@ public final class Companion {
 	}
 
 	private LivingEntity foe() {
+		if (inArena) return duelFoe != null && duelFoe.isAlive() && duelFoe.level() == player.level() && player.distanceTo(duelFoe) < 32
+				? duelFoe : null;
 		double reach = player.entityInteractionRange() + 0.5;
 		LivingEntity best = null;
 		double bestD = reach;
@@ -460,7 +433,7 @@ public final class Companion {
 
 	/** When nobody it knows is around to hear, it leaves a note on a sign (one it carries), signed with its name. */
 	void note(String text) {
-		if (!mod.config.signs || player == null || someoneListening(mod.config.chatWakeDistance)) return;
+		if (!mod.config.signs || player == null || inArena || someoneListening(mod.config.chatWakeDistance)) return;
 		long now = player.level().getGameTime();
 		if (now - lastNote < 6000) return;                            // at most one note every five minutes
 		long day = now / 24000 + 1;
@@ -491,7 +464,7 @@ public final class Companion {
 
 	void chatter(String text, boolean always) {
 		long now = System.currentTimeMillis();
-		if (!mod.config.chat || (!always && now - lastChatter < personality.chatterGapMillis())) return;
+		if (!mod.config.chat || inArena || (!always && now - lastChatter < personality.chatterGapMillis())) return;
 		lastChatter = now;
 		say(text);
 	}
@@ -502,7 +475,7 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
-		if (obs != null) {
+		if (obs != null && !inArena) {
 			float harm = lastHealth / 20f + 1f;
 			mod.learn(obs, lastAction, 0, harm, obs, true, emotions, name);
 		}
@@ -511,7 +484,7 @@ public final class Companion {
 		genDeaths++;
 		String cause = source.type().msgId() + (source.getEntity() != null
 				? ":" + BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath() : "");
-		mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, cause);
+		if (!inArena) mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, cause);
 		lifeTicks = 0;
 		lifeReward = 0;
 		emotions.reset();
@@ -534,9 +507,10 @@ public final class Companion {
 
 	public String status() {
 		if (player == null) return name + " is not here.";
-		return String.format("%s (%s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. %s Last thought: %s",
-				name, personality.describe(), personality.style(), player.getHealth(), player.getFoodData().getFoodLevel(), emotions.mood(),
-				emotions.fear * 100, mode.name().toLowerCase(), senses.describe(), lastThought);
+		return String.format("%s (%s; %s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. %s%s Last thought: %s",
+				name, personality.describe(), personality.style(), wants.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
+				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), senses.describe(),
+				wants.current != null ? " Wants to " + wants.current.what + "." : "", lastThought);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */
@@ -548,8 +522,9 @@ public final class Companion {
 		}
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
+				+ (wants.current != null ? " " + wants.describe() : "")
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
-						+ " (" + Personality.fight(personality.fight).how() + "). " + personality.buildNote() : "");
+						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote() : "");
 	}
 
 	/**
@@ -558,6 +533,7 @@ public final class Companion {
 	 * notes for the chat to answer from.
 	 */
 	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from) {
+		if (!r.intent().equals("chat")) wants.drop();                // being asked for something comes before its own wants
 		if (player == null) return null;
 		known.add(from.getUUID());                                    // now it knows them
 		String who = from.getName().getString();

@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.3.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.3.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.4.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.4.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The mod and its chat model are plain Java with no native code, so the same jar
 runs on x86-64 and ARM64 (phones, Raspberry Pi, Apple Silicon). Every push is
@@ -262,21 +262,39 @@ and a tone of voice: cheerful, calm, grumpy, shy, bold or silly) and a skin
 really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
 tries new things up to 1.5x as often, a patient one keeps at a chore longer.
 
-Each Xen also gets a **fighting style** (brawler, rusher, skirmisher, guard or
-dancer: how often it jumps for critical hits, whether it presses in, steps
-back or circles while its sword recharges, whether it chases, when it backs
-off to recover) and a **building style** (the shelter it builds is a hut, a
-fort or a tower, of stone, dirt or whatever it has). Children inherit them.
-Set them by hand with `/xen style Pip fight guard`.
+Each Xen also gets **fight genes** (ten 1.9+ PvP skills, starting from one of
+five styles: brawler, rusher, skirmisher, guard or dancer) and a **building
+style** (the shelter it builds is a hut, a fort or a tower, of stone, dirt or
+whatever it has). Children inherit them. Set them by hand with
+`/xen style Pip fight guard` or `/xen style Pip crit 0.9`.
 
-**Teams and PvP.** Xens can be one team or split into 2-6 colored teams. PvP is
-`off`, `defend` (fights back against a player who hurts it or its owner) or
-`teams`. It times its swings for full damage, jumps for critical hits and
-sprints in, but it's a companion, not a PvP bot: against a scripted fighter
-with the same sword that strikes first it loses, leaving it at 2-14 of 20
-health. Style against style (Xen vs Xen, 60 fights, both sides), fights won
-of 24: brawler 20, rusher 18, skirmisher 12, dancer 9, guard 1. But a guard
-with a shield beat brawlers and rushers without one in 9 of 12.
+**PvP like a 1.9+ player.** PvP is `off`, `defend` (fights back against a
+player who hurts it or its owner) or `teams`. It plays by the server's rules
+with a player's inputs: critical hits on the way down with sprint released,
+full-charge swings, sprint hits with S-taps in between, jump resets, spacing
+at the edge of its reach, stepping out of the foe's crit jump, hit selecting,
+shields (raised while recharging, an axe against the foe's), and golden
+apples when badly hurt. Against a scripted fighter with the same sword that
+strikes first, a brawler Xen now wins about half its fights (the last version
+won none).
+
+**It trains against itself: red against blue.** `/xen arena start 4 40 sword`
+builds an arena in the sky and pits red Xens against blue ones in duels, with
+the same kit. Every few rounds each team evolves its fight genes (children of
+its best replace its worst; a team that falls behind learns from the enemy),
+and new Xens are born with the champions' genes. In a 40-generation run both
+teams found the same way to fight: always crit, swing as soon as the sword
+allows, fight at the edge of reach, S-tap and jump-reset, and never wait or
+back off. Blue started as circling dancers, lost 11 of 12 fights by
+generation 20, then learned from red and caught up (6-6 by generation 31).
+The champion it evolved beats the careful styles, but not yet the best
+aggressive ones: self-play confirmed what works with these skills, without
+yet finding anything better.
+
+**Its own goals.** A free Xen decides what it wants: food, a shelter for the
+night, wood, stone, ore, or to explore. It weighs what it needs right now, its
+personality, and how well each goal worked out before. It says what it wants
+("I want to get some wood."), does it, and learns which goals it likes.
 
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by
@@ -607,7 +625,8 @@ bridge/xen_bridge.js  mineflayer bots <-> Xen (hosts the whole swarm)
 brains/               pre-trained brain
 mod/                  Fabric mod: Xen Companion
   common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen),
-                      personalities, names and skins, teams, evolution, redstone, signs, settings
+                      personalities, names and skins, teams, evolution, redstone, signs, settings,
+                      Fighter (1.9+ PvP), Arena (red vs blue self-play), Wants (its own goals)
   common/java/.../client/  the Mod Menu settings screen
   common/test/        crossCheck: Java == Python for senses, brain, memories, paths and chat rules
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)

@@ -37,6 +37,8 @@ public final class XenConfig {
 	public boolean randomNames = true;
 	/** Give each Xen its own personality (brave or timid, curious, chatty, patient, and a tone of voice). */
 	public boolean personalities = true;
+	/** Free Xens choose their own goals (food, shelter, wood, stone, ore, exploring) and learn which ones they like. */
+	public boolean wants = true;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
 	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("random"));
 

@@ -25,8 +25,10 @@ public class XenPlayer extends ServerPlayer {
 			level().getChunkSource().move(this);          // load the world around it, like a player
 		}
 		super.tick();
+		double x = getX(), y = getY(), z = getZ();
 		doTick();                                          // player physics a client would normally drive
-	}
+		doCheckFallDamage(getX() - x, getY() - y, getZ() - z, onGround());   // and what the server does with a client's moves:
+	}                                                      // falling counts (fall damage, and critical hits need it)
 
 	@Override
 	public void die(DamageSource source) {

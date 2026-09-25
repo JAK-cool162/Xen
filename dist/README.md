@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.3.0-alpha
+# Xen Companion (Fabric mod), prototype 0.4.0-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -9,8 +9,8 @@ through a player's inputs.
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-0.3.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer |
-| `xen-companion-0.3.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-0.4.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer |
+| `xen-companion-0.4.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Get them from the GitHub **Releases** page (with the chat model and Xen's
 brains as separate downloads) or from this folder. This is a prototype, so
@@ -57,7 +57,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.3.0-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.4.0-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -145,25 +145,26 @@ slow a server away. Turn **Redstone** off to disable it.
   (cheerful, calm, grumpy, shy, bold, silly) that shows in what it says.
   `/xen status` and the summon message tell you who it is: "Rune (shy, timid
   and impatient; a skirmisher (hits and steps back), builds stone forts)".
-* **Fighting style** (random for each Xen, and inherited):
-  * `brawler`: trades blows, jumps for critical hits a lot;
-  * `rusher`: rushes in and keeps pressing, jumps for criticals most;
+* **Fighting**: every Xen has ten fight genes, the 1.9+ PvP skills a player
+  learns (see [PvP](#teams-and-pvp)). They start from one of five styles and
+  are inherited:
+  * `brawler`: trades blows and jumps for critical hits a lot;
+  * `rusher`: rushes in, keeps pressing, and jumps for criticals most;
   * `skirmisher`: hits, then steps back while its sword recharges, and backs
-    off to recover when badly hurt;
-  * `guard`: doesn't chase, holds its ground behind its shield (give it one)
-    and waits for full-power swings;
+    off to heal when badly hurt;
+  * `guard`: holds its ground behind its shield (give it one), waits for
+    full-power swings and lets the foe swing first;
   * `dancer`: circles around its foe between swings.
-  It keeps its eyes on its foe while it steps back or strafes, like a player
-  with a mouse.
 * **Building style** (random, and inherited): the shelter it builds when you
   ask, a `hut` (2-high walls and a roof, 10 blocks), a `fort` (corners filled
   in, 18 blocks) or a `tower` (3-high walls, 14 blocks), in its favorite
   material: `stone` (cobblestone), `earth` (dirt) or `any`. With too few blocks
   for its style, it builds a hut.
 * **Set them yourself**: `/xen style Pip fight guard` (also `build`,
-  `material`, `tone`, and `bravery`, `curiosity`, `chattiness`, `diligence`
-  from 0 to 1). Its owner or an operator can do it, and it's saved with the
-  world.
+  `material`, `tone`; `bravery`, `curiosity`, `chattiness`, `diligence` from 0
+  to 1; and each fight gene: `crit`, `charge`, `spacing`, `wtap`,
+  `jumpreset`, `strafe`, `counter`, `select`, `retreat`, `shield`). Its owner
+  or an operator can do it, and it's saved with the world.
 * **Skins**: built-in skins are Minecraft's own 18 default skins (Steve, Alex,
   Ari, Efe, Kai, Makena, Noor, Sunny, Zuri, in both arm widths), so there's
   nothing to download and every game can show them. "random" picks one per Xen.
@@ -180,22 +181,70 @@ slow a server away. Turn **Redstone** off to disable it.
     its owner. It never fights its owner or a teammate, and it draws its sword
     when an armed stranger comes close.
   * `teams`: Xens of different teams also fight each other.
-* **How good is it?** A companion, not a PvP bot. It swings when its attack is
-  charged, jumps for critical hits, sprints in, keeps its eyes on its foe and
-  fights back at once when hit, even from behind (it knows everything within 6
-  blocks). It can't combo or dodge arrows. Against a simple scripted fighter
-  with the same iron sword that strikes first, it loses: that fighter was
-  left at 2-14 of 20 health (under 10 in 9 of 10 fights). A good player will beat it.
-* **Style against style** (Xen vs Xen, iron swords, 60 fights, each pairing
-  from both sides), fights won of 24:
+* **How it fights**: like a 1.9+ player, with only a player's inputs, and by
+  the server's own rules:
+  * **critical hits**: it jumps and strikes on the way down, and lets go of
+    sprint in the air (a crit doesn't count while sprinting);
+  * **full-charge swings**: crits and extra knockback need the swing charged
+    over 90%, so it times its swings;
+  * **sprint hits and S-taps**: it sprints in for extra knockback, then steps
+    back a moment so the next hit is a sprint hit again;
+  * **jump resets**: it jumps toward a hit as it lands, for less knockback;
+  * **spacing**: it keeps near the edge of its reach while its sword recharges;
+  * **reading the foe**: it steps back when the foe jumps in for a crit, and
+    can wait for the foe to swing first and punish it (hit selecting);
+  * **shields**: it raises its shield while recharging, takes out its axe
+    against a raised shield (an axe hit disables it) or circles around it;
+  * **healing**: badly hurt, it backs off and eats a golden apple.
+  It fights back at once when hit, even from behind (it knows everything
+  within 6 blocks). How much of each it does is up to its fight genes.
+* **How good is it?** Against a simple scripted fighter with the same iron
+  sword that strikes first, a brawler Xen now wins about half its fights (6 of
+  10) and a rusher 2 of 5, where the last version won none. A good player will
+  still beat it: it can't combo or dodge arrows, and doesn't use a mace,
+  spear, crystals or pearls yet.
 
-  | brawler | rusher | skirmisher | dancer | guard | guard with a shield |
-  |---|---|---|---|---|---|
-  | 20 | 18 | 12 | 9 | 1 | won 9 of 12 against brawlers and rushers (2 draws) |
+## The PvP arena: red against blue
 
-  With the same sword, pressing on wins. A guard only shines with a shield:
-  it holds the shield up while its sword recharges, like a player holding
-  right-click, and lowers it to swing.
+Xens can train their fighting against each other:
+
+```
+/xen arena start [xens per team] [generations] [kit]     (operators; e.g. /xen arena start 4 40 sword)
+/tick sprint 1d                                          (optional: much faster)
+/xen arena status
+/xen arena stop
+```
+
+* It builds lanes high above you (barrier blocks with colored glass under the
+  floor, so nothing spawns there and nothing gets broken). Red Xens `Red1`...
+  and blue Xens `Blue1`... join, all with the same kit: iron armor, an iron
+  sword and a golden apple (`shield` adds a shield, `axe` a shield and an axe).
+* Every round each red Xen duels a random blue one in its own lane, until one
+  falls (or 30 seconds). The teams swap ends every round, and nobody gets to act
+  first.
+* Every 3 rounds each team evolves: its worst quarter get the fight genes of
+  children of its best (each gene from one of two parents, plus a small
+  mutation). A team that wins under a quarter of its fights also learns from
+  the enemy (one child gets a parent from the other team).
+* Every generation is logged in `<world>/xen/arena.csv`. The best fighters'
+  genes are kept in `arena_champions.json`, and **new Xens are born with
+  them** (a little mutated). Arena Xens don't learn into the shared brain, so
+  duels can't crowd out what it knows about lava and caves.
+
+A 40-generation run (4 against 4, sword kit, about 8 minutes sprinted):
+both teams ended up fighting the same way: always jump for critical hits,
+swing as soon as the sword allows, fight near the edge of reach, S-tap and
+jump-reset a lot, and never wait for the foe to swing or back off. Blue started
+as circling dancers and lost 11 of 12 fights at generation 20; learning from
+red, it caught up and was even (6-6) by generation 31.
+
+How good is the champion it evolved? Against each of the five starting styles,
+3 fights from each side (30 fights, arena kit), it won 15, lost 12 and drew 3.
+It beat the careful styles (dancer 5-0, skirmisher 4-1, guard 3-2) but not the
+aggressive ones (brawler 2-4, rusher 1-5). What the arena evolved is itself an
+aggressive fighter, so self-play confirmed what works best with these ten
+skills, but it hasn't yet found anything better than the best hand-made
+style.
 
 ## Evolution
 
@@ -207,6 +256,19 @@ one of two parents, with a small mutation. All Xens keep sharing one brain
 (what they learned). What evolves is their nature. Each generation is logged
 in `<world>/xen/evolution.csv`. Your own Xens (with an owner) are never
 replaced.
+
+## Its own goals
+
+A Xen that's free (nobody to follow, nothing asked of it) chooses what it wants
+to do, every 20 seconds or so: find food, build a shelter for the night, get
+wood, get stone, look for ore, or just explore. It weighs three things: what it
+needs right now (hungry with no food? dark with no roof? few blocks?), its
+personality (patient Xens like work, brave ones go for ore, curious ones
+explore), and how well each goal has turned out for it before. It says what it
+wants ("I want to get some wood."), does it with the same chores you can ask
+for, and learns: goals that pay off become ones it likes. `/xen status` shows
+what it wants and likes, and when you chat with it, it knows its own goal.
+Your requests always come first. Turn it off with **Own goals** (`wants`).
 
 ## The chat model only wakes when it's needed
 
@@ -242,6 +304,7 @@ away in single player. On a server, operators use:
 | `maxXens` | `0` | Xens the whole world may have (0 = no limit) |
 | `randomNames` | `true` | names like Pip and Nova instead of Xen, Xen2... |
 | `personalities` | `true` | each Xen has its own nature |
+| `wants` | `true` | free Xens choose their own goals |
 | `skins` | `["random"]` | built-in skin names, "random", or custom textures |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
 | `pvp` | `"defend"` | `"off"`, `"defend"` or `"teams"` |
@@ -263,7 +326,8 @@ away in single player. On a server, operators use:
 | `/xen spawn <count> [radius]` | operators: many ownerless Xens, scattered on the surface up to `radius` blocks away (default 300) |
 | `/xen mode follow\|stay\|free` | the same as asking it to follow, stay or explore |
 | `/xen status` | who it is, health, hunger, mood, what it knows and what it's doing |
-| `/xen style <xen> <trait> <value>` | its owner or operators: set a trait by hand, e.g. `/xen style Pip fight skirmisher`, `/xen style Pip build tower`, `/xen style Pip material stone`, `/xen style Pip bravery 0.9` |
+| `/xen style <xen> <trait> <value>` | its owner or operators: set a trait by hand, e.g. `/xen style Pip fight skirmisher`, `/xen style Pip crit 0.9`, `/xen style Pip build tower`, `/xen style Pip bravery 0.9` |
+| `/xen arena start [xens] [generations] [kit]`, `stop`, `status` | operators: [the PvP arena](#the-pvp-arena-red-against-blue) |
 | `/xen chat on\|off`, `/xen learn on\|off` | quick switches |
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
@@ -274,6 +338,8 @@ away in single player. On a server, operators use:
   reach, and eats when it gets hungry.
 * **Death**: it drops its items like a player, respawns at its bed or the
   world spawn, and remembers what hurt it.
+* **Falling** hurts it like any player (before 0.4.0 it didn't count, which
+  also meant its critical hits never landed).
 
 ## What it knows (it can't cheat)
 

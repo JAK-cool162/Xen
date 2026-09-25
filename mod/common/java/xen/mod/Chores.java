@@ -74,6 +74,10 @@ final class Chores {
 	private String circuitName;
 	private int cycles, fails;
 	private int[] buildSide;                                            // where it stands to reach far parts
+	/** Is this chore one it chose itself (its own want)? Then it doesn't report every step. */
+	boolean own;
+	/** Did the last shelter get built? */
+	boolean shelterBuilt;
 	/** What it's doing for the chore right now, in words (for /xen status). */
 	String doing = "";
 
@@ -99,6 +103,8 @@ final class Chores {
 	private void begin(Kind k) {
 		cancel();
 		kind = k;
+		own = false;
+		shelterBuilt = false;
 		until = now() + (long) (TIME * c.personality.patience());
 		skip.clear();
 		saidLooking = false;
@@ -402,7 +408,7 @@ final class Chores {
 
 	private void finish(String say) {
 		cancel();
-		c.chatter(say, true);
+		c.chatter(say, !own);
 	}
 
 	private double distance(int[] p) {
@@ -420,7 +426,7 @@ final class Chores {
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
 			if (!saidLooking) {
-				c.chatter("I haven't seen any " + lookFor + " yet, I'll look around.", true);
+				c.chatter("I haven't seen any " + lookFor + " yet, I'll look around.", !own);
 				saidLooking = true;
 			}
 			return lookAround();
@@ -612,6 +618,7 @@ final class Chores {
 		}
 		if (done) {
 			finish("Done! I'm safe in my little " + shape + ".");
+			shelterBuilt = true;
 			kind = Kind.HIDE;
 			until = now() + 1200;
 			return Action.IDLE;

@@ -32,6 +32,7 @@ public final class Hands {
 	final XenPlayer p;
 	int yaw, pitch;
 	private Action current = Action.IDLE;
+	private Action lastMove = Action.IDLE;
 	private int ticks, limit;
 	private BlockPos digging;
 	private float progress;
@@ -106,16 +107,31 @@ public final class Hands {
 	}
 
 	void start(Action a) {
+		boolean move = a == Action.FORWARD || a == Action.BACK || a == Action.LEFT || a == Action.RIGHT;
+		if (move && a == current && busy() && !pillar) {             // the same move again: the key just stays down
+			ticks = 0;
+			look();
+			return;
+		}
 		stop();
 		current = a;
+		if (move || a == Action.JUMP) lastMove = a;
 		ticks = 0;
 		limit = 5;                                                    // a quarter of a second
 		switch (a) {
+			case FORWARD -> p.zza = 1;                                // keys go down now, for the next physics step
+			case BACK -> p.zza = -1;
+			case LEFT -> p.xxa = 1;
+			case RIGHT -> p.xxa = -1;
 			case TURN_LEFT -> { yaw = Math.floorMod(yaw - 1, 4); limit = 1; }
 			case TURN_RIGHT -> { yaw = Math.floorMod(yaw + 1, 4); limit = 1; }
 			case LOOK_UP -> { pitch = Math.min(1, pitch + 1); limit = 1; }
 			case LOOK_DOWN -> { pitch = Math.max(-1, pitch - 1); limit = 1; }
-			case JUMP -> limit = 7;
+			case JUMP -> {
+				limit = 7;
+				p.zza = 1;
+				p.setJumping(true);
+			}
 			case MINE -> startMining();
 			case PLACE -> { place(); limit = 2; }
 			case ATTACK -> { attack(); limit = 2; }
@@ -287,11 +303,14 @@ public final class Hands {
 
 	// -------------------------------------------------------------------------------- eating
 	private void startEating() {
-		if (!p.getFoodData().needsFood()) {
-			limit = 1;
-			return;
+		int slot = p.getHealth() < p.getMaxHealth() ? findHotbar(Hands::goldenApple) : -1;   // hurt: a golden apple, hungry or not
+		if (slot < 0) {
+			if (!p.getFoodData().needsFood()) {
+				limit = 1;
+				return;
+			}
+			slot = findHotbar(s -> s.has(DataComponents.FOOD));
 		}
-		int slot = findHotbar(s -> s.has(DataComponents.FOOD));
 		if (slot < 0) {
 			limit = 1;
 			return;
@@ -430,9 +449,34 @@ public final class Hands {
 
 	/** Hold its best weapon (a sword, else an axe), like a player about to fight. */
 	void ready() {
-		int weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_sword"));
-		if (weapon < 0) weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_axe"));
+		ready(false);
+	}
+
+	/** The same, but an axe first when axeFirst (an axe hit disables a raised shield). */
+	void ready(boolean axeFirst) {
+		String first = axeFirst ? "_axe" : "_sword", second = axeFirst ? "_sword" : "_axe";
+		int weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith(first));
+		if (weapon < 0) weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith(second));
 		if (weapon >= 0 && weapon != p.getInventory().getSelectedSlot()) p.getInventory().setSelectedSlot(weapon);
+	}
+
+	boolean holdingAxe() {
+		return BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath().endsWith("_axe");
+	}
+
+	/** The last way it moved (walked, stepped back, strafed or jumped). */
+	Action lastMove() {
+		return lastMove;
+	}
+
+	/** Can it heal by eating now: a golden apple (any time), or food when hungry? */
+	boolean canHeal() {
+		return findHotbar(Hands::goldenApple) >= 0 || p.getFoodData().needsFood() && findHotbar(s -> s.has(DataComponents.FOOD)) >= 0;
+	}
+
+	private static boolean goldenApple(ItemStack s) {
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		return n.equals("golden_apple") || n.equals("enchanted_golden_apple");
 	}
 
 	/**

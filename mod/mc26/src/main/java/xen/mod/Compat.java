@@ -38,7 +38,32 @@ final class Compat {
 		}
 	}
 
+	private static java.lang.reflect.Method isSwinging;
+	private static java.lang.reflect.Field swinging;
+
+	static {
+		try {
+			isSwinging = LivingEntity.class.getMethod("isSwinging");                        // 26.3
+		} catch (NoSuchMethodException e) {
+			try {
+				swinging = LivingEntity.class.getField("swinging");                         // 26.1
+			} catch (NoSuchFieldException e2) {
+				swinging = null;
+			}
+		}
+	}
+
 	private Compat() {}
+
+	/** Is it swinging its arm (it can see that)? */
+	static boolean swinging(LivingEntity e) {
+		try {
+			if (isSwinging != null) return (boolean) isSwinging.invoke(e);
+			return swinging != null && swinging.getBoolean(e);
+		} catch (ReflectiveOperationException ex) {
+			return false;
+		}
+	}
 
 	static void swing(LivingEntity e) {
 		if (swing == null) return;

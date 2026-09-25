@@ -57,6 +57,7 @@ public class XenMod implements ModInitializer {
 	/** The running mod (for the settings screen). */
 	static XenMod INSTANCE;
 	final Roster roster = new Roster();
+	final Arena arena = new Arena(this);
 	final java.util.Random random = new java.util.Random();
 	private long lastChatNeed, lastEvolvedDay = -1;
 
@@ -64,6 +65,10 @@ public class XenMod implements ModInitializer {
 	Brain brain;
 	Chat chat;
 	MinecraftServer server;
+
+	MinecraftServer server() {
+		return server;
+	}
 	final List<Companion> companions = new CopyOnWriteArrayList<>();
 	private final AtomicInteger pendingTraining = new AtomicInteger();
 	private volatile boolean running;
@@ -94,7 +99,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	// --------------------------------------------------------------------------------- brain
-	private Path brainFile() {
+	Path brainFile() {
 		return server.getWorldPath(LevelResource.ROOT).resolve("xen").resolve("brain.bin");
 	}
 
@@ -173,6 +178,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private void stopping(MinecraftServer s) {
+		arena.stop("the server is stopping.");
 		for (Companion c : new ArrayList<>(companions)) c.leave();
 		running = false;
 		if (trainer != null) trainer.interrupt();
@@ -182,7 +188,10 @@ public class XenMod implements ModInitializer {
 
 	// --------------------------------------------------------------------------------- world
 	private void tick(MinecraftServer s) {
-		for (Companion c : companions) {
+		arena.tick();
+		List<Companion> order = new ArrayList<>(companions);
+		java.util.Collections.shuffle(order, random);                  // nobody always gets to act first
+		for (Companion c : order) {
 			try {
 				c.tick();
 			} catch (Throwable e) {
@@ -227,7 +236,7 @@ public class XenMod implements ModInitializer {
 		if (day - lastEvolvedDay < Math.max(1, config.generationDays)) return;
 		lastEvolvedDay = day;
 		List<Companion> pool = new ArrayList<>();
-		for (Companion c : companions) if (c.owner == null && c.player() != null) pool.add(c);
+		for (Companion c : companions) if (c.owner == null && c.player() != null && !c.inArena) pool.add(c);
 		if (pool.size() < 4) return;
 		java.util.function.ToDoubleFunction<Companion> fitness = c -> c.genReward + 2.0 * c.genTicks / 24000.0 - 5.0 * c.genDeaths;
 		pool.sort(java.util.Comparator.comparingDouble(fitness).reversed());
@@ -253,7 +262,7 @@ public class XenMod implements ModInitializer {
 		}
 		double[] mean = new double[4];
 		for (Companion c : companions) {
-			if (c.owner != null) continue;
+			if (c.owner != null || c.inArena) continue;
 			mean[0] += c.personality.bravery;
 			mean[1] += c.personality.curiosity;
 			mean[2] += c.personality.chattiness;
@@ -262,7 +271,7 @@ public class XenMod implements ModInitializer {
 			c.genTicks = 0;
 			c.genDeaths = 0;
 		}
-		int n = (int) companions.stream().filter(c -> c.owner == null).count();
+		int n = (int) companions.stream().filter(c -> c.owner == null && !c.inArena).count();
 		Path file = brainFile().resolveSibling("evolution.csv");
 		try {
 			if (!Files.exists(file)) Files.writeString(file, "day,generation,xens,best_fitness,bravery,curiosity,chattiness,diligence,gone,born\n");
@@ -362,6 +371,27 @@ public class XenMod implements ModInitializer {
 												})
 												.executes(ctx -> style(ctx, StringArgumentType.getString(ctx, "xen"),
 														StringArgumentType.getString(ctx, "trait"), StringArgumentType.getString(ctx, "value")))))))
+				.then(Commands.literal("arena").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+						.then(Commands.literal("start").executes(ctx -> arenaStart(ctx, 4, 10, "sword"))
+								.then(Commands.argument("xens", IntegerArgumentType.integer(1, 16))
+										.executes(ctx -> arenaStart(ctx, IntegerArgumentType.getInteger(ctx, "xens"), 10, "sword"))
+										.then(Commands.argument("generations", IntegerArgumentType.integer(1, 10000))
+												.executes(ctx -> arenaStart(ctx, IntegerArgumentType.getInteger(ctx, "xens"),
+														IntegerArgumentType.getInteger(ctx, "generations"), "sword"))
+												.then(Commands.argument("kit", StringArgumentType.word()).suggests((ctx, b) -> {
+															for (String k : Arena.KITS) b.suggest(k);
+															return b.buildFuture();
+														})
+														.executes(ctx -> arenaStart(ctx, IntegerArgumentType.getInteger(ctx, "xens"),
+																IntegerArgumentType.getInteger(ctx, "generations"), StringArgumentType.getString(ctx, "kit")))))))
+						.then(Commands.literal("stop").executes(ctx -> {
+							arena.stop("stopped.");
+							return 1;
+						}))
+						.then(Commands.literal("status").executes(ctx -> {
+							ctx.getSource().sendSuccess(() -> Component.literal(arena.status()), false);
+							return 1;
+						})))
 				.then(Commands.literal("save").executes(ctx -> {
 					save();
 					ctx.getSource().sendSuccess(() -> Component.literal("Xen's brain saved (" + brain.steps + " steps lived)."), false);
@@ -369,7 +399,19 @@ public class XenMod implements ModInitializer {
 				})));
 	}
 
-	private static final String[] TRAITS = {"fight", "build", "material", "tone", "bravery", "curiosity", "chattiness", "diligence"};
+	/** /xen arena start: red against blue, training their fighting against each other. */
+	private int arenaStart(CommandContext<CommandSourceStack> ctx, int perTeam, int generations, String kit) {
+		if (!java.util.Arrays.asList(Arena.KITS).contains(kit)) {
+			ctx.getSource().sendFailure(Component.literal("Kits: " + String.join(", ", Arena.KITS)));
+			return 0;
+		}
+		String result = arena.start(ctx.getSource().getLevel(), BlockPos.containing(ctx.getSource().getPosition()), perTeam, generations, kit);
+		ctx.getSource().sendSuccess(() -> Component.literal(result), true);
+		return arena.running() ? 1 : 0;
+	}
+
+	private static final String[] TRAITS = {"fight", "build", "material", "tone", "bravery", "curiosity", "chattiness", "diligence", "crit", "charge",
+			"spacing", "wtap", "jumpreset", "strafe", "counter", "select", "retreat", "shield"};
 
 	/** /xen style: set one of a Xen's traits by hand (its owner, or an operator). */
 	private int style(CommandContext<CommandSourceStack> ctx, String who, String trait, String value) {
@@ -415,12 +457,20 @@ public class XenMod implements ModInitializer {
 		Personality p = nature != null ? nature
 				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality"))
 				: config.personalities ? Personality.random(random) : Personality.plain();
+		if (nature == null && known == null && config.personalities) {           // born with an arena champion's fighting
+			float[] champion = Arena.championGenes(brainFile().getParent(), random);
+			if (champion != null) {
+				p.fightGenes = champion;
+				p.fight = Personality.nearest(champion);
+			}
+		}
 		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : Looks.pickSkin(config.skins, random);
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (known != null && known.has("known")) {
 			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
 		}
+		if (known != null && known.has("likes")) c.wants.load(known.getAsJsonObject("likes"));
 		return c;
 	}
 
@@ -437,6 +487,17 @@ public class XenMod implements ModInitializer {
 	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */
 	void joinTeam(Companion c) {
 		var board = server.getScoreboard();
+		if (c.arenaTeam != null) {                                     // the arena's red and blue teams
+			String name = "xen_" + c.arenaTeam;
+			var team = board.getPlayerTeam(name);
+			if (team == null) {
+				team = board.addPlayerTeam(name);
+				Compat.teamColor(team, c.arenaTeam.equals("red") ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.BLUE);
+				team.setAllowFriendlyFire(false);
+			}
+			board.addPlayerToTeam(c.name, team);
+			return;
+		}
 		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
 		if (n == 0) {
 			if (teamOf(c) != null) board.removePlayerFromTeam(c.name);

@@ -20,6 +20,11 @@ final class Compat {
 		e.swing(InteractionHand.MAIN_HAND);
 	}
 
+	/** Is it swinging its arm (it can see that)? */
+	static boolean swinging(LivingEntity e) {
+		return e.swinging;
+	}
+
 	/** Tosses a stack like the Q key. */
 	static boolean drop(ServerPlayer p, ItemStack stack) {
 		p.drop(stack, false, true);

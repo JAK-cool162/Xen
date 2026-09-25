@@ -51,6 +51,7 @@ final class Roster {
 		JsonArray known = new JsonArray();
 		for (UUID u : c.known) known.add(u.toString());
 		o.add("known", known);
+		o.add("likes", c.wants.toJson());
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

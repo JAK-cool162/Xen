@@ -2,8 +2,6 @@ package xen.mod;
 
 import com.google.gson.JsonObject;
 
-import xen.mod.core.Action;
-
 import java.util.Locale;
 import java.util.Random;
 
@@ -14,7 +12,7 @@ import java.util.Random;
  */
 public final class Personality {
 	static final String[] TONES = {"cheerful", "calm", "grumpy", "shy", "bold", "silly"};
-	/** How it fights: see {@link Fight}. */
+	/** How it fights: presets of its fight genes (see {@link #GENES}). */
 	static final String[] FIGHTS = {"brawler", "rusher", "skirmisher", "guard", "dancer"};
 	/** The shape of the shelter it builds: a hut (10 blocks), a fort with corners (18) or a tall tower (14). */
 	static final String[] BUILDS = {"hut", "fort", "tower"};
@@ -22,19 +20,51 @@ public final class Personality {
 	static final String[] MATERIALS = {"stone", "earth", "any"};
 
 	/**
-	 * A fighting style: how often it jumps for critical hits, how charged its swing must be, what it does while its
-	 * swing charges (null: wait), how hurt it gets before it backs off to recover (0: never), and whether it chases.
+	 * Fight genes (each 0 to 1), the 1.9+ PvP skills a player learns: how often it jumps for critical hits; how charged
+	 * its swing must be (0.85 to 1); the distance it keeps while its sword recharges (2.2 to 3 blocks); how often it
+	 * S-taps after a hit so the next one is a sprint hit again; how often it jumps toward a hit to take less knockback
+	 * (jump reset); strafing instead of stepping back; stepping back when the foe jumps in for a crit; waiting for the
+	 * foe to swing first and punishing it (hit selecting); how hurt it gets before it backs off to heal (0 to 40%); and
+	 * holding up a shield while it recharges.
 	 */
-	record Fight(String name, String how, float crit, float charge, Action recharge, float flee, boolean chase) {}
+	static final String[] GENES = {"crit", "charge", "spacing", "wtap", "jumpreset", "strafe", "counter", "select", "retreat", "shield"};
 
-	static Fight fight(String name) {
-		return switch (name) {
-			case "rusher" -> new Fight(name, "rushes in and keeps pressing", 0.85f, 0.85f, Action.FORWARD, 0f, true);
-			case "skirmisher" -> new Fight(name, "hits and steps back", 0.3f, 0.95f, Action.BACK, 0.3f, true);
-			case "guard" -> new Fight(name, "holds its ground behind its shield and waits for full swings", 0.5f, 1f, null, 0.35f, false);
-			case "dancer" -> new Fight(name, "circles around its foe", 0.4f, 0.9f, Action.LEFT, 0.25f, true);
-			default -> new Fight("brawler", "trades blows", 0.6f, 0.9f, null, 0f, true);
+	/** The five fighting styles are starting points in gene space. */
+	static float[] preset(String style) {
+		return switch (style) {
+			//                     crit charge space wtap  jump strafe count select retreat shield
+			case "rusher" -> new float[] {0.85f, 0.0f, 0.2f, 0.9f, 0.7f, 0.1f, 0.1f, 0.0f, 0.0f, 0.0f};
+			case "skirmisher" -> new float[] {0.3f, 0.67f, 0.9f, 0.8f, 0.4f, 0.2f, 0.6f, 0.6f, 0.75f, 0.2f};
+			case "guard" -> new float[] {0.5f, 1.0f, 0.6f, 0.3f, 0.3f, 0.1f, 0.5f, 0.8f, 0.9f, 1.0f};
+			case "dancer" -> new float[] {0.4f, 0.33f, 0.6f, 0.6f, 0.5f, 0.9f, 0.5f, 0.3f, 0.6f, 0.2f};
+			default -> new float[] {0.6f, 0.33f, 0.5f, 0.5f, 0.5f, 0.3f, 0.3f, 0.2f, 0.0f, 0.3f};   // brawler
 		};
+	}
+
+	static String how(String style) {
+		return switch (style) {
+			case "rusher" -> "rushes in and keeps pressing";
+			case "skirmisher" -> "hits and steps back";
+			case "guard" -> "holds its ground behind its shield and waits for full swings";
+			case "dancer" -> "circles around its foe";
+			default -> "trades blows";
+		};
+	}
+
+	/** The style its fight genes are closest to (for describing it). */
+	static String nearest(float[] genes) {
+		String best = "brawler";
+		double bestD = Double.MAX_VALUE;
+		for (String style : FIGHTS) {
+			float[] p = preset(style);
+			double d = 0;
+			for (int i = 0; i < p.length; i++) d += (genes[i] - p[i]) * (genes[i] - p[i]);
+			if (d < bestD) {
+				bestD = d;
+				best = style;
+			}
+		}
+		return best;
 	}
 
 	/** 0 = timid, 1 = fearless: how much fear holds it back. */
@@ -47,6 +77,8 @@ public final class Personality {
 	public float diligence;
 	public String tone;
 	public String fight = "brawler";
+	/** Its fight genes (see {@link #GENES}). */
+	public float[] fightGenes = preset("brawler");
 	public String build = "hut";
 	public String material = "any";
 	public int generation;
@@ -60,6 +92,8 @@ public final class Personality {
 		p.diligence = r.nextFloat();
 		p.tone = TONES[r.nextInt(TONES.length)];
 		p.fight = FIGHTS[r.nextInt(FIGHTS.length)];
+		p.fightGenes = preset(p.fight);
+		for (int i = 0; i < p.fightGenes.length; i++) p.fightGenes[i] = mutate(p.fightGenes[i], r);
 		p.build = BUILDS[r.nextInt(BUILDS.length)];
 		p.material = MATERIALS[r.nextInt(MATERIALS.length)];
 		return p;
@@ -81,7 +115,9 @@ public final class Personality {
 		c.chattiness = mutate(r.nextBoolean() ? chattiness : other.chattiness, r);
 		c.diligence = mutate(r.nextBoolean() ? diligence : other.diligence, r);
 		c.tone = pick(tone, other.tone, TONES, r);
-		c.fight = pick(fight, other.fight, FIGHTS, r);
+		c.fightGenes = new float[GENES.length];
+		for (int i = 0; i < GENES.length; i++) c.fightGenes[i] = mutate(r.nextBoolean() ? fightGenes[i] : other.fightGenes[i], r);
+		c.fight = nearest(c.fightGenes);
 		c.build = pick(build, other.build, BUILDS, r);
 		c.material = pick(material, other.material, MATERIALS, r);
 		c.generation = Math.max(generation, other.generation) + 1;
@@ -94,7 +130,7 @@ public final class Personality {
 		return r.nextFloat() < 0.1f ? all[r.nextInt(all.length)] : (r.nextBoolean() ? mine : theirs);
 	}
 
-	private static float mutate(float gene, Random r) {
+	static float mutate(float gene, Random r) {
 		return Math.max(0f, Math.min(1f, gene + (float) r.nextGaussian() * 0.1f));
 	}
 
@@ -145,7 +181,7 @@ public final class Personality {
 			case "earth" -> "dirt ";
 			default -> "";
 		};
-		return "a " + fight + " (" + fight(fight).how() + "), builds " + of + what;
+		return "a " + fight + " (" + how(fight) + "), builds " + of + what;
 	}
 
 	/** "You build stone forts." (for its notes) */
@@ -157,6 +193,9 @@ public final class Personality {
 		return String.format(Locale.ROOT, "bravery %.2f, curiosity %.2f, chattiness %.2f, diligence %.2f, %s, %s, %s %s, generation %d",
 				bravery, curiosity, chattiness, diligence, tone, fight, material, build, generation);
 	}
+
+	static final String TRAITS_HELP = "Traits: tone, fight, build, material (words); bravery, curiosity, chattiness, diligence, and the fight "
+			+ "genes " + String.join(", ", GENES) + " (0 to 1).";
 
 	/** Change one trait by hand (/xen style). Null if it worked, else what's wrong. */
 	String set(String trait, String value) {
@@ -172,7 +211,10 @@ public final class Personality {
 			if (!java.util.Arrays.asList(choices).contains(v)) return trait + " is one of: " + String.join(", ", choices);
 			switch (trait) {
 				case "tone" -> tone = v;
-				case "fight" -> fight = v;
+				case "fight" -> {
+					fight = v;
+					fightGenes = preset(v);
+				}
 				case "build" -> build = v;
 				default -> material = v;
 			}
@@ -182,16 +224,22 @@ public final class Personality {
 		try {
 			f = Float.parseFloat(v);
 		} catch (NumberFormatException e) {
-			return "Traits: tone, fight, build, material (words); bravery, curiosity, chattiness, diligence (0 to 1).";
+			return TRAITS_HELP;
 		}
 		if (f < 0 || f > 1) return trait + " is between 0 and 1.";
+		int gene = java.util.Arrays.asList(GENES).indexOf(trait);
+		if (gene >= 0) {
+			fightGenes[gene] = f;
+			fight = nearest(fightGenes);
+			return null;
+		}
 		switch (trait) {
 			case "bravery" -> bravery = f;
 			case "curiosity" -> curiosity = f;
 			case "chattiness" -> chattiness = f;
 			case "diligence" -> diligence = f;
 			default -> {
-				return "Traits: tone, fight, build, material (words); bravery, curiosity, chattiness, diligence (0 to 1).";
+				return TRAITS_HELP;
 			}
 		}
 		return null;
@@ -205,6 +253,9 @@ public final class Personality {
 		o.addProperty("diligence", diligence);
 		o.addProperty("tone", tone);
 		o.addProperty("fight", fight);
+		com.google.gson.JsonArray genes = new com.google.gson.JsonArray();
+		for (float g : fightGenes) genes.add(g);
+		o.add("fightGenes", genes);
 		o.addProperty("build", build);
 		o.addProperty("material", material);
 		o.addProperty("generation", generation);
@@ -220,6 +271,10 @@ public final class Personality {
 		if (o.has("diligence")) p.diligence = o.get("diligence").getAsFloat();
 		if (o.has("tone")) p.tone = o.get("tone").getAsString();
 		if (o.has("fight")) p.fight = o.get("fight").getAsString();
+		p.fightGenes = preset(p.fight);
+		if (o.has("fightGenes") && o.getAsJsonArray("fightGenes").size() == GENES.length) {
+			for (int i = 0; i < GENES.length; i++) p.fightGenes[i] = o.getAsJsonArray("fightGenes").get(i).getAsFloat();
+		}
 		if (o.has("build")) p.build = o.get("build").getAsString();
 		if (o.has("material")) p.material = o.get("material").getAsString();
 		if (o.has("generation")) p.generation = o.get("generation").getAsInt();
