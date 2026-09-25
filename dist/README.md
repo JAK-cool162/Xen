@@ -89,6 +89,26 @@ version list.
 * It was tested on PC servers, in a real (virtual) game client, and in the Java
   code on ARM64 machines, but not on a phone yet.
 
+## How fast is it?
+
+Measured on a 4-core cloud PC (x86-64):
+
+* **Its brain**: a decision takes about 0.3 ms. A Xen decides 4 times a second
+  (every tick in a fight). Learning (about 60 ms a step, one step every 4
+  decisions) runs on its own thread, not the game's. With 8 Xens, a sped-up
+  server still ran at 110-210 ticks per second (normal speed is 20).
+* **The chat model** (SmolLM2-360M, 8-bit, 360 million parameters):
+  * loading takes 1-4 seconds; then it reads its two fixed prompts once (242
+    and 367 tokens) at about 4, 7 or 9 tokens a second with 1, 2 or 3 threads,
+    so it's ready after 1-2 minutes (until then Xen answers in plain words);
+  * an answer reads about 50 new tokens (its notes and your message) and
+    writes up to 40: 8 seconds with 3 threads, 10 with 2, 16 with 1;
+  * `chatThreads` sets its threads (default: half your cores, 1-4). Its
+    vocabulary is 49,152 tokens; the mod gives it a 1024-token window (the
+    model can take 8192).
+* **Phones** weren't measured. Their cores are slower: the brain is light
+  enough, and the chat model stays off below about 3 GB anyway.
+
 ## Talking to Xen: it understands and does it
 
 Say its name in chat. Only its owner can give it orders (anyone can, for the
