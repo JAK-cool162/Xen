@@ -218,8 +218,14 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.4.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.4.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.4.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.4.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+
+The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
+**all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
+chat model (SmolLM2-360M) inside, so Xen talks with nothing else to download.
+The mod unpacks the model once into `config/xen/` and checks its SHA-256.
+(`python scripts/bundle_chat_model.py <mod jar> <model>` makes one.)
 
 The mod and its chat model are plain Java with no native code, so the same jar
 runs on x86-64 and ARM64 (phones, Raspberry Pi, Apple Silicon). Every push is

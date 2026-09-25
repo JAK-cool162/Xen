@@ -52,6 +52,11 @@ jobs:
         working-directory: mod/mc1.21.11
         run: ./gradlew build crossCheck llmCheck -PchatModel=${{ github.workspace }}/smollm2-360m-instruct-q8_0.gguf --no-daemon
 
+      - name: All-in-one jar (the mod with its chat model inside)
+        run: |
+          python scripts/bundle_chat_model.py mod/mc1.21.11/build/libs/xen-companion-*+mc1.21.11.jar smollm2-360m-instruct-q8_0.gguf
+          unzip -l mod/mc1.21.11/build/libs/*-with-chat.jar | grep -q "assets/xen/model/smollm2-360m-instruct-q8_0.gguf"
+
       - name: Mod for 26.x (build, Java == Python)
         working-directory: mod/mc26
         run: ./gradlew build crossCheck --no-daemon

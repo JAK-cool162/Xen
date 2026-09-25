@@ -5,17 +5,27 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.4.0-alpha+mc1.21.11.jar` | the mod for Minecraft 1.21.11 (Java 21). **Use this one on phones** |
-| `xen-companion-0.4.0-alpha+mc26.x.jar` | the mod for Minecraft 26.1 - 26.3 (Java 25) |
-| `smollm2-360m-instruct-q8_0.gguf` | the chat model (optional, about 390 MB): put it in `config/xen/`. Otherwise it downloads by itself the first time it's needed |
+| `xen-companion-0.4.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.4.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.4.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.4.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
 | `SHA256SUMS.txt` | checksums |
 
-Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
+Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.4.0-alpha
+### What's new in 0.4.1-alpha
+
+* **All in one: the chat model inside the mod.** The `-with-chat` jars carry Xen's chat model (SmolLM2-360M), so it
+  talks with nothing else to download. The first time it's needed, the mod unpacks it once into `config/xen/` (read
+  from a file there, which saves memory). Every unpacked or downloaded copy is checked against the model's SHA-256,
+  and a damaged one is never loaded. The model takes a minute or two to warm up; until then Xen answers in plain words.
+* Backing off to heal no longer repeats its "I'm getting out of here!" line over and over.
+
+### New in 0.4.0-alpha
 
 * **PvP like a 1.9+ player.** Xen now fights by the server's own rules with a player's inputs: critical hits on the
   way down with sprint released, full-charge swings, sprint hits with S-taps in between, jump resets, spacing at the

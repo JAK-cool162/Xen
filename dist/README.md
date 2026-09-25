@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.4.0-alpha
+# Xen Companion (Fabric mod), prototype 0.4.1-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -7,14 +7,17 @@ skin and personality, and with evolution the ones that do well pass their
 nature on. It plays fair: it only knows what it can sense, and it acts only
 through a player's inputs.
 
-| file | Minecraft | Java |
-|---|---|---|
-| `xen-companion-0.4.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer |
-| `xen-companion-0.4.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| file | Minecraft | Java | chat model |
+|---|---|---|---|
+| `xen-companion-0.4.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.4.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.4.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.4.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
-Get them from the GitHub **Releases** page (with the chat model and Xen's
-brains as separate downloads) or from this folder. This is a prototype, so
-expect rough edges.
+Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
+and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
+Get them from the GitHub **Releases** page (they're too big for this folder,
+which has the light jars). This is a prototype, so expect rough edges.
 
 **Every device**: the mod is plain Java with no native code, so the same jar
 runs on x86-64 PCs and ARM64 (phones, Raspberry Pi, Apple Silicon Macs). The
@@ -31,9 +34,13 @@ ARM64 machine (GitHub Actions: the tests, both builds, and the chat model).
 * **Memory**: 2 GB is enough for Xen itself. For the chat model, give the game
   3 GB or more; it takes about 500 MB. With less, Xen still chats and
   understands requests, only more simply.
-* **Chat model** (optional): `smollm2-360m-instruct-q8_0.gguf`, about 390 MB. It
-  downloads by itself into `config/xen/` the first time it's needed, or take it
-  from the release page and put it in `config/xen/` yourself.
+* **Chat model**: `smollm2-360m-instruct-q8_0.gguf`, about 390 MB. The
+  with-chat jar has it inside: the first time it's needed, the mod unpacks it
+  once into `config/xen/` (it's read from a file there, which saves memory).
+  With the light jar it downloads by itself into `config/xen/`, or take it from
+  the release page and put it there yourself. Either way the mod checks the
+  file's SHA-256 and never loads a damaged copy. It takes a minute or two to
+  warm up; until then Xen answers in plain words.
 
 Players don't need the mod on a server: it runs on the server, and vanilla
 clients can join and play with Xen. For single player, put it (with Fabric API)
@@ -57,7 +64,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.4.0-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.4.1-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -74,8 +81,9 @@ version list.
 
 **On a phone:**
 
-* The chat model normally stays off (phones give Minecraft less than 3 GB).
-  Xen still understands requests by their keywords and answers in plain words.
+* Use the **light** jar, not `-with-chat`: phones usually give Minecraft less
+  than 3 GB, so the chat model stays off anyway. Xen still understands requests
+  by their keywords and answers in plain words.
 * Slow phone? In Mod Menu (or `config/xen.json`) set **Decisions** to
   "2 a second" and turn **Learning** off.
 * It was tested on PC servers, in a real (virtual) game client, and in the Java

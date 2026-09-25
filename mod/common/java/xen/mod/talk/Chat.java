@@ -39,6 +39,10 @@ import java.util.regex.Pattern;
 public final class Chat {
 	public static final String MODEL = "smollm2-360m-instruct-q8_0.gguf";
 	public static final String URL = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/" + MODEL;
+	/** The model's SHA-256: a copy unpacked from the mod or downloaded must be exactly this file. */
+	public static final String SHA256 = "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201";
+	/** Where the all-in-one jar carries the model. */
+	public static final String EMBEDDED = "/assets/xen/model/" + MODEL;
 	/** Memory the game should have (-Xmx3G or more) before the model is loaded on "auto"; the model takes about 500 MB. */
 	public static final long AUTO_MEMORY = 2816L << 20;
 
@@ -305,6 +309,14 @@ public final class Chat {
 
 	private Llm model() throws IOException {
 		if (!Files.exists(modelPath)) {
+			try (InputStream in = Chat.class.getResourceAsStream(EMBEDDED)) {     // the all-in-one jar has it inside
+				if (in != null) {
+					log.accept("Unpacking Xen's chat model from the mod to " + modelPath + " (only the first time)...");
+					unpack(in, modelPath);
+				}
+			}
+		}
+		if (!Files.exists(modelPath)) {
 			if (!download.getAsBoolean()) throw new IOException("no chat model at " + modelPath + " (downloadChatModel is off)");
 			fetch();
 		}
@@ -319,20 +331,42 @@ public final class Chat {
 	private void fetch() throws IOException {
 		Files.createDirectories(modelPath.getParent());
 		log.accept("Downloading Xen's chat model (" + MODEL + ", about 390 MB) to " + modelPath + " ...");
-		Path part = modelPath.resolveSibling(MODEL + ".part");
 		HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
 		try {
 			HttpResponse<InputStream> r = http.send(HttpRequest.newBuilder(URI.create(URL)).build(), HttpResponse.BodyHandlers.ofInputStream());
 			if (r.statusCode() != 200) throw new IOException("download failed: HTTP " + r.statusCode());
 			try (InputStream in = r.body()) {
-				Files.copy(in, part, StandardCopyOption.REPLACE_EXISTING);
+				unpack(in, modelPath);
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new IOException(e);
 		}
-		Files.move(part, modelPath, StandardCopyOption.REPLACE_EXISTING);
 		log.accept("Xen's chat model downloaded.");
+	}
+
+	/**
+	 * Write the model to {@code to} from a stream (the mod jar, or a download), through a .part file, and only keep it
+	 * if it's exactly the right file (its SHA-256). A cut-off or damaged copy is thrown away, never loaded.
+	 */
+	public static void unpack(InputStream in, Path to) throws IOException {
+		Files.createDirectories(to.toAbsolutePath().getParent());
+		Path part = to.resolveSibling(to.getFileName() + ".part");
+		java.security.MessageDigest sha;
+		try {
+			sha = java.security.MessageDigest.getInstance("SHA-256");
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IOException(e);
+		}
+		try (InputStream checked = new java.security.DigestInputStream(in, sha)) {
+			Files.copy(checked, part, StandardCopyOption.REPLACE_EXISTING);
+		}
+		String got = java.util.HexFormat.of().formatHex(sha.digest());
+		if (!got.equals(SHA256)) {
+			Files.deleteIfExists(part);
+			throw new IOException("the chat model file is damaged (SHA-256 " + got + "), so it wasn't used");
+		}
+		Files.move(part, to, StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	/** Unload the model (nobody around for a while). It frees its memory until it's needed again. */
