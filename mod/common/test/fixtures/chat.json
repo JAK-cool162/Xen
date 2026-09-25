@@ -437,6 +437,36 @@
    5
   ],
   [
+   "any diamonds?",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "xen can you get some wood?",
+   "wood",
+   "",
+   8
+  ],
+  [
+   "could you follow me?",
+   "follow",
+   "",
+   0
+  ],
+  [
+   "what are you doing?",
+   "chat",
+   "",
+   0
+  ],
+  [
+   "is it night?",
+   "chat",
+   "",
+   0
+  ],
+  [
    "random craft boat",
    "craft",
    "boat",

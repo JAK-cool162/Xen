@@ -93,7 +93,7 @@ def honest(reply, notes):
     return " ".join(kept) if kept else "I'm not sure, I haven't seen that."
 
 
-_FIRST_PERSON = ((r"\bYou are\b", "I'm"), (r"\bYou know there is\b", "I know there's"), (r"\b[Yy]ou will\b", "I'll"),
+_FIRST_PERSON = ((r"\bYou are\b", "I'm"), (r"\b[Yy]ou were\b", "I was"), (r"\bYou know there is\b", "I know there's"), (r"\b[Yy]ou will\b", "I'll"),
                  (r"\byou won't\b", "I won't"), (r"\byou're\b", "I'm"), (r"\byou are\b", "I'm"), (r"\b(so|and|but|because|if|when) you\b", r"\1 I"),
                  (r"\b(tree|block|ore|lava|water|mob|mobs|it) you\b", r"\1 I"), (r"\byou (need|have|know|saw|see)\b", r"I \1"),
                  (r"\byourself\b", "myself"), (r"\bYour\b", "My"), (r"\byour\b", "my"), (r"\bYou\b", "I"), (r"\byou\b", "me"))
@@ -249,7 +249,9 @@ _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          #
 # Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader.
 _TRADE = re.compile(r"\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\b|\b\d{1,3} [a-z_]+ for (\d{1,3} )?(your |my )?[a-z_]+")
 _QUESTION = re.compile(r"^((what|where|why|how|who|when|which)\b|(do|does|did|are|is|am|was|were|have|has|had) "
-                       r"(you|we|i|it|there|they|he|she|this|that|your|my)\b|you (had|have|got|already have) \d+)")   # (and "you had 20 wood")
+                       r"(you|we|i|it|there|they|he|she|this|that|your|my)\b|you (had|have|got|already have) \d+|any\b|"
+                       r"(?!(can|could|will|would|wanna|pls|please) )[^?]*\?\s*$)")
+# (and "you had 20 wood": telling it; "any diamonds?"; anything else asked with a "?", but "can you get wood?" is a request)
 _SOCIAL = re.compile(r"^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
                      r"love you|you rock|you're (the best|awesome|cool)|bye|goodbye|good night)\b")
 _NUMBER = re.compile(r"\b(\d{1,3})\b")

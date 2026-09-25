@@ -86,6 +86,11 @@ public final class Hands {
 
 	/** In a fight it keeps its eyes on the foe (like a player's mouse), even while it steps back or strafes. */
 	LivingEntity watching;
+	/**
+	 * Where it's walking to next (the middle of the next block of its way): it steers at it like a player moving the
+	 * mouse a little, so it doesn't catch on the corner of a block when it isn't in the middle of its own.
+	 */
+	Vec3 steer;
 
 	void look() {
 		if (aim != null) return;                                      // eyes on the block it's mining
@@ -97,8 +102,14 @@ public final class Hands {
 			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
 			return;
 		}
-		p.setYRot(YAW[yaw]);
-		p.setYHeadRot(YAW[yaw]);
+		float yRot = YAW[yaw];
+		if (steer != null && (current == Action.FORWARD || current == Action.JUMP)) {
+			double dx = steer.x - p.getX(), dz = steer.z - p.getZ();
+			float to = (float) Math.toDegrees(Math.atan2(-dx, dz));
+			if (Math.hypot(dx, dz) > 0.15 && Math.abs(net.minecraft.util.Mth.wrapDegrees(to - YAW[yaw])) < 50) yRot = to;   // (a little, never sideways)
+		}
+		p.setYRot(yRot);
+		p.setYHeadRot(yRot);
 		p.setXRot((float) -Math.toDegrees(Perception.LOOK_PITCH[pitch + 1]));
 	}
 
@@ -119,6 +130,7 @@ public final class Hands {
 		}
 		stop();
 		current = a;
+		if (a != Action.FORWARD && a != Action.JUMP) steer = null;
 		if (move || a == Action.JUMP) lastMove = a;
 		ticks = 0;
 		limit = 5;                                                    // a quarter of a second
@@ -203,6 +215,11 @@ public final class Hands {
 			return;
 		}
 		selectBestTool(state);
+		if (state.getDestroyProgress(p, level, pos) < 1f / 200) {      // more than 10 seconds with what it has: not worth it
+			cantMine = pos.immutable();
+			limit = 2;
+			return;
+		}
 		digging = pos;
 		progress = 0;
 		limit = 200;                                                  // give up after 10 seconds
@@ -249,6 +266,15 @@ public final class Hands {
 		};
 	}
 
+	/** How fast the best tool in its hotbar breaks a block (a fraction of it per tick). */
+	private float bestSpeed(BlockState state, ServerLevel level, BlockPos pos) {
+		int was = p.getInventory().getSelectedSlot();
+		selectBestTool(state);
+		float f = state.getDestroyProgress(p, level, pos);
+		p.getInventory().setSelectedSlot(was);
+		return f;
+	}
+
 	/** Pick the hotbar item that breaks this block fastest (like pressing a number key). */
 	private void selectBestTool(BlockState state) {
 		Inventory inv = p.getInventory();
@@ -264,9 +290,18 @@ public final class Hands {
 		inv.setSelectedSlot(best);
 	}
 
+	/** The last block it gave up on: it would take too long with what it has (or can't be broken). */
+	BlockPos cantMine;
+
 	/** Mine a block it can reach by looking at it (not just ahead or under its feet): for staircases. */
 	boolean mine(BlockPos pos) {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockState state = level.getBlockState(pos);
+		if (state.getDestroySpeed(level, pos) < 0 || bestSpeed(state, level, pos) < 1f / 200) {   // bedrock, or far too slow
+			cantMine = pos.immutable();
+			return false;
+		}
 		stop();
 		face(Vec3.atCenterOf(pos));
 		aim = pos.immutable();

@@ -330,11 +330,64 @@ public class XenMod implements ModInitializer {
 			if (!c.talker.waitingFor(sender.getUUID()) && !c.trader.dealWith(sender.getUUID())) continue;
 			if (nearest == null || c.player().distanceTo(sender) < nearest.player().distanceTo(sender)) nearest = c;
 		}
+		if (nearest == null) nearest = addressedWithoutName(sender);
 		if (nearest != null) {
 			Companion c = nearest;
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> c.say(reply)));
 		}
+	}
+
+	/**
+	 * No name, but it's clear who they're talking to, the way players can tell: a Xen they're in a conversation with
+	 * (it answered them in the last half minute), one they're looking right at, or their own Xen when it's just the
+	 * two of them. Not when another player is closer and they aren't looking at the Xen (then they're talking to them).
+	 */
+	private Companion addressedWithoutName(ServerPlayer sender) {
+		long now = sender.level().getGameTime();
+		Companion best = null;
+		double bestScore = Double.MAX_VALUE;
+		for (Companion c : companions) {
+			ServerPlayer x = c.player();
+			if (x == null || x.level() != sender.level()) continue;
+			double d = x.distanceTo(sender);
+			if (d > 12) continue;
+			boolean talking = sender.getUUID().equals(c.talkingWith) && now < c.talkingUntil;
+			boolean looking = looksAt(sender, x);
+			boolean justUs = sender.getUUID().equals(c.owner) && d <= 8 && nobodyElseNear(sender, x);
+			if (!talking && !looking && !justUs) continue;
+			if (!looking && otherPlayerCloser(sender, x)) continue;
+			double score = d - (talking ? 6 : 0) - (looking ? 4 : 0);
+			if (score < bestScore) {
+				bestScore = score;
+				best = c;
+			}
+		}
+		return best;
+	}
+
+	/** Is the player looking right at it (within about 15 degrees)? */
+	private static boolean looksAt(ServerPlayer who, ServerPlayer at) {
+		net.minecraft.world.phys.Vec3 look = who.getViewVector(1f), to = at.getEyePosition().subtract(who.getEyePosition());
+		return to.length() > 0.1 && look.dot(to.normalize()) > 0.966 && who.hasLineOfSight(at);
+	}
+
+	/** No other real player and no other Xen within 16 blocks of the two of them. */
+	private boolean nobodyElseNear(ServerPlayer sender, ServerPlayer xen) {
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p == sender || p == xen || p.level() != sender.level()) continue;
+			if (p.distanceTo(sender) <= 16) return false;
+		}
+		return true;
+	}
+
+	private boolean otherPlayerCloser(ServerPlayer sender, ServerPlayer xen) {
+		double d = xen.distanceTo(sender);
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p == sender || p == xen || p instanceof XenPlayer || p.level() != sender.level()) continue;
+			if (p.distanceTo(sender) < d) return true;
+		}
+		return false;
 	}
 
 	/** Run on the server thread and wait for the result (the chat thread must not touch the world itself). */
@@ -505,6 +558,7 @@ public class XenMod implements ModInitializer {
 		if (known != null) {
 			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
 			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
+			if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString());
 			if (known.has("trust")) {
 				for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
 			}

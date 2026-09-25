@@ -113,6 +113,7 @@ public final class Companion {
 		XenPlayer p = new XenPlayer(server, level, profile);
 		p.companion = this;
 		FakeConnection connection = new FakeConnection(() -> server.execute(this::leave));
+		connection.body = p;
 		server.getPlayerList().placeNewPlayer(connection, p, new CommonListenerCookie(profile, 0, p.clientInformation(), false));
 		if (at != null) p.teleportTo(level, at.x, at.y, at.z, Set.<Relative>of(), yaw, 0, true);
 		player = p;
@@ -149,14 +150,16 @@ public final class Companion {
 		genTicks++;
 		hands.tick();
 		hurtNow = player.getHealth() < tickHealth;
+		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
+		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
 		mimic.watch();                                                  // what are the players it sees doing?
 		antics.watch();
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
-			trust(by.getUUID(), -0.3f);                                     // it remembers who hit it
+			hitBy(by);
 		}
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
 		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0 && !fighting) return;   // in a fight, every tick
@@ -244,6 +247,7 @@ public final class Companion {
 			ServerPlayer w = server.getPlayerList().getPlayer(watchFor);
 			if (w != null && w.level() == player.level()) hands.watching = w;
 		}
+		if (!fighting && action != Action.FORWARD.ordinal() && action != Action.JUMP.ordinal()) run(false);   // stopped: no more running
 		if (!pillaring && !acted) hands.start(Action.values()[action]);
 		if (DEBUG) XenMod.LOG.info("[xen debug] {} at {} ground={} yaw={} pitch={} -> {} ({})", name, player.position(), player.onGround(),
 				hands.yaw, hands.pitch, Action.values()[action], lastThought);
@@ -377,6 +381,8 @@ public final class Companion {
 			Action craft = crafter.next();
 			if (craft != null) return craft;
 		}
+		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
+		if (light != null) return light;
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
 			chores.cancel();
 			goals.drop();
@@ -429,6 +435,112 @@ public final class Companion {
 		if (mode != Mode.FOLLOW || leader == null) return false;
 		ServerPlayer o = server.getPlayerList().getPlayer(leader);
 		return o != null && o.level() == player.level() && o.distanceTo(player) > mod.config.followDistance * 2;
+	}
+
+	private long lastTorch, nextTorchCraft;
+
+	/**
+	 * Light where it is when it's dark there (underground or under a roof, not just night outside): a torch on the
+	 * floor next to it or on a wall, from its bag. Without torches but with coal, it makes some first. So caves it
+	 * works in get lit up the way players light them, and mobs don't spawn right next to it.
+	 */
+	private Action lightUp() {
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos feet = player.blockPosition();
+		long now = level.getGameTime();
+		if (fighting || !player.onGround() || now - lastTorch < 60) return null;
+		boolean dark = WorldSenses.light(level, feet) <= 3 && level.getBrightness(net.minecraft.world.level.LightLayer.SKY, feet) < 8;
+		if (!dark) return null;
+		if (DEBUG) XenMod.LOG.info("[xen debug] {} is in the dark (light {}), torches {}", name, WorldSenses.light(level, feet), items().getOrDefault("torch", 0));
+		var items = items();
+		if (items.getOrDefault("torch", 0) == 0) {
+			int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0);
+			if (coal > 0 && !crafter.hasOrder() && now >= nextTorchCraft) {
+				nextTorchCraft = now + 1200;
+				crafter.request("torch", 4);
+				chatter("It's dark here. I'll make some torches.", false);
+			}
+			return null;
+		}
+		for (int k = 0; k < 4; k++) {
+			int[] f = Perception.forward((hands.yaw + 2 + k) % 4);                // behind it first (not where it's going)
+			BlockPos side = feet.offset(f[0], 0, f[1]);
+			BlockPos wall = side.above();
+			if (!level.getBlockState(wall).canBeReplaced() && level.getBlockState(wall).isFaceSturdy(level, wall, direction(-f[0], -f[1]))
+					&& level.getBlockState(feet.above()).canBeReplaced()
+					&& hands.placeItem(feet.above(), st -> itemKey(st).equals("torch"), wall, direction(-f[0], -f[1]), -1)) {   // on the wall
+				lastTorch = now;
+				acted = true;
+				return Action.PLACE;
+			}
+			BlockPos under = side.below();
+			if (level.getBlockState(side).canBeReplaced() && level.getFluidState(side).isEmpty()
+					&& level.getBlockState(under).isFaceSturdy(level, under, net.minecraft.core.Direction.UP)
+					&& hands.placeItem(side, st -> itemKey(st).equals("torch"), under, net.minecraft.core.Direction.UP, -1)) {   // on the floor
+				lastTorch = now;
+				acted = true;
+				return Action.PLACE;
+			}
+		}
+		lastTorch = now;                                               // nowhere to put one right here: in a moment
+		if (DEBUG) XenMod.LOG.info("[xen debug] {} found nowhere for a torch: {}", name, hands.cantPlace);
+		return null;
+	}
+
+	private static net.minecraft.core.Direction direction(int x, int z) {
+		return x > 0 ? net.minecraft.core.Direction.EAST : x < 0 ? net.minecraft.core.Direction.WEST : z > 0 ? net.minecraft.core.Direction.SOUTH
+				: net.minecraft.core.Direction.NORTH;
+	}
+
+	/** Signs it has read (where, and what they said), and the last one, for its notes. */
+	private final Map<BlockPos, String> signsRead = new HashMap<>();
+	private String lastSign;
+	private long lastSignAt, lastSignSaid = -10_000;
+
+	/** Read the signs it can see within 10 blocks (a new or changed one it reads out when someone's there to hear). */
+	private void readSigns() {
+		if (inArena) return;
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos feet = player.blockPosition();
+		Vec3 eye = player.getEyePosition();
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				var chunk = level.getChunkSource().getChunkNow((feet.getX() >> 4) + dx, (feet.getZ() >> 4) + dz);
+				if (chunk == null) continue;
+				for (var e : chunk.getBlockEntities().entrySet()) {
+					if (!(e.getValue() instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign)) continue;
+					BlockPos at = e.getKey();
+					Vec3 middle = Vec3.atCenterOf(at);
+					double d = eye.distanceTo(middle);
+					if (d > 10) continue;
+					if (d > 3) {                                               // further: in its view, with nothing in the way
+						double[] from = {eye.x, eye.y, eye.z}, to = {middle.x, middle.y, middle.z};
+						if (!Perception.inView(from, hands.yaw, hands.pitch, to)) continue;
+						var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, middle, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+								net.minecraft.world.level.ClipContext.Fluid.NONE, player));
+						if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hit.getBlockPos().equals(at)) continue;
+					}
+					String text = Compat.readSign(sign).trim();
+					if (DEBUG && !text.equals(signsRead.get(at))) XenMod.LOG.info("[xen debug] {} reads the sign at {}: {}", name, at, text);
+					if (text.isEmpty() || text.equals(signsRead.get(at))) continue;
+					if (signsRead.size() > 200) signsRead.clear();
+					signsRead.put(at.immutable(), text);
+					if (text.contains("-" + name)) continue;                     // its own note
+					lastSign = text.length() > 90 ? text.substring(0, 90) : text;
+					lastSignAt = level.getGameTime();
+					if (someoneListening(12) && lastSignAt - lastSignSaid > 600) {   // read out (one sign every half minute at most)
+						lastSignSaid = lastSignAt;
+						chatter("This sign says: \"" + lastSign + "\"", true);
+					}
+				}
+			}
+		}
+	}
+
+	/** Sprint (a double tap on W): when there's far to go and it isn't too hungry, like a player; never in water. */
+	void run(boolean on) {
+		boolean can = on && player.getFoodData().getFoodLevel() > 6 && !player.isInWater() && !player.isShiftKeyDown() && player.onGround();
+		if (can != player.isSprinting() && (can || !fighting)) player.setSprinting(can);
 	}
 
 	/** Where it's walking to, and the closest it has got (and when): to notice when it's getting nowhere. */
@@ -484,9 +596,16 @@ public final class Companion {
 		int[] step = senses.last == null ? null
 				: Paths.firstStep(senses.last, goal.x - (feet.getX() + 0.5), goal.y - feet.getY(), goal.z - (feet.getZ() + 0.5), maxDrop());
 		if (step != null) {
-			if (step[0] != hands.yaw) return Math.floorMod(step[0] - hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
+			if (step[0] != hands.yaw) {
+				run(false);
+				return Math.floorMod(step[0] - hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
+			}
+			int[] ahead = Perception.forward(step[0]);
+			hands.steer = Vec3.atBottomCenterOf(feet.offset(ahead[0], 0, ahead[1]));   // the middle of the next block
+			run(Math.hypot(dx, dz) > 5 && step[1] == 0);                   // far to go: it runs, like a player
 			return step[1] == 1 ? Action.JUMP : Action.FORWARD;
 		}
+		run(false);
 		// No known way gets closer: dig towards it.
 		int want = 0;
 		double best = -2;
@@ -577,6 +696,69 @@ public final class Companion {
 		trust.put(who, Math.max(-1f, Math.min(1f, trust(who) + change)));
 	}
 
+	/** When each player last hit it with a weapon (then it's a real attack). */
+	private final Map<UUID, Long> armedHitAt = new HashMap<>();
+	/** Hits with an empty hand (or a flower, a block...) lately, per player: someone wanting its attention. */
+	private final Map<UUID, java.util.ArrayDeque<Long>> pokes = new HashMap<>();
+	private long answeredPokeAt = -10_000;
+
+	static boolean isWeapon(ItemStack s) {
+		if (s.isEmpty()) return false;
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		return n.endsWith("_sword") || n.endsWith("_axe") || n.endsWith("_spear") || n.equals("trident") || n.equals("mace")
+				|| n.equals("bow") || n.equals("crossbow");
+	}
+
+	/**
+	 * A player hit it. With a weapon, it's an attack: it trusts them a lot less and may fight back. With an empty hand
+	 * (or a flower, a block) it's a poke, the way players get someone's attention: it turns to them and asks what's up,
+	 * and barely minds. Poking on and on is an attack too.
+	 */
+	private void hitBy(ServerPlayer by) {
+		long now = player.level().getGameTime();
+		UUID u = by.getUUID();
+		if (isWeapon(by.getMainHandItem()) || by.getAttackStrengthScale(0) > 0 && player.getHealth() < tickHealthBefore - 3) {
+			armedHitAt.put(u, now);
+			trust(u, -0.3f);                                           // it remembers who hit it
+			return;
+		}
+		var q = pokes.computeIfAbsent(u, k -> new java.util.ArrayDeque<>());
+		q.addLast(now);
+		while (!q.isEmpty() && now - q.peekFirst() > 200) q.removeFirst();
+		if (q.size() >= 6) {                                           // on and on: that's not asking for attention any more
+			armedHitAt.put(u, now);
+			trust(u, -0.3f);
+			q.clear();
+			say(pick3("Stop that!", "Okay, that's enough!", "Quit it!"));
+			return;
+		}
+		trust(u, -0.01f);
+		known.add(u);
+		hands.watching = by;
+		watchFor = u;
+		watchUntil = player.tickCount + 100;                           // it looks at them
+		if (now - answeredPokeAt > 200) {
+			answeredPokeAt = now;
+			talkingWith = u;
+			talkingUntil = now + 600;
+			String n = by.getName().getString();
+			say(switch (personality.tone) {
+				case "grumpy" -> "What? What do you want, " + n + "?";
+				case "shy" -> "O-oh! Um, yes, " + n + "?";
+				case "silly" -> "Boop! Hi " + n + ", what's up?";
+				case "bold" -> "Yeah? What is it, " + n + "?";
+				case "calm" -> "Yes, " + n + "? I'm listening.";
+				default -> "Hey " + n + "! What's up?";
+			});
+		}
+	}
+
+	/** Is this player really attacking it (a weapon, or poking on and on) lately? */
+	private boolean attackedBy(LivingEntity a, long now) {
+		if (!(a instanceof ServerPlayer sp)) return true;               // mobs: yes
+		return now - armedHitAt.getOrDefault(sp.getUUID(), -1_000_000L) < 200;
+	}
+
 	/** Friends: players and Xens it trusts (its owner counts). */
 	int friends() {
 		int n = owner != null ? 1 : 0;
@@ -601,7 +783,7 @@ public final class Companion {
 	/** It knows everything within 6 blocks (like a player who hears and feels what's close), seen or not. */
 	private static final double NEAR = 6;
 
-	private float tickHealth;
+	private float tickHealth, tickHealthBefore;
 	private boolean fighting, hurtNow;
 
 	/** A player (not its owner, not a teammate) close by with a sword or axe in hand: it can see that. */
@@ -634,12 +816,20 @@ public final class Companion {
 		}
 		if (best != null || mod.config.pvp.equals("off")) return best;
 		ServerPlayer o = owner == null ? null : server.getPlayerList().getPlayer(owner);
+		long now = player.level().getGameTime();
+		boolean own = mod.config.pvp.equals("own");
 		for (LivingEntity victim : new LivingEntity[] {player, o}) {               // who hurt it, or its owner, just now
 			if (victim == null || victim.level() != player.level()) continue;
 			LivingEntity a = victim.getLastHurtByMob();
 			if (a == null || !a.isAlive() || a == player || a == o || player.isAlliedTo(a)) continue;
 			if (a instanceof AbstractVillager || a instanceof AbstractGolem || a instanceof TamableAnimal t && t.isTame()) continue;
 			if (victim.tickCount - victim.getLastHurtByMobTimestamp() > 200 || player.distanceTo(a) > 16) continue;
+			if (victim == player && !attackedBy(a, now)) continue;                // a poke to get its attention isn't a fight
+			if (victim == o && a instanceof ServerPlayer sp && !isWeapon(sp.getMainHandItem())) continue;   // nor someone poking its owner
+			if (own && a instanceof ServerPlayer sp) {                            // its own call: who, and whether it can win
+				if (trust(sp.getUUID()) >= 0.6f && player.getHealth() > 10) continue;   // a friend's mistake: it lets it go
+				if (player.getHealth() < 6 || personality.bravery < 0.3f && player.getHealth() < 12) continue;   // losing: it gets away instead
+			}
 			if (player.distanceTo(a) <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, a)) return a;   // near: it feels them
 		}
 		if (!mod.config.pvp.equals("teams")) return null;
@@ -759,6 +949,7 @@ public final class Companion {
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
 				+ " " + goals.describe() + " " + crafter.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
+				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
 				+ (trader.market().isEmpty() ? "" : " " + trader.market())
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
@@ -824,7 +1015,30 @@ public final class Companion {
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
 		if (r.intent().equals("chat") && FRIENDLY.matcher(words).find()) trust(u, 0.05f);   // kind words
 		script.heard(words, from);
+		talkingWith = u;                                              // a conversation: for the next half minute, no name needed
+		talkingUntil = player.level().getGameTime() + 600;
 		if (talker.answered(from, words)) return null;               // a yes or no to something it asked
+		java.util.regex.Matcher rem = REMEMBER.matcher(words);
+		if (rem.find() && (owner == null || owner.equals(u) || trust(u) >= 0.3f)) {
+			String fact = rem.group(4).trim().replaceAll("[.!]+$", "");
+			fact = fact.replaceAll("\\bmy\\b", who + "'s").replaceAll("\\bi am\\b|\\bi'm\\b", who + " is").replaceAll("\\bme\\b", who).replaceAll("^i ", who + " ");
+			memories.add(who + " told you: " + fact + ".");
+			while (memories.size() > 12) memories.remove(0);
+			say(pick3("Okay, I'll remember that.", "Got it. I won't forget.", "Noted!"));
+			lastThought = "Remembered: " + fact;
+			return null;
+		}
+		if (FORGET_ALL.matcher(words).find()) {
+			memories.removeIf(m -> m.startsWith(who + " told you:"));
+			say("Okay, I forgot it.");
+			return null;
+		}
+		if (RECALL.matcher(words).find()) {
+			java.util.List<String> mine = memories.stream().filter(m -> m.startsWith(who + " told you:")).toList();
+			say(mine.isEmpty() ? "You haven't asked me to remember anything." : "You told me: "
+					+ String.join(" ", mine.subList(Math.max(0, mine.size() - 3), mine.size()).stream().map(m -> m.substring((who + " told you: ").length())).toList()));
+			return null;
+		}
 		if (r.intent().equals("chat") && WATCH.matcher(words).find()) {
 			watchFor = u;
 			watchUntil = player.tickCount + 1200;                     // a minute
@@ -927,8 +1141,9 @@ public final class Companion {
 	 * ("Pip: you love cats" is only for Pip).
 	 */
 	String instructions() {
-		String all = mod.config.instructions;
-		if (all == null || all.isBlank()) return "";
+		String all = mod.config.instructions == null ? "" : mod.config.instructions;
+		for (String m : memories) all = all + "\n" + m;                 // and what people asked it to remember
+		if (all.isBlank()) return "";
 		StringBuilder sb = new StringBuilder();
 		for (String raw : all.split("\\r?\\n|\\|")) {                             // lines, or | between them (for /xen set)
 			String line = raw.trim();
@@ -943,6 +1158,20 @@ public final class Companion {
 		}
 		return sb.toString();
 	}
+	/** What people asked it to remember ("Steve told you: the base is by the river."), newest last. */
+	final java.util.List<String> memories = new java.util.ArrayList<>();
+	private static final java.util.regex.Pattern REMEMBER = java.util.regex.Pattern.compile("^(please |pls |can you |could you )?remember(,)? (that |this: |this )?(.+)$");
+	private static final java.util.regex.Pattern RECALL = java.util.regex.Pattern.compile("\\b(what did i (tell|say to) you|what do you remember|what i told you)\\b");
+	private static final java.util.regex.Pattern FORGET_ALL = java.util.regex.Pattern.compile("^forget (everything|what i (told you|said))\\b");
+	/** Who it's talking with (so "what about you?" without its name is for it), and until when. */
+	UUID talkingWith;
+	long talkingUntil;
+
+	private String pick3(String a, String b, String c3) {
+		int r = random.nextInt(3);
+		return r == 0 ? a : r == 1 ? b : c3;
+	}
+
 	/** Someone said "watch me": it keeps its eyes on them for a while. */
 	private UUID watchFor;
 	private int watchUntil;

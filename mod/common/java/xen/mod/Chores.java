@@ -79,6 +79,8 @@ final class Chores {
 	private int[] buildSide;                                            // where it stands to reach far parts
 	/** Is this chore one it chose itself (its own want)? Then it doesn't report every step. */
 	boolean own;
+	/** What it was told to do before it built its shelter (follow), to go back to in the morning. */
+	private Companion.Mode resume;
 	/** Did the last shelter get built? */
 	boolean shelterBuilt;
 	/** What it's doing for the chore right now, in words (for /xen status). */
@@ -105,6 +107,7 @@ final class Chores {
 
 	private void begin(Kind k) {
 		cancel();
+		gaveAt = -1;
 		kind = k;
 		own = false;
 		shelterBuilt = false;
@@ -187,17 +190,52 @@ final class Chores {
 				prey.getType().getDescription().getString().toLowerCase(java.util.Locale.ROOT), c.player.distanceTo(prey));
 	}
 
+	/** How many of something it keeps for itself (it isn't a chest): wood for a pickaxe, stone for tools, a little food. */
+	int keepFor(String key) {
+		int tier = c.crafter.pickTier();
+		return switch (key) {
+			case "log" -> tier == 0 ? 3 : 0;
+			case "cobblestone" -> Math.max(tier < 2 ? 3 : 0, c.goals.evening() ? 10 - count("dirt") : 0);   // (a shelter tonight: 10 blocks)
+			case "dirt" -> c.goals.evening() ? 10 - count("cobblestone") : 0;
+			case "food" -> c.player.getFoodData().getFoodLevel() < 14 ? 2 : 0;
+			case "torch" -> 2;
+			default -> 0;
+		};
+	}
+
+	private String why(String key) {
+		return switch (key) {
+			case "log" -> "for your pickaxe";
+			case "cobblestone" -> c.goals.evening() && 10 - count("dirt") > 3 ? "for a shelter tonight" : "for your stone tools";
+			case "dirt" -> "for a shelter tonight";
+			case "food" -> "to eat";
+			default -> "for yourself";
+		};
+	}
+
+	/**
+	 * Asked for its things: it doesn't just hand everything over. It thinks for a moment, keeps what it needs itself
+	 * (and says so), then walks over and tosses the rest.
+	 */
 	String give(ServerPlayer to, String item, int amount) {
 		int have = item.equals("all") ? giveable().size() : count(item);
 		if (have == 0) return item.equals("all") ? "You have nothing to give." : "You have no " + named(item, 2) + " to give.";
+		int keep = item.equals("all") ? 0 : keepFor(item);
+		if (!item.equals("all") && have <= keep) {
+			return "You can't give your " + named(item, 2) + " away, because you need the " + have + " you have " + why(item) + ".";
+		}
 		begin(Kind.GIVE);
 		forWhom = to.getUUID();
 		giveItem = item;
-		want = amount;
+		int n = amount > 0 ? Math.min(amount, have - keep) : have - keep;
+		want = item.equals("all") ? 0 : n;
+		thinkUntil = now() + 20 + random.nextInt(30);                 // a moment to think it over, like anyone would
 		String name = to.getName().getString();
-		int n = amount > 0 ? Math.min(amount, have) : have;
-		return item.equals("all") ? "You will give " + name + " what you carry." : "You will give " + name + " " + n + " " + named(item, n) + ".";
+		if (item.equals("all")) return "You will think it over, then give " + name + " what you can spare.";
+		return "You will give " + name + " " + n + " " + named(item, n) + (keep > 0 ? ", but keep " + keep + " " + why(item) : "") + ".";
 	}
+
+	private long thinkUntil;
 
 	/** "log" -> "5 logs", "raw_iron" -> "raw iron". */
 	static String named(String item, int n) {
@@ -276,6 +314,7 @@ final class Chores {
 		walls = plan;
 		shape = build;
 		waited = 0;
+		resume = c.mode == Companion.Mode.STAY ? null : c.mode;        // in the morning it goes back to what it was told
 		c.mode = Companion.Mode.STAY;
 		c.anchor = feet;
 		return "You will build a small " + of + build + " around yourself with " + missing + " blocks.";
@@ -438,6 +477,8 @@ final class Chores {
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
 					cancel();
+					if (resume != null) c.mode = resume;                        // following again, as it was told
+					resume = null;
 					yield null;
 				}
 				yield Action.IDLE;
@@ -712,7 +753,10 @@ final class Chores {
 	}
 
 	private Action mine(BlockPos b) {
-		if (!c.hands.mine(b)) return null;
+		if (!c.hands.mine(b)) {
+			if (b.equals(c.hands.cantMine)) giveUp(b);                    // it can't break that: another one, not waiting forever
+			return null;
+		}
 		c.acted = true;
 		return Action.MINE;
 	}
@@ -838,26 +882,56 @@ final class Chores {
 			}
 			return Action.IDLE;
 		}
-		if (!below && c.player.distanceTo(to) > 2) {
+		if (!below && c.player.distanceTo(to) > 3) {
 			doing = String.format(java.util.Locale.ROOT, "bringing it to %s, %.0f blocks away", to.getName().getString(), c.player.distanceTo(to));
 			return c.walkTo(to.position());
 		}
 		c.hands.face(to.getEyePosition());
+		if (gaveAt >= 0) {                                             // given: a moment still, then it's done
+			if (now() - gaveAt < 60) return Action.IDLE;
+			gaveAt = -1;
+			cancel();
+			return null;
+		}
+		if (now() < thinkUntil) {                                      // looking at them, thinking it over
+			doing = "thinking about what to give " + to.getName().getString();
+			return Action.IDLE;
+		}
+		if (!below && c.player.distanceTo(to) < 1.4) return Action.BACK;   // right on top of them: a step back, or it throws past them
+		c.hands.face(to.position().add(0, 0.2, 0));                     // aimed at their feet, the way players hand things over
 		var inv = c.player.getInventory();
 		int left = want > 0 ? want : Integer.MAX_VALUE, given = 0;
+		java.util.Map<String, Integer> kept = new java.util.HashMap<>();
 		for (int i = 0; i < 36 && left > 0; i++) {
 			ItemStack s = inv.getItem(i);
 			if (s.isEmpty() || s.isDamageableItem()) continue;
-			if (!giveItem.equals("all") && !c.itemKey(s).equals(giveItem)) continue;
-			int n = Math.min(left, s.getCount());
+			String key = c.itemKey(s);
+			if (!giveItem.equals("all") && !key.equals(giveItem)) continue;
+			int spare = s.getCount();
+			if (giveItem.equals("all")) {                              // everything but what it needs itself
+				int keepLeft = keepFor(key) - kept.getOrDefault(key, 0);
+				int k = Math.max(0, Math.min(keepLeft, spare));
+				kept.merge(key, k, Integer::sum);
+				spare -= k;
+			}
+			int n = Math.min(left, spare);
+			if (n <= 0) continue;
 			c.hands.toss(inv.removeItem(i, n));
 			left -= n;
 			given += n;
 		}
-		finish(given > 0 ? "Here you go!" : "I don't have that anymore.");
 		c.acted = true;
+		if (given == 0) {
+			finish("I don't have that anymore.");
+			return Action.IDLE;
+		}
+		c.chatter("Here you go!", !own);
+		gaveAt = now();                                                // and it stands still while they pick it up
 		return Action.IDLE;
 	}
+
+	/** When it tossed what it was asked for (it waits a moment, not walking over its own gift and taking it back). */
+	private long gaveAt = -1;
 
 	private Action shelterNext() {
 		ServerLevel level = (ServerLevel) c.player.level();

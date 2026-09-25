@@ -122,8 +122,8 @@ public class XenSettingsScreen extends Screen {
 			}
 			case 3 -> {
 				choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams (no friendly fire).");
-				choice("PvP", "pvp", List.of("off", "defend", "teams"), s -> s,
-						"defend: fights back against players who hurt it or its owner. teams: Xens of different teams fight too.");
+				choice("PvP", "pvp", List.of("own", "off", "defend", "teams"), s -> s,
+						"own: its own call: it fights back when someone attacks it or its owner with a weapon, lets a friend's mistake go, and gets away when it's losing. A poke with an empty hand only gets its attention. defend: always fights back against armed attacks. teams: Xens of different teams fight too.");
 			}
 			case 4 -> {
 				onOff("Redstone", "redstone", "Xen may build small circuits it learned (NOT, OR, AND gates) from parts it carries.");

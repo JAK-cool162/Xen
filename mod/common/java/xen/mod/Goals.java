@@ -246,9 +246,14 @@ final class Goals {
 
 	/** Evening (or night already) and too few blocks for a shelter: a player gets some dirt before dark. */
 	boolean needBlocksForTheNight() {
+		return evening() && blocks() < 10;
+	}
+
+	/** Evening or night: time to think about a shelter. */
+	boolean evening() {
 		var level = c.player.level();
 		long time = Compat.timeOfDay(level);
-		return (time >= 11000 && time < 23000 || level.isDarkOutside()) && blocks() < 10;
+		return time >= 11000 && time < 23000 || level.isDarkOutside();
 	}
 
 	/** What its dream adds to a short goal. */

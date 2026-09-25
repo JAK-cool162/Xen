@@ -18,8 +18,22 @@ public class XenPlayer extends ServerPlayer {
 		super(server, level, profile, ClientInformation.createDefault());
 	}
 
+	/** Knockback the server sent "to its client": applied at the start of its next tick, as a game client would. */
+	private net.minecraft.world.phys.Vec3 push;
+	private boolean addPush;
+
+	void pushed(net.minecraft.world.phys.Vec3 motion, boolean add) {
+		push = add && push != null ? push.add(motion) : motion;
+		addPush = add;
+	}
+
 	@Override
 	public void tick() {
+		if (push != null) {                                // hit or blown back: the push its client would feel
+			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} pushed {} (was moving {})", getName().getString(), push, getDeltaMovement());
+			setDeltaMovement(addPush ? getDeltaMovement().add(push) : push);
+			push = null;
+		}
 		if (level().getServer().getTickCount() % 10 == 0) {
 			connection.resetPosition();
 			level().getChunkSource().move(this);          // load the world around it, like a player

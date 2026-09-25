@@ -102,7 +102,55 @@ public final class WorldSenses {
 		Vec3 eye = p.getEyePosition(), head = e.position().add(0, e.getBbHeight() * 0.85, 0);
 		double[] from = {eye.x, eye.y, eye.z}, to = {head.x, head.y, head.z};
 		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-		return Perception.inView(from, yaw, pitch, to) && Perception.lineOfSight((x, y, z) -> seen(level, m.set(x, y, z)), from, to);
+		return Perception.inView(from, yaw, pitch, to) && Perception.lineOfSight((x, y, z) -> seen(level, m.set(x, y, z)), from, to)
+				&& lit(level, e.blockPosition(), from);
+	}
+
+	/** How far it sees in the dark: like a player, the first few blocks (its own eyes adjust), not further. */
+	static final double DARK_SIGHT = 5;
+
+	/** Light a player's eyes get from here: blocks' own light, or the sky's (less at night). */
+	static int light(ServerLevel level, BlockPos pos) {
+		return level.isLoaded(pos) ? level.getRawBrightness(pos, level.getSkyDarken()) : 0;
+	}
+
+	/** Can it make out something at pos (lit enough, or close)? */
+	static boolean lit(ServerLevel level, BlockPos pos, double[] eye) {
+		double dx = pos.getX() + 0.5 - eye[0], dy = pos.getY() + 0.5 - eye[1], dz = pos.getZ() + 0.5 - eye[2];
+		return dx * dx + dy * dy + dz * dz <= DARK_SIGHT * DARK_SIGHT || light(level, pos) >= 3 || light(level, pos.above()) >= 3;
+	}
+
+	/**
+	 * What its eyes make out at a block: a solid surface in the dark beyond a few blocks is unknown (the ray stops
+	 * there), like a cave you look into without a torch.
+	 */
+	static int inTheLight(ServerLevel level, BlockPos.MutableBlockPos pos, double[] eye, int c) {
+		if (c < 0 || !Blocks.OPAQUE[c]) return c;
+		double dx = pos.getX() + 0.5 - eye[0], dy = pos.getY() + 0.5 - eye[1], dz = pos.getZ() + 0.5 - eye[2];
+		if (dx * dx + dy * dy + dz * dz <= DARK_SIGHT * DARK_SIGHT) return c;
+		int best = 0;
+		BlockPos.MutableBlockPos n = new BlockPos.MutableBlockPos();
+		for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {   // the light on its faces
+			best = Math.max(best, light(level, n.setWithOffset(pos, side)));
+			if (best >= 3) return c;
+		}
+		return -1;
+	}
+
+	/**
+	 * What it feels close by (within 6 blocks) is everything, except ore buried in stone: nobody can tell that's
+	 * there until a face of it shows (in a cave, a cliff, a tunnel it digs).
+	 */
+	static int felt(ServerLevel level, BlockPos.MutableBlockPos pos, int c) {
+		if (c < Blocks.COAL || c > Blocks.DIAMOND) return c;
+		BlockPos.MutableBlockPos n = new BlockPos.MutableBlockPos();
+		for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+			n.setWithOffset(pos, side);
+			if (!level.isLoaded(n)) continue;
+			BlockState st = level.getBlockState(n);
+			if (!st.canOcclude() || !st.getFluidState().isEmpty()) return c;              // a face shows: it can see it
+		}
+		return Blocks.STONE;
 	}
 
 	public static Perception.Sight sense(ServerPlayer p, int yaw, int pitch, int phase, Perception.Body body) {
@@ -119,14 +167,15 @@ public final class WorldSenses {
 			for (int dy = -near; dy <= near; dy++) {
 				for (int dz = -near; dz <= near; dz++) {
 					m.set(feet.getX() + dx, feet.getY() + dy, feet.getZ() + dz);
-					s.near[i++] = level.isLoaded(m) ? category(level, m, level.getBlockState(m)) : Blocks.STONE;
+					s.near[i++] = level.isLoaded(m) ? felt(level, m, category(level, m, level.getBlockState(m))) : Blocks.STONE;
 				}
 			}
 		}
 		Vec3 eye = p.getEyePosition();
 		double[] e = {eye.x, eye.y, eye.z};
 		Perception.World world = (x, y, z) -> seen(level, m.set(x, y, z));
-		Perception.castRays(world, e, yaw, pitch, phase, s);
+		Perception.World eyes = (x, y, z) -> inTheLight(level, m.set(x, y, z), e, seen(level, m));   // (in the dark it sees little)
+		Perception.castRays(eyes, e, yaw, pitch, phase, s);
 		AABB box = p.getBoundingBox().inflate(Perception.VIEW * 0.75);
 		List<LivingEntity> mobs = level.getEntitiesOfClass(LivingEntity.class, box, x -> x instanceof Enemy && x.isAlive());
 		for (LivingEntity mob : mobs) {
@@ -137,7 +186,7 @@ public final class WorldSenses {
 			} else {
 				Vec3 head = mob.position().add(0, mob.getBbHeight() * 0.85, 0);
 				double[] h = {head.x, head.y, head.z};
-				if (Perception.inView(e, yaw, pitch, h) && Perception.lineOfSight(world, e, h)) {
+				if (Perception.inView(e, yaw, pitch, h) && Perception.lineOfSight(world, e, h) && lit(level, q, e)) {
 					s.farMobs.add(new int[] {q.getX(), q.getY(), q.getZ()});
 				}
 			}

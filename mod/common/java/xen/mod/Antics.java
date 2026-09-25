@@ -100,9 +100,31 @@ final class Antics {
 	}
 
 	// ------------------------------------------------------------------------------ each tick
-	/** Watching for someone dancing (every tick, it's quick). */
+	/** When it last greeted each player back (a crouch greeting once a while, not every crouch). */
+	private final Map<UUID, Long> greetedAt = new HashMap<>();
+
+	/**
+	 * Someone crouched at it a few times quickly: the players' way of saying "hi, I'm friendly". It trusts them a
+	 * little more (never all the way: anyone can crouch) and crouches back.
+	 */
+	private void greeted(ServerPlayer p, long now) {
+		if (now - greetedAt.getOrDefault(p.getUUID(), -10_000L) < 600) return;
+		greetedAt.put(p.getUUID(), now);
+		float t = c.trust(p.getUUID());
+		if (t < 0.5f) c.trust(p.getUUID(), Math.min(0.1f, 0.5f - t));
+		if (!busy()) {
+			partner = p;
+			c.hands.watching = p;
+			start("wave", 8);
+		}
+		if (!(p instanceof XenPlayer)) c.talker.sayNear(pick("Hi hi! *crouches back*", "Hey. *crouches back*", "Hm. Hi.", "O-oh, hi! *crouches*",
+				"Yo! *crouch crouch*", "*crouch crouch crouch* Hiii!"));
+		if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} greeted {} back (trust now {})", c.name, p.getName().getString(), c.trust(p.getUUID()));
+	}
+
+	/** Watching for someone greeting it or dancing (every tick, it's quick). */
 	void watch() {
-		if (!c.mod.config.antics || c.player == null || c.inArena) return;
+		if (c.player == null || c.inArena) return;
 		long now = now();
 		for (ServerPlayer p : c.server.getPlayerList().getPlayers()) {
 			if (p == c.player || p.level() != c.player.level() || p.distanceTo(c.player) > 8) continue;
@@ -115,8 +137,10 @@ final class Antics {
 			seen[1] = (int) now;
 			if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} saw {} crouch ({} in a row; busy {})", c.name, p.getName().getString(), seen[0], doing);
 			boolean isXenDancing = p instanceof XenPlayer x && x.companion != null && x.companion.antics.doing.equals("dance");
+			if (seen[0] == 4 && !isXenDancing && c.player.hasLineOfSight(p)) greeted(p, now);   // a crouch greeting (always, like players)
+			if (!c.mod.config.antics) continue;
 			boolean trusted = c.known.contains(p.getUUID()) || isXenDancing || c.trust(p.getUUID()) >= 0.3f;
-			if (seen[0] >= 4 && trusted && !busy() && random.nextFloat() < 0.4f + 0.6f * playful()) {
+			if (seen[0] >= 10 && trusted && !busy() && random.nextFloat() < 0.4f + 0.6f * playful()) {   // it keeps going: a dance
 				partner = p;
 				start("dance", 60 + random.nextInt(40));
 				c.talker.sayNear(pick("Dance party!", "Alright, alright.", "Ugh... fine. One dance.", "O-okay, I'll dance too...",
@@ -130,7 +154,8 @@ final class Antics {
 	 * water, and not in the arena.
 	 */
 	Action next(boolean fighting) {
-		if (!c.mod.config.antics || c.inArena || c.player == null) return null;
+		if (c.inArena || c.player == null) return null;
+		if (!c.mod.config.antics && !doing.equals("wave")) return null;   // (crouching back to a greeting isn't an antic)
 		if (fighting || c.player.isInWater() || c.player.getHealth() < 10) {
 			if (busy() && !doing.equals("fight")) stop();
 			return null;

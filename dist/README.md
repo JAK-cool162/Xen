@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.6.0-alpha
+# Xen Companion (Fabric mod), prototype 0.6.1-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -11,10 +11,10 @@ through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.6.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.6.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.6.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.6.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.6.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.6.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.6.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.6.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -66,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.6.0-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.6.1-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -178,9 +178,11 @@ just talk. `/xen status` shows what it's doing right now.
 
 It does it fairly:
 
-* It only goes for blocks and animals it knows about: felt within 6 blocks,
-  spotted within 14 (a trunk between the trees, ore showing in a cliff: only
-  what shows a face to the air), or seen further away in its 90° view. When it
+* It only goes for blocks and animals it knows about: felt within 6 blocks
+  (but not ore buried in stone: nobody can tell that's there), spotted within
+  14 (a trunk between the trees, ore showing in a cliff: only what shows a face
+  to the air), or seen further away in its 90° view. In the dark it can't make
+  out anything unlit beyond 5 blocks, like a player. When it
   knows of none, it looks around and walks somewhere new. Huge mushrooms aren't
   trees to it (their stems give no wood).
 * It mines what it can see and reach, like a player: from the side, diagonally,
@@ -199,6 +201,30 @@ It does it fairly:
 * It needs the right tools, like you: stone and coal need a pickaxe, iron a
   stone one. Ask for stone without one and it gets wood first, makes the
   pickaxe, then gets the stone.
+
+## Around people
+
+* **Talking without its name**: it knows you're talking to it when you're in a
+  conversation with it (it answered you in the last half minute), when you're
+  looking right at it, or when it's your Xen and nobody else is around.
+* **Remembering**: "Pip, remember that the base is by the big oak". Then "what
+  did I tell you?" or "where is the base?". It's saved with the Xen (up to 12
+  things); "forget what I told you" clears yours.
+* **Signs**: it reads the signs it can see, says what a new one says when
+  someone's there, and knows it afterwards.
+* **Greetings**: crouch at it quickly a few times and it crouches back and trusts
+  you a little more (never fully: anyone can crouch).
+* **Pokes and attacks**: a hit with an empty hand (or a flower, a block) gets its
+  attention ("Hey! What's up?"); a hit with a weapon, or poking on and on, is an
+  attack. With PvP `own` (the default) it decides what to do about an attack
+  itself: it fights back against armed attacks on it or its owner, lets a
+  friend's mistake go, and gets away when it's losing.
+* **Giving**: it thinks for a moment, keeps what it needs (wood for its
+  pickaxe, stone for its tools, 10 blocks for a shelter in the evening, a little
+  food when it's hungry) and says so, then tosses the rest at your feet and waits
+  while you pick it up.
+* **In the dark** (caves, tunnels, under a roof) it puts torches on the floor or
+  the walls as it goes, and makes torches from coal when it has none.
 
 ## Tools: it crafts like a new player
 
@@ -432,10 +458,14 @@ can't read. With `/xen set script`, put `|` between rules.
 * **Teams**: all Xens on one team, or split into 2-6 colored teams (red, blue,
   green, yellow, purple, aqua). Teammates can't hurt each other.
 * **PvP**:
+  * `own` (default): its own call. It fights back when a player attacks it
+    or its owner with a weapon, lets a friend's mistake go (someone it trusts,
+    while it's healthy), and gets away instead when it's losing. A poke with an
+    empty hand only gets its attention.
   * `off`: Xen fights only monsters.
-  * `defend` (default): it also fights back against a player who hurts it or
-    its owner. It never fights its owner or a teammate, and it draws its sword
-    when an armed stranger comes close.
+  * `defend`: it always fights back against a player who attacks it or its
+    owner with a weapon (or keeps poking it). It never fights its owner or a
+    teammate, and it draws its sword when an armed stranger comes close.
   * `teams`: Xens of different teams also fight each other.
 * **How it fights**: like a 1.9+ player, with only a player's inputs, and by
   the server's own rules:
@@ -615,7 +645,7 @@ away in single player. On a server, operators use:
 | `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
 | `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
-| `pvp` | `"defend"` | `"off"`, `"defend"` or `"teams"` |
+| `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
 | `generationDays` | `3` | Minecraft days per generation |
 | `redstone` | `true` | Xen may build small circuits |

@@ -249,6 +249,9 @@ final class Talker {
 		if (asked == null || c.player == null || now() > askedUntil || !from.getUUID().equals(askedWho)) return false;
 		boolean yes = YES.matcher(words).lookingAt(), no = !yes && NO.matcher(words).lookingAt();
 		if (!yes && !no) return false;
+		if (words.trim().contains(" ") && !xen.mod.talk.Chat.understand(words, c.name).intent().equals("chat")) {
+			return false;                                              // "please give me 16 cobblestone" is a new request, not a yes
+		}
 		String q = asked;
 		asked = null;
 		if (no) {

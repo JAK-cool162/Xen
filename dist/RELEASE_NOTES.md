@@ -5,10 +5,10 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.6.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.6.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.6.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.6.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.6.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.6.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.6.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.6.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -17,7 +17,42 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.6.0-alpha
+### What's new in 0.6.1-alpha
+
+**It behaves more like a player (on by default)**
+
+* **It takes knockback.** Hits and explosions didn't push it at all: the server leaves a player's knockback to their
+  own game client, and a Xen has none. Now it gets the same push a game client would (a punch sends it a couple of
+  blocks, a Knockback sword further). Checked on 1.21.11 and 26.1.2.
+* **It runs**: it sprints when it has far to go (catching up with you, walking to a tree), and walks the last bit.
+  It steers for the middle of the next block, so it no longer gets caught on block corners.
+* **It gives up on blocks it can't break** (bedrock, or something that would take forever with what it has) instead
+  of standing there swinging.
+* **It understands the dark.** Beyond 5 blocks it can't make out unlit blocks or mobs (like a player looking into a
+  dark cave), and in dark caves and tunnels it **places torches** on the floor or the walls. With coal and no
+  torches, it makes some ("It's dark here. I'll make some torches.").
+* **No more knowing where buried ore is.** It used to feel all ore within 6 blocks, even deep in stone. Now it only
+  knows ore that shows a face (in a cave, a cliff, a tunnel it digs).
+* **A crouch greeting is a friendly hello.** Crouch at it quickly a few times and it crouches back ("Hi hi!
+  *crouches back*") and trusts you a little more, but never fully (anyone can crouch). Keep going and it dances.
+* **A punch with an empty hand gets its attention, not a fight**: it turns to you ("Hey Alex! What's up?"). Hit
+  with a weapon, or poked on and on, and it's an attack.
+* **PvP is its own call** (new default `own`): it fights back when someone attacks it or its owner with a weapon,
+  lets a friend's mistake go, and gets away instead when it's losing. (`defend` and `teams` still work.)
+* **It doesn't give things away instantly**: it thinks for a moment, keeps what it needs itself and says so ("I'll give
+  Steve 6 cobblestone, but keep 10 for a shelter tonight"), then hands them over aimed at your feet and waits for you
+  to pick them up.
+* **You don't have to say its name** when it's clear you're talking to it: you're in a conversation with it, you're
+  looking right at it, or it's your Xen and nobody else is around.
+* **It remembers what you tell it**: "Pip, remember that the base is by the big oak", then "what did I tell you?" or
+  "where is the base?" ("Steve told me: the base is by the big oak."). Saved with the Xen; "forget what I told you"
+  clears it.
+* **It reads signs** it can see ("This sign says: "Welcome to Steve's base""), and knows what they said.
+* **It doesn't forget your orders**: after a night in its shelter it goes back to following you, and its own ideas
+  never override "stay". A question ("any diamonds?") is no longer taken as an order to go mining, and "please give me
+  ..." is no longer taken as a "yes" to something it asked.
+
+### New in 0.6.0-alpha
 
 **Fixes for what players saw**
 
@@ -164,7 +199,8 @@ ARM64 machine.
 ### Known limits
 
 It's a prototype. Xen still dies more than a good player and gets lost in tricky terrain. It doesn't go to the
-Nether or the End or fight the Ender Dragon, and it doesn't follow you through portals yet. It can't smelt yet (so no iron
+Nether or the End or fight the Ender Dragon, and it doesn't follow you through portals yet. It builds only small
+shelters so far (houses and bases are next). It can't smelt yet (so no iron
 tools), and it leaves its crafting tables where it used them. Its chat model is small and its answers are simple (plain
 questions are now answered without it). It only gathers what it can reach on foot (plus one block up with a pillar). A good PvP
 player will still beat it: it can't combo or dodge arrows, and it doesn't use a mace, spear, crystals or pearls yet.

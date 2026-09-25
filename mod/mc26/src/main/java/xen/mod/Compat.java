@@ -65,6 +65,45 @@ final class Compat {
 		}
 	}
 
+	/**
+	 * The words on the front of a sign ("" if it's blank). 26.1/26.2: getFrontText().getMessage(i, false); 26.3:
+	 * getText(SignTextSlot.FRONT).getMessages(false). By reflection, so one jar reads them on every 26.x.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	static String readSign(SignBlockEntity sign) {
+		try {
+			Object text;
+			try {
+				text = SignBlockEntity.class.getMethod("getFrontText").invoke(sign);
+			} catch (NoSuchMethodException e) {
+				Class slot = Class.forName("net.minecraft.world.level.block.entity.SignTextSlot");
+				text = SignBlockEntity.class.getMethod("getText", slot).invoke(sign, Enum.valueOf(slot, "FRONT"));
+			}
+			java.util.List<Component> lines = new java.util.ArrayList<>();
+			try {
+				Method one = text.getClass().getMethod("getMessage", int.class, boolean.class);
+				for (int i = 0; i < 4; i++) lines.add((Component) one.invoke(text, i, false));
+			} catch (NoSuchMethodException e) {
+				Object all = text.getClass().getMethod("getMessages", boolean.class).invoke(text, false);
+				if (all instanceof List<?> l) for (Object o : l) lines.add((Component) o);
+				else for (Object o : (Object[]) all) lines.add((Component) o);
+			}
+			StringBuilder sb = new StringBuilder();
+			for (Component c : lines) {
+				String line = c.getString().trim();
+				if (!line.isEmpty()) sb.append(sb.length() > 0 ? " " : "").append(line);
+			}
+			return sb.toString();
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			return "";
+		}
+	}
+
+	/** The motion the server tells a player's client to take (knockback), if the packet is that, for this entity. */
+	static net.minecraft.world.phys.Vec3 motionFor(net.minecraft.network.protocol.Packet<?> packet, int id) {
+		return packet instanceof net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket m && m.id() == id ? m.movement() : null;
+	}
+
 	/** The time of day, 0 to 23999 (0 is sunrise, 13000 about nightfall). */
 	static long timeOfDay(net.minecraft.world.level.Level level) {
 		return level.getOverworldClockTime() % 24000;   // (26.x: world clocks)

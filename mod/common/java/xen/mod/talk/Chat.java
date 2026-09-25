@@ -93,7 +93,8 @@ public final class Chat {
 	/** Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader. */
 	private static final Pattern TRADE = Pattern.compile("\\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\\b|\\b\\d{1,3} [a-z_]+ for (\\d{1,3} )?(your |my )?[a-z_]+");
 	private static final Pattern QUESTION = Pattern.compile("^((what|where|why|how|who|when|which)\\b|(do|does|did|are|is|am|was|were|have|has|had) "
-			+ "(you|we|i|it|there|they|he|she|this|that|your|my)\\b|you (had|have|got|already have) \\d+)");   // (and "you had 20 wood": telling it)
+			+ "(you|we|i|it|there|they|he|she|this|that|your|my)\\b|you (had|have|got|already have) \\d+|any\\b|(?!(can|could|will|would|wanna|pls|please) )[^?]*\\?\\s*$)");
+			// (and "you had 20 wood": telling it; "any diamonds?"; anything else asked with a "?", but "can you get wood?" is a request)
 	private static final Pattern SOCIAL = Pattern.compile("^(thanks|thank you|thx|ty|good (job|work|boy|girl)|nice (one|job|work)|well done|gg|lol|haha|"
 			+ "love you|you rock|you're (the best|awesome|cool)|bye|goodbye|good night)\\b");
 	private static final Pattern NUMBER = Pattern.compile("\\b(\\d{1,3})\\b");
@@ -524,7 +525,7 @@ public final class Chat {
 		return kept.isEmpty() ? "I'm not sure, I haven't seen that." : String.join(" ", kept);
 	}
 
-	private static final String[][] FIRST_PERSON = {{"\\bYou are\\b", "I'm"}, {"\\bYou know there is\\b", "I know there's"},
+	private static final String[][] FIRST_PERSON = {{"\\bYou are\\b", "I'm"}, {"\\b[Yy]ou were\\b", "I was"}, {"\\bYou know there is\\b", "I know there's"},
 			{"\\b[Yy]ou will\\b", "I'll"}, {"\\byou won't\\b", "I won't"}, {"\\byou're\\b", "I'm"}, {"\\byou are\\b", "I'm"},
 			{"\\b(so|and|but|because|if|when) you\\b", "$1 I"}, {"\\b(tree|block|ore|lava|water|mob|mobs|it) you\\b", "$1 I"},
 			{"\\byou (need|have|know|saw|see)\\b", "I $1"}, {"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},

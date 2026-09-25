@@ -60,8 +60,12 @@ public final class XenConfig {
 
 	/** Teams: 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams. */
 	public int teams = 1;
-	/** Fighting players: "off", "defend" (fights back against players who hurt it or its owner), "teams" (also Xens of other teams). */
-	public String pvp = "defend";
+	/**
+	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
+	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",
+	 * "defend" (fights back against anyone who attacks it or its owner with a weapon), "teams" (also Xens of other teams).
+	 */
+	public String pvp = "own";
 
 	/** Evolution: every few days, the Xens that did worst (only ones without an owner) are replaced by children of the best. */
 	public boolean evolution = false;
@@ -77,7 +81,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 2;
+	public int version = 3;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -97,7 +101,8 @@ public final class XenConfig {
 				com.google.gson.JsonObject j = gson.fromJson(Files.readString(path), com.google.gson.JsonObject.class);
 				config = gson.fromJson(j, XenConfig.class);
 				if (!j.has("version") && config.followDistance == 10) config.followDistance = 4;   // it stayed too far behind
-				config.version = 2;
+				if ((!j.has("version") || j.get("version").getAsInt() < 3) && config.pvp.equals("defend")) config.pvp = "own";   // the new default
+				config.version = 3;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

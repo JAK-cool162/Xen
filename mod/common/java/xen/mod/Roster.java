@@ -57,6 +57,9 @@ final class Roster {
 		c.trust.forEach((u, t) -> trust.addProperty(u.toString(), t));
 		o.add("trust", trust);
 		o.add("skills", c.mimic.toJson());
+		JsonArray memories = new JsonArray();
+		for (String m : c.memories) memories.add(m);
+		o.add("memories", memories);
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

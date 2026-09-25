@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.6.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.6.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.6.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.6.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -281,8 +281,9 @@ style** (the shelter it builds is a hut, a fort or a tower, of stone, dirt or
 whatever it has). Children inherit them. Set them by hand with
 `/xen style Pip fight guard` or `/xen style Pip crit 0.9`.
 
-**PvP like a 1.9+ player.** PvP is `off`, `defend` (fights back against a
-player who hurts it or its owner) or `teams`. It plays by the server's rules
+**PvP like a 1.9+ player.** PvP is `own` (the default: its own call, see
+above), `off`, `defend` (always fights back against a player who attacks it or
+its owner with a weapon) or `teams`. It plays by the server's rules
 with a player's inputs: critical hits on the way down with sprint released,
 full-charge swings, sprint hits with S-taps in between, jump resets, spacing
 at the edge of its reach, stepping out of the foe's crit jump, hit selecting,
@@ -317,6 +318,19 @@ what's worth it and never digs straight down (it digs a staircase, and one up
 to get out of a hole). **Next to you it gets on with things by itself** (wood,
 stone, food, ore, a shelter at night) and drops them to keep up when you
 leave. With good health it drops down 4 or 5 blocks like a player would.
+
+**It acts like a player around people.** A few quick crouches at it are a
+friendly hello: it crouches back and trusts you a little (never fully). A
+punch with an empty hand just gets its attention ("Hey! What's up?"); only a
+weapon (or poking on and on) is an attack. PvP is its own call by default: it
+fights back against armed attacks on it or its owner, forgives a friend's
+mistake, and runs when it's losing. Asked for its things, it thinks first and
+keeps what it needs ("but keep 10 for a shelter tonight"). You don't need its
+name when it's obvious you're talking to it, it remembers what you tell it
+("remember that the base is by the big oak"), and it reads signs. It takes
+knockback like any player, runs when there's far to go, can't see far in the
+dark (and lights caves with torches), and doesn't know about ore buried in
+stone.
 
 **It's unpredictable.** Crouch up and down next to it and it dances along
 (other Xens join in); now and then it shows off a trick ("Watch this!") that

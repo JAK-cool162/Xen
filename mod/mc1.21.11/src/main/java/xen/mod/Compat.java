@@ -16,6 +16,21 @@ import java.util.List;
 final class Compat {
 	private Compat() {}
 
+	/** The words on the front of a sign, one line after another ("" if it's blank). */
+	static String readSign(SignBlockEntity sign) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < 4; i++) {
+			String line = sign.getFrontText().getMessage(i, false).getString().trim();
+			if (!line.isEmpty()) sb.append(sb.length() > 0 ? " " : "").append(line);
+		}
+		return sb.toString();
+	}
+
+	/** The motion the server tells a player's client to take (knockback), if the packet is that, for this entity. */
+	static net.minecraft.world.phys.Vec3 motionFor(net.minecraft.network.protocol.Packet<?> packet, int id) {
+		return packet instanceof net.minecraft.network.protocol.game.ClientboundSetEntityMotionPacket m && m.getId() == id ? m.getMovement() : null;
+	}
+
 	/** The time of day, 0 to 23999 (0 is sunrise, 13000 about nightfall). */
 	static long timeOfDay(net.minecraft.world.level.Level level) {
 		return level.getDayTime() % 24000;

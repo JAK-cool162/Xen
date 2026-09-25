@@ -62,6 +62,8 @@ function parseArgs (argv) {
   return out
 }
 
+const DARK_SIGHT = 5                      // in the dark it makes out only this far (like the mod)
+
 function category (block) {
   if (!block) return B.STONE // unloaded: treat as solid unknown
   const n = block.name
@@ -213,6 +215,7 @@ class Body {
           const block = at(x, y, z)
           if (!block) break                    // not loaded: unknown
           if (opaque(block)) {
+            if (t > DARK_SIGHT && !this.litFace(x, y, z, at)) break   // a surface in the dark: it can't make it out
             dist.push(t); cat.push(category(block)); hit.push(x, y, z)
             found = true
             break
@@ -222,6 +225,32 @@ class Body {
       }
     }
     return { dist, cat, hit, at }
+  }
+
+  /** Light a player's eyes get at a block (its own light, or the sky's: less at night), as the mod does. */
+  light (block) {
+    if (!block) return 0
+    const skyDarken = this.bot.time && !this.bot.time.isDay ? 11 : 0
+    return Math.max(block.light || 0, (block.skyLight || 0) - skyDarken)
+  }
+
+  litFace (x, y, z, at) {
+    for (const [a, b, c] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+      if (this.light(at(x + a, y + b, z + c)) >= 3) return true
+    }
+    return false
+  }
+
+  /** Close by it feels everything, except ore buried in stone (nobody can tell until a face of it shows). */
+  felt (p) {
+    const block = this.bot.blockAt(p)
+    const kind = category(block)
+    if (kind < B.COAL || kind > B.DIAMOND) return kind
+    for (const [a, b, c] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+      const n = this.bot.blockAt(p.offset(a, b, c))
+      if (n && (!n.boundingBox || n.boundingBox === 'empty' || n.transparent || category(n) === B.WATER || category(n) === B.AIR)) return kind
+    }
+    return B.STONE
   }
 
   inView (eye, target) {
@@ -254,7 +283,7 @@ class Body {
     let i = 0
     for (let dx = -NEAR; dx <= NEAR; dx++) {
       for (let dy = -NEAR; dy <= NEAR; dy++) {
-        for (let dz = -NEAR; dz <= NEAR; dz++) near[i++] = category(bot.blockAt(p.offset(dx, dy, dz)))
+        for (let dz = -NEAR; dz <= NEAR; dz++) near[i++] = this.felt(p.offset(dx, dy, dz))
       }
     }
     const eye = bot.entity.position.offset(0, EYE, 0)
@@ -269,7 +298,8 @@ class Body {
         nearMobs.push(rel)                     // felt, even behind it
       } else {
         const head = e.position.offset(0, (e.height || 1.8) * 0.85, 0)
-        if (this.inView(eye, head) && this.canSee(eye, head, rays.at)) farMobs.push([q.x, q.y, q.z])
+        const lit = Math.hypot(...rel) <= DARK_SIGHT || this.light(bot.blockAt(q)) >= 3 || this.light(bot.blockAt(q.offset(0, 1, 0))) >= 3
+        if (this.inView(eye, head) && this.canSee(eye, head, rays.at) && lit) farMobs.push([q.x, q.y, q.z])
       }
     }
     let burning = false
