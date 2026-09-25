@@ -54,6 +54,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class XenMod implements ModInitializer {
 	public static final Logger LOG = LoggerFactory.getLogger("xen");
+	/** The running mod (for the settings screen). */
+	static XenMod INSTANCE;
+	final Roster roster = new Roster();
+	final java.util.Random random = new java.util.Random();
+	private long lastChatNeed, lastEvolvedDay = -1;
 
 	XenConfig config;
 	Brain brain;
@@ -67,9 +72,11 @@ public class XenMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		INSTANCE = this;
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
-		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), config.chatModel, config.downloadChatModel, config.chatThreads, LOG::info);
+		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> config.chatModel, () -> config.downloadChatModel,
+				config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
 		ServerLifecycleEvents.SERVER_STARTED.register(this::started);
 		ServerLifecycleEvents.SERVER_STOPPING.register(this::stopping);
@@ -93,6 +100,7 @@ public class XenMod implements ModInitializer {
 
 	private void started(MinecraftServer s) {
 		server = s;
+		roster.load(brainFile().resolveSibling("companions.json"));
 		Path file = brainFile();
 		try (InputStream in = Files.exists(file) ? Files.newInputStream(file) : XenMod.class.getResourceAsStream("/assets/xen/brain.bin")) {
 			if (in == null) throw new IOException("no bundled brain");
@@ -160,6 +168,8 @@ public class XenMod implements ModInitializer {
 		} catch (IOException e) {
 			LOG.warn("Could not save Xen's brain: {}", e.toString());
 		}
+		for (Companion c : companions) roster.remember(c, teamOf(c));
+		roster.save();
 	}
 
 	private void stopping(MinecraftServer s) {
@@ -183,6 +193,84 @@ public class XenMod implements ModInitializer {
 			lastSave = System.currentTimeMillis();
 			save();
 		}
+		if (s.getTickCount() % 100 == 0) {
+			wakeChat();
+			if (config.evolution) evolve();
+		}
+	}
+
+	/**
+	 * The chat model only runs when it may be needed: someone a Xen knows is near it (or someone just talked). With
+	 * nobody around for a while it's unloaded again, and Xen writes on signs instead.
+	 */
+	private void wakeChat() {
+		long now = System.currentTimeMillis();
+		for (Companion c : companions) {
+			if (c.player() != null && c.someoneListening(config.chatWakeDistance)) {
+				lastChatNeed = now;
+				break;
+			}
+		}
+		if (config.chat && now - lastChatNeed < 5000) chat.warmUp();
+		else if (chat.hasModel() && now - lastChatNeed > config.chatIdleMinutes * 60_000L) chat.sleep();
+	}
+
+	/**
+	 * Evolution. Every few days the Xens without an owner are ranked by how they did this generation (what they
+	 * gathered, days they lived, deaths). The worst quarter leave, and children of the best half take their places:
+	 * each gene from one of two parents, with a small mutation. They all keep one shared brain; what evolves is
+	 * their nature. Logged in {@code <world>/xen/evolution.csv}.
+	 */
+	void evolve() {
+		long day = server.overworld().getGameTime() / 24000;
+		if (lastEvolvedDay < 0) lastEvolvedDay = day;
+		if (day - lastEvolvedDay < Math.max(1, config.generationDays)) return;
+		lastEvolvedDay = day;
+		List<Companion> pool = new ArrayList<>();
+		for (Companion c : companions) if (c.owner == null && c.player() != null) pool.add(c);
+		if (pool.size() < 4) return;
+		java.util.function.ToDoubleFunction<Companion> fitness = c -> c.genReward + 2.0 * c.genTicks / 24000.0 - 5.0 * c.genDeaths;
+		pool.sort(java.util.Comparator.comparingDouble(fitness).reversed());
+		int replace = Math.max(1, pool.size() / 4), gen = 0;
+		List<Companion> parents = pool.subList(0, pool.size() / 2);
+		StringBuilder gone = new StringBuilder(), born = new StringBuilder();
+		double best = fitness.applyAsDouble(pool.get(0));
+		for (int i = 0; i < replace; i++) {
+			Companion loser = pool.get(pool.size() - 1 - i);
+			Companion a = parents.get(random.nextInt(parents.size())), b = parents.get(random.nextInt(parents.size()));
+			Personality nature = a.personality.child(b.personality, a.name + "+" + b.name, random);
+			gen = Math.max(gen, nature.generation);
+			Vec3 at = a.player().position();
+			ServerLevel level = (ServerLevel) a.player().level();
+			gone.append(gone.length() > 0 ? " " : "").append(loser.name);
+			loser.leave();
+			Companion child = create(null, null, nature);
+			child.mode = Companion.Mode.FREE;
+			child.join(level, at, random.nextInt(4) * 90f);
+			companions.add(child);
+			born.append(born.length() > 0 ? " " : "").append(child.name);
+		}
+		double[] mean = new double[4];
+		for (Companion c : companions) {
+			if (c.owner != null) continue;
+			mean[0] += c.personality.bravery;
+			mean[1] += c.personality.curiosity;
+			mean[2] += c.personality.chattiness;
+			mean[3] += c.personality.diligence;
+			c.genReward = 0;
+			c.genTicks = 0;
+			c.genDeaths = 0;
+		}
+		int n = (int) companions.stream().filter(c -> c.owner == null).count();
+		Path file = brainFile().resolveSibling("evolution.csv");
+		try {
+			if (!Files.exists(file)) Files.writeString(file, "day,generation,xens,best_fitness,bravery,curiosity,chattiness,diligence,gone,born\n");
+			Files.writeString(file, String.format(Locale.ROOT, "%d,%d,%d,%.2f,%.3f,%.3f,%.3f,%.3f,%s,%s%n", day, gen, n, best,
+					mean[0] / n, mean[1] / n, mean[2] / n, mean[3] / n, gone, born), java.nio.file.StandardOpenOption.APPEND);
+		} catch (IOException e) {
+			LOG.warn("Could not write {}: {}", file, e.toString());
+		}
+		LOG.info("Xen evolution, day {}: {} left, {} born (generation {})", day, gone, born, gen);
 	}
 
 	void forget(Companion c) {
@@ -197,6 +285,8 @@ public class XenMod implements ModInitializer {
 	/** A player said something: if it's to a Xen (by name), it understands, does what was asked and answers. */
 	private void heard(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
+		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
+		chat.warmUp();
 		for (Companion c : companions) {
 			if (c.player() == null) continue;
 			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
@@ -241,6 +331,14 @@ public class XenMod implements ModInitializer {
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "chat", false))))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
+				.then(Commands.literal("settings").executes(this::showSettings))
+				.then(Commands.literal("set").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+						.then(Commands.argument("setting", StringArgumentType.word()).suggests((ctx, b) -> {
+									for (var f : XenConfig.class.getFields()) b.suggest(f.getName());
+									return b.buildFuture();
+								})
+								.then(Commands.argument("value", StringArgumentType.greedyString()).executes(ctx ->
+										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
 				.then(Commands.literal("save").executes(ctx -> {
 					save();
 					ctx.getSource().sendSuccess(() -> Component.literal("Xen's brain saved (" + brain.steps + " steps lived)."), false);
@@ -252,11 +350,80 @@ public class XenMod implements ModInitializer {
 		return ctx.getSource().permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
 	}
 
-	/** A free player name: base, base2, base3, ... (null if it gets too long). */
-	private String freeName(String base) {
-		String name = base;
-		for (int i = 2; server.getPlayerList().getPlayerByName(name) != null; i++) name = base + i;
-		return name.length() <= 16 ? name : null;
+	// ------------------------------------------------------------------- who they are
+	private java.util.Set<String> takenNames() {
+		java.util.Set<String> taken = new java.util.HashSet<>();
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) taken.add(p.getName().getString().toLowerCase(Locale.ROOT));
+		return taken;
+	}
+
+	/** A Xen: the same one again if it has been here before (by name), otherwise new, with a name, nature and skin. */
+	Companion create(String wanted, ServerPlayer owner, Personality nature) {
+		java.util.Set<String> taken = takenNames();
+		if (wanted == null) taken.addAll(roster.names());                 // a new Xen gets a new name
+		String name = wanted != null ? wanted : Looks.freshName(config.randomNames, taken, random);
+		com.google.gson.JsonObject known = roster.get(name);
+		Personality p = nature != null ? nature
+				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality"))
+				: config.personalities ? Personality.random(random) : Personality.plain();
+		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : Looks.pickSkin(config.skins, random);
+		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
+				owner == null ? "nobody" : owner.getName().getString(), p, skin);
+		if (known != null && known.has("known")) {
+			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
+		}
+		return c;
+	}
+
+	private static final String[] TEAM_COLORS = {"red", "blue", "green", "yellow", "purple", "aqua"};
+	private static final net.minecraft.ChatFormatting[] TEAM_FORMATS = {net.minecraft.ChatFormatting.RED, net.minecraft.ChatFormatting.BLUE,
+			net.minecraft.ChatFormatting.GREEN, net.minecraft.ChatFormatting.YELLOW, net.minecraft.ChatFormatting.LIGHT_PURPLE,
+			net.minecraft.ChatFormatting.AQUA};
+
+	String teamOf(Companion c) {
+		var team = server.getScoreboard().getPlayersTeam(c.name);
+		return team != null && team.getName().startsWith("xen") ? team.getName() : null;
+	}
+
+	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */
+	void joinTeam(Companion c) {
+		var board = server.getScoreboard();
+		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
+		if (n == 0) {
+			if (teamOf(c) != null) board.removePlayerFromTeam(c.name);
+			return;
+		}
+		String name;
+		if (n == 1) {
+			name = "xen";
+		} else {
+			var known = roster.get(c.name);
+			String had = known != null && known.has("team") ? known.get("team").getAsString() : null;
+			int index = had == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(had.replace("xen_", ""));
+			if (index < 0 || index >= n) {
+				int[] size = new int[n];
+				for (Companion o : companions) {
+					String t = o == c ? null : teamOf(o);
+					int i = t == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(t.replace("xen_", ""));
+					if (i >= 0 && i < n) size[i]++;
+				}
+				index = 0;
+				for (int i = 1; i < n; i++) if (size[i] < size[index]) index = i;
+			}
+			name = "xen_" + TEAM_COLORS[index];
+		}
+		var team = board.getPlayerTeam(name);
+		if (team == null) {
+			team = board.addPlayerTeam(name);
+			Compat.teamColor(team, n == 1 ? net.minecraft.ChatFormatting.AQUA : TEAM_FORMATS[java.util.Arrays.asList(TEAM_COLORS).indexOf(name.replace("xen_", ""))]);
+			team.setAllowFriendlyFire(false);
+		}
+		board.addPlayerToTeam(c.name, team);
+		roster.remember(c, name);
+	}
+
+	private boolean full() {
+		return config.maxXens > 0 && companions.size() >= config.maxXens;
 	}
 
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
@@ -270,14 +437,16 @@ public class XenMod implements ModInitializer {
 			ctx.getSource().sendFailure(Component.literal("Names are up to 16 letters, digits or _."));
 			return 0;
 		}
-		String name = freeName(wanted != null ? wanted : "Xen");
-		if (name == null) {
-			ctx.getSource().sendFailure(Component.literal("That name is taken."));
+		if (wanted != null && server.getPlayerList().getPlayerByName(wanted) != null) {
+			ctx.getSource().sendFailure(Component.literal(wanted + " is already here."));
 			return 0;
 		}
-		if (config.chat) chat.warmUp();
-		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
-				owner == null ? "nobody" : owner.getName().getString());
+		if (full()) {
+			ctx.getSource().sendFailure(Component.literal("The world already has " + companions.size() + " Xens (max " + config.maxXens + ")."));
+			return 0;
+		}
+		Companion c = create(wanted, owner, null);
+		String name = c.name;
 		if (owner != null) {
 			Vec3 at = owner.position();                                // next to its owner, where there is room to stand
 			for (Vec3 side : new Vec3[]{new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)}) {
@@ -287,16 +456,24 @@ public class XenMod implements ModInitializer {
 				}
 			}
 			c.join((ServerLevel) owner.level(), at, owner.getYRot());
-		} else {                                                       // from the console: at world spawn, on its own
+		} else {                                                       // from the console: on the ground at world spawn, on its own
 			c.mode = Companion.Mode.FREE;
-			c.join(server.overworld(), null, 0);
+			Vec3 spawn = ctx.getSource().getPosition();
+			c.join(server.overworld(), surface(server.overworld(), (int) Math.floor(spawn.x), (int) Math.floor(spawn.z)), 0);
 		}
 		companions.add(c);
 		String n = name;
-		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here. Talk to it in chat with its name (\"" + n + ", get some wood\", \""
-				+ n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
+		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here (" + c.personality.describe() + "). Talk to it in chat with its name (\""
+				+ n + ", get some wood\", \"" + n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
 		c.say("Hi! I'm " + n + ". I only know what I can see, so show me around!");
 		return 1;
+	}
+
+	/** The top of the ground at x, z (null over water or lava). */
+	static Vec3 surface(ServerLevel level, int x, int z) {
+		int y = level.getChunk(x >> 4, z >> 4).getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1;
+		if (y <= level.getMinY() + 1 || !level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty()) return null;
+		return new Vec3(x + 0.5, y, z + 0.5);
 	}
 
 	/** Admins: bring in many Xens on their own, scattered on the surface up to radius blocks around here. */
@@ -305,28 +482,57 @@ public class XenMod implements ModInitializer {
 		Vec3 center = ctx.getSource().getPosition();
 		java.util.Random random = new java.util.Random();
 		int made = 0;
-		for (int i = 0; i < count; i++) {
-			String name = freeName("Xen");
-			if (name == null) break;
+		for (int i = 0; i < count && !full(); i++) {
 			Vec3 at = null;
 			for (int tries = 0; tries < 10 && at == null; tries++) {
 				double angle = random.nextDouble() * Math.PI * 2, r = radius * Math.sqrt(random.nextDouble());
 				int x = (int) Math.floor(center.x + Math.cos(angle) * r), z = (int) Math.floor(center.z + Math.sin(angle) * r);
-				int y = level.getChunk(x >> 4, z >> 4).getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1;
-				if (y > level.getMinY() + 1 && level.getFluidState(new BlockPos(x, y - 1, z)).isEmpty()) at = new Vec3(x + 0.5, y, z + 0.5);
+				at = surface(level, x, z);
 			}
 			if (at == null) continue;
-			Companion c = new Companion(this, server, name, null, "nobody");
+			Companion c = create(null, null, null);
 			c.mode = Companion.Mode.FREE;
 			c.join(level, at, random.nextInt(4) * 90f);
 			companions.add(c);
 			made++;
 		}
 		int n = made;
-		if (n > 0 && config.chat) chat.warmUp();
 		ctx.getSource().sendSuccess(() -> Component.literal(n + " Xens joined within " + radius + " blocks. They share one brain. "
 				+ "/xen dismiss sends them all home."), true);
 		return n;
+	}
+
+	private int showSettings(CommandContext<CommandSourceStack> ctx) {
+		StringBuilder sb = new StringBuilder("Xen settings:");
+		for (var f : XenConfig.class.getFields()) {
+			try {
+				sb.append("\n  ").append(f.getName()).append(" = ").append(f.get(config));
+			} catch (IllegalAccessException ignored) {
+			}
+		}
+		ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
+		return 1;
+	}
+
+	private int set(CommandContext<CommandSourceStack> ctx, String key, String value) {
+		String error = config.set(key, value);
+		if (error != null) {
+			ctx.getSource().sendFailure(Component.literal(error));
+			return 0;
+		}
+		config.save();
+		applySettings();
+		ctx.getSource().sendSuccess(() -> Component.literal("Xen: " + key + " = " + value), true);
+		return 1;
+	}
+
+	/** After settings change (command or settings screen): teams, and the chat model. */
+	void applySettings() {
+		if (server == null) return;
+		server.execute(() -> {
+			for (Companion c : companions) if (c.player() != null) joinTeam(c);
+			if (!config.chat || config.chatModel.equalsIgnoreCase("off")) chat.sleep();
+		});
 	}
 
 	private int each(CommandContext<CommandSourceStack> ctx, java.util.function.Function<Companion, String> f) {

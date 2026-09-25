@@ -101,7 +101,7 @@ public final class Brain {
 		t.fear = fear;
 		List<String> options = new ArrayList<>();
 		boolean restless = rng.nextFloat() < 0.9f * boredom;
-		if (restless || (explore && rng.nextFloat() < exploreEnd * (1f - 0.8f * fear))) {
+		if (restless || (explore && rng.nextFloat() < exploreEnd * emo.curiosityDrive * (1f - 0.8f * fear))) {
 			if (rng.nextFloat() < 0.5f) {
 				double[] p = new double[nActions];
 				double max = Double.NEGATIVE_INFINITY, sum = 0;

@@ -1,0 +1,62 @@
+# Everything runs on both x86-64 and ARM64 (the chips in phones, Raspberry Pi, Apple Silicon): the Python tests with
+# the real chat model, both mod builds with their Java == Python checks, and the chat model in Java.
+name: Check (x86-64 and ARM64)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Machine
+        run: uname -m && nproc
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Chat model (SmolLM2-360M-Instruct, Apache-2.0)
+        uses: actions/cache@v4
+        with:
+          path: smollm2-360m-instruct-q8_0.gguf
+          key: smollm2-360m-instruct-q8_0
+
+      - name: Download the chat model
+        run: |
+          [ -f smollm2-360m-instruct-q8_0.gguf ] || curl -fL --retry 5 -o smollm2-360m-instruct-q8_0.gguf \
+            https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf
+
+      - name: Python tests
+        env:
+          XEN_MODEL: ${{ github.workspace }}/smollm2-360m-instruct-q8_0.gguf
+        run: |
+          pip install -r requirements.txt
+          python -m unittest discover -s tests -t .
+
+      - name: Mod for 1.21.11 (build, Java == Python, chat model in Java)
+        working-directory: mod/mc1.21.11
+        run: ./gradlew build crossCheck llmCheck -PchatModel=${{ github.workspace }}/smollm2-360m-instruct-q8_0.gguf --no-daemon
+
+      - name: Mod for 26.x (build, Java == Python)
+        working-directory: mod/mc26
+        run: ./gradlew build crossCheck --no-daemon
+
+      # The jar is built against 26.1.2 and runs on 26.1 - 26.3: it must also compile against the newest 26.x.
+      - name: Mod for 26.x compiles against 26.3
+        working-directory: mod/mc26
+        run: ./gradlew compileJava -Pminecraft_version=26.3 -Pfabric_api_version=0.161.0+26.3 -Pmc_range=~26.3 --no-daemon

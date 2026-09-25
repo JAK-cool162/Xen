@@ -2,7 +2,6 @@ package xen.mod;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -72,15 +71,30 @@ public final class Companion {
 	private int stuck;
 	private int lifeTicks;
 	private float lifeReward;
+	/** Its nature (genes) and how it looks. */
+	final Personality personality;
+	final String skin;
+	/** Players it knows: its owner and whoever has talked to it. */
+	final Set<UUID> known = new java.util.HashSet<>();
+	/** How it does this generation (for evolution). */
+	float genReward;
+	long genTicks;
+	int genDeaths;
+	private long lastNote = -1_000_000;
 
-	Companion(XenMod mod, MinecraftServer server, String name, UUID owner, String ownerName) {
+	Companion(XenMod mod, MinecraftServer server, String name, UUID owner, String ownerName, Personality personality, String skin) {
 		this.mod = mod;
 		this.server = server;
 		this.name = name;
 		this.owner = owner;
 		this.leader = owner;
 		this.ownerName = ownerName;
+		this.personality = personality;
+		this.skin = skin;
+		if (owner != null) known.add(owner);
 		this.emotions = mod.brain.newBody();
+		emotions.baseCaution *= personality.cautionScale();            // brave ones mind fear less
+		emotions.curiosityDrive = personality.curiosityScale();         // curious ones try new things more
 	}
 
 	public XenPlayer player() {
@@ -90,7 +104,7 @@ public final class Companion {
 	// ------------------------------------------------------------------------------- joining
 	/** Join the server as a real player at a position. */
 	void join(ServerLevel level, Vec3 at, float yaw) {
-		GameProfile profile = new GameProfile(UUIDUtil.createOfflinePlayerUUID(name), name);
+		GameProfile profile = Looks.profile(name, skin);
 		XenPlayer p = new XenPlayer(server, level, profile);
 		p.companion = this;
 		FakeConnection connection = new FakeConnection(() -> server.execute(this::leave));
@@ -102,6 +116,7 @@ public final class Companion {
 		lastFood = p.getFoodData().getFoodLevel();
 		lastItems = items();
 		obs = null;
+		mod.joinTeam(this);
 	}
 
 	void leave() {
@@ -125,9 +140,10 @@ public final class Companion {
 			return;
 		}
 		lifeTicks++;
+		genTicks++;
 		hands.tick();
 		if (hands.busy()) return;
-		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0) return;
+		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0 && !fighting) return;   // in a fight, every tick
 		decide();
 	}
 
@@ -186,7 +202,11 @@ public final class Companion {
 			float harm = Math.max(0f, lastHealth - player.getHealth()) / 20f;
 			mod.learn(obs, lastAction, reward, harm, next, false, emotions, name);
 			lifeReward += reward;
-			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) chatter("Diamonds!!", true);
+			genReward += reward;
+			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) {
+				chatter(personality.say("diamonds"), true);
+				note("Diamonds here!");
+			}
 		}
 		lastHealth = player.getHealth();
 		lastFood = player.getFoodData().getFoodLevel();
@@ -295,53 +315,127 @@ public final class Companion {
 		return Action.FORWARD;
 	}
 
-	/** A monster within reach (it knows everything within 6 blocks): face it and hit it once the attack is charged. */
+	/**
+	 * Fighting: a monster within reach (it knows everything within 6 blocks); with PvP on, whoever hurt it or its owner
+	 * in the last ten seconds (never its owner or a teammate); with team PvP, Xens of other teams it sees. It faces
+	 * them and hits once its attack is charged, like a player.
+	 */
 	private Action fightBack() {
+		if (!mod.config.pvp.equals("off") && armedStranger()) hands.ready();   // someone armed comes close: sword out
+		LivingEntity foe = foe();
+		fighting = foe != null;
+		player.setSprinting(fighting && player.distanceTo(foe) > 2);
+		if (foe == null) return null;
+		hands.ready();
+		if (player.distanceTo(foe) <= player.entityInteractionRange()) {
+			if (player.getAttackStrengthScale(0.5f) < 0.9f) {
+				hands.pause(1);                                            // wait for the swing to charge, but only a tick
+				acted = true;
+				return Action.IDLE;
+			}
+			boolean falling = !player.onGround() && player.getDeltaMovement().y < 0;
+			if (!falling && player.onGround() && foe instanceof net.minecraft.world.entity.player.Player && random.nextFloat() < 0.6f) {
+				return Action.JUMP;                                        // jump, and strike on the way down (a critical hit)
+			}
+			hands.hit(foe);
+			acted = true;
+			return Action.ATTACK;
+		}
+		return walkTo(foe.position());                                  // go after it
+	}
+
+	private final java.util.Random random = new java.util.Random();
+	private boolean fighting;
+
+	/** A player (not its owner, not a teammate) close by with a sword or axe in hand: it can see that. */
+	private boolean armedStranger() {
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p == player || p.level() != player.level() || p.getUUID().equals(owner) || player.isAlliedTo(p)) continue;
+			if (p.distanceTo(player) > 5) continue;
+			String held = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath();
+			if (held.endsWith("_sword") || held.endsWith("_axe")) return true;
+		}
+		return false;
+	}
+
+	private LivingEntity foe() {
 		double reach = player.entityInteractionRange() + 0.5;
-		LivingEntity foe = null;
-		double closest = reach;
+		LivingEntity best = null;
+		double bestD = reach;
 		for (LivingEntity e : player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(reach),
 				x -> x instanceof Enemy && x.isAlive())) {
 			double d = player.distanceTo(e);
-			if (d <= closest && player.hasLineOfSight(e)) {
-				closest = d;
-				foe = e;
+			if (d <= bestD && player.hasLineOfSight(e)) {
+				bestD = d;
+				best = e;
 			}
 		}
-		if (foe == null) return null;
-		double dx = foe.getX() - player.getX(), dz = foe.getZ() - player.getZ();
-		int want = hands.yaw;
-		double best = -2;
-		for (int k = 0; k < 4; k++) {
-			int[] f = Perception.forward(k);
-			double dot = (dx * f[0] + dz * f[1]) / Math.max(1e-6, Math.hypot(dx, dz));
-			if (dot > best) {
-				best = dot;
-				want = k;
-			}
+		if (best != null || mod.config.pvp.equals("off")) return best;
+		ServerPlayer o = owner == null ? null : server.getPlayerList().getPlayer(owner);
+		for (LivingEntity victim : new LivingEntity[] {player, o}) {               // who hurt it, or its owner, just now
+			if (victim == null || victim.level() != player.level()) continue;
+			LivingEntity a = victim.getLastHurtByMob();
+			if (a == null || !a.isAlive() || a == player || a == o || player.isAlliedTo(a)) continue;
+			if (victim.tickCount - victim.getLastHurtByMobTimestamp() > 200 || player.distanceTo(a) > 16) continue;
+			if (WorldSenses.sees(player, hands.yaw, hands.pitch, a)) return a;
 		}
-		if (want != hands.yaw) return Math.floorMod(want - hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
-		return player.getAttackStrengthScale(0.5f) >= 0.9f ? Action.ATTACK : Action.IDLE;
+		if (!mod.config.pvp.equals("teams")) return null;
+		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
+			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
+			if (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null) continue;
+			double d = player.distanceTo(other);
+			if (d < 24 && (best == null || d < player.distanceTo(best)) && WorldSenses.sees(player, hands.yaw, hands.pitch, other)) best = other;
+		}
+		return best;
 	}
 
 	private static int cat(ServerLevel level, BlockPos pos) {
 		return level.isLoaded(pos) ? WorldSenses.category(level, pos, level.getBlockState(pos)) : Blocks.STONE;
 	}
 
+	/** Is someone it knows close enough to hear it? */
+	boolean someoneListening(double distance) {
+		for (UUID u : known) {
+			ServerPlayer p = server.getPlayerList().getPlayer(u);
+			if (p != null && p.level() == player.level() && p.distanceTo(player) <= distance) return true;
+		}
+		return false;
+	}
+
+	/** When nobody it knows is around to hear, it leaves a note on a sign (one it carries), signed with its name. */
+	void note(String text) {
+		if (!mod.config.signs || player == null || someoneListening(mod.config.chatWakeDistance)) return;
+		long now = player.level().getGameTime();
+		if (now - lastNote < 6000) return;                            // at most one note every five minutes
+		long day = now / 24000 + 1;
+		if (hands.placeSign("Day " + day + ": " + text + " -" + name)) {
+			lastNote = now;
+			acted = true;
+			XenMod.LOG.info("{} left a note on a sign at {}: {}", name, player.blockPosition().toShortString(), text);
+		}
+	}
+
 	/** Short spoken reactions to what it feels (no language model needed). */
 	private void react() {
 		boolean night = player.level().isDarkOutside();
-		if (night && !wasNight) chatter("It's getting dark... stay close.", false);
+		if (night && !wasNight) chatter(personality.say("night"), false);
+		if (!night && wasNight) note(switch (mode) {                  // a morning note for whoever comes by
+			case FOLLOW -> "Looking for my friend.";
+			case STAY -> "Waiting here.";
+			case FREE -> "Off exploring.";
+		});
 		wasNight = night;
-		if (emotions.pain > 0.25f) chatter("Ouch!", false);
+		if (emotions.pain > 0.25f) chatter(personality.say("ouch"), false);
 		else if (emotions.fear > 0.65f) {
-			chatter(senses.describe().contains("lava") ? "Careful, there's lava!" : "I don't like this...", false);
+			boolean lava = senses.describe().contains("lava");
+			chatter(personality.say(lava ? "lava" : "afraid"), false);
+			if (lava) note("Careful, lava!");
 		}
 	}
 
 	void chatter(String text, boolean always) {
 		long now = System.currentTimeMillis();
-		if (!mod.config.chat || (!always && now - lastChatter < 20_000)) return;
+		if (!mod.config.chat || (!always && now - lastChatter < personality.chatterGapMillis())) return;
 		lastChatter = now;
 		say(text);
 	}
@@ -358,6 +452,7 @@ public final class Companion {
 		}
 		obs = null;
 		mod.brain.lives++;
+		genDeaths++;
 		String cause = source.type().msgId() + (source.getEntity() != null
 				? ":" + BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath() : "");
 		mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, cause);
@@ -383,9 +478,9 @@ public final class Companion {
 
 	public String status() {
 		if (player == null) return name + " is not here.";
-		return String.format("%s: health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. %s Last thought: %s",
-				name, player.getHealth(), player.getFoodData().getFoodLevel(), emotions.mood(), emotions.fear * 100,
-				mode.name().toLowerCase(), senses.describe(), lastThought);
+		return String.format("%s (%s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. %s Last thought: %s",
+				name, personality.describe(), player.getHealth(), player.getFoodData().getFoodLevel(), emotions.mood(),
+				emotions.fear * 100, mode.name().toLowerCase(), senses.describe(), lastThought);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */
@@ -396,7 +491,8 @@ public final class Companion {
 			carrying.append(carrying.length() > 0 ? ", " : "").append(e.getValue()).append(' ').append(e.getKey().replace('_', ' '));
 		}
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
-				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe());
+				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
+				+ (mod.config.personalities ? " Your personality: " + personality.describe() + "." : "");
 	}
 
 	/**
@@ -406,6 +502,7 @@ public final class Companion {
 	 */
 	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from) {
 		if (player == null) return null;
+		known.add(from.getUUID());                                    // now it knows them
 		String who = from.getName().getString();
 		String plan = null;
 		if (!r.intent().equals("chat") && owner != null && !owner.equals(from.getUUID())) {
@@ -447,6 +544,7 @@ public final class Companion {
 				case "give" -> plan = chores.give(from, r.thing(), r.amount());
 				case "shelter" -> plan = chores.shelter();
 				case "eat" -> plan = chores.eat();
+				case "redstone" -> plan = chores.redstone(r.thing());
 				default -> {}
 			}
 		}

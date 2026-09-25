@@ -24,7 +24,27 @@ import java.util.UUID;
  * digs there with its own hands, and looks around when it knows of none.
  */
 final class Chores {
-	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT }
+	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE }
+
+	/** The small redstone circuits Xen learned (xen/redstone, exported by scripts/export_circuits.py). */
+	static final com.google.gson.JsonObject CIRCUITS;
+	static {
+		com.google.gson.JsonObject c = new com.google.gson.JsonObject();
+		try (var in = Chores.class.getResourceAsStream("/assets/xen/circuits.json")) {
+			if (in != null) c = new com.google.gson.Gson().fromJson(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8),
+					com.google.gson.JsonObject.class);
+		} catch (java.io.IOException | RuntimeException e) {
+			XenMod.LOG.warn("No redstone circuits: {}", e.toString());
+		}
+		CIRCUITS = c;
+	}
+
+	/** One part of a circuit, placed in the world: where, what, which way it points (0-3) and its delay. */
+	record Part(BlockPos pos, String kind, int facing, int delay) {}
+
+	private static final java.util.Map<String, String> ITEM = java.util.Map.of("dust", "redstone", "torch", "redstone_torch",
+			"repeater", "repeater", "comparator", "comparator", "lever", "lever", "lamp", "redstone_lamp");
+	private static final List<String> ORDER = List.of("block", "lamp", "lever", "torch", "repeater", "comparator", "dust");
 
 	private static final long TIME = 6000;                           // give up after five minutes
 
@@ -49,6 +69,10 @@ final class Chores {
 	private LivingEntity prey;
 	private List<BlockPos> walls;
 	private int waited;
+	private List<Part> circuit;
+	private String circuitName;
+	private int cycles, fails;
+	private int[] buildSide;                                            // where it stands to reach far parts
 	/** What it's doing for the chore right now, in words (for /xen status). */
 	String doing = "";
 
@@ -74,7 +98,7 @@ final class Chores {
 	private void begin(Kind k) {
 		cancel();
 		kind = k;
-		until = now() + TIME;
+		until = now() + (long) (TIME * c.personality.patience());
 		skip.clear();
 		saidLooking = false;
 		scans = 0;
@@ -172,6 +196,131 @@ final class Chores {
 		return "You will build a small shelter around yourself with " + missing + " blocks.";
 	}
 
+	/** Build one of the circuits it learned, in front of it, from redstone parts it carries. */
+	String redstone(String which) {
+		if (!c.mod.config.redstone) return "You can't build redstone because it's switched off in the settings.";
+		if (!CIRCUITS.has(which)) return "You don't know how to build that.";
+		com.google.gson.JsonObject spec = CIRCUITS.getAsJsonObject(which);
+		String name = spec.get("name").getAsString();
+		var parts = spec.getAsJsonArray("parts");
+		if (parts.size() > c.mod.config.maxRedstoneParts) {
+			return "You won't build the " + name + " because it has " + parts.size() + " parts and the limit is " + c.mod.config.maxRedstoneParts + ".";
+		}
+		int yaw = c.hands.yaw, depth = spec.get("depth").getAsInt();
+		int[] fwd = Perception.forward(yaw), right = Perception.forward((yaw + 1) % 4);
+		BlockPos feet = c.player.blockPosition();
+		ServerLevel level = (ServerLevel) c.player.level();
+		List<Part> plan = new java.util.ArrayList<>();
+		for (var e : parts) {
+			var a = e.getAsJsonArray();
+			int cx = a.get(0).getAsInt(), cz = a.get(1).getAsInt() - depth / 2, d = a.get(3).getAsInt();
+			BlockPos pos = feet.offset(fwd[0] * (2 + cx) + right[0] * cz, 0, fwd[1] * (2 + cx) + right[1] * cz);
+			int[] v = Perception.DIRS[d];                            // the circuit's directions, turned the way it faces
+			int wx = v[0] * fwd[0] + v[1] * right[0], wz = v[0] * fwd[1] + v[1] * right[1];
+			int facing = 0;
+			for (int k = 0; k < 4; k++) if (Perception.DIRS[k][0] == wx && Perception.DIRS[k][1] == wz) facing = k;
+			plan.add(new Part(pos, a.get(2).getAsString(), facing, a.get(4).getAsInt()));
+		}
+		int width = spec.get("width").getAsInt();                    // the ground where it goes must be flat and clear
+		for (int cx = 0; cx < width; cx++) {
+			for (int cz = -depth / 2; cz < depth - depth / 2; cz++) {
+				BlockPos pos = feet.offset(fwd[0] * (2 + cx) + right[0] * cz, 0, fwd[1] * (2 + cx) + right[1] * cz);
+				if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(pos.below()).isCollisionShapeFullBlock(level, pos.below())) {
+					return "You can't build the " + name + " here because the ground in front of you isn't flat and clear.";
+				}
+			}
+		}
+		java.util.Map<String, Integer> need = new java.util.TreeMap<>();
+		for (Part p : plan) need.merge(p.kind().equals("block") ? "block" : ITEM.get(p.kind()), 1, Integer::sum);
+		StringBuilder missing = new StringBuilder();
+		for (var e : need.entrySet()) {
+			int have = e.getKey().equals("block") ? count("dirt", "cobblestone") : countItem(e.getKey());
+			if (have < e.getValue()) {
+				String what = e.getKey().equals("block") ? "dirt or cobblestone" : e.getKey().replace('_', ' ');
+				missing.append(missing.length() > 0 ? ", " : "").append(e.getValue() - have).append(" more ").append(what);
+			}
+		}
+		if (missing.length() > 0) return "You can't build the " + name + " yet because you need " + missing + ".";
+		begin(Kind.REDSTONE);
+		plan.sort(java.util.Comparator.comparingInt(p -> ORDER.indexOf(p.kind())));
+		circuit = plan;
+		circuitName = name;
+		buildSide = Perception.forward((yaw + 3) % 4);                 // the left side of it, fixed while it builds
+		cycles = fails = 0;
+		c.mode = Companion.Mode.STAY;
+		c.anchor = feet;
+		return "You will build a " + name + " (" + plan.size() + " parts) in front of you.";
+	}
+
+	private int countItem(String id) {
+		var inv = c.player.getInventory();
+		int n = 0;
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (!s.isEmpty() && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id)) n += s.getCount();
+		}
+		return n;
+	}
+
+	private Action redstoneNext() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (Part p : circuit) {
+			if (!level.getBlockState(p.pos()).canBeReplaced()) {
+				String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p.pos()).getBlock()).getPath();
+				if (p.kind().equals("repeater") && id.equals("repeater") && cycles < p.delay() - 1) {   // set its delay
+					if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p.pos())) > c.player.blockInteractionRange()) {
+						return c.walkTo(Vec3.atCenterOf(p.pos()));
+					}
+					c.hands.use(p.pos());
+					cycles++;
+					c.acted = true;
+					return Action.PLACE;
+				}
+				continue;
+			}
+			cycles = 0;
+			doing = "building a " + circuitName + ": " + p.kind();
+			boolean placed;
+			if (p.kind().equals("block")) {
+				placed = c.hands.placeItem(p.pos(), s -> Hands.PLACEABLE.contains(
+						net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()), p.pos().below(), net.minecraft.core.Direction.UP, -1);
+			} else if (p.kind().equals("torch")) {                        // on the side of the block behind it
+				int[] back = Perception.DIRS[(p.facing() + 2) % 4];
+				placed = c.hands.placeItem(p.pos(), s -> isItem(s, "redstone_torch"), p.pos().offset(back[0], 0, back[1]), direction(p.facing()), -1);
+			} else {                                                        // on the ground, facing the way it looks
+				String id = ITEM.get(p.kind());
+				placed = c.hands.placeItem(p.pos(), s -> isItem(s, id), p.pos().below(), net.minecraft.core.Direction.UP, p.facing());
+			}
+			if (placed) {
+				c.acted = true;
+				return Action.PLACE;
+			}
+			if (c.hands.cantPlace.equals("too far to reach")) {             // walk along the side of it
+				return c.walkTo(Vec3.atCenterOf(p.pos().offset(buildSide[0] * 2, 0, buildSide[1] * 2)));
+			}
+			if (++fails > 20) {
+				finish("I couldn't finish the " + circuitName + ": " + c.hands.cantPlace + ".");
+				return null;
+			}
+			return Action.IDLE;
+		}
+		finish("The " + circuitName + " is ready! Flip the lever and watch the lamp.");
+		return null;
+	}
+
+	private static boolean isItem(ItemStack s, String id) {
+		return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id);
+	}
+
+	private static net.minecraft.core.Direction direction(int facing) {
+		return switch (facing) {
+			case 0 -> net.minecraft.core.Direction.NORTH;
+			case 1 -> net.minecraft.core.Direction.EAST;
+			case 2 -> net.minecraft.core.Direction.SOUTH;
+			default -> net.minecraft.core.Direction.WEST;
+		};
+	}
+
 	String eat() {
 		if (count("food") == 0) return "You have no food.";
 		if (!c.player.getFoodData().needsFood()) return "You are not hungry.";
@@ -193,6 +342,7 @@ final class Chores {
 			case HUNT -> huntNext();
 			case GIVE -> giveNext();
 			case SHELTER -> shelterNext();
+			case REDSTONE -> redstoneNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
 					cancel();

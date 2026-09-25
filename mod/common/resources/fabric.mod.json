@@ -7,12 +7,18 @@
 	"authors": ["JAK-cool162"],
 	"contact": { "sources": "https://github.com/JAK-cool162/Xen" },
 	"license": "Apache-2.0",
+	"icon": "assets/xen/icon.png",
 	"environment": "*",
-	"entrypoints": { "main": ["xen.mod.XenMod"] },
+	"entrypoints": {
+		"main": ["xen.mod.XenMod"],
+		"client": ["xen.mod.client.XenClient"],
+		"modmenu": ["xen.mod.client.XenModMenu"]
+	},
 	"depends": {
 		"fabricloader": ">=0.16.0",
 		"fabric-api": "*",
 		"minecraft": "${minecraft}",
 		"java": ">=${java}"
-	}
+	},
+	"suggests": { "modmenu": "*" }
 }

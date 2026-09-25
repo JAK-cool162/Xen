@@ -4,6 +4,8 @@ package xen.mod.core;
 public final class Emotions {
 	public float baseCaution = 4f, sensitizationGain = 3f, habituation = 0.997f, maxSensitization = 2f, fearGain = 3f;
 	public float sensitization;
+	/** How readily this body tries something new (its personality; 1 = as the brain learned). */
+	public float curiosityDrive = 1f;
 	public float pain, fear, curiosity, satisfaction, boredom;
 	private int same;
 	private float[] lastView;

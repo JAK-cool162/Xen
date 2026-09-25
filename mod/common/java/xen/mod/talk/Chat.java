@@ -59,10 +59,11 @@ public final class Chat {
 	// ------------------------------------------------------------------------------ requests
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
 	public static final String[] INTENTS = {"follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give",
-			"shelter", "eat", "stop", "chat"};
+			"shelter", "eat", "stop", "redstone", "chat"};
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
+			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -89,7 +90,7 @@ public final class Chat {
 			{"go wander around", "explore"}, {"we need a place to hide tonight", "shelter"}, {"never mind", "stop"},
 			{"go get us something to eat", "food"}, {"you're funny", "chat"}, {"i need smelting fuel", "coal"},
 			{"follow my lead", "follow"}, {"grab me some cobblestone", "stone"}, {"see you later", "chat"},
-			{"you look hurt, eat up", "eat"}};
+			{"you look hurt, eat up", "eat"}, {"put together a little logic thing with levers", "redstone"}};
 	static final String EARS;
 	/** The model's pick must beat "chat" by this much (log-probability), or it's just chat. */
 	static final float SURE = 1.0f;
@@ -97,7 +98,7 @@ public final class Chat {
 		for (int i = 0; i < RULES.length; i++) RULE[i] = Pattern.compile(RULES[i][1]);
 		StringBuilder sb = new StringBuilder("<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player "
 				+ "says to Xen and answer with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, "
-				+ "iron, mine, food, give, shelter, eat, stop, or chat (only talking, thanking, praising or asking something).<|im_end|>\n");
+				+ "iron, mine, food, give, shelter, eat, stop, redstone, or chat (only talking, thanking, praising or asking something).<|im_end|>\n");
 		for (String[] e : EAR_EXAMPLES) {
 			sb.append("<|im_start|>user\n").append(e[0]).append("<|im_end|>\n<|im_start|>assistant\n").append(e[1]).append("<|im_end|>\n");
 		}
@@ -147,6 +148,16 @@ public final class Chat {
 		Integer n = number.find() ? Integer.valueOf(number.group(1)) : words.contains("stack") ? Integer.valueOf(64) : null;
 		int amount = n != null ? n : AMOUNT.getOrDefault(intent, 0);
 		String thing = "";
+		if (intent.equals("redstone")) {
+			thing = "not";
+			for (String k : new String[] {"and", "or", "wire"}) {
+				if (Pattern.compile("\\b" + k + "\\b").matcher(words).find()) {
+					thing = k;
+					break;
+				}
+			}
+			amount = 0;
+		}
 		if (intent.equals("give")) {
 			thing = "all";
 			for (String[] t : GIVE_THINGS) {
@@ -181,9 +192,9 @@ public final class Chat {
 	private static final Pattern NEGATION = Pattern.compile("\\b(no|not|n't|never|nothing|haven't|don't|can't|didn't|any)\\b");
 
 	private final Path modelPath;
-	private final boolean download;
+	private final java.util.function.BooleanSupplier download;
 	private final int threads;
-	private final String policy;
+	private final java.util.function.Supplier<String> policy;
 	private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "xen-chat");
 		t.setDaemon(true);
@@ -193,12 +204,14 @@ public final class Chat {
 	private volatile Llm llm;
 	private volatile boolean loading;
 	private volatile String problem;
+	private volatile long problemAt;
 	private final Consumer<String> log;
 
-	/** policy: "auto" (load the model when there is memory for it), "on" or "off". */
-	public Chat(Path modelPath, String policy, boolean download, int threads, Consumer<String> log) {
+	/** policy: "auto" (load the model when there is memory for it), "on" or "off" (read each time, so settings apply live). */
+	public Chat(Path modelPath, java.util.function.Supplier<String> policy, java.util.function.BooleanSupplier download, int threads,
+			Consumer<String> log) {
 		this.modelPath = modelPath;
-		this.policy = policy == null ? "auto" : policy.toLowerCase(Locale.ROOT);
+		this.policy = policy;
 		this.download = download;
 		this.threads = threads;
 		this.log = log;
@@ -206,7 +219,8 @@ public final class Chat {
 
 	/** Whether the chat model should be used here. */
 	public boolean wantsModel() {
-		return switch (policy) {
+		String p = policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT);
+		return switch (p) {
 			case "on", "true" -> true;
 			case "off", "false" -> false;
 			default -> Runtime.getRuntime().maxMemory() >= AUTO_MEMORY;
@@ -219,7 +233,9 @@ public final class Chat {
 
 	/** Start loading the model in the background (it answers in plain words until it's ready). */
 	public synchronized void warmUp() {
-		if (llm != null || loading || problem != null) return;
+		if (llm != null || loading) return;
+		if (problem != null && System.currentTimeMillis() - problemAt < 10 * 60_000L) return;   // try again later, not every time
+		problemAt = System.currentTimeMillis();
 		if (!wantsModel()) {
 			problem = "not loaded: the game has " + (Runtime.getRuntime().maxMemory() >> 20) + " MB of memory and the chat model wants "
 					+ (AUTO_MEMORY >> 20) + " MB (set \"chatModel\": \"on\" in config/xen.json to load it anyway)";
@@ -289,7 +305,7 @@ public final class Chat {
 
 	private Llm model() throws IOException {
 		if (!Files.exists(modelPath)) {
-			if (!download) throw new IOException("no chat model at " + modelPath + " (downloadChatModel is off)");
+			if (!download.getAsBoolean()) throw new IOException("no chat model at " + modelPath + " (downloadChatModel is off)");
 			fetch();
 		}
 		log.accept("Loading Xen's chat model (" + modelPath.getFileName() + ")...");
@@ -317,6 +333,16 @@ public final class Chat {
 		}
 		Files.move(part, modelPath, StandardCopyOption.REPLACE_EXISTING);
 		log.accept("Xen's chat model downloaded.");
+	}
+
+	/** Unload the model (nobody around for a while). It frees its memory until it's needed again. */
+	public synchronized void sleep() {
+		if (llm == null) return;
+		Llm model = llm;
+		llm = null;
+		problem = null;
+		worker.submit(model::close);                                   // after anything it's still saying
+		log.accept("Xen's chat model is resting (nobody around to talk to).");
 	}
 
 	public void close() {

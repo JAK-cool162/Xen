@@ -148,10 +148,11 @@ def carrying(inventory, limit=60):
 # ------------------------------------------------------------------------------ requests
 # What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do.
 INTENTS = ("follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give", "shelter", "eat",
-           "stop", "chat")
+           "stop", "redstone", "chat")
 AMOUNT = {"wood": 8, "stone": 16, "coal": 8, "iron": 4, "mine": 8, "food": 3}
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
+    ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -176,14 +177,14 @@ _GIVE_THINGS = (("log", ("wood", "log", "tree", "plank")), ("cobblestone", ("sto
 EARS = (
     "<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player says to Xen and answer "
     "with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, iron, mine, food, give, "
-    "shelter, eat, stop, or chat (only talking, thanking, praising or asking something).<|im_end|>\n"
+    "shelter, eat, stop, redstone, or chat (only talking, thanking, praising or asking something).<|im_end|>\n"
     + "".join(f"<|im_start|>user\n{said}<|im_end|>\n<|im_start|>assistant\n{intent}<|im_end|>\n" for said, intent in (
         ("come with me", "follow"), ("nice one!", "chat"), ("could you chop down a few trees", "wood"),
         ("keep guard right here", "stay"), ("hand me your stuff", "give"), ("how are you doing?", "chat"),
         ("go wander around", "explore"), ("we need a place to hide tonight", "shelter"), ("never mind", "stop"),
         ("go get us something to eat", "food"), ("you're funny", "chat"), ("i need smelting fuel", "coal"),
         ("follow my lead", "follow"), ("grab me some cobblestone", "stone"), ("see you later", "chat"),
-        ("you look hurt, eat up", "eat"))))
+        ("you look hurt, eat up", "eat"), ("put together a little logic thing with levers", "redstone"))))
 SURE = 1.0          # the model's pick must beat "chat" by this much (log-probability), or it's just chat
 
 
@@ -210,6 +211,9 @@ def details(intent, words):
     number = _NUMBER.search(words)
     amount = int(number.group(1)) if number else 64 if "stack" in words else AMOUNT.get(intent, 0)
     thing = ""
+    if intent == "redstone":
+        thing = next((k for k in ("and", "or", "wire") if re.search(rf"\b{k}\b", words)), "not")
+        amount = 0
     if intent == "give":
         thing = next((item for item, keys in _GIVE_THINGS if any(k in words for k in keys)), "all")
         amount = int(number.group(1)) if number else 64 if "stack" in words else 0     # 0 = all of it

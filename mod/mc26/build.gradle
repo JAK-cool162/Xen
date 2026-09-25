@@ -10,10 +10,15 @@ sourceSets.main {
 	resources.srcDirs = ['../common/resources']
 }
 
+repositories {
+	maven { url = "https://maven.terraformersmc.com/releases/" }   // Mod Menu (optional: its settings screen)
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	compileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 processResources {
@@ -40,4 +45,13 @@ tasks.register('crossCheck', JavaExec) {
 	classpath = sourceSets.crossCheck.runtimeClasspath
 	mainClass = 'xen.mod.core.CrossCheck'
 	args file('../common/test/fixtures').absolutePath
+}
+
+// The chat model in Java == Python's: ./gradlew llmCheck -PchatModel=path/to/smollm2-360m-instruct-q8_0.gguf
+tasks.register('llmCheck', JavaExec) {
+	classpath = sourceSets.crossCheck.runtimeClasspath
+	mainClass = 'xen.mod.core.LlmCheck'
+	args((project.findProperty('chatModel') ?: System.getenv('XEN_MODEL') ?: 'smollm2-360m-instruct-q8_0.gguf').toString(),
+			file('../common/test/fixtures').absolutePath)
+	maxHeapSize = '2g'
 }

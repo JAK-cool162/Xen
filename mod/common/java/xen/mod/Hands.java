@@ -27,7 +27,7 @@ import java.util.Set;
  */
 public final class Hands {
 	static final Set<String> PLACEABLE = Set.of("cobblestone", "cobbled_deepslate", "dirt");
-	private static final float[] YAW = {180f, -90f, 0f, 90f};          // our facing index -> Minecraft degrees
+	static final float[] YAW = {180f, -90f, 0f, 90f};                  // our facing index -> Minecraft degrees
 
 	final XenPlayer p;
 	int yaw, pitch;
@@ -260,13 +260,13 @@ public final class Hands {
 				bestDist = dist;
 			}
 		}
-		Compat.swing(p);
 		if (best != null) {
 			Vec3 d = best.getEyePosition().subtract(eye);
 			p.setYRot((float) Math.toDegrees(Math.atan2(-d.x, d.z)));
 			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
-			p.attack(best);
+			p.attack(best);                                            // attack, then swing: a swing resets the charge
 		}
+		Compat.swing(p);
 	}
 
 	// -------------------------------------------------------------------------------- eating
@@ -340,20 +340,122 @@ public final class Hands {
 		return false;
 	}
 
-	/** Hit a creature in reach (the normal attack, with the normal cooldown). */
+	/**
+	 * Place an item it carries at pos by right-clicking a face of the block {@code against}, looking the way
+	 * {@code facing} says (0-3, for parts that face the way you look, like repeaters; -1 = don't care).
+	 */
+	boolean placeItem(BlockPos pos, java.util.function.Predicate<ItemStack> item, BlockPos against, Direction side, int facing) {
+		ServerLevel level = (ServerLevel) p.level();
+		if (!level.getBlockState(pos).canBeReplaced()) {
+			cantPlace = "already a block there";
+			return false;
+		}
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) {
+			cantPlace = "too far to reach";
+			return false;
+		}
+		int slot = findHotbar(item);
+		if (slot < 0) {
+			cantPlace = "it has run out of something it needs";
+			return false;
+		}
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(0.5));
+		face(hit);
+		if (facing >= 0) {
+			p.setYRot(YAW[facing]);
+			p.setYHeadRot(YAW[facing]);
+		}
+		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 4;
+		cantPlace = level.getBlockState(pos).canBeReplaced() ? "it didn't stay" : "";
+		return cantPlace.isEmpty();
+	}
+
+	/** Right-click a block, like a player (a repeater: one more tick of delay). */
+	void use(BlockPos pos) {
+		ServerLevel level = (ServerLevel) p.level();
+		Vec3 hit = Vec3.atCenterOf(pos).add(0, 0.4, 0);
+		face(hit);
+		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, Direction.UP, pos, false));
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 3;
+	}
+
+	/** Do nothing for a few ticks. */
+	void pause(int n) {
+		stop();
+		current = Action.IDLE;
+		ticks = 0;
+		limit = n;
+	}
+
+	/** Hold its best weapon (a sword, else an axe), like a player about to fight. */
+	void ready() {
+		int weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_sword"));
+		if (weapon < 0) weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_axe"));
+		if (weapon >= 0 && weapon != p.getInventory().getSelectedSlot()) p.getInventory().setSelectedSlot(weapon);
+	}
+
+	/** Hit a creature in reach (the normal attack, with the normal cooldown), with its best weapon. */
 	void hit(LivingEntity e) {
 		stop();
+		ready();
 		face(e.getEyePosition());
+		p.attack(e);                                                   // attack, then swing: a swing resets the charge
 		Compat.swing(p);
-		p.attack(e);
 		current = Action.ATTACK;
 		ticks = 0;
 		limit = 2;
 	}
 
+	/** Place a sign it carries next to it and write on it (up to 4 short lines), like a player would. */
+	boolean placeSign(String text) {
+		int slot = findHotbar(s -> {
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			return n.endsWith("_sign") && !n.contains("hanging");
+		});
+		if (slot < 0) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockPos feet = p.blockPosition();
+		for (int d = 0; d < 4; d++) {
+			int[] f = Perception.forward((yaw + d) % 4);
+			BlockPos pos = feet.offset(f[0], 0, f[1]), below = pos.below();
+			if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(below).isCollisionShapeFullBlock(level, below)) continue;
+			stop();
+			p.getInventory().setSelectedSlot(slot);
+			Vec3 hit = Vec3.atCenterOf(below).add(0, 0.5, 0);
+			face(hit);
+			p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
+					new BlockHitResult(hit, Direction.UP, below, false));
+			Compat.swing(p);
+			if (!(level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign)) return false;
+			java.util.List<net.minecraft.network.chat.Component> lines = new java.util.ArrayList<>();
+			StringBuilder line = new StringBuilder();
+			for (String w : text.split(" ")) {                          // about 15 letters fit on a sign line
+				if (line.length() + w.length() + 1 > 15 && line.length() > 0) {
+					if (lines.size() == 4) break;
+					lines.add(net.minecraft.network.chat.Component.literal(line.toString()));
+					line.setLength(0);
+				}
+				line.append(line.length() > 0 ? " " : "").append(w);
+			}
+			if (lines.size() < 4 && line.length() > 0) lines.add(net.minecraft.network.chat.Component.literal(line.toString()));
+			while (lines.size() < 4) lines.add(net.minecraft.network.chat.Component.empty());
+			return Compat.signText(sign, lines);
+		}
+		return false;
+	}
+
 	/** Toss items where it looks (a player's Q key); the other player picks them up. */
 	void toss(ItemStack stack) {
-		p.drop(stack, false, true);
+		if (!Compat.drop(p, stack)) p.getInventory().add(stack);
 		Compat.swing(p);
 	}
 

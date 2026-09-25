@@ -21,13 +21,15 @@ plain words ("Xen, get me some wood", "build a shelter", "follow me") and it
 does them, with its own hands and senses. A small local chat model
 (SmolLM2-360M) helps it understand and answer, and it only knows what Xen
 knows. In real Minecraft you can bring in as many Xens as the server allows.
-Each one is a real player, and they all share one brain.
+Each one is a real player with its own name, skin and personality, and they
+all share one brain. With evolution, the ones that do well pass their nature
+on.
 
 **Want it in your world?** Get the survival-companion mod from the
 [Releases](https://github.com/JAK-cool162/Xen/releases) page or
-[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x, also on Android
-launchers). The mod has the trained brain inside and needs no Python. It's a
-prototype.
+[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x, x86-64 and
+ARM64, also on Android launchers). The mod has the trained brain inside and
+needs no Python. Settings are in Mod Menu. It's a prototype.
 
 The Python side only needs Python 3.9+ and numpy. No GPU and no deep-learning
 framework.
@@ -165,6 +167,45 @@ Its fear is learned, and it's specific (how much harm the amygdala expects):
 It still dies more often than a good player. Deep digging for ore means lava
 and zombies, and more training makes it better.
 
+### What it learned by itself
+
+Nothing below is a rule in Xen's code. SimCraft only has physics, rewards (the
+value of what it mines and eats) and harm. Same situations for the trained
+brain and a newborn, 12 fixed worlds each, no exploring, the choices it made
+most often:
+
+| situation | trained Xen | newborn |
+|---|---|---|
+| diamond right in front | mines it (5 of 12) | never mines (eats 6, turns 2) |
+| iron right in front | mines it (4) | never mines (eats 3) |
+| looking down, lava 2 blocks below | **never digs** (walks on 3, looks 2) | digs down (5) |
+| looking down, stone below | digs down (5) | digs (3) |
+| stone in front, already carrying 64 cobblestone | mostly doesn't bother | mines it (3) |
+| a zombie in its face | backs off or sidesteps (4) | random |
+| nothing around | looks down at the ground (7): a miner's habit, that's where ore shows | random |
+
+So it worked out "don't dig straight down onto lava" (but do dig onto stone),
+that ore is worth taking, and that more stone isn't. It did **not** learn to
+eat when hungry, which is why the mod has an eating instinct.
+
+### Training in real Minecraft
+
+The mod keeps learning while it plays. For long runs, `/tick sprint` speeds up
+the game and Xen's learning together, so it stays fair: Xen gets the same
+number of decisions and learning steps per game tick as at normal speed, just
+sooner. Every life is logged in `<world>/xen/lives.csv`.
+
+* **100 real days (8 Xens)**: it made the brain worse. Real Minecraft rewards
+  are rarer than SimCraft's, and the brain slowly forgot to fear lava because
+  it hardly met any. That's why its trauma and joy memories are now saved with
+  the brain and keep being replayed. With them, a second run kept the fear
+  (0.146 for walking into lava vs 0.013 onto ground).
+* **30 real days with evolution (8 Xens)**: see
+  [the results](#evolution-30-days-in-real-minecraft) below.
+
+The bundled brain is still the SimCraft one, since it's the best at SimCraft's
+tests. The 30-day brain is an optional download on the release page.
+
 ---
 
 ## Playing real Minecraft
@@ -176,8 +217,13 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.2.0-alpha+mc1.21.11.jar` | 1.21.11 | 21+ |
-| `dist/xen-companion-0.2.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.3.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.3.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+
+The mod and its chat model are plain Java with no native code, so the same jar
+runs on x86-64 and ARM64 (phones, Raspberry Pi, Apple Silicon). Every push is
+checked on both an x86-64 and an ARM64 machine
+([`.github/workflows/check.yml`](.github/workflows/check.yml)).
 
 Put it in `mods/` with Fabric API and run `/xen summon`. Xen joins as a real
 player next to you and plays survival with you. It follows you, stays or lives
@@ -208,8 +254,58 @@ can't. From test runs on a real 1.21.11 server:
 <Xen> Got some food!
 ```
 
-The full list of requests, settings and phone launchers (PojavLauncher,
-Amethyst, Zalith) is in [`dist/README.md`](dist/README.md).
+**Every Xen is someone.** New Xens get a random name (Pip, Nova, Waffle...), a
+personality (brave or timid, curious, chatty or quiet, patient or impatient,
+and a tone of voice: cheerful, calm, grumpy, shy, bold or silly) and a skin
+(Minecraft's 18 built-in skins, or your own from mineskin.org). The genes
+really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
+tries new things up to 1.5x as often, a patient one keeps at a chore longer.
+
+**Teams and PvP.** Xens can be one team or split into 2-6 colored teams. PvP is
+`off`, `defend` (fights back against a player who hurts it or its owner) or
+`teams`. It times its swings for full damage, jumps for critical hits and
+sprints in, but it's a companion, not a PvP bot: against a scripted fighter
+with the same sword that struck first it lost 5 of 5, leaving the attacker
+at 2-9 of 20 health in 4 of them.
+
+**Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
+circuits it worked out itself in its redstone lessons, placed part by part by
+hand. Capped at 24 parts by default so nothing big slows the server.
+
+**The chat model only wakes when it's needed**: when someone the Xen knows is
+within 32 blocks, or someone talks to it. It unloads after 10 quiet minutes.
+When nobody it knows is around, Xen leaves notes on signs instead ("Day 12:
+Diamonds here! -Pip").
+
+**Settings in Mod Menu** (or `/xen set` on servers): how many Xens, teams,
+PvP, evolution, redstone and its limit, names, personalities, skins, chat.
+
+![Xen Companion settings in Mod Menu](docs/screenshots/settings.png)
+
+The full list of requests, settings and phone launchers (Zalith Launcher 2,
+PojavLauncher, Amethyst) is in [`dist/README.md`](dist/README.md).
+
+#### Evolution: 30 days in real Minecraft
+
+With evolution on, every few days the worst quarter of the ownerless Xens
+leave and children of the best half take their places. Each gene comes from
+one of two parents, with a small mutation. All Xens still share one brain:
+what evolves is their nature. Your own Xens are never replaced.
+
+A 30-day run in real Minecraft (8 ownerless Xens, a new generation every 3
+days, sprinted with `/tick sprint`), from `<world>/xen/evolution.csv`, the
+average genes of the Xens alive:
+
+| day | generation | bravery | curiosity | chattiness | patience |
+|---|---|---|---|---|---|
+| 3 | 1 | 0.37 | 0.45 | 0.60 | 0.51 |
+| 6 | 1 | 0.43 | 0.46 | 0.62 | 0.59 |
+| 9 | 2 | 0.62 | 0.48 | 0.57 | 0.64 |
+| 12 | 3 | 0.60 | 0.50 | 0.52 | 0.58 |
+| 15 | 3 | 0.84 | 0.57 | 0.54 | 0.60 |
+
+Bravery is what gets selected: brave Xens explore and gather more, and that
+outweighs dying a bit more often. (Run in progress; the table grows to day 30.)
 
 A brain trained in Python can go into the mod: `python -m xen export --brain
 xen_brain.npz --out brain.bin`, then copy it to `<world>/xen/brain.bin`.
@@ -472,13 +568,17 @@ xen/
 bridge/xen_bridge.js  mineflayer bots <-> Xen (hosts the whole swarm)
 brains/               pre-trained brain
 mod/                  Fabric mod: Xen Companion
-  common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen)
-  common/test/        crossCheck: Java == Python for senses, brain, fear and chat rules
+  common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen),
+                      personalities, names and skins, teams, evolution, redstone, signs, settings
+  common/java/.../client/  the Mod Menu settings screen
+  common/test/        crossCheck: Java == Python for senses, brain, memories, paths and chat rules
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
-  mc26/               build for Minecraft 26.x (Java 25)
+  mc26/               build for Minecraft 26.x (Java 25); Compat looks up what differs in 26.1 - 26.3
 dist/                 the built mod jars, with install notes and requirements
-.github/workflows/    release.yml: a pushed version tag publishes a release (jars, brain, chat model)
-scripts/              real-server verification, mod test fixtures
+docs/screenshots/     the settings screen in a real game client
+.github/workflows/    check.yml: tests and builds on x86-64 and ARM64; release.yml: a pushed version tag
+                      publishes a release (jars, brains, chat model)
+scripts/              real-server verification, mod test fixtures, circuits for the mod
 tests/                python -m unittest discover -s tests -t .
 ```
 
@@ -497,8 +597,15 @@ and learning, the chat (understanding requests, tokenizer, honesty filter,
 safe chat; generation and the model's choices when the model file is there)
 and the command line.
 
-The mod has its own check, which compares the Java port with the Python Xen:
+The mod has its own check, which compares the Java port with the Python Xen
+(senses, brain, fear, memories, paths and chat rules), and one for the chat
+model in Java:
 
 ```
 cd mod/mc1.21.11 && ./gradlew crossCheck
+./gradlew llmCheck -PchatModel=/path/to/smollm2-360m-instruct-q8_0.gguf
+./gradlew runClient -PuiTest     # opens Mod Menu and the settings screen by itself, then closes
 ```
+
+GitHub Actions runs all of it on every push, on an x86-64 and an ARM64 machine,
+and also compiles the 26.x mod against 26.3 (the jar is built against 26.1.2).
