@@ -140,12 +140,36 @@ public final class Companion {
 	}
 
 	// -------------------------------------------------------------------------------- living
+	/** A minion (see {@link Crew}): it doesn't load the world, and takes orders from its boss. */
+	boolean minion;
+	Companion boss;
+	/** Its minions, if it has any, and the work it gives them. */
+	final Crew crew = new Crew(this);
+	private net.minecraft.world.level.Level minionLevel;
+
+	int respawning() {
+		return respawnIn;
+	}
+
+	/** Is it in the world someone keeps loaded (a minion only lives there)? */
+	boolean awake() {
+		return player != null && (!minion || ((ServerLevel) player.level()).isPositionEntityTicking(player.blockPosition()));
+	}
+
 	void tick() {
 		if (player == null) return;
 		if (respawnIn >= 0) {
 			if (--respawnIn < 0) respawn();
 			return;
 		}
+		if (minion) {
+			if (player.level() != minionLevel) {                         // (new world, portal: off the loading again)
+				minionLevel = player.level();
+				Crew.stopLoading(player);
+			}
+			if (!awake()) return;                                        // frozen till someone comes by
+		}
+		crew.tick();
 		lifeTicks++;
 		genTicks++;
 		hands.tick();
@@ -439,6 +463,12 @@ public final class Companion {
 			}
 		} else if (mode == Mode.STAY && anchor != null && Vec3.atCenterOf(anchor).distanceTo(player.position()) > 8) {
 			goal = Vec3.atCenterOf(anchor);
+		}
+		if (goal == null && minion && mode == Mode.FREE && boss != null && boss.player != null && boss.player.level() == player.level()
+				&& boss.player.distanceTo(player) > 48) {
+			goal = boss.player.position();                               // a minion stays where its boss keeps the world alive
+			goals.instant = "going back to " + boss.name;
+			return walkTo(goal);
 		}
 		if (goal == null) return null;
 		goals.instant = mode == Mode.STAY ? "going back to where you were told to stay" : "keeping up with your friend";
@@ -1207,8 +1237,9 @@ public final class Companion {
 		}
 		String plan = null;
 		boolean refused = false;
-		if (!r.intent().equals("chat") && owner != null && !owner.equals(u)) {
-			plan = "Only " + ownerName + " can tell you what to do, so you won't.";
+		boolean fromBoss = minion && boss != null && boss.player != null && boss.player.getUUID().equals(u);
+		if (!r.intent().equals("chat") && owner != null && !owner.equals(u) && !fromBoss) {
+			plan = "Only " + (minion && boss != null ? boss.name + " (or " + ownerName + ")" : ownerName) + " can tell you what to do, so you won't.";
 		} else if (!r.intent().equals("chat") && (plan = refusal(r, from, words)) != null) {
 			refused = true;
 			lastThought = "Said no to " + who + ": " + plan;

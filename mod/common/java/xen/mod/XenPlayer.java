@@ -29,12 +29,14 @@ public class XenPlayer extends ServerPlayer {
 
 	@Override
 	public void tick() {
+		boolean minion = companion != null && companion.minion;
+		if (minion && !((net.minecraft.server.level.ServerLevel) level()).isPositionEntityTicking(blockPosition())) return;   // nobody keeps it loaded: it waits, frozen
 		if (push != null) {                                // hit or blown back: the push its client would feel
 			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} pushed {} (was moving {})", getName().getString(), push, getDeltaMovement());
 			setDeltaMovement(addPush ? getDeltaMovement().add(push) : push);
 			push = null;
 		}
-		if (level().getServer().getTickCount() % 10 == 0) {
+		if (level().getServer().getTickCount() % 10 == 0 && !minion) {   // (a minion doesn't load the world: others do)
 			connection.resetPosition();
 			level().getChunkSource().move(this);          // load the world around it, like a player
 		}

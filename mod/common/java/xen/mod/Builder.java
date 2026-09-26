@@ -151,6 +151,11 @@ final class Builder {
 	 * it can't.
 	 */
 	String start(String what) {
+		return startNear(what, null);
+	}
+
+	/** The same, near a spot someone picked (a boss laying out its village), or next to it if null. */
+	String startNear(String what, BlockPos near) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		creative = c.player.isCreative();
 		Direction front = c.player.getDirection().getOpposite();             // the door faces where it stood looking from
@@ -164,7 +169,7 @@ final class Builder {
 			made = Architect.underground(top.above().relative(front.getOpposite(), 1), front, 7, 9, 7, p, creative);
 		} else {
 			int w = creative ? 9 : 7, d = creative ? 7 : 7;
-			BlockPos corner = Architect.site(level, feet.relative(front.getOpposite(), 3), front, w, d);
+			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, w, d);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 			made = Architect.cottage(corner, front, w, d, p, creative, random);
 		}

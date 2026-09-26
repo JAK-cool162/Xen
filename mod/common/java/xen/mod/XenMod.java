@@ -419,6 +419,8 @@ public class XenMod implements ModInitializer {
 								.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), 300))
 								.then(Commands.argument("radius", IntegerArgumentType.integer(0, 30000))
 										.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), IntegerArgumentType.getInteger(ctx, "radius"))))))
+				.then(Commands.literal("minions").then(Commands.argument("count", IntegerArgumentType.integer(1, 64))
+						.executes(ctx -> minions(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
 				.then(Commands.literal("dismiss").executes(ctx -> each(ctx, c -> { c.leave(); return c.name + " went home."; })))
 				.then(Commands.literal("mode")
 						.then(Commands.literal("follow").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FOLLOW; return c.name + " will follow you."; })))
@@ -655,7 +657,7 @@ public class XenMod implements ModInitializer {
 
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
 		ServerPlayer owner = ctx.getSource().getPlayer();              // null from the server console
-		long mine = owner == null ? 0 : companions.stream().filter(c -> owner.getUUID().equals(c.owner)).count();
+		long mine = owner == null ? 0 : companions.stream().filter(c -> owner.getUUID().equals(c.owner) && !c.minion).count();
 		if (config.maxPerPlayer > 0 && mine >= config.maxPerPlayer && !op(ctx)) {
 			ctx.getSource().sendFailure(Component.literal("You already have " + mine + " Xen (max " + config.maxPerPlayer + ")."));
 			return 0;
@@ -694,6 +696,48 @@ public class XenMod implements ModInitializer {
 				+ n + ", get some wood\", \"" + n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
 		c.say("Hi! I'm " + n + ". I only know what I can see, so show me around!");
 		return 1;
+	}
+
+	/**
+	 * Minions for your Xen: sidekicks with the same mind that don't load the world themselves (they only live where
+	 * someone keeps it loaded), take orders from their boss, and help it build a village. See {@link Crew}.
+	 */
+	private int minions(CommandContext<CommandSourceStack> ctx, int count) {
+		ServerPlayer owner = ctx.getSource().getPlayer();
+		Companion boss = owner == null ? null : companions.stream().filter(c -> owner.getUUID().equals(c.owner) && !c.minion && c.player != null)
+				.findFirst().orElse(null);
+		if (boss == null) {
+			ctx.getSource().sendFailure(Component.literal("Summon a Xen first (/xen summon): minions work for a Xen."));
+			return 0;
+		}
+		int room = op(ctx) ? count : Math.max(0, config.maxMinions - boss.crew.minions.size());
+		int made = 0;
+		java.util.Random random = new java.util.Random();
+		for (int i = 0; i < Math.min(count, room) && !full(); i++) {
+			Companion m = create(null, owner, null);
+			m.minion = true;
+			m.boss = boss;
+			m.mode = Companion.Mode.FREE;
+			Vec3 at = boss.player.position();
+			for (int tries = 0; tries < 12; tries++) {
+				Vec3 side = new Vec3(random.nextInt(7) - 3, 0, random.nextInt(7) - 3);
+				if (boss.player.level().noCollision(boss.player.getBoundingBox().move(side))) {
+					at = boss.player.position().add(side);
+					break;
+				}
+			}
+			m.join((ServerLevel) boss.player.level(), at, random.nextFloat() * 360);
+			companions.add(m);
+			boss.crew.minions.add(m);
+			m.say(m.pick3("Ready to work, " + boss.name + "!", "What's the job, boss?", "Hi " + boss.name + "! Where do I start?"));
+			made++;
+		}
+		int n = made;
+		if (made == 0) ctx.getSource().sendFailure(Component.literal(boss.name + " has all the minions it may have (" + config.maxMinions + ")."));
+		else ctx.getSource().sendSuccess(() -> Component.literal(n + " minion" + (n == 1 ? "" : "s") + " for " + boss.name
+				+ ". They don't load the world themselves (they freeze where nobody keeps it loaded), take orders from " + boss.name
+				+ " and you, and build a village around " + boss.name + "'s home."), false);
+		return made;
 	}
 
 	/** The top of the ground at x, z (null over water or lava). */

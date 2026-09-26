@@ -28,6 +28,8 @@ public final class XenConfig {
 	public int maxPerPlayer = 1;
 	/** How many Xens the whole world may have (0 = no limit). */
 	public int maxXens = 0;
+	/** How many minions (/xen minions) one Xen may have (operators: no limit). Minions don't load chunks. */
+	public int maxMinions = 8;
 	/** Load the chat model only when someone Xen knows is this close (blocks) or talks to it. */
 	public int chatWakeDistance = 32;
 	/** Unload the chat model after this many minutes with nobody around it knows and no chat. */
