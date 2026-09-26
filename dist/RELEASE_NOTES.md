@@ -5,11 +5,12 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.7.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.7.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.7.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.7.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.7.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.7.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.7.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.7.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
+| `SmolLM2-135M-Instruct-Q8_0.gguf` | **new**: the small chat model (145 MB, about 3x faster), for phones and low-memory PCs: put it in `config/xen/` (or it downloads by itself when the chat size is `small`, or `auto` on a phone) |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
 | `SHA256SUMS.txt` | checksums |
@@ -17,7 +18,89 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.7.0-alpha
+### What's new in 0.7.1-alpha
+
+**Villages: tribes that share, stand together and trade**
+
+* **Tribes.** Xens of the same owner or team are a tribe; free Xens that meet and get on team up into a band. A
+  tribe has a centre (the first home), builds its houses around it, **shares** food, tools and materials with members
+  who need them, **teaches** each other what they've learned, and **stands together**: attack one and the others
+  come, and they remember who did it; a truce with one is a truce with the tribe. At night some keep watch.
+  `/xen tribes` (setting `tribes`).
+* **They treat each other like players**: trust, truces, trades and gifts between Xens work the way they do with you.
+* **Their own economy, not commands.** A village picks its money (what its members have most of: emeralds,
+  diamonds, gold, iron or coal) and says so. Prices follow supply (what's scarce costs more) and move after every
+  sale. A Xen with more than it needs **opens a shop**: a chest at a stall near the village centre and a sign with its
+  prices; others with money buy food, iron or wood from it.
+* **Chests**: they put away what they don't need (keeping tools, food and some blocks), remember what's in each
+  chest, and take from their chests first. No chest yet: they make one and put it by their home. Chests out in the
+  world that nobody opened (dungeons, camps, trial chambers) they loot (setting `loot`).
+
+**Houses they design themselves (no templates)**
+
+* Every house is **its own design**: size (7x5 to 13x9), wall height, roof (gable, hipped or flat, with overhangs),
+  a stone base or bottom row, a log frame with windows between the posts, shutters, a porch, a chimney with smoke,
+  a loft with a ladder, and **outside**: a path to the door (made with a shovel, like players do), lamp posts, bushes,
+  flower beds, a woodpile, a fenced yard with a gate. Inside: beds, crafting table, furnace, chest, barrel, table and
+  chair, carpet, bookshelves, plants, lanterns hanging from a beam.
+* **Its taste learns.** It starts from its personality (a fort builder likes stone and hipped roofs, a tower builder
+  tall houses with a loft) and after each house learns from how the build went, from **what you say** ("nice house!",
+  "that's ugly") and from **what its tribe says** ("Nice house, NRZT! I like the shutters."), so a village comes to
+  share a style.
+* Its first survival house is small and cheap; later, with plenty of wood, it builds a better one and moves in.
+* Everything outside stands on the ground (holes under it are filled first), and it never takes a house's logs for a
+  tree.
+
+**Farming the real way**
+
+* Seeds from the grass, a hoe, farmland by water (once it knows crops need water: it learns when its farmland dries
+  up), planting, looking after it (replanting empty farmland, re-tilling trampled soil), **harvesting when ripe**, and
+  bread.
+
+**What it knows, and what it doesn't**
+
+* 25 game mechanics: 11 every new player knows (wood, pickaxes, night, creepers...) and 14 it has to find out, the
+  ways players do: by **seeing** it (end crystals healing the dragon), **trying** it (a piglin attacking it without
+  gold), being **told** ("water on lava makes obsidian", "the Nether is 8 times smaller"), from its **tribe**, or by
+  being born later (**evolution**: from generation 4 it knows the Nether portal math and finding strongholds from two
+  eye throws). What it doesn't know, it doesn't do. `/xen knows`.
+
+**The Nether and the End (new, only partly tested in game)**
+
+* **Portals**: it builds one (obsidian mined, or made with water on lava once it knows how), lights it, **follows you
+  through**, and remembers both ends. In the Nether: gold armour (if it knows about piglins), looking for a fortress,
+  blaze rods; home through its portal, or, knowing the math, a new portal at x/8, z/8.
+* **The Ender Dragon**, as one adventure: gear, a bow, blaze rods, ender pearls, eyes of ender, following (or
+  triangulating) the eyes to the stronghold, filling the frame, the End: crystals first if it knows they heal her
+  (caged ones: it pillars up and breaks the bars), arrows, hits on the head when she perches, away from her breath,
+  a totem in hand. Brave free Xens go on their own when they're ready (setting `adventures`).
+* **Totems**: it holds a totem of undying when it's in danger.
+* **Trial chambers** (and newer things: the creaking and its heart, breezes, the mace, wind charges, 26.2's sulfur
+  gas): it recognizes a chamber, fights the spawners, opens vaults with the keys.
+* **Places and paths**: it remembers named places (home, farm, portal, fortress, trial chamber, shop) in each
+  dimension and the trails it walked, and long trips follow known trails.
+
+**Fixes from your play reports**
+
+* **Saved when you quit**: Xens come back with their things, where they were.
+* **No more aimless back and forth**: it explores with a heading and a reason, heads home at dusk, and underground it
+  mines along a level or digs a staircase up instead of mining at random.
+* **Progress like a player**: stone tools, then iron (mining, smelting), armour, diamonds; it finds its own food.
+* It **chops whole trees**, doesn't mine under water (no more drowning for stone), swims and jumps out of water, and
+  tunnels less (its path planning avoids digging).
+* **Less picky about building**: a third of the wood is enough to start; it fetches the rest as it goes (its chests
+  first).
+* It **picks up** useful things lying around.
+* **Chat**: much less repetition (the same line isn't said again by anyone for 3 minutes), and it answers when you're
+  close (5 blocks) or looking at it, without its name.
+
+**The chat model runs on your device, and it's your choice**
+
+* **AI chat (on this device)**: auto, on or off. **AI chat size**: auto, small or normal. The small model (SmolLM2-135M,
+  145 MB, about 3x faster) is picked by itself on phones and low memory, and runs on the CPU. **Chat runs on**: auto,
+  GPU or CPU, now showing your GPU's name.
+
+### New in 0.7.0-alpha
 
 **It lives its own life (on by default)**
 

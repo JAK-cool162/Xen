@@ -62,6 +62,9 @@ final class Walker {
 	String doing = "", lastProblem = "";
 	private String journaled = "";
 
+	/** The one portal block it means to walk into (following someone through, going to the Nether), else none. */
+	BlockPos portalOk;
+
 	// how bold it is on the way, set by its mind before each plan
 	private int maxFall = 3, maxGap = 0, blocks;
 	private boolean dig = true;
@@ -355,12 +358,12 @@ final class Walker {
 			// walk (or swim) across, digging through what's in the way
 			if (floor(q) || water(q)) {
 				double br = breaks(q.above()) + breaks(q);
-				if (br < INF) add(water(q) || inWater ? Kind.SWIM : Kind.WALK, p, q, (water(q) ? SWIM : SPRINT) + br + danger + door(q),
+				if (br < INF) add(water(q) || inWater ? Kind.SWIM : Kind.WALK, p, q, (water(q) ? SWIM : SPRINT) + br + danger + door(q) + under(q) + (farmland(q) ? 8 : 0),
 						br > 0 ? List.of(q.above(), q) : List.of());
 			}
 			// jump up a block (digging a staircase up if need be: over its head, then the two above the step)
 			BlockPos up = q.above();
-			if (!passable(q) && step(q) && floor(up)) {
+			if (!passable(q) && step(q) && floor(up) && !farmland(up)) {        // (never jump onto farmland: it tramples it)
 				double br = breaks(p.above(2)) + breaks(up.above()) + breaks(up);
 				if (br < INF) add(Kind.ASCEND, p, up, SPRINT + JUMP + br + danger(up), br > 0 ? List.of(p.above(2), up.above(), up) : List.of());
 			}
@@ -372,7 +375,7 @@ final class Walker {
 					r = r.below();
 					k++;
 				}
-				if (water(r) || k <= maxFall && floor(r)) {
+				if (water(r) || k <= maxFall && floor(r) && !farmland(r)) {
 					double hurt = water(r) ? 0 : Math.max(0, k - 3) * (12 + 30 * fear);
 					add(Kind.FALL, p, r, WALK + 2 * k + hurt + danger(r), List.of());
 				}
@@ -384,7 +387,7 @@ final class Walker {
 						BlockPos mid = p.relative(d, i);
 						clear = passable(mid) && passable(mid.above()) && passable(mid.above(2)) && !floor(mid);
 					}
-					if (clear) add(Kind.PARKOUR, p, land, (g + 1) * SPRINT + 4 + g * 6 * fear + danger(land), List.of());
+					if (clear && !farmland(land)) add(Kind.PARKOUR, p, land, (g + 1) * SPRINT + 4 + g * 6 * fear + danger(land), List.of());
 					if (!clear) break;
 				}
 				// or a block down to walk on (sneaking at the edge, placed against the side of the one it stands on)
@@ -411,7 +414,7 @@ final class Walker {
 		if (climbable(p) && passable(above) && passable(above.above())) add(Kind.CLIMB_UP, p, above, CLIMB, List.of());
 		if (climbable(p.below()) && passable(p.below())) add(Kind.CLIMB_DOWN, p, p.below(), CLIMB, List.of());
 		if (inWater && passable(above) && (water(above) || floor(above) || passable(above.above()))) add(Kind.SWIM, p, above, SWIM, List.of());
-		if (inWater && water(p.below())) add(Kind.SWIM, p, p.below(), SWIM, List.of());
+		if (inWater && water(p.below())) add(Kind.SWIM, p, p.below(), SWIM + under(p.below()), List.of());
 		if (blocks > 0 && onFloor && !inWater) {                          // tower up (out of a hole): jump, block under its feet
 			double br = breaks(p.above(2));
 			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 6 + br, br > 0 ? List.of(p.above(2)) : List.of());
@@ -450,6 +453,7 @@ final class Walker {
 		BlockState s = state(p);
 		if (s.getFluidState().is(FluidTags.LAVA) || s.is(Blocks.FIRE) || s.is(Blocks.SOUL_FIRE) || s.is(Blocks.COBWEB)
 				|| s.is(Blocks.POWDER_SNOW) || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.CACTUS)) return false;
+		if ((s.is(Blocks.NETHER_PORTAL) || s.is(Blocks.END_PORTAL) || s.is(Blocks.END_GATEWAY)) && (portalOk == null || p.distManhattan(portalOk) > 3)) return false;   // not by accident
 		if (openable(s) || s.is(BlockTags.CLIMBABLE)) return true;
 		VoxelShape shape = s.getCollisionShape(level, p);
 		return shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.1875;
@@ -497,10 +501,24 @@ final class Walker {
 		return state(p).is(BlockTags.CLIMBABLE);
 	}
 
+	/** Standing there, it would be on farmland (a field: walk on it gently, never land on it). */
+	private boolean farmland(BlockPos p) {
+		return state(p.below()).is(Blocks.FARMLAND);
+	}
+
+	/** Swimming with its head under water: it would rather keep its head up (out of breath: much rather). */
+	private double under(BlockPos p) {
+		if (!water(p.above())) return 0;
+		var body = c.player;
+		return body.getAirSupply() < body.getMaxAirSupply() / 2 ? INF : 12;
+	}
+
 	/** Lava next to the way, a drop into the void: it keeps well clear. */
 	private double danger(BlockPos p) {
 		double d = 0;
 		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 40;
+		String below = BuiltInRegistries.BLOCK.getKey(state(p.below()).getBlock()).getPath();
+		if (below.equals("potent_sulfur") || below.equals("wither_rose") || below.equals("magma_block")) d += 30;   // sulfur gas makes you sick
 		return d;
 	}
 
@@ -523,7 +541,7 @@ final class Walker {
 		if (c.player.isCreative()) return 2;
 		float speed = c.hands.digSpeed(s, level, p);
 		if (speed < 1f / 200) return INF;                                     // more than ten seconds: not that way
-		return 1 / speed + 4;
+		return 1 / speed + 12;                                                // (a player walks round or over rather than tunnel through)
 	}
 
 	/** Ground it may dig: earth, stone, sand, ores, leaves, snow (what the world is made of, not what people make). */

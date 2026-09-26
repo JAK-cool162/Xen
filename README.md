@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.7.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.7.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.7.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.7.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its

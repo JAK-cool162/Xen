@@ -95,8 +95,10 @@ public class XenSettingsScreen extends Screen {
 		switch (tab) {
 			case 0 -> {
 				onOff("Chat", "chat", "Xen answers and understands chat.");
-				choice("Chat model", "chatModel", List.of("auto", "on", "off"), s -> s,
-						"The small chat model: auto = only with about 3 GB of memory for the game. It only wakes when someone Xen knows is near or talks. Without it, Xens still understand requests and answer simply.");
+				choice("AI chat (on this device)", "chatModel", List.of("auto", "on", "off"), s -> s,
+						"The small AI chat model runs on your own device (your computer or phone), never online: a 400 MB download once, and some memory and power while it talks. auto = only when the game has about 3 GB of memory. off = it never runs: Xens still understand what you ask and answer simply, from what they know. It only wakes when someone a Xen knows is near or talks.");
+				choice("AI chat size", "chatModelSize", List.of("auto", "small", "normal"), s -> s.equals("small") ? "small (phones)" : s,
+						"Which chat model runs on your device. small: SmolLM2 135M, about 145 MB, three times faster, simpler answers (for phones and weaker computers). normal: SmolLM2 360M, about 390 MB, better answers. auto: small on phones and when the game has less than 3 GB of memory, else normal. It downloads the one it needs the first time.");
 				onOff("Talks on its own", "talk", "Xen says what's on its mind now and then, greets people it knows and asks things you can answer with yes or no.");
 				onOff("Talks with Xens", "talkToXens", "Xens that meet have a short chat and tell each other where they saw trees and ore.");
 				onOff("Trading", "trading", "Xen trades with villagers (on their trading screen) and bargains with players.");
@@ -117,10 +119,15 @@ public class XenSettingsScreen extends Screen {
 			case 2 -> {
 				onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, trading, exploring) and a dream to work toward, and learn which they like.");
 				onOff("Antics", "antics", "Xen does unpredictable things for fun: dances along when you crouch-dance, shows off tricks (that don't always work), surprises in fights. Playful Xens more.");
+				onOff("Tribes", "tribes", "Xens that live together (yours, a team, free ones that get on) share food, iron and chests, build their houses around one village, keep watch over it at night, and stand together when one of them is attacked.");
+				onOff("Adventures", "adventures", "Free Xens go for the Ender Dragon on their own when they're ready (the Nether for blaze rods, ender pearls, eyes of ender, the stronghold, the End), and take on trial chambers they find.");
+				onOff("Loot chests", "loot", "Xens open chests they find out in the world that nobody has opened yet (dungeons, camps, trial chambers) and loot them. Chests players put down they leave alone.");
 				onOff("Learns by watching", "copy", "Xen watches you and copies moves that work out for you: the water-bucket clutch, and how you fight when you win. Clumsy at first, better each time. Say \"Pip, watch this\" first.");
 				onOff("Learning", "learn", "Xen keeps learning from what it lives through.");
 				onOff("Evolution", "evolution", "Every few days the ownerless Xens that did worst are replaced by children of the best.");
 				choice("Days per generation", "generationDays", List.of(1, 2, 3, 5, 7, 10), n -> "" + n, "How often evolution happens (Minecraft days).");
+				choice("Portal math from generation", "smartsAtGeneration", List.of(4, 0, 1, 2, 3, 6, 8), n -> n == 0 ? "born knowing" : "" + n,
+						"From which generation of evolution Xens know that a block in the Nether is eight in the overworld (so they build their way home at x/8, z/8) and find strongholds from two eye throws. Younger Xens can be taught: say \"the Nether is 8 times smaller\".");
 			}
 			case 3 -> {
 				choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams (no friendly fire).");
@@ -133,8 +140,9 @@ public class XenSettingsScreen extends Screen {
 				onOff("Signs", "signs", "When nobody it knows is around, Xen leaves notes on signs it carries.");
 			}
 			case 5 -> {
-				choice("Chat on GPU", "gpu", List.of("auto", "on", "off"), s -> s,
-						"Run the chat model on the graphics card (much faster answers). auto: when there's a real graphics card with OpenGL 3.3, in single player. Works with Sodium, Iris and Vulkan mods. Applies the next time the model loads.");
+				String gpu = GlAccelerator.gpuName();
+				choice("Chat runs on", "gpu", List.of("auto", "on", "off"), s -> s.equals("off") ? "CPU" : (s.equals("on") ? "GPU" : "auto") + ": " + shortGpu(gpu),
+						"Run the chat model on the graphics card (much faster answers). Your graphics card: " + gpu + ". auto: when it's a real graphics card with OpenGL 3.3, in single player. Works with Sodium, Iris and Vulkan mods. Applies the next time the model loads.");
 				choice("Decisions", "decisionTicks", List.of(5, 10, 20), n -> n == 5 ? "4 a second" : n == 10 ? "2 a second" : "1 a second",
 						"Fewer decisions for slower computers and phones.");
 				choice("Chat threads", "chatThreads", List.of(1, 2, 3, 4, 6, 8), n -> n + (n == 1 ? " thread" : " threads"),
@@ -259,6 +267,12 @@ public class XenSettingsScreen extends Screen {
 		int col = row % columns, line = row / columns;
 		row++;
 		return new int[] {left + col * (buttonWidth + 8), top + line * 24};
+	}
+
+	/** A graphics card's name short enough for a button ("Adreno (TM) 740" -> "Adreno 740"). */
+	private static String shortGpu(String gpu) {
+		String s = gpu.replaceAll("\\(TM\\)|\\(R\\)|/PCIe/SSE2|/PCIe|/SSE2| \\(.*\\)$", "").replaceAll("\\s+", " ").trim();
+		return s.length() > 22 ? s.substring(0, 21) + "…" : s;
 	}
 
 	private void onOff(String label, String key, String help) {

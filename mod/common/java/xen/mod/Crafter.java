@@ -222,7 +222,7 @@ final class Crafter {
 
 	/** Make an exact recipe (for the builder: "spruce_stairs"), without talking about it. */
 	void orderRecipe(String id, int amount) {
-		if (recipe(id) == null) return;
+		if (recipe(id) == null || c.player.level().getGameTime() < nextTry) return;   // (it just failed at something: in a bit)
 		order = id;
 		orderName = id.replace('_', ' ');
 		orderLeft = Math.max(1, amount);
@@ -371,6 +371,7 @@ final class Crafter {
 			XenMod.LOG.info("{} couldn't make {} (making {})", c.name, what, making);
 			nextTry = c.player.level().getGameTime() + 600;              // try again in half a minute
 			making = null;
+			order = null;
 			return null;
 		}
 		return Action.PLACE;
@@ -450,11 +451,23 @@ final class Crafter {
 	private boolean placeTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
-		for (int d = 0; d < 4; d++) {
-			int[] f = Perception.forward((c.hands.yaw + d) % 4);
-			BlockPos pos = feet.offset(f[0], 0, f[1]), below = pos.below();
-			if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(below).isCollisionShapeFullBlock(level, below)) continue;
-			if (c.hands.placeItem(pos, s -> path(s).equals("crafting_table"), below, Direction.UP, -1)) {
+		// the closest free spot on solid ground within reach (not where it's building, not where it stands)
+		java.util.List<BlockPos> spots = new java.util.ArrayList<>();
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				for (int dy = -1; dy <= 1; dy++) {
+					BlockPos pos = feet.offset(dx, dy, dz), below = pos.below();
+					if (pos.equals(feet) || pos.equals(feet.above()) || pos.equals(feet.below())) continue;
+					if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(pos).getFluidState().isEmpty()) continue;
+					if (!level.getBlockState(below).isCollisionShapeFullBlock(level, below) || c.builder.planned(pos)) continue;
+					if (c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 4.3) continue;
+					spots.add(pos);
+				}
+			}
+		}
+		spots.sort(java.util.Comparator.comparingDouble(p -> p.distSqr(feet)));
+		for (BlockPos pos : spots.subList(0, Math.min(6, spots.size()))) {
+			if (c.hands.placeSeen(pos, s -> path(s).equals("crafting_table"), pos.below(), Direction.UP, -1)) {
 				table = tableSeen = pos;
 				placedTable = pos;
 				return true;
@@ -473,7 +486,7 @@ final class Crafter {
 		boolean made = craftIn(menu, r);
 		c.player.closeContainer();
 		if (made) {
-			c.chatter("I made a " + name.replace('_', ' ') + "!", false);
+			c.chatter("I made " + ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name.replace('_', ' ') + "!", false);
 			XenMod.LOG.info("{} made a {}", c.name, name);
 		}
 		making = null;

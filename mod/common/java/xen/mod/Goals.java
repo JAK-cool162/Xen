@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
+import xen.mod.core.Action;
 
 import java.util.EnumMap;
 import java.util.Locale;
@@ -36,6 +37,9 @@ final class Goals {
 		SMELT("smelt your iron", "raw iron has to be smelted before you can make tools of it"),
 		FARM("build a farm", "a farm by your house means food without hunting"),
 		MOBFARM("build a mob farm", "a mob farm brings bones, string, gunpowder and experience to your door"),
+		STORE("put your things away in a chest", "your bag is getting full"),
+		ADVENTURE("go on an adventure to beat the Ender Dragon", "you are well equipped now and the dragon is waiting"),
+		TRIALS("take on the trial chamber", "its vaults are full of loot"),
 		TRADE("trade with a villager", "you have things a villager may want"),
 		EXPLORE("explore", "you are curious");
 
@@ -49,7 +53,8 @@ final class Goals {
 
 	enum Long {
 		HOME("build a home"), STOCKPILE("gather a big stockpile of wood and stone"), TREASURE("find diamonds"),
-		TRADER("become a trader with 5 emeralds"), EXPLORER("see places 300 blocks away"), FRIENDS("make three friends");
+		TRADER("become a trader with 5 emeralds"), EXPLORER("see places 300 blocks away"), FRIENDS("make three friends"),
+		DRAGON("beat the Ender Dragon"), VILLAGE("grow a village with my tribe");
 
 		final String what;
 
@@ -93,6 +98,8 @@ final class Goals {
 		pull.put(Long.TRADER, 0.6f * p.chattiness + (c.mod.config.trading ? 0.1f : -1f));
 		pull.put(Long.EXPLORER, 0.8f * p.curiosity);
 		pull.put(Long.FRIENDS, 0.8f * p.chattiness);
+		pull.put(Long.DRAGON, c.mod.config.adventures ? 0.6f * p.bravery + 0.3f * p.diligence : -1f);
+		pull.put(Long.VILLAGE, c.mod.config.tribes ? 0.5f * p.chattiness + 0.4f * p.diligence : -1f);
 		Long best = null;
 		float bestScore = -9;
 		for (var e : pull.entrySet()) {
@@ -117,6 +124,13 @@ final class Goals {
 			case TRADER -> Math.min(1f, items.getOrDefault("emerald", 0) / 5f);
 			case EXPLORER -> origin == null ? 0 : (float) Math.min(1.0, Math.hypot(c.player.getX() - origin[0], c.player.getZ() - origin[1]) / 300.0);
 			case FRIENDS -> Math.min(1f, c.friends() / 3f);
+			case DRAGON -> dragonDown ? 1f : c.adventure.stage == null ? 0.05f : c.adventure.stage.ordinal() / (float) Adventure.Stage.DONE.ordinal();
+			case VILLAGE -> {
+				Tribe t = c.tribe();
+				int homes = 0;
+				if (t != null) for (Companion m : t.members) if (m.goals.home != null) homes++;
+				yield Math.min(1f, homes / 4f);
+			}
 		};
 	}
 
@@ -144,6 +158,8 @@ final class Goals {
 			case TRADER -> "Five emeralds! I'm a real trader now.";
 			case EXPLORER -> "I've come so far! Everything here is new to me.";
 			case FRIENDS -> "I have three friends now. That makes me happy.";
+			case DRAGON -> "The Ender Dragon is beaten! I did it!";
+			case VILLAGE -> "Look at our village! Four houses, and a tribe to live in it.";
 		});
 		Long old = dream;
 		dream = pickDream(old);
@@ -167,16 +183,21 @@ final class Goals {
 	boolean think(boolean nearby) {
 		long now = c.player.level().getGameTime();
 		if (current != null) {
-			boolean over = current == Short.EXPLORE ? now > until : building(current) ? !c.builder.busy() : !c.chores.busy();
+			boolean over = current == Short.EXPLORE ? now > until || progressWaiting() && now > until - EXPLORE_TICKS / 2
+					: current == Short.FARM ? !c.farmer.on && !c.chores.busy()
+					: building(current) ? !c.builder.busy() : current == Short.STORE ? !c.storage.busy()
+					: current == Short.ADVENTURE ? !c.adventure.on : current == Short.TRIALS ? !c.trials.on : !c.chores.busy();
 			if (!over) return c.chores.busy() && !building(current);
 			learn();
+			next = now;                                                      // done: straight on to the next thing, like a player
 		}
 		if (now < next) return false;
 		next = now + THINK;
 		Short best = null;
 		float bestScore = 0.25f;                                         // below this it's happy doing whatever it does
 		for (Short s : Short.values()) {
-			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM)) continue;   // those would take it away from its friend
+			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM
+					|| s == Short.ADVENTURE || s == Short.TRIALS || s == Short.STORE)) continue;   // those would take it away from its friend
 			float score = (urgency(s) + dreamPull(s)) * (0.5f + liking.get(s)) + random.nextFloat() * 0.15f * c.personality.curiosity;
 			if (score > bestScore) {
 				bestScore = score;
@@ -193,16 +214,18 @@ final class Goals {
 					: c.chores.gather("stone", 16);
 			case ORE -> c.chores.gather("ore", 2);
 			case HOUSE -> {
-				String h = c.builder.start("house");
+				Tribe t = c.tribe();
+				BlockPos plot = t != null && t.members.size() > 1 && t.center != null ? t.plot() : home != null ? nextTo(home, 14) : null;   // in its tribe's village
+				String h = plot != null ? c.builder.startNear("house", plot) : c.builder.start("house");
 				yield h.startsWith("You will") ? h : "You can't: " + h;
 			}
+			case STORE -> c.storage.store();
+			case ADVENTURE -> c.adventure.start();
+			case TRIALS -> c.trials.start();
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(-54, "diamonds", 3)
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", 6) : c.chores.mine(40, "coal", 8);
 			case SMELT -> c.chores.smelt();
-			case FARM -> {
-				String h = c.builder.startNear("farm", nextTo(home, 13));
-				yield h.startsWith("You will") ? h : "You can't: " + h;
-			}
+			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
 			case MOBFARM -> {
 				String h = c.builder.startNear("mob farm", nextTo(home, 24));
 				yield h.startsWith("You will") ? h : "You can't: " + h;
@@ -254,22 +277,113 @@ final class Goals {
 			case WOOD -> tools == 0 && items.getOrDefault("log", 0) < 3 ? 0.9f                 // wood for a pickaxe comes first
 					: items.getOrDefault("log", 0) < 4 ? 0.5f * (0.5f + p.diligence) : 0;
 			case STONE -> needBlocksForTheNight() ? 0.85f                  // evening, and not enough blocks for a shelter: dirt will do
-					: tools == 0 ? 0 : blocks < 10 || tools == 1 && items.getOrDefault("cobblestone", 0) < 3 ? 0.4f * (0.5f + p.diligence) : 0;
+					: tools == 0 ? 0 : c.crafter.pickTier() == 1 && items.getOrDefault("cobblestone", 0) < 3 ? 0.8f   // stone tools next
+					: blocks < 10 ? 0.4f * (0.5f + p.diligence) : 0;
 			case ORE -> tools == 0 ? 0 : 0.3f * (0.5f + p.bravery);                         // no pickaxe: ore drops nothing
 			case TRADE -> c.mod.config.trading && c.trader.villagerNear() != null && c.trader.hasSomethingToTrade() ? 0.35f : 0;
-			case EXPLORE -> 0.3f * (0.5f + p.curiosity);
+			case EXPLORE -> 0.3f * (0.5f + p.curiosity) * (progressWaiting() ? 0.4f : 1f);   // not while there's progress to make
 			// the way a player gets on in the world: a real house once it has tools, then down for iron, then diamonds
 			case HOUSE -> home == null && !busyBuilding && c.crafter.pickTier() >= 2 && !evening() && !c.player.isCreative()
-					? 0.7f * (0.6f + p.diligence) : 0;
+					? 0.7f * (0.6f + p.diligence)
+					: home != null && !busyBuilding && !evening() && !c.player.isCreative() && c.taste.wantsBigger(items.getOrDefault("log", 0))
+					? 0.35f * (0.5f + p.diligence) : 0;                                // a better house once it has the wood
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
 					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? 0.5f * (0.5f + p.bravery)
 					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
-			case FARM -> home != null && farm == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
+			case FARM -> home != null && c.farmer.middle == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
 					&& (c.player.isCreative() || items.getOrDefault("cobblestone", 0) >= 300) ? 0.45f * (0.5f + p.diligence) : 0;
 			case SMELT -> (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
 					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0) ? 0.85f : 0;
+			case STORE -> c.storage.wantsToStore() && (home != null || c.tribe() != null && c.tribe().center != null) ? 0.6f : 0;
+			case ADVENTURE -> c.mod.config.adventures && !dragonDown && c.crafter.pickTier() >= 3 && !evening() && !c.player.isCreative()
+					&& (dream == Long.DRAGON || c.personality.bravery > 0.6f && c.personality.generation >= 1) ? 0.5f * (0.5f + p.bravery) : 0;
+			case TRIALS -> c.places.get("trial chamber") != null && c.trials.ready() && !evening() ? 0.45f * (0.5f + p.bravery) : 0;
 		};
+	}
+
+	/** The next step in a player's progress is waiting (tools to upgrade, stone, iron): no time to wander off. */
+	private boolean progressWaiting() {
+		var items = c.items();
+		int tier = c.crafter.pickTier();
+		if (c.player.isCreative()) return false;
+		return tier == 0 || tier == 1 || tier == 2 && items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0) < 3;
+	}
+
+	// ------------------------------------------------------------------------------ exploring
+	private Vec3 exploreTo;
+	private long exploreSince, lookUntil, nextMineUnderground;
+	private double heading = Double.NaN;
+
+	/**
+	 * Exploring the way a player does it: it picks a spot a few dozen blocks off (on in the same direction, mostly,
+	 * not back where it came from) and walks there, sprinting; there it stops and looks around for a moment, and on to
+	 * the next. At dusk, with a home, it heads home instead. (What it sees on the way is what makes it want things.)
+	 */
+	Action exploreStep() {
+		var p = c.player;
+		long now = p.level().getGameTime();
+		if (home != null && evening() && p.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+				&& p.blockPosition().distSqr(home) > 12 * 12 && p.blockPosition().distSqr(home) < 400 * 400) {
+			instant = "heading home for the night";
+			c.run(true);
+			return c.walkTo(Vec3.atBottomCenterOf(home));
+		}
+		// Underground with no way to the sky it knows (a cave, a box someone put it in): a player doesn't wander in the
+		// dark, it goes mining along a pattern (branch tunnels) when it has a pickaxe, or digs a staircase up and out.
+		BlockPos feet = p.blockPosition();
+		var level = (net.minecraft.server.level.ServerLevel) p.level();
+		if (p.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && !level.canSeeSky(feet.above())) {
+			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+			if (top - feet.getY() > 8) {
+				int tier = c.crafter.pickTier();
+				if (tier >= 1 && !evening() && now >= nextMineUnderground) {
+					nextMineUnderground = now + 20 * 60 * 3;
+					String plan = tier >= 3 && feet.getY() < 10 ? c.chores.mine(feet.getY(), "diamonds", 3)
+							: tier >= 2 ? c.chores.mine(feet.getY(), "iron", 6) : c.chores.mine(feet.getY(), "coal", 8);
+					if (plan.startsWith("You will")) {
+						c.chores.own = true;
+						c.chatter("Underground already? Then I'll mine here, in tunnels.", false);
+						return null;
+					}
+				}
+				instant = "digging a way up to the surface";
+				return c.walkTo(new Vec3(feet.getX() + 0.5 + 3, top + 1, feet.getZ() + 0.5));   // a staircase up
+			}
+		}
+		if (now < lookUntil) {                                                  // a look around, like a player taking in the view
+			instant = "looking around";
+			if (random.nextFloat() < 0.15f) c.hands.face(p.getEyePosition().add(random.nextGaussian(), random.nextGaussian() * 0.3, random.nextGaussian()));
+			c.acted = true;
+			return Action.IDLE;
+		}
+		if (exploreTo != null && (p.position().distanceTo(exploreTo) < 3 || now - exploreSince > 20 * 40)) {
+			exploreTo = null;
+			lookUntil = now + 30 + random.nextInt(50);
+			return Action.IDLE;
+		}
+		if (exploreTo == null) {
+			if (Double.isNaN(heading)) heading = random.nextDouble() * Math.PI * 2;
+			for (int tries = 0; tries < 8 && exploreTo == null; tries++) {
+				double a = heading + (random.nextDouble() - 0.5) * (tries < 4 ? 1.2 : Math.PI * 2);
+				double r = 24 + random.nextInt(32);
+				BlockPos from = p.blockPosition();
+				int x = (int) Math.round(from.getX() + Math.cos(a) * r), z = (int) Math.round(from.getZ() + Math.sin(a) * r);
+				if (!p.level().hasChunkAt(new BlockPos(x, from.getY(), z))) continue;
+				Vec3 top = XenMod.surface((net.minecraft.server.level.ServerLevel) p.level(), x, z);
+				if (top == null || Math.abs(top.y - p.getY()) > 20) continue;          // (water, a cliff: somewhere else)
+				exploreTo = top;
+				heading = a;
+			}
+			exploreSince = now;
+			if (exploreTo == null) {
+				heading += Math.PI / 2;
+				return Action.IDLE;
+			}
+		}
+		instant = "exploring";
+		c.run(p.position().distanceTo(exploreTo) > 6);
+		return c.walkTo(exploreTo);
 	}
 
 	/** A spot about that far from home, to one side (for its farm, its mob farm), in a direction that's the same for it each time. */
@@ -278,8 +392,11 @@ final class Goals {
 		return home.offset((int) Math.round(Math.cos(a) * far), 0, (int) Math.round(Math.sin(a) * far));
 	}
 
+	/** The dragon is dead (it was there): its big adventure is over. */
+	boolean dragonDown;
+
 	private static boolean building(Short s) {
-		return s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM;
+		return s == Short.HOUSE || s == Short.MOBFARM;
 	}
 
 	private int diamonds() {
@@ -316,6 +433,8 @@ final class Goals {
 			case TRADER -> s == Short.TRADE && urgency(Short.TRADE) > 0 ? 0.45f : s == Short.ORE ? 0.15f : 0;
 			case EXPLORER -> s == Short.EXPLORE ? 0.45f : 0;
 			case FRIENDS -> s == Short.EXPLORE ? 0.1f : 0;
+			case DRAGON -> s == Short.ADVENTURE ? 0.5f : s == Short.MINE ? 0.2f : 0;
+			case VILLAGE -> s == Short.HOUSE ? 0.3f : s == Short.FARM ? 0.2f : s == Short.STORE ? 0.1f : 0;
 		};
 	}
 
@@ -384,6 +503,7 @@ final class Goals {
 		JsonObject o = new JsonObject();
 		if (dream != null) o.addProperty("dream", dream.name());
 		o.addProperty("achieved", achieved);
+		if (dragonDown) o.addProperty("dragonDown", true);
 		if (home != null) {
 			JsonArray h = new JsonArray();
 			h.add(home.getX());
@@ -430,6 +550,7 @@ final class Goals {
 			}
 		}
 		if (dreams.has("achieved")) achieved = dreams.get("achieved").getAsInt();
+		dragonDown = dreams.has("dragonDown") && dreams.get("dragonDown").getAsBoolean();
 		if (dreams.has("home")) {
 			JsonArray h = dreams.getAsJsonArray("home");
 			home = new BlockPos(h.get(0).getAsInt(), h.get(1).getAsInt(), h.get(2).getAsInt());

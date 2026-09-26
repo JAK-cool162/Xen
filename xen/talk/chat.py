@@ -223,15 +223,21 @@ _CRAFT_THING = re.compile(r"\b((wooden|wood|stone|iron|golden|gold|diamond) )?("
 _CRAFT_WORD = re.compile(r"\bcraft(ing)? (me |us )?(a |an |some |the |\d+ )*([a-z_]+)")
 AMOUNT = {"wood": 8, "stone": 16, "coal": 8, "iron": 4, "mine": 8, "food": 3}
 # Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins.
-THAI = (("peace", ("สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว")), ("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด", "ซื้อ", "ขาย")), ("stop", ("หยุด", "พอแล้ว", "ยกเลิก")),
+THAI = (("peace", ("สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว")), ("quest", ("มังกร", "เนเธอร์", "ดิเอนด์", "ห้องทดลอง")),
+        ("store", ("เก็บของ", "ใส่หีบ", "ใส่กล่อง")), ("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด", "ซื้อ", "ขาย")), ("stop", ("หยุด", "พอแล้ว", "ยกเลิก")),
         ("stay", ("ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่")), ("follow", ("ตาม", "มานี่", "มาทางนี้", "มาหา")),
         ("give", ("ขอ", "ส่ง")), ("explore", ("สำรวจ", "ไปเที่ยว", "ไปเล่น")), ("redstone", ("เรดสโตน", "วงจร")),
         ("wood", ("ไม้",)), ("coal", ("ถ่าน",)), ("iron", ("เหล็ก",)), ("stone", ("หิน",)), ("mine", ("ขุด", "แร่", "เพชร", "ทอง")),
         ("food", ("อาหาร", "ล่า", "หาของกิน")), ("build", ("สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน", "ฟาร์ม", "คอก")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
 _THAI_CHAR = re.compile("[\u0e00-\u0e7f]")
+ATTACK_RULE = r"\b(attack|go after|gang up on|team up (on|against)|take down|hunt down) (the )?([a-z0-9_]{3,16})\b"
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
     ("pickup", r"\b(mine|break|pick up|pickup|take|grab|collect) (the |that |this |your |my |a )?(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\b"),
     ("peace", r"\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"),
+    ("attack", ATTACK_RULE),
+    ("quest", r"\b(kill|beat|defeat|slay|fight) (the )?(ender ?)?dragon\b|\bbeat the game\b|\b(find|locate|look for) (the |a )?(stronghold|end portal)\b|\b(go|travel|head) (to|into) (the )?(nether|end)\b|\bnether trip\b|\b(get|find|farm|collect) (some |me |us )?(\d+ )?blaze rods?\b|\b(build|make|light) (a |the |us a |me a )?(nether )?portal\b|\b(raid|loot|clear|do|beat|take on) (the |a )?(trial chambers?|vaults?)\b|\bleave the nether\b|\b(go|get) (back )?home from the nether\b"),
+    ("store", r"\b(put|store|stash|deposit|dump)\b.*\b(chests?|storage|away)\b|\b(sort|organi[sz]e) (the |your )?(chests?|storage|stuff|inventory)\b"),
+    ("guard", r"\b(guard|protect|defend|patrol|keep watch over) (the |our |my |this )?(village|base|home|house|area|territory|farm)\b|\bkeep (the )?(monsters|mobs) (out|away)\b"),
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
@@ -346,6 +352,18 @@ def details(intent, words):
             w = _CRAFT_WORD.search(words)
             thing = w.group(4) if w else ""
         amount = int(number.group(1)) if number else 1
+    if intent == "quest":                                        # "go to the nether" -> ("quest", "nether", 0)
+        thing = ("trial" if re.search(r"\b(trial|vault)|ห้องทดลอง", words) else "blaze" if re.search(r"\bblaze\b", words)
+                 else "home" if re.search(r"\b(leave the nether|home)\b", words)
+                 else "portal" if re.search(r"\b(build|make|light) (a |the |us a |me a )?(nether )?portal\b", words)
+                 else "dragon" if re.search(r"\b(dragon|stronghold|end portal|the end|beat the game)\b|มังกร|ดิเอนด์", words) else "nether")
+        amount = int(number.group(1)) if number else 64 if "stack" in words else 0
+    if intent == "attack":                                       # "attack steve" -> ("attack", "steve", 0)
+        m = re.search(ATTACK_RULE, words)
+        thing = m.group(4) if m else ""
+        amount = 0
+    if intent in ("store", "guard"):
+        amount = 0
     if intent == "give":
         thing = next((item for item, keys in _GIVE_THINGS if any(k in words for k in keys)), "all")
         amount = int(number.group(1)) if number else 64 if "stack" in words else 0     # 0 = all of it

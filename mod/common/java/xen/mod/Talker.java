@@ -107,9 +107,13 @@ final class Talker {
 		if (now >= nextRemark && (now - anyoneSpoke > 200 || FAST) && lines.isEmpty() && !listeners(48).isEmpty()) {
 			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.chattiness) * (0.7f + 0.6f * random.nextFloat())));
 			String r = random.nextFloat() < (FAST ? 0.7f : 0.35f) ? question() : null;
+			boolean asking = r != null;
 			if (r == null) r = remark();
 			if (r != null && r.equals(lastRemark)) r = null;                  // not the same thing twice in a row
+			if (r != null && (System.currentTimeMillis() - c.mod.lastRemarkAt < (FAST ? 0 : 6000) || !c.fresh(r))) r = null;   // nor what another Xen just said
+			if (r == null && asking) asked = null;                            // (a question it didn't ask after all)
 			if (r != null) {
+				c.mod.lastRemarkAt = System.currentTimeMillis();
 				lastRemark = r;
 				anyoneSpoke = now;
 				sayNear(r);

@@ -71,6 +71,29 @@ public final class WorldSenses {
 		return n.equals("stone") || n.equals("deepslate") || n.equals("cobblestone");
 	}
 
+	/**
+	 * A log that's part of a tree (leaves grew on it, not placed ones), not one somebody built a house with: the way a
+	 * player tells a trunk from a wall of logs.
+	 */
+	static boolean treeLog(ServerLevel level, BlockPos p) {
+		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+		for (int dy = -1; dy <= 12; dy++) {
+			for (int dx = -2; dx <= 2; dx++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+					if (!level.isLoaded(m)) return true;                           // (can't tell: say yes)
+					BlockState s = level.getBlockState(m);
+					if (s.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock) {
+						if (!s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT) || !s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)) return true;
+					} else if (s.is(net.minecraft.world.level.block.Blocks.NETHER_WART_BLOCK) || s.is(net.minecraft.world.level.block.Blocks.WARPED_WART_BLOCK)) {
+						return true;                                                    // (a Nether "tree")
+					}
+				}
+			}
+		}
+		return false;
+	}
+
 	/** Can sight pass through it? (glass, ice...) */
 	static boolean opaque(ServerLevel level, BlockPos pos, BlockState state) {
 		int c = category(level, pos, state);

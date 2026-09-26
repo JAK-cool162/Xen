@@ -155,6 +155,23 @@ public final class GlAccelerator implements Llm.Accelerator {
 		}
 	}
 
+	private static String gpuName;
+
+	/**
+	 * The game's graphics card, as its driver names it ("Adreno (TM) 740", "NVIDIA GeForce RTX 3060/PCIe/SSE2"), for the
+	 * settings screen. Asked once, on the render thread; "unknown" if the game doesn't draw with OpenGL.
+	 */
+	static String gpuName() {
+		if (gpuName != null) return gpuName;
+		try {
+			String r = GL11.glGetString(GL11.GL_RENDERER), v = GL11.glGetString(GL11.GL_VENDOR);
+			gpuName = r == null ? "unknown" : r + (v != null && !r.toLowerCase(Locale.ROOT).contains(v.toLowerCase(Locale.ROOT).split(" ")[0]) ? " (" + v + ")" : "");
+		} catch (Throwable e) {
+			gpuName = "unknown";
+		}
+		return gpuName;
+	}
+
 	// ----------------------------------------------------------------------- setting up
 	/** On the GL thread: the context, a check of what it is, the shader. A reason it can't be used, or null. */
 	private String setUp(boolean force) {

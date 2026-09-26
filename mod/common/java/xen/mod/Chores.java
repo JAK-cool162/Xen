@@ -24,7 +24,7 @@ import java.util.UUID;
  * digs there with its own hands, and looks around when it knows of none.
  */
 final class Chores {
-	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE, MINE, SMELT, PICKUP }
+	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE, MINE, SMELT, PICKUP, BLOCKS, SLAY }
 
 	/** The small redstone circuits Xen learned (xen/redstone, exported by scripts/export_circuits.py). */
 	static final com.google.gson.JsonObject CIRCUITS;
@@ -168,7 +168,15 @@ final class Chores {
 		want = Math.max(1, amount);
 		had = count(items);
 		int[] known = c.senses.nearestKnown(cats, 0.25, skip, 4);
+		for (int tries = 0; known != null && known[4] == Blocks.LOG && tries < 8; tries++) {   // a tree, not someone's house
+			BlockPos k = new BlockPos(known[0], known[1], known[2]);
+			ServerLevel level = (ServerLevel) c.player.level();
+			if (!level.isLoaded(k) || WorldSenses.treeLog(level, k)) break;
+			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
+			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
+		}
 		if (known == null) return "You don't know where to find any " + lookFor + ", so you will look around for some.";
+		XenMod.LOG.info("{} goes for {} it knows at {} {} {}", c.name, Blocks.NAMES[known[4]], known[0], known[1], known[2]);
 		String name = known[4] == Blocks.LOG ? "tree" : Blocks.NAMES[known[4]];
 		return known[3] == 1
 				? String.format(java.util.Locale.ROOT, "You will get %d %s from the %s you know is %.0f blocks from you.", want, what, name, distance(known))
@@ -509,6 +517,8 @@ final class Chores {
 			case TRADE -> c.trader.villagerStep();
 			case MINE -> mineNext();
 			case PICKUP -> pickupNext();
+			case BLOCKS -> blocksNext();
+			case SLAY -> slayNext();
 			case SMELT -> smeltNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
@@ -575,10 +585,11 @@ final class Chores {
 		int[] known = glance(cats);                                    // what it can see around it (14 blocks)...
 		for (int tries = 0; known == null && tries < 12; tries++) {       // ...or saw earlier, further away
 			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
-			if (known == null || known[4] != Blocks.STONE) break;
+			if (known == null || known[4] != Blocks.STONE && known[4] != Blocks.LOG) break;
 			BlockPos k = new BlockPos(known[0], known[1], known[2]);       // what it saw: real stone, not a mushroom cap or a wall
-			ServerLevel level = (ServerLevel) c.player.level();
-			if (!level.isLoaded(k) || WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(k).getBlock()).getPath())) break;
+			ServerLevel level = (ServerLevel) c.player.level();         // (and a tree, not someone's house)
+			if (!level.isLoaded(k) || (known[4] == Blocks.LOG ? WorldSenses.treeLog(level, k)
+					: WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(k).getBlock()).getPath()))) break;
 			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
 			known = null;
 		}
@@ -595,6 +606,13 @@ final class Chores {
 			target = t;
 			closest = Double.MAX_VALUE;
 			lastCloser = now();
+		}
+		if (known[4] == Blocks.LOG) lastLog = t;
+		if (c.player.isUnderWater() && c.player.getAirSupply() < c.player.getMaxAirSupply() / 2 || underwater(t)) {
+			skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));   // under water: not worth drowning for
+			target = null;
+			doing = "coming up for air";
+			return c.player.isInWater() ? Action.JUMP : null;
 		}
 		double d = distance(known);
 		if (d < closest - 0.5) {
@@ -763,6 +781,121 @@ final class Chores {
 		if (pickupGoneAt < 0) pickupGoneAt = now();
 		if (now() - pickupGoneAt > 60) finish("Hmm, the " + what + " is gone.");
 		return Action.IDLE;
+	}
+
+	// ------------------------------------------------------------------------------ blocks and mobs, for something
+	private String blocksId, blocksItem, slayType;
+
+	/**
+	 * Mine blocks of one kind it can see (gravel for flint, obsidian for a portal) until it has this many of an item
+	 * (flint drops from gravel only now and then, like for anyone): the plan, or why not.
+	 */
+	String mineFor(String block, String item, int amount, String what) {
+		BlockPos at = findVisible(block);
+		begin(Kind.BLOCKS);
+		until = now() + 20 * 60 * 4;
+		blocksId = block;
+		blocksItem = item;
+		items = new String[] {item, block};
+		this.what = what;
+		lookFor = block.replace('_', ' ');
+		want = amount;
+		had = countItem(item);
+		return at == null ? "You will look around for " + lookFor + " to get " + what + "."
+				: String.format(java.util.Locale.ROOT, "You will mine the %s %.0f blocks away to get %s.", lookFor, Math.sqrt(at.distSqr(c.player.blockPosition())), what);
+	}
+
+	private Action blocksNext() {
+		if (countItem(blocksItem) - had >= want) {
+			finish("Got the " + what + "!");
+			return null;
+		}
+		ItemEntity drop = dropToPickUp();
+		if (drop != null) {
+			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
+			return c.walkTo(drop.position());
+		}
+		if (target == null || !isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(c.player.level().getBlockState(target).getBlock()).getPath(), blocksId)
+				|| skip.contains(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()))) {
+			target = findVisible(blocksId);
+			while (target != null && skip.contains(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()))) {
+				target = null;                                                 // (a skipped one: look again in a moment)
+			}
+			closest = Double.MAX_VALUE;
+			lastCloser = now();
+		}
+		if (target == null) {
+			doing = "looking for " + lookFor;
+			return lookAround();
+		}
+		double d = Math.sqrt(target.distSqr(c.player.blockPosition()));
+		if (d < closest - 0.5) {
+			closest = d;
+			lastCloser = now();
+		} else if (now() - lastCloser > 300) {
+			skip.add(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()));
+			target = null;
+			return null;
+		}
+		doing = String.format(java.util.Locale.ROOT, "mining %s for %s (%d of %d)", lookFor, what, countItem(blocksItem) - had, want);
+		return reach(target);
+	}
+
+	/**
+	 * Hunt a kind of mob for what it drops (spiders for string, chickens for feathers, endermen for pearls, blazes
+	 * for rods), until it has this many of the item.
+	 */
+	String slay(String mob, String item, int amount, String what) {
+		begin(Kind.SLAY);
+		until = now() + 20 * 60 * 5;
+		slayType = mob;
+		items = new String[] {item};
+		this.what = what;
+		want = amount;
+		had = countItem(item);
+		prey = nearestOf(mob);
+		return prey == null ? "You will look for a " + mob.replace('_', ' ') + " to get " + what + "."
+				: String.format(java.util.Locale.ROOT, "You will fight the %s %.0f blocks away for %s.", mob.replace('_', ' '), c.player.distanceTo(prey), what);
+	}
+
+	private LivingEntity nearestOf(String type) {
+		LivingEntity best = null;
+		for (LivingEntity e : c.player.level().getEntitiesOfClass(LivingEntity.class, c.player.getBoundingBox().inflate(40), x -> x.isAlive()
+				&& net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(x.getType()).getPath().equals(type))) {
+			if (!WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, e) && c.player.distanceTo(e) > Perception.NEAR) continue;
+			if (best == null || c.player.distanceTo(e) < c.player.distanceTo(best)) best = e;
+		}
+		return best;
+	}
+
+	private Action slayNext() {
+		if (countItem(items[0]) - had >= want) {
+			finish("Got the " + what + "!");
+			return null;
+		}
+		ItemEntity drop = dropToPickUp();
+		if (drop != null) {
+			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
+			return c.walkTo(drop.position());
+		}
+		if (prey == null || !prey.isAlive() || c.player.distanceTo(prey) > 48) prey = nearestOf(slayType);
+		if (prey == null) {
+			doing = "looking for a " + slayType.replace('_', ' ');
+			return lookAround();
+		}
+		doing = String.format(java.util.Locale.ROOT, "fighting a %s for %s (%d of %d)", slayType.replace('_', ' '), what, countItem(items[0]) - had, want);
+		double d = c.player.distanceTo(prey);
+		if (d <= c.player.entityInteractionRange()) {
+			if (c.player.getAttackStrengthScale(0.5f) < 0.9f) return Action.IDLE;
+			c.hands.hit(prey);
+			c.acted = true;
+			return Action.ATTACK;
+		}
+		if (d > 6 && c.hands.hasBow() && c.player.hasLineOfSight(prey)) {            // out of reach (a blaze up there): the bow
+			Action shot = c.shoot(prey.position().add(0, prey.getBbHeight() * 0.6, 0), prey.getDeltaMovement());
+			if (shot != null) return shot;
+		}
+		return c.walkTo(prey.position());
 	}
 
 	// ------------------------------------------------------------------------------ smelting
@@ -970,13 +1103,22 @@ final class Chores {
 					if (!want[cat]) continue;
 					if (cat == Blocks.STONE && !WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath())) continue;
 					double d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.max(0, dy - 1);   // high up counts as further
+					if (cat == Blocks.LOG && lastLog != null && Math.abs(m.getX() - lastLog.getX()) <= 1 && Math.abs(m.getZ() - lastLog.getZ()) <= 1
+							&& m.getY() >= lastLog.getY() && m.getY() - feet.getY() <= 6) {
+						d = Math.sqrt(dx * dx + dz * dz) - 8;                            // the rest of the tree it's chopping, first
+					}
 					if (d >= best || skip.contains(Perception.Beliefs.key(m.getX(), m.getY(), m.getZ()))) continue;
 					boolean shows = false;
 					for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
 						n.setWithOffset(m, side);
-						shows |= level.getBlockState(n).canBeReplaced() || level.getBlockState(n).is(net.minecraft.tags.BlockTags.LEAVES);
+						var ns = level.getBlockState(n);                              // open to the air (not under water: it would drown)
+						shows |= ns.canBeReplaced() && ns.getFluidState().isEmpty() || ns.is(net.minecraft.tags.BlockTags.LEAVES);
 					}
 					if (!shows) continue;
+					if (cat == Blocks.LOG && !WorldSenses.treeLog(level, m)) {            // a house's logs, not a tree: leave them
+						skip.add(Perception.Beliefs.key(m.getX(), m.getY(), m.getZ()));
+						continue;
+					}
 					best = d;
 					glanced = new int[] {m.getX(), m.getY(), m.getZ(), 1, cat};
 				}
@@ -987,6 +1129,20 @@ final class Chores {
 
 	/** How far it looks around for what it's gathering. */
 	static final int GLANCE = 14;
+	/** The last log it went for (the rest of that tree comes first: players don't leave floating trunks). */
+	private BlockPos lastLog;
+
+	/** Only water around it (a river bed, the bottom of a lake): it would have to dive for it. */
+	private boolean underwater(BlockPos b) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		boolean water = false;
+		for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+			var ns = level.getBlockState(b.relative(side));
+			if (ns.getFluidState().isEmpty() && (ns.canBeReplaced() || ns.is(net.minecraft.tags.BlockTags.LEAVES))) return false;
+			water |= !ns.getFluidState().isEmpty();
+		}
+		return water;
+	}
 
 	/**
 	 * Can it mine this from where it stands, like a player: within reach, and the first thing its eyes meet on the way
@@ -997,8 +1153,8 @@ final class Chores {
 		Vec3 eye = c.player.getEyePosition(), center = Vec3.atCenterOf(t);
 		double reach = c.player.blockInteractionRange() - 0.3;
 		if (eye.distanceTo(center) > reach) return null;
-		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, center, net.minecraft.world.level.ClipContext.Block.COLLIDER,
-				net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));
+		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, center, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));                  // (what the mouse picks: grass and flowers too)
 		if (hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.getBlockPos().equals(t)) return t;
 		BlockPos in = hit.getBlockPos();
 		if (level.getBlockState(in).is(net.minecraft.tags.BlockTags.LEAVES) && eye.distanceTo(Vec3.atCenterOf(in)) <= reach) return in;
@@ -1040,6 +1196,10 @@ final class Chores {
 			return null;
 		}
 		if (Math.abs(dx) + Math.abs(dz) <= 1 && dy < 0) return digDown(t);
+		if (dx == 0 && dz == 0 && (dy == 0 || dy == 1) && hands.mine(t)) {   // standing in it (grass, a flower): at its feet
+			c.acted = true;
+			return Action.MINE;
+		}
 		return c.walkTo(Vec3.atCenterOf(t));
 	}
 

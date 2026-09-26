@@ -104,7 +104,12 @@ REQUESTS = ["Xen, get some wood", "xen follow me", "do you have wood?", "can you
             "truce!", "ok ok i give up", "sorry", "stop fighting me", "peace?", "i surrender", "don't hit me", "ยอมแพ้แล้ว",
             "build a mob farm", "make a wheat farm", "build us a farm", "build an animal pen", "build a mob grinder", "สร้างฟาร์ม",
             "pick up the crafting table", "mine the crafting table", "break your furnace",
-            "build a statue of me", "make a statue of yourself", "build a statue", "build a statue of steve"]
+            "build a statue of me", "make a statue of yourself", "build a statue", "build a statue of steve",
+            "go to the nether", "let's go to the nether", "kill the ender dragon", "beat the game", "find the stronghold",
+            "get 6 blaze rods", "build a nether portal", "light the portal", "raid the trial chamber", "leave the nether",
+            "follow me to the nether", "put your stuff in the chest", "store everything away", "sort your inventory",
+            "guard the village", "protect our base", "attack steve", "team up against notch", "ไปเนเธอร์กัน", "ฆ่ามังกร",
+            "เก็บของใส่หีบ", "where is the nether portal?", "the nether is 8 times smaller"]
 
 
 def main():

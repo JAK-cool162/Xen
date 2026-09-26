@@ -60,6 +60,13 @@ final class Roster {
 		JsonArray memories = new JsonArray();
 		for (String m : c.memories) memories.add(m);
 		o.add("memories", memories);
+		o.add("places", c.places.toJson());
+		o.add("chests", c.storage.toJson());
+		o.add("knows", c.knowledge.toJson());
+		o.add("taste", c.taste.toJson());
+		o.add("crops", c.farmer.toJson());
+		if (c.adventure.on) o.addProperty("adventure", true);
+		if (c.band != null) o.addProperty("band", c.band);
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

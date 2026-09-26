@@ -43,8 +43,40 @@ public final class Chat {
 	public static final String SHA256 = "48ab3034d0dd401fbc721eb1df3217902fee7dab9078992d66431f09b7750201";
 	/** Where the all-in-one jar carries the model. */
 	public static final String EMBEDDED = "/assets/xen/model/" + MODEL;
-	/** Memory the game should have (-Xmx3G or more) before the model is loaded on "auto"; the model takes about 500 MB. */
+	/** Memory the game should have (-Xmx3G or more) before the normal model is loaded on "auto"; it takes about 500 MB. */
 	public static final long AUTO_MEMORY = 2816L << 20;
+	/** Below that, "auto" takes the small model (about 200 MB); below this, none at all. */
+	public static final long SMALL_MEMORY = 1100L << 20;
+
+	/** A chat model it can run: the file, where it comes from, its SHA-256, about how big, what it's called. */
+	public record Model(String file, String url, String sha256, int megabytes, String name) {}
+
+	/** The normal one (the best answers), and a small one for phones and weak computers (three times faster, simpler). */
+	public static final Model NORMAL = new Model(MODEL, URL, SHA256, 390, "SmolLM2 360M"),
+			SMALL = new Model("SmolLM2-135M-Instruct-Q8_0.gguf", "https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q8_0.gguf",
+					"5a1395716f7913741cc51d98581b9b1228d80987a9f7d3664106742eb06bba83", 145, "SmolLM2 135M");
+	/** The chatModelSize setting: "auto" (small on phones and with less memory), "small" or "normal". */
+	public static java.util.function.Supplier<String> sizeSetting = () -> "auto";
+
+	/** Is the game running on a phone (Pojav, Zalith and other Android launchers)? */
+	static boolean phone() {
+		return System.getenv("POJAV_NATIVEDIR") != null || System.getenv("POJAV_RENDERER") != null
+				|| System.getProperty("java.vendor", "").toLowerCase(Locale.ROOT).contains("android")
+				|| System.getProperty("java.vm.vendor", "").toLowerCase(Locale.ROOT).contains("android") || Files.exists(Path.of("/system/build.prop"));
+	}
+
+	/** The model to use now, from the setting (and, on auto, the device). */
+	public static Model chosen() {
+		String s = sizeSetting.get() == null ? "auto" : sizeSetting.get().toLowerCase(Locale.ROOT);
+		return switch (s) {
+			case "small", "135m", "tiny" -> SMALL;
+			case "normal", "360m", "big", "large" -> NORMAL;
+			default -> phone() || Runtime.getRuntime().maxMemory() < AUTO_MEMORY ? SMALL : NORMAL;
+		};
+	}
+
+	/** Which model is loaded now (null: none). */
+	public volatile Model loaded;
 
 	static final String PERSONA = "<|im_start|>system\nYou are Xen, a survival companion in Minecraft. You play fair like a real player: "
 			+ "you only know what you have seen yourself, and far-away things are only guesses. You feel fear, pain and "
@@ -75,6 +107,10 @@ public final class Chat {
 	private static final String[][] RULES = {                                   // the first that matches wins
 			{"pickup", "\\b(mine|break|pick up|pickup|take|grab|collect) (the |that |this |your |my |a )?(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\\b"},
 			{"peace", "\\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"},
+			{"attack", "\\b(attack|go after|gang up on|team up (on|against)|take down|hunt down) (the )?([a-z0-9_]{3,16})\\b"},
+			{"quest", "\\b(kill|beat|defeat|slay|fight) (the )?(ender ?)?dragon\\b|\\bbeat the game\\b|\\b(find|locate|look for) (the |a )?(stronghold|end portal)\\b|\\b(go|travel|head) (to|into) (the )?(nether|end)\\b|\\bnether trip\\b|\\b(get|find|farm|collect) (some |me |us )?(\\d+ )?blaze rods?\\b|\\b(build|make|light) (a |the |us a |me a )?(nether )?portal\\b|\\b(raid|loot|clear|do|beat|take on) (the |a )?(trial chambers?|vaults?)\\b|\\bleave the nether\\b|\\b(go|get) (back )?home from the nether\\b"},
+			{"store", "\\b(put|store|stash|deposit|dump)\\b.*\\b(chests?|storage|away)\\b|\\b(sort|organi[sz]e) (the |your )?(chests?|storage|stuff|inventory)\\b"},
+			{"guard", "\\b(guard|protect|defend|patrol|keep watch over) (the |our |my |this )?(village|base|home|house|area|territory|farm)\\b|\\bkeep (the )?(monsters|mobs) (out|away)\\b"},
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
@@ -93,6 +129,7 @@ public final class Chat {
 			{"follow", "\\b(follow|come|with me|let'?s go|over here|this way|keep up|to me)\\b"},
 	};
 	private static final Pattern[] RULE = new Pattern[RULES.length];
+	private static final Pattern RULE_ATTACK = Pattern.compile("\\b(attack|go after|gang up on|team up (on|against)|take down|hunt down) (the )?([a-z0-9_]{3,16})\\b");
 	/** Trading comes first, questions too ("how much for your logs?"): Xen answers those itself, as a trader. */
 	private static final Pattern TRADE = Pattern.compile("\\b(trade|trades|trading|sell|selling|buy|buying|swap|exchange|barter|haggle|how much (for|is|are|do you want)|what do you want for|price (of|for))\\b|\\b\\d{1,3} [a-z_]+ for (\\d{1,3} )?(your |my )?[a-z_]+");
 	private static final Pattern QUESTION = Pattern.compile("^((what|where|why|how|who|when|which)\\b|(do|does|did|are|is|am|was|were|have|has|had) "
@@ -155,7 +192,8 @@ public final class Chat {
 	}
 
 	/** Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins. */
-	static final String[][] THAI = {{"peace", "สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว"}, {"chat", "ขอบคุณ"}, {"trade", "แลก", "เทรด", "ซื้อ", "ขาย"}, {"stop", "หยุด", "พอแล้ว", "ยกเลิก"},
+	static final String[][] THAI = {{"peace", "สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว"}, {"quest", "มังกร", "เนเธอร์", "ดิเอนด์", "ห้องทดลอง"},
+			{"store", "เก็บของ", "ใส่หีบ", "ใส่กล่อง"}, {"chat", "ขอบคุณ"}, {"trade", "แลก", "เทรด", "ซื้อ", "ขาย"}, {"stop", "หยุด", "พอแล้ว", "ยกเลิก"},
 			{"stay", "ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่"}, {"follow", "ตาม", "มานี่", "มาทางนี้", "มาหา"}, {"give", "ขอ", "ส่ง"},
 			{"explore", "สำรวจ", "ไปเที่ยว", "ไปเล่น"}, {"redstone", "เรดสโตน", "วงจร"}, {"wood", "ไม้"}, {"coal", "ถ่าน"}, {"iron", "เหล็ก"},
 			{"stone", "หิน"}, {"mine", "ขุด", "แร่", "เพชร", "ทอง"}, {"food", "อาหาร", "ล่า", "หาของกิน"},
@@ -241,6 +279,20 @@ public final class Chat {
 			}
 			amount = n != null ? n : 1;
 		}
+		if (intent.equals("quest")) {                                         // "go to the nether" is (quest, nether)
+			thing = Pattern.compile("\\b(trial|vault)|ห้องทดลอง").matcher(words).find() ? "trial"
+					: Pattern.compile("\\bblaze\\b").matcher(words).find() ? "blaze"
+					: Pattern.compile("\\b(leave the nether|home)\\b").matcher(words).find() ? "home"
+					: Pattern.compile("\\b(build|make|light) (a |the |us a |me a )?(nether )?portal\\b").matcher(words).find() ? "portal"
+					: Pattern.compile("\\b(dragon|stronghold|end portal|the end|beat the game)\\b|มังกร|ดิเอนด์").matcher(words).find() ? "dragon" : "nether";
+			amount = n != null ? n : 0;
+		}
+		if (intent.equals("attack")) {                                        // "attack steve" is (attack, steve)
+			Matcher m = RULE_ATTACK.matcher(words);
+			thing = m.find() ? m.group(4) : "";
+			amount = 0;
+		}
+		if (intent.equals("store") || intent.equals("guard")) amount = 0;
 		if (intent.equals("give")) {
 			thing = "all";
 			for (String[] t : GIVE_THINGS) {
@@ -316,7 +368,7 @@ public final class Chat {
 		return switch (p) {
 			case "on", "true" -> true;
 			case "off", "false" -> false;
-			default -> Runtime.getRuntime().maxMemory() >= AUTO_MEMORY;
+			default -> Runtime.getRuntime().maxMemory() >= SMALL_MEMORY;       // (the small model when memory is short)
 		};
 	}
 
@@ -326,29 +378,30 @@ public final class Chat {
 
 	/** The chat model's state in words, for players: ready, waking up, or off and why. */
 	public String status() {
-		if (llm != null) return "ready (on the " + runsOn + ")";
+		if (llm != null) return "ready (" + (loaded == null ? "" : loaded.name() + ", ") + "on the " + runsOn + ")";
 		if (loading) return "still waking up (that takes a minute or two)";
 		String p = policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT);
 		if (p.equals("off") || p.equals("false")) return "turned off in the settings";
 		if (!wantsModel()) {
-			return "off: the game has " + (Runtime.getRuntime().maxMemory() >> 20) + " MB of memory and it needs about "
-					+ (AUTO_MEMORY >> 20) + " MB (give Minecraft more memory in your launcher, or set Chat model to on)";
+			return "off: the game has " + (Runtime.getRuntime().maxMemory() >> 20) + " MB of memory and even the small model needs about "
+					+ (SMALL_MEMORY >> 20) + " MB (give Minecraft more memory in your launcher, or set AI chat to on)";
 		}
 		return problem != null ? "not available (" + problem + ")" : "not loaded yet";
 	}
 
 	/** Start loading the model in the background (it answers in plain words until it's ready). */
 	public synchronized void warmUp() {
+		if (llm != null && loaded != null && loaded != chosen() && !loading) sleep();   // the size setting changed: the other model
 		if (llm != null || loading) return;
-		String p = policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT);
+		String p = (policy.get() == null ? "auto" : policy.get().toLowerCase(Locale.ROOT)) + "/" + chosen().file();
 		boolean sameSetting = p.equals(problemPolicy);
 		if (problem != null && sameSetting && System.currentTimeMillis() - problemAt < 10 * 60_000L) return;   // try again later, or when the setting changes
 		problemAt = System.currentTimeMillis();
 		problemPolicy = p;
 		if (!wantsModel()) {
-			boolean off = p.equals("off") || p.equals("false");
+			boolean off = p.startsWith("off/") || p.startsWith("false/");
 			problem = off ? "turned off in the settings" : "not loaded: the game has " + (Runtime.getRuntime().maxMemory() >> 20)
-					+ " MB of memory and the chat model wants " + (AUTO_MEMORY >> 20) + " MB (set \"chatModel\": \"on\" in config/xen.json to load it anyway)";
+					+ " MB of memory and even the small chat model wants " + (SMALL_MEMORY >> 20) + " MB (set \"chatModel\": \"on\" in config/xen.json to load it anyway)";
 			if (!off) log.accept("Xen's chat model " + problem + ". Xen still understands requests and answers in plain words.");
 			return;
 		}
@@ -392,13 +445,14 @@ public final class Chat {
 					float[] s = model.choose(EARS + "<|im_start|>user\n" + words + "<|im_end|>\n<|im_start|>assistant\n", INTENTS);
 					int best = 0;
 					for (int i = 1; i < s.length; i++) if (s[i] > s[best]) best = i;
-					if (s[best] - s[INTENTS.length - 1] >= SURE) request = details(INTENTS[best], words);
+					if (s[best] - s[java.util.Arrays.asList(INTENTS).indexOf("chat")] >= SURE) request = details(INTENTS[best], words);
 				}
 				String notes = act.apply(request);
 				if (notes == null) return;
 				String answer = null;
 				if (model != null && !PLAN.matcher(notes.trim()).find()) {   // requests are answered with the plan, in plain words
-					String prompt = PERSONA + "<|im_start|>user\nNotes: " + notes + "\n" + speaker + " says: " + message
+					String brief = notes.length() > 900 ? notes.substring(0, notes.lastIndexOf(' ', 900) > 0 ? notes.lastIndexOf(' ', 900) : 900) : notes;   // (short: fast on phones)
+					String prompt = PERSONA + "<|im_start|>user\nNotes: " + brief + "\n" + speaker + " says: " + message
 							+ "<|im_end|>\n<|im_start|>assistant\n";
 					for (int attempt = 0; attempt < 2 && answer == null; attempt++) {  // made something up: try once more
 						String text = safe(model.generate(prompt, 40, 0.5f, 0.9f, System.nanoTime()));
@@ -408,6 +462,12 @@ public final class Chat {
 				reply.accept(answer != null ? answer : plainly(notes, message));
 			} catch (Throwable e) {
 				log.accept("Xen's chat failed: " + e);
+				try {
+					String notes = act.apply(new Request("chat", "", 0));             // it still answers, simply
+					if (notes != null) reply.accept(plainly(notes, message));
+				} catch (Throwable ignored) {
+					// (nothing to say then)
+				}
 			} finally {
 				pending.decrementAndGet();
 			}
@@ -415,20 +475,23 @@ public final class Chat {
 	}
 
 	private Llm model() throws IOException {
+		Model m = chosen();
+		Path modelPath = this.modelPath.resolveSibling(m.file());
 		if (!Files.exists(modelPath)) {
-			try (InputStream in = Chat.class.getResourceAsStream(EMBEDDED)) {     // the all-in-one jar has it inside
+			try (InputStream in = Chat.class.getResourceAsStream("/assets/xen/model/" + m.file())) {   // the all-in-one jar has it inside
 				if (in != null) {
 					log.accept("Unpacking Xen's chat model from the mod to " + modelPath + " (only the first time)...");
-					unpack(in, modelPath);
+					unpack(in, modelPath, m.sha256());
 				}
 			}
 		}
 		if (!Files.exists(modelPath)) {
 			if (!download.getAsBoolean()) throw new IOException("no chat model at " + modelPath + " (downloadChatModel is off)");
-			fetch();
+			fetch(m, modelPath);
 		}
-		log.accept("Loading Xen's chat model (" + modelPath.getFileName() + ")...");
+		log.accept("Loading Xen's chat model (" + m.name() + ", " + modelPath.getFileName() + ")...");
 		Llm model = new Llm(modelPath.toString(), threads, 1024);
+		loaded = m;
 		String setting = gpuSetting.get();
 		runsOn = "CPU";
 		var makeGpu = gpu;
@@ -457,15 +520,15 @@ public final class Chat {
 		return model;
 	}
 
-	private void fetch() throws IOException {
+	private void fetch(Model m, Path modelPath) throws IOException {
 		Files.createDirectories(modelPath.getParent());
-		log.accept("Downloading Xen's chat model (" + MODEL + ", about 390 MB) to " + modelPath + " ...");
+		log.accept("Downloading Xen's chat model (" + m.name() + ", about " + m.megabytes() + " MB) to " + modelPath + " ...");
 		HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build();
 		try {
-			HttpResponse<InputStream> r = http.send(HttpRequest.newBuilder(URI.create(URL)).build(), HttpResponse.BodyHandlers.ofInputStream());
+			HttpResponse<InputStream> r = http.send(HttpRequest.newBuilder(URI.create(m.url())).build(), HttpResponse.BodyHandlers.ofInputStream());
 			if (r.statusCode() != 200) throw new IOException("download failed: HTTP " + r.statusCode());
 			try (InputStream in = r.body()) {
-				unpack(in, modelPath);
+				unpack(in, modelPath, m.sha256());
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -479,6 +542,11 @@ public final class Chat {
 	 * if it's exactly the right file (its SHA-256). A cut-off or damaged copy is thrown away, never loaded.
 	 */
 	public static void unpack(InputStream in, Path to) throws IOException {
+		unpack(in, to, SHA256);
+	}
+
+	/** The same, for a model with this SHA-256. */
+	public static void unpack(InputStream in, Path to, String sha256) throws IOException {
 		Files.createDirectories(to.toAbsolutePath().getParent());
 		Path part = to.resolveSibling(to.getFileName() + ".part");
 		java.security.MessageDigest sha;
@@ -491,7 +559,7 @@ public final class Chat {
 			Files.copy(checked, part, StandardCopyOption.REPLACE_EXISTING);
 		}
 		String got = java.util.HexFormat.of().formatHex(sha.digest());
-		if (!got.equals(SHA256)) {
+		if (!got.equals(sha256)) {
 			Files.deleteIfExists(part);
 			throw new IOException("the chat model file is damaged (SHA-256 " + got + "), so it wasn't used");
 		}
@@ -503,6 +571,7 @@ public final class Chat {
 		if (llm == null) return;
 		Llm model = llm;
 		llm = null;
+		loaded = null;
 		problem = null;
 		worker.submit(model::close);                                   // after anything it's still saying
 		log.accept("Xen's chat model is resting (nobody around to talk to).");

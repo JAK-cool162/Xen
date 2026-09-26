@@ -74,6 +74,12 @@ public class XenMod implements ModInitializer {
 		return server;
 	}
 	final List<Companion> companions = new CopyOnWriteArrayList<>();
+	/** The tribes Xens live in (see {@link Tribe}), by key. */
+	final java.util.Map<String, Tribe> tribes = Tribe.newMap();
+	/** Lines Xens said lately (any of them): so they don't all say the same thing over and over. */
+	final java.util.Map<String, Long> saidLately = new java.util.HashMap<>();
+	/** When a Xen last made a remark on its own (they take turns, a few seconds apart, not all at once). */
+	volatile long lastRemarkAt;
 	private final AtomicInteger pendingTraining = new AtomicInteger();
 	private volatile boolean running;
 	private Thread trainer;
@@ -85,6 +91,7 @@ public class XenMod implements ModInitializer {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
 		Chat.gpuSetting = () -> config.gpu;
+		Chat.sizeSetting = () -> config.chatModelSize;
 		skins.prepare(configDir, config.skins);
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
@@ -96,6 +103,7 @@ public class XenMod implements ModInitializer {
 		ServerTickEvents.END_SERVER_TICK.register(this::tick);
 		ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> heard(sender, message.signedContent()));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> ownerLeft(handler.getPlayer()));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> ownerJoined(handler.getPlayer()));
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
 			if (!(entity instanceof XenPlayer xen) || !(player instanceof ServerPlayer sp) || xen.companion == null) return InteractionResult.PASS;
 			if (!sp.getUUID().equals(xen.companion.owner)) return InteractionResult.PASS;
@@ -123,6 +131,8 @@ public class XenMod implements ModInitializer {
 			LOG.warn("Starting Xen with a newborn brain: {}", e.toString());
 			brain = new Brain(Perception.OBS_DIM);
 		}
+		loadAway();
+		later(60, () -> comeBack(o -> !o.has("owner")));                          // the free ones: back when the world is up
 		running = true;
 		trainer = new Thread(this::train, "xen-learning");
 		trainer.setDaemon(true);
@@ -193,6 +203,10 @@ public class XenMod implements ModInitializer {
 
 	private void stopping(MinecraftServer s) {
 		arena.stop("the server is stopping.");
+		for (Companion c : companions) if (c.player() != null && !c.inArena) rememberAway(c);   // they come back next time
+		saveAway();
+		for (Companion c : companions) roster.remember(c, teamOf(c));                          // (before they leave: all they know)
+		roster.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
 		running = false;
 		if (trainer != null) trainer.interrupt();
@@ -203,6 +217,7 @@ public class XenMod implements ModInitializer {
 	// --------------------------------------------------------------------------------- world
 	private void tick(MinecraftServer s) {
 		arena.tick();
+		runLater();
 		List<Companion> order = new ArrayList<>(companions);
 		java.util.Collections.shuffle(order, random);                  // nobody always gets to act first
 		for (Companion c : order) {
@@ -218,6 +233,11 @@ public class XenMod implements ModInitializer {
 		}
 		if (s.getTickCount() % 100 == 0) {
 			wakeChat();
+			try {
+				Tribe.tickAll(this);                                          // tribes: who's in which, sharing, the night watch
+			} catch (RuntimeException e) {
+				LOG.warn("Xen tribes stumbled: {}", e.toString(), e);
+			}
 			if (config.evolution) evolve();
 		}
 	}
@@ -303,7 +323,126 @@ public class XenMod implements ModInitializer {
 
 	private void ownerLeft(ServerPlayer p) {
 		if (p == null || p instanceof XenPlayer || !config.leaveWithOwner) return;
-		for (Companion c : companions) if (p.getUUID().equals(c.owner)) server.execute(c::leave);
+		for (Companion c : companions) {
+			if (!p.getUUID().equals(c.owner)) continue;
+			rememberAway(c);                                                     // back when its owner is
+			roster.remember(c, teamOf(c));
+			server.execute(c::leave);
+		}
+		saveAway();
+		roster.save();
+	}
+
+	// ------------------------------------------------------------------------------ coming back
+	/**
+	 * The Xens that were in the world when it stopped (or when their owner left): who, whose, and how they were
+	 * (following, staying, free; a minion and its boss). They come back by themselves: the free ones when the world
+	 * starts, the others when their owner joins, where they were and with their things (the server keeps a player's
+	 * bag and place). Kept in {@code <world>/xen/away.json}.
+	 */
+	private final java.util.Map<String, com.google.gson.JsonObject> away = new java.util.LinkedHashMap<>();
+
+	private Path awayFile() {
+		return brainFile().resolveSibling("away.json");
+	}
+
+	private void rememberAway(Companion c) {
+		com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+		if (c.owner != null) o.addProperty("owner", c.owner.toString());
+		o.addProperty("mode", c.mode.name());
+		if (c.anchor != null) {
+			o.addProperty("ax", c.anchor.getX());
+			o.addProperty("ay", c.anchor.getY());
+			o.addProperty("az", c.anchor.getZ());
+		}
+		if (c.minion) o.addProperty("boss", c.boss == null ? "" : c.boss.name);
+		away.put(c.name, o);
+	}
+
+	private void saveAway() {
+		try {
+			com.google.gson.JsonObject all = new com.google.gson.JsonObject();
+			away.forEach(all::add);
+			Files.createDirectories(awayFile().getParent());
+			Files.writeString(awayFile(), new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(all));
+		} catch (IOException | RuntimeException e) {
+			LOG.warn("Could not save who's away: {}", e.toString());
+		}
+	}
+
+	private void loadAway() {
+		away.clear();
+		try {
+			if (!Files.exists(awayFile())) return;
+			var all = new com.google.gson.Gson().fromJson(Files.readString(awayFile()), com.google.gson.JsonObject.class);
+			for (var e : all.entrySet()) away.put(e.getKey(), e.getValue().getAsJsonObject());
+		} catch (IOException | RuntimeException e) {
+			LOG.warn("Could not read who's away: {}", e.toString());
+		}
+	}
+
+	/** Its owner is back: its Xens come back too (a moment later, when the world around has loaded). */
+	private void ownerJoined(ServerPlayer p) {
+		if (p == null || p instanceof XenPlayer) return;
+		String id = p.getUUID().toString();
+		if (away.values().stream().noneMatch(o -> o.has("owner") && o.get("owner").getAsString().equals(id))) return;
+		later(40, () -> comeBack(o -> o.has("owner") && o.get("owner").getAsString().equals(id)));
+	}
+
+	private final List<Object[]> laterJobs = new ArrayList<>();
+
+	private void later(int ticks, Runnable job) {
+		synchronized (laterJobs) {
+			laterJobs.add(new Object[] {server.getTickCount() + ticks, job});
+		}
+	}
+
+	private void runLater() {
+		List<Runnable> due = new ArrayList<>();
+		synchronized (laterJobs) {
+			laterJobs.removeIf(j -> {
+				if ((int) j[0] > server.getTickCount()) return false;
+				due.add((Runnable) j[1]);
+				return true;
+			});
+		}
+		for (Runnable r : due) r.run();
+	}
+
+	/** Bring back the Xens that were away (those that match), where the server kept them, bosses before their minions. */
+	private void comeBack(java.util.function.Predicate<com.google.gson.JsonObject> which) {
+		List<String> names = new ArrayList<>();
+		for (var e : away.entrySet()) if (which.test(e.getValue())) names.add(e.getKey());
+		names.sort(java.util.Comparator.comparing(n -> away.get(n).has("boss") ? 1 : 0));
+		int back = 0;
+		for (String name : names) {
+			com.google.gson.JsonObject o = away.remove(name);
+			if (server.getPlayerList().getPlayerByName(name) != null || full() && !o.has("boss")) continue;
+			ServerPlayer owner = o.has("owner") ? server.getPlayerList().getPlayer(java.util.UUID.fromString(o.get("owner").getAsString())) : null;
+			if (o.has("owner") && owner == null) {
+				away.put(name, o);                                               // (its owner left again already)
+				continue;
+			}
+			Companion c = create(name, owner, null);
+			try {
+				c.mode = Companion.Mode.valueOf(o.get("mode").getAsString());
+			} catch (RuntimeException e) {
+				c.mode = Companion.Mode.FOLLOW;
+			}
+			if (o.has("ax")) c.anchor = new BlockPos(o.get("ax").getAsInt(), o.get("ay").getAsInt(), o.get("az").getAsInt());
+			if (o.has("boss")) {
+				Companion boss = companions.stream().filter(b -> b.name.equals(o.get("boss").getAsString())).findFirst().orElse(null);
+				if (boss == null || boss.player() == null) continue;              // its boss isn't here: it stays away
+				c.minion = true;
+				c.boss = boss;
+				boss.crew.minions.add(c);
+			}
+			c.join(server.overworld(), null, 0);                                // (the server puts it back where it was, bag and all)
+			companions.add(c);
+			back++;
+		}
+		saveAway();
+		if (back > 0) LOG.info("{} Xens came back ({} still away)", back, away.size());
 	}
 
 	/** A player said something: if it's to a Xen (by name), it understands, does what was asked and answers. */
@@ -363,10 +502,12 @@ public class XenMod implements ModInitializer {
 			if (d > 12) continue;
 			boolean talking = sender.getUUID().equals(c.talkingWith) && now < c.talkingUntil;
 			boolean looking = looksAt(sender, x);
-			boolean justUs = sender.getUUID().equals(c.owner) && d <= 8 && nobodyElseNear(sender, x);
-			if (!talking && !looking && !justUs) continue;
-			if (!looking && otherPlayerCloser(sender, x)) continue;
-			double score = d - (talking ? 6 : 0) - (looking ? 4 : 0);
+			boolean mine = sender.getUUID().equals(c.owner);
+			boolean justUs = mine && d <= 8 && nobodyElseNear(sender, x);
+			boolean close = d <= 5 || mine && d <= 10;                       // right next to you: you're talking to it
+			if (!talking && !looking && !justUs && !close) continue;
+			if (!looking && !mine && otherPlayerCloser(sender, x)) continue;
+			double score = d - (talking ? 6 : 0) - (looking ? 4 : 0) - (mine ? 3 : 0);
 			if (score < bestScore) {
 				bestScore = score;
 				best = c;
@@ -378,7 +519,7 @@ public class XenMod implements ModInitializer {
 	/** Is the player looking right at it (within about 15 degrees)? */
 	private static boolean looksAt(ServerPlayer who, ServerPlayer at) {
 		net.minecraft.world.phys.Vec3 look = who.getViewVector(1f), to = at.getEyePosition().subtract(who.getEyePosition());
-		return to.length() > 0.1 && look.dot(to.normalize()) > 0.966 && who.hasLineOfSight(at);
+		return to.length() > 0.1 && look.dot(to.normalize()) > 0.9 && who.hasLineOfSight(at);   // (about 25 degrees, like a glance)
 	}
 
 	/** No other real player and no other Xen within 16 blocks of the two of them. */
@@ -421,7 +562,12 @@ public class XenMod implements ModInitializer {
 										.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), IntegerArgumentType.getInteger(ctx, "radius"))))))
 				.then(Commands.literal("minions").then(Commands.argument("count", IntegerArgumentType.integer(1, 64))
 						.executes(ctx -> minions(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
-				.then(Commands.literal("dismiss").executes(ctx -> each(ctx, c -> { c.leave(); return c.name + " went home."; })))
+				.then(Commands.literal("dismiss").executes(ctx -> each(ctx, c -> {
+					away.remove(c.name);                                            // (sent home: it doesn't come back by itself)
+					c.leave();
+					saveAway();
+					return c.name + " went home.";
+				})))
 				.then(Commands.literal("mode")
 						.then(Commands.literal("follow").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FOLLOW; return c.name + " will follow you."; })))
 						.then(Commands.literal("stay").executes(ctx -> each(ctx, c -> {
@@ -431,6 +577,15 @@ public class XenMod implements ModInitializer {
 						})))
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
+				.then(Commands.literal("knows").executes(ctx -> each(ctx, c -> c.knowledge.status())))
+
+				.then(Commands.literal("tribes").executes(ctx -> {
+					StringBuilder sb = new StringBuilder();
+					for (Tribe t : tribes.values()) if (t.members.size() > 1) sb.append(sb.length() > 0 ? "\n" : "").append(t.status());
+					String out = sb.length() == 0 ? "No tribes yet (Xens on their own)." : sb.toString();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				}))
 				.then(Commands.literal("chat").then(Commands.literal("on").executes(ctx -> setting(ctx, "chat", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "chat", false))))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
@@ -585,6 +740,14 @@ public class XenMod implements ModInitializer {
 			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
 			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
 			if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString());
+			if (known.has("places")) c.places.load(known.getAsJsonObject("places"));
+			if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests"));
+			if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows"));
+			if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT);
+			if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops"));
+			if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste"));
+			c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean();
+			if (known.has("band")) c.band = known.get("band").getAsString();
 			if (known.has("trust")) {
 				for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
 			}

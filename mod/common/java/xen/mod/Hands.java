@@ -129,8 +129,30 @@ public final class Hands {
 	 */
 	Vec3 steer;
 
+	/**
+	 * Idle: a point its eyes go to (whoever's there, something that moved, the view), turning a little each tick the way
+	 * a player moves the mouse, never in one jump.
+	 */
+	Vec3 glance;
+	/**
+	 * Placing things where people see it (building, a table, a chest): only on a face it can see. (Its legs' own blocks,
+	 * pillaring up and bridging, go the way a player's do, by feel, without this.)
+	 */
+	boolean strictSight;
+
 	void look() {
 		if (aim != null) return;                                      // eyes on the block it's mining
+		if (glance != null && current == Action.IDLE && watching == null) {
+			Vec3 d = glance.subtract(p.getEyePosition());
+			float toY = (float) Math.toDegrees(Math.atan2(-d.x, d.z)), toX = (float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)));
+			float y = p.getYRot() + net.minecraft.util.Mth.clamp(net.minecraft.util.Mth.wrapDegrees(toY - p.getYRot()), -9f, 9f);
+			float x = p.getXRot() + net.minecraft.util.Mth.clamp(toX - p.getXRot(), -6f, 6f);
+			p.setYRot(y);
+			p.setYHeadRot(y);
+			p.setXRot(x);
+			yaw = Math.floorMod(Math.round((y + 180f) / 90f), 4);
+			return;
+		}
 		if (watching != null && watching.isAlive() && watching.level() == p.level()) {
 			Vec3 d = watching.getEyePosition().subtract(p.getEyePosition());
 			float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
@@ -251,8 +273,8 @@ public final class Hands {
 		BlockPos pos = target();
 		BlockState state = level.getBlockState(pos);
 		int c = WorldSenses.category(level, pos, state);
-		if (state.isAir() || c == Blocks.AIR || c == Blocks.LAVA || c == Blocks.WATER || c == Blocks.BEDROCK
-				|| state.getDestroySpeed(level, pos) < 0) {
+		if (state.isAir() || c == Blocks.AIR && state.getShape(level, pos).isEmpty() || c == Blocks.LAVA || c == Blocks.WATER || c == Blocks.BEDROCK
+				|| state.getDestroySpeed(level, pos) < 0) {                   // (grass and flowers it can break: they have a shape)
 			limit = 2;                                                // nothing to mine there
 			return;
 		}
@@ -513,6 +535,16 @@ public final class Hands {
 	 * Place an item it carries at pos by right-clicking a face of the block {@code against}, looking the way
 	 * {@code facing} says (0-3, for parts that face the way you look, like repeaters; -1 = don't care).
 	 */
+	/** placeItem, only on a face it can see (a table, a chest: things people watch it put down). */
+	boolean placeSeen(BlockPos pos, java.util.function.Predicate<ItemStack> item, BlockPos against, Direction side, int facing) {
+		strictSight = true;
+		try {
+			return placeItem(pos, item, against, side, facing);
+		} finally {
+			strictSight = false;
+		}
+	}
+
 	boolean placeItem(BlockPos pos, java.util.function.Predicate<ItemStack> item, BlockPos against, Direction side, int facing) {
 		ServerLevel level = (ServerLevel) p.level();
 		if (!level.getBlockState(pos).canBeReplaced()) {
@@ -528,9 +560,13 @@ public final class Hands {
 			cantPlace = "it has run out of something it needs";
 			return false;
 		}
+		Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(0.5));
+		if (strictSight && !canSee(level, against, side, hit)) {     // like a player: only where it can see the face it clicks
+			cantPlace = "it can't see that spot from here";
+			return false;
+		}
 		stop();
 		p.getInventory().setSelectedSlot(slot);
-		Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(0.5));
 		face(hit);
 		if (facing >= 0) {
 			p.setYRot(YAW[facing]);
@@ -544,6 +580,24 @@ public final class Hands {
 		cantPlace = level.getBlockState(pos).canBeReplaced() ? "it didn't stay (" + result + ", clicked " + level.getBlockState(against).getBlock()
 				+ " " + side + ", holding " + p.getInventory().getSelectedItem() + ")" : "";
 		return cantPlace.isEmpty();
+	}
+
+	/**
+	 * Could a player standing here click that face? Its eyes on the right side of it, and nothing solid between (grass
+	 * and flowers don't count: a click goes through them).
+	 */
+	boolean canSee(ServerLevel level, BlockPos against, Direction side, Vec3 hit) {
+		return canSee(level, p.getEyePosition(), against, side, hit);
+	}
+
+	/** The same, from eyes at that point (a spot it might stand on). */
+	boolean canSee(ServerLevel level, Vec3 eye, BlockPos against, Direction side, Vec3 hit) {
+		Vec3 normal = Vec3.atLowerCornerOf(side.getUnitVec3i());
+		if (eye.subtract(hit).dot(normal) <= 0.01) return false;               // it's behind that face
+		Vec3 to = hit.subtract(normal.scale(0.05));                           // (just into the block)
+		BlockHitResult seen = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+		return seen.getType() == net.minecraft.world.phys.HitResult.Type.MISS || seen.getBlockPos().equals(against);
 	}
 
 	/**
@@ -657,6 +711,7 @@ public final class Hands {
 	 */
 	boolean raiseShield() {
 		if (!isShield(p.getOffhandItem())) {
+			if (isTotem(p.getOffhandItem()) && (p.getHealth() <= 10 || p.companion != null && p.companion.dangerous())) return false;   // the totem stays
 			Inventory inv = p.getInventory();
 			int slot = -1;
 			for (int i = 0; i < 36 && slot < 0; i++) if (isShield(inv.getItem(i))) slot = i;
@@ -683,6 +738,7 @@ public final class Hands {
 		stop();
 		lowerShield();
 		ready();
+		if (p.fallDistance > 1.5 && e.getY() < p.getY()) readyMace();            // falling onto it: a mace smash, if it has one
 		face(e.getEyePosition());
 		p.attack(e);                                                   // attack, then swing: a swing resets the charge
 		Compat.swing(p);
@@ -727,6 +783,163 @@ public final class Hands {
 			return Compat.signText(sign, lines);
 		}
 		return false;
+	}
+
+	// ------------------------------------------------------------------- totems, bows, throwing
+	static boolean isTotem(ItemStack s) {
+		return !s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("totem_of_undying");
+	}
+
+	/**
+	 * A totem of undying in the off hand (the swap-hands key), where it saves its life if it would die. False if it has
+	 * none. A player keeps one there when things get dangerous (low health, the End, lava, a big fall).
+	 */
+	boolean holdTotem() {
+		if (isTotem(p.getOffhandItem())) return true;
+		Inventory inv = p.getInventory();
+		for (int i = 0; i < 36; i++) {
+			if (!isTotem(inv.getItem(i))) continue;
+			lowerShield();
+			ItemStack off = p.getOffhandItem();
+			p.setItemInHand(InteractionHand.OFF_HAND, inv.getItem(i));
+			inv.setItem(i, off);
+			return true;
+		}
+		return false;
+	}
+
+	static boolean isBow(ItemStack s) {
+		return !s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bow");
+	}
+
+	/** Arrows it carries (or it can shoot anyway, in creative). */
+	int arrows() {
+		if (p.isCreative()) return 64;
+		int n = 0;
+		Inventory inv = p.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			String k = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (k.equals("arrow") || k.equals("spectral_arrow") || k.equals("tipped_arrow")) n += inv.getItem(i).getCount();
+		}
+		return n;
+	}
+
+	boolean hasBow() {
+		return findHotbar(Hands::isBow) >= 0 && arrows() > 0;
+	}
+
+	/** Draw its bow (the right mouse button, held). False without a bow and arrows. */
+	boolean drawBow() {
+		if (p.isUsingItem() && isBow(p.getUseItem())) return true;
+		if (arrows() == 0) return false;
+		int slot = findHotbar(Hands::isBow);
+		if (slot < 0) return false;
+		stop();
+		lowerShield();
+		p.getInventory().setSelectedSlot(slot);
+		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+		return p.isUsingItem();
+	}
+
+	/** How long the bow has been drawn (a full draw is 20 ticks), 0 if it isn't. */
+	int drawn() {
+		return p.isUsingItem() && isBow(p.getUseItem()) ? p.getTicksUsingItem() : 0;
+	}
+
+	/** Point the mouse this way (degrees, like the game: yaw, and pitch with up negative). */
+	void aim(float yRot, float xRot) {
+		p.setYRot(yRot);
+		p.setYHeadRot(yRot);
+		p.setXRot(xRot);
+		yaw = Math.floorMod(Math.round((yRot + 180f) / 90f), 4);
+	}
+
+	/** Let go of the right mouse button: the arrow flies where it looks. */
+	void loose() {
+		if (p.isUsingItem()) p.releaseUsingItem();
+	}
+
+	/**
+	 * Where to point a fully drawn bow to hit a point (yaw, pitch in the game's degrees), working out the arrow's fall
+	 * the way a player learns it: it flies at 3 blocks a tick, slows by 1% and falls 0.05 faster each tick. The low
+	 * arc; null if it can't reach.
+	 */
+	static float[] bowAim(Vec3 eye, Vec3 target) {
+		double dx = target.x - eye.x, dz = target.z - eye.z, flat = Math.hypot(dx, dz), dy = target.y - (eye.y - 0.1);
+		float yRot = (float) Math.toDegrees(Math.atan2(-dx, dz));
+		double best = Double.MAX_VALUE;
+		float bestPitch = Float.NaN;
+		for (double deg = -60; deg <= 60; deg += 0.25) {
+			double a = Math.toRadians(deg), vx = 3 * Math.cos(a), vy = 3 * Math.sin(a), x = 0, y = 0;
+			for (int t = 0; t < 120 && x < flat; t++) {
+				double nx = x + vx, ny = y + vy;
+				if (nx >= flat) {
+					y = y + (ny - y) * (flat - x) / Math.max(1e-6, nx - x);
+					x = flat;
+					break;
+				}
+				x = nx;
+				y = ny;
+				vx *= 0.99;
+				vy = vy * 0.99 - 0.05;
+			}
+			if (x < flat) continue;
+			double err = Math.abs(y - dy);
+			if (err < best) {
+				best = err;
+				bestPitch = (float) -deg;
+			}
+			if (y > dy && best < 0.5) break;                                     // (the low arc is enough)
+		}
+		return Float.isNaN(bestPitch) || best > 1.5 ? null : new float[] {yRot, bestPitch};
+	}
+
+	/** How many ticks an arrow takes to fly that far (to lead something moving). */
+	static int flightTicks(double flat) {
+		double x = 0, v = 3;
+		int t = 0;
+		while (x < flat && t < 100) {
+			x += v;
+			v *= 0.99;
+			t++;
+		}
+		return t;
+	}
+
+	/** Throw or use what it holds at the air (an eye of ender, a wind charge, an ender pearl), looking this way. */
+	boolean useAtAir(java.util.function.Predicate<ItemStack> item, float yRot, float xRot) {
+		int slot = findHotbar(item);
+		if (slot < 0) return false;
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		aim(yRot, xRot);
+		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 4;
+		return true;
+	}
+
+	/** Hit anything in reach (a part of the Ender Dragon, an end crystal): the normal attack, with its best weapon. */
+	void hitEntity(net.minecraft.world.entity.Entity e, Vec3 at) {
+		stop();
+		lowerShield();
+		ready();
+		face(at);
+		p.attack(e);
+		Compat.swing(p);
+		current = Action.ATTACK;
+		ticks = 0;
+		limit = 2;
+	}
+
+	/** Its best weapon for a smash from above: a mace, if it has one (a player switches to it mid-fall). */
+	boolean readyMace() {
+		int slot = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("mace"));
+		if (slot < 0) return false;
+		p.getInventory().setSelectedSlot(slot);
+		return true;
 	}
 
 	/** Toss items where it looks (a player's Q key); the other player picks them up. */

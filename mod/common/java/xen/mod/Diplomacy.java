@@ -55,6 +55,9 @@ final class Diplomacy {
 	}
 
 	void makePeace(Entity other, String why) {
+		if (other instanceof XenPlayer x && x.companion != null && c.owner == null && x.companion.owner == null) {
+			c.trust(other.getUUID(), 0.2f);                                   // two free Xens that made peace may team up after
+		}
 		peace.put(other.getUUID(), now() + 2400);
 		madeAt.put(other.getUUID(), c.player.tickCount);
 		askedTruce = null;

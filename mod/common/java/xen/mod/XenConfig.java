@@ -16,6 +16,11 @@ public final class XenConfig {
 	 * 3 GB of memory or more), "on" or "off". Without it Xen still understands keywords and answers in plain words.
 	 */
 	public String chatModel = "auto";
+	/**
+	 * Which chat model: "auto" (the small one on phones and with less than 3 GB for the game, else the normal one),
+	 * "small" (SmolLM2 135M: about 145 MB, three times faster, simpler answers) or "normal" (SmolLM2 360M, about 390 MB).
+	 */
+	public String chatModelSize = "auto";
 	/** Chat model on the graphics card: "auto" (when there's a real one, in a game client), "on" (even a software one) or "off". */
 	public String gpu = "auto";
 	/** Download the chat model (about 390 MB) to config/xen/ the first time it's needed. */
@@ -72,6 +77,20 @@ public final class XenConfig {
 	public boolean journal = true;
 	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
 	public boolean antics = true;
+	/**
+	 * Tribes: Xens that live together (one owner's, a team, free ones that get on) share their things and chests, build
+	 * their houses around one village, keep watch over it at night, and stand together when one of them is attacked.
+	 */
+	public boolean tribes = true;
+	/** Xens open chests they find out in the world that nobody has opened yet (dungeons, camps, trial chambers) and loot them. */
+	public boolean loot = true;
+	/**
+	 * Adventures: free Xens go for the Ender Dragon on their own when they're ready (the Nether for blaze rods, pearls,
+	 * the stronghold, the End), and take on trial chambers they find.
+	 */
+	public boolean adventures = true;
+	/** The generation (of evolution) from which Xens know the Nether portal math (and triangulate strongholds). */
+	public int smartsAtGeneration = 4;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
 	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("modern"));
 	/**
@@ -103,7 +122,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 5;
+	public int version = 6;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -133,7 +152,7 @@ public final class XenConfig {
 					if (config.maxXens == 0) config.maxXens = 50;
 					if (!j.has("maxMinions") || config.maxMinions == 8) config.maxMinions = 100;
 				}
-				config.version = 5;
+				config.version = 6;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

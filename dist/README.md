@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.7.0-alpha
+# Xen Companion (Fabric mod), prototype 0.7.1-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -11,10 +11,10 @@ through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.7.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.7.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.7.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.7.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.7.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.7.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.7.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.7.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -66,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.7.0-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.7.1-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -83,9 +83,11 @@ version list.
 
 **On a phone:**
 
-* Use the **light** jar, not `-with-chat`: phones usually give Minecraft less
-  than 3 GB, so the chat model stays off anyway. Xen still understands requests
-  by their keywords and answers in plain words.
+* Use the **light** jar, not `-with-chat`. On a phone the chat model is the **small** one (SmolLM2-135M, 145 MB,
+  about 3x faster than the 360M one; it runs on the CPU), and it downloads by itself the first time (or put
+  `SmolLM2-135M-Instruct-Q8_0.gguf` from the release in `config/xen/`). It needs about 1.1 GB of Minecraft's memory;
+  with less, chat stays on its keyword rules (Xen still understands requests and answers in plain words). You
+  choose: **AI chat (on this device)** auto/on/off and **AI chat size** auto/small/normal in the Talk tab.
 * Slow phone? In Mod Menu (or `config/xen.json`) set **Decisions** to
   "2 a second" and turn **Learning** off.
 * It was tested on PC servers, in a real (virtual) game client, and in the Java
@@ -640,10 +642,17 @@ its way through the air around the walls, in by the door, over the roof); in sur
 slabs, doors, fences and hoes itself, gets more wood and stone when it runs out, climbs on a pillar for the roof
 (and takes it down), fills a bucket at the nearest water, and leaves out decoration it has nothing to make from.
 
-* **Cottage**: a stone base, a log frame with posts every few blocks, plank walls with windows between the posts, a
-  steep stair roof that overhangs, a beam with a lantern; inside a bed, crafting table, furnace, chest, a table and
-  chair; outside shutters, a step, lamp posts and flowers. The look fits the biome in creative (oak, spruce, birch,
-  medieval, stone, desert); in survival it's its own wood.
+* **A house of its own design** (since 0.7.1 there are no house templates): every Xen designs each house itself,
+  choosing the size (7x5 up to 13x9), wall height, the roof (gable, hipped or flat, with overhangs), a stone base or
+  bottom row, a log frame with windows between the posts, shutters, a porch, a chimney with smoke, a loft with a
+  ladder; outside a path to the door (made with a shovel), lamp posts, bushes, flower beds, a woodpile and a fenced
+  yard with a gate, all standing on the ground (it fills holes under them first); inside beds, a crafting table,
+  furnace, chest, barrel, table and chair, carpet, bookshelves, plants and lanterns on a beam. Its choices come from
+  its **taste**, which starts from its personality and learns: from how each build went, from what you say about it
+  ("nice house!", "that's ugly") and from what its tribe says, so a village comes to share a style. Its first
+  survival house is small and cheap; with plenty of wood later it builds a better one and moves in. The look fits
+  the biome in creative (oak, spruce, birch, medieval, stone, desert); in survival it's its own wood (glass when it
+  has some, open windows when not).
 * **Underground base**: a staircase down with torches, a door, a room carved in the stone with log pillars, ceiling
   beams and lanterns, a plank floor, chests, a barrel, a crafting table, furnaces, a bed, a table and chair.
 * **Crop farm** (the wiki's 9x9: one water block in the middle keeps every farmland block wet), a fence, a gate,
@@ -711,7 +720,8 @@ away in single player. On a server, operators use:
 | setting | default | meaning |
 |---|---|---|
 | `chat` | `true` | Xen answers and understands chat |
-| `chatModel` | `"auto"` | the chat model: `"auto"` (with about 3 GB or more), `"on"` or `"off"` |
+| `chatModel` | `"auto"` | the chat model, run on this device: `"auto"` (with about 3 GB or more), `"on"` or `"off"` |
+| `chatModelSize` | `"auto"` | `"small"` (SmolLM2-135M, 145 MB, about 3x faster: phones and low memory), `"normal"` (SmolLM2-360M) or `"auto"` (small on phones and with little memory) |
 | `chatWakeDistance` | `32` | wake the chat model when someone Xen knows is this close |
 | `chatIdleMinutes` | `10` | unload it after this long with nobody around |
 | `downloadChatModel` | `true` | download the chat model the first time it's needed |
@@ -722,6 +732,10 @@ away in single player. On a server, operators use:
 | `maxXens` | `50` | Xens the whole world may have (0 = no limit; minions don't count) |
 | `maxMinions` | `100` | [minions](#minion-xens) the whole world may have (0 = no limit) |
 | `ownLife` | `true` | a new Xen starts free and plays its own game ([more](#its-own-life)) |
+| `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
+| `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
+| `adventures` | `true` | free Xens go for the Ender Dragon on their own when ready, and take on trial chambers |
+| `smartsAtGeneration` | `4` | from this generation of evolution Xens know the Nether portal math (x/8) and triangulating strongholds |
 | `pathAssist` | `true` | its legs find the way: sprint, jump, drop, jump gaps, swim, climb, doors, dig, bridge, tower up ([more](#path-assist)) |
 | `solver` | `true` | (experimental) the [solver](#the-solver-and-the-journal): learns ways out when it's stuck |
 | `journal` | `true` | (experimental) keep the [journal](#the-solver-and-the-journal) of what Xens see, think, say and hear |
@@ -766,6 +780,8 @@ away in single player. On a server, operators use:
 | `/xen minions <count>` | [minions](#minion-xens) for your Xen (up to 100 in the world) |
 | `/xen build <what>` | the same as asking it: `house`, `base`, `farm`, `pen`, `mob farm` |
 | `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
+| `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
+| `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
 | `/xen dismiss` | it goes home, with its minions (operators and the console send every Xen home) |
 
 * **Its bag**: right-click your Xen to open its inventory.
