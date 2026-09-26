@@ -29,8 +29,10 @@ import java.util.concurrent.Executors;
 /**
  * Where Xens' skins come from (the {@code skins} setting, any mix of these):
  * <ul>
- *   <li>{@code "random"}: any skin that comes with the mod: its pack and Minecraft's 18 default skins;</li>
- *   <li>{@code "pack"}: the mod's own skin pack (61 original skins, free to use, signed so everyone sees them);</li>
+ *   <li>{@code "modern"} (the default): the mod's skins in today's style: shaded hair with volume, hoodies, jackets,
+ *   sneakers, muted and pastel colours, many with slim arms (original, free to use, signed so everyone sees them);</li>
+ *   <li>{@code "fun"}: the funny 61 of earlier versions; {@code "pack"}: both;</li>
+ *   <li>{@code "random"}: any skin that comes with the mod: both packs and Minecraft's 18 default skins;</li>
  *   <li>{@code "default"}: only Minecraft's 18 default skins;</li>
  *   <li>{@code "folder"}: your own skins: put PNG skin files in {@code config/xen/skins/} (from Planet Minecraft, The
  *   Skindex, NameMC, or drawn yourself). Each one is signed once through mineskin.org (the image is uploaded, unlisted)
@@ -57,21 +59,29 @@ final class Skins {
 	private Path dir;
 	private volatile boolean fetchingGallery;
 
+	/** The modern pack (today's style), and the fun pack of earlier versions ({@link #pack}). */
+	private final List<String> modern = new ArrayList<>();
+
 	Skins() {
-		try (InputStream in = Skins.class.getResourceAsStream("/assets/xen/skins/pack.json")) {
+		read("/assets/xen/skins/pack.json", pack);
+		read("/assets/xen/skins/modern.json", modern);
+	}
+
+	private static void read(String resource, List<String> into) {
+		try (InputStream in = Skins.class.getResourceAsStream(resource)) {
 			if (in != null) {
 				for (JsonElement e : new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), JsonArray.class)) {
 					JsonObject o = e.getAsJsonObject();
-					pack.add("texture:" + o.get("value").getAsString() + ":" + o.get("signature").getAsString());
+					into.add("texture:" + o.get("value").getAsString() + ":" + o.get("signature").getAsString());
 				}
 			}
 		} catch (Exception e) {
-			XenMod.LOG.warn("Xen's skin pack couldn't be read: {}", e.toString());
+			XenMod.LOG.warn("Xen's skin pack {} couldn't be read: {}", resource, e.toString());
 		}
 	}
 
 	int packSize() {
-		return pack.size();
+		return pack.size() + modern.size();
 	}
 
 	/** Get ready for the setting: sign new skins in the folder, fetch gallery skins and players' skins (in the background). */
@@ -105,10 +115,16 @@ final class Skins {
 			String k = s.trim(), low = k.toLowerCase(Locale.ROOT);
 			switch (low) {
 				case "random" -> {
+					out.addAll(modern);
 					out.addAll(pack);
 					for (String d : Looks.SKINS) out.add(d);
 				}
-				case "pack" -> out.addAll(pack);
+				case "modern" -> out.addAll(modern);
+				case "fun" -> out.addAll(pack);
+				case "pack" -> {
+					out.addAll(modern);
+					out.addAll(pack);
+				}
 				case "default" -> {
 					for (String d : Looks.SKINS) out.add(d);
 				}
@@ -127,7 +143,7 @@ final class Skins {
 				}
 			}
 		}
-		if (out.isEmpty()) out.addAll(pack.isEmpty() ? List.of(Looks.SKINS) : pack);   // nothing ready yet
+		if (out.isEmpty()) out.addAll(!modern.isEmpty() ? modern : pack.isEmpty() ? List.of(Looks.SKINS) : pack);   // nothing ready yet
 		return out.get(r.nextInt(out.size()));
 	}
 

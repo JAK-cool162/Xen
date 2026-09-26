@@ -576,6 +576,7 @@ public class XenMod implements ModInitializer {
 		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : skins.pick(config.skins, random);
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
+		if (config.ownLife && config.wants) c.mode = Companion.Mode.FREE;   // its own life: it plays its own game
 		if (known != null && known.has("known")) {
 			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
 		}

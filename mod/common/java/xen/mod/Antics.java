@@ -283,8 +283,8 @@ final class Antics {
 					"Mid-fight snack!", "Nom nom nom."));
 			return Action.EAT;
 		}
-		if (foeLow && distance > 2.5) {
-			c.talker.sayNear(pick("Hehe, gotcha!", "Give up yet?", "Too easy.", "S-sorry!", "Is that all?", "Boop!"));
+		if (foeLow && distance > 2.5 && !(foe instanceof net.minecraft.server.level.ServerPlayer)) {   // (a player: it talks terms instead, and keeps at it)
+			c.talker.sayNear(pick("Hehe, gotcha!", "Too easy.", "Is that all?", "Boop!", "Next!", "Ha!"));
 			c.player.setShiftKeyDown(true);
 			c.hands.watching = foe;
 			return Action.IDLE;

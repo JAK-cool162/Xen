@@ -285,9 +285,11 @@ final class Walker {
 		this.level = level;
 		this.eyes = start;
 		BlockPos target = BlockPos.containing(to);
+		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
 		Map<Long, Node> nodes = new HashMap<>();
 		PriorityQueue<Node> open = new PriorityQueue<>();
 		Node first = new Node(start);
+		first.placedFloor = c.player.onGround();                            // it's standing (maybe on the very edge of a block)
 		first.f = h(start, to);
 		nodes.put(start.asLong(), first);
 		open.add(first);

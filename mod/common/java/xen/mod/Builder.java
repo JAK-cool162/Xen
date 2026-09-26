@@ -52,6 +52,78 @@ final class Builder {
 	private String gathering;
 	/** What it's doing, in words (for /xen status). */
 	String doing = "";
+	/** What it was doing before (its own life: back to it when the house is done). */
+	private Companion.Mode modeBefore;
+	/** Survival: has it got (or got the makings of) everything the plan needs, like a builder before starting? */
+	private boolean prepared;
+	private boolean toldList;
+
+	/**
+	 * What the plan still needs, like a builder's list: wood (in planks: a log is 4), cobblestone and dirt; decoration
+	 * it can't make it leaves out anyway. Ten percent spare, for mistakes.
+	 */
+	Map<String, Integer> materials() {
+		double wood = 0;
+		int stone = 0, dirt = 0;
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (Architect.Step s : left) {
+			if (s.dig() || done(level, s)) continue;
+			String n = BuiltInRegistries.ITEM.getKey(itemFor(s.state())).getPath();
+			if (s.phase() == Architect.SUPPORT && n.equals("dirt")) {
+				if (level.getBlockState(s.pos()).canBeReplaced()) dirt++;
+				continue;
+			}
+			if (n.endsWith("_planks")) wood += 1;
+			else if (n.endsWith("_log") || n.endsWith("_wood")) wood += 4;
+			else if (n.endsWith("_stairs") && !n.contains("stone") && !n.contains("brick")) wood += 1.5;
+			else if (n.endsWith("_slab") && !n.contains("stone")) wood += 0.5;
+			else if (n.endsWith("_door")) wood += 2;
+			else if (n.endsWith("_fence")) wood += 1.7;
+			else if (n.endsWith("_trapdoor")) wood += 1.5;
+			else if (n.endsWith("_pressure_plate")) wood += 2;
+			else if (n.equals("crafting_table")) wood += 4;
+			else if (n.equals("chest")) wood += 8;
+			else if (n.equals("barrel")) wood += 7;
+			else if (n.equals("cobblestone") || n.startsWith("cobblestone_")) stone++;
+			else if (n.equals("furnace")) stone += 8;
+		}
+		Map<String, Integer> out = new java.util.LinkedHashMap<>();
+		out.put("wood", (int) Math.ceil(wood * 1.1));
+		out.put("cobblestone", (int) Math.ceil(stone * 1.1));
+		out.put("dirt", dirt);
+		return out;
+	}
+
+	/** Survival, before the first block: enough of everything? If not, it goes to get it (and says what it needs). */
+	private Action prepare() {
+		Map<String, Integer> need = materials();
+		int logs = count(x -> x.endsWith("_log") || x.endsWith("_stem")), planks = count(x -> x.endsWith("_planks"));
+		int woodHave = logs * 4 + planks, stoneHave = count(x -> x.equals("cobblestone"));
+		int woodShort = need.get("wood") - woodHave, stoneShort = need.get("cobblestone") - stoneHave;
+		if (!toldList) {
+			toldList = true;
+			c.chatter(String.format(java.util.Locale.ROOT, "For this %s I need about %d logs%s. I have %d. %s", plan.name(),
+					(need.get("wood") + 3) / 4, need.get("cobblestone") > 0 ? " and " + need.get("cobblestone") + " cobblestone" : "", logs,
+					woodShort > 0 || stoneShort > 0 ? "Getting it all first, like a real builder." : "That's enough, let's go!"), true);
+			c.journal("build", "materials for the " + plan.name() + ": " + need + "; has " + woodHave + " wood, " + stoneHave + " cobblestone");
+		}
+		if (woodShort > 0) {
+			gathering = "wood";
+			c.chores.gather("wood", Math.min(24, (woodShort + 3) / 4));
+			c.chores.own = true;
+			return null;
+		}
+		if (stoneShort > 0) {
+			gathering = "stone";
+			c.chores.gather("stone", Math.min(32, stoneShort));
+			c.chores.own = true;
+			return null;
+		}
+		prepared = true;
+		c.mode = Companion.Mode.STAY;
+		c.anchor = plan.middle();
+		return null;
+	}
 
 	Builder(Companion c) {
 		this.c = c;
@@ -97,6 +169,8 @@ final class Builder {
 			made = Architect.cottage(corner, front, w, d, p, creative, random);
 		}
 		cancel();
+		modeBefore = c.mode;
+		prepared = creative;
 		plan = made;
 		left.addAll(made.steps());
 		var box = new net.minecraft.world.phys.AABB(made.middle());
@@ -107,6 +181,7 @@ final class Builder {
 		tries.clear();
 		scaffold.clear();
 		removingScaffold = false;
+		toldList = false;
 		placed = dug = 0;
 		started = lastProgress = now();
 		c.chores.cancel();
@@ -181,6 +256,7 @@ final class Builder {
 			c.chatter("Back to building!", false);
 		}
 		if (c.crafter.hasOrder()) return null;                               // making what it needs first
+		if (!prepared && !creative) return prepare();                        // everything it needs, first
 		if (removingScaffold) return takeDownScaffold(level);
 		// what's left, in order: the first phase that still has work
 		left.removeIf(s -> done(level, s) || skipped.contains(s.pos()));
@@ -266,7 +342,7 @@ final class Builder {
 		c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
 		c.goals.home = plan.middle();
 		c.antics.celebrate();
-		c.mode = Companion.Mode.STAY;
+		c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;   // its own house: back to its life
 		c.anchor = plan.middle();
 		plan = null;
 		return Action.IDLE;

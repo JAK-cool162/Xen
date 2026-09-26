@@ -154,6 +154,7 @@ public final class Companion {
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
 		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
+		if (player.tickCount % 40 == 20) wearArmor();
 		mimic.watch();                                                  // what are the players it sees doing?
 		solver.watch();                                                 // and how they get out of holes
 		antics.watch();
@@ -397,6 +398,8 @@ public final class Companion {
 			Action craft = crafter.next();
 			if (craft != null) return craft;
 		}
+		Action back = backForMyThings();                              // it died: its things are lying where it fell
+		if (back != null) return back;
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
 		if (light != null) return light;
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
@@ -575,6 +578,58 @@ public final class Companion {
 		return h >= 16 ? 5 : h >= 12 ? 4 : 3;
 	}
 
+	/** Where it died, with its things lying there, and until when they're there. */
+	private BlockPos lostAt;
+	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lostDimension;
+	private long lostUntil;
+	private boolean saidGoingBack;
+
+	/** Back for its things after dying, like a player (before they're gone, and not straight into what killed it). */
+	private Action backForMyThings() {
+		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
+		long now = player.level().getGameTime();
+		if (now > lostUntil || emotions.fear > 0.8f) {
+			lostAt = null;
+			saidGoingBack = false;
+			return null;
+		}
+		if (!saidGoingBack) {
+			saidGoingBack = true;
+			chatter("My stuff! I'm going back for it.", true);
+		}
+		goals.instant = "going back for its things";
+		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) > 3) return walkTo(Vec3.atBottomCenterOf(lostAt));
+		for (var item : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(6), e -> e.isAlive())) {
+			return walkTo(item.position());
+		}
+		lostAt = null;
+		saidGoingBack = false;
+		chatter("Got my things back!", true);
+		return null;
+	}
+
+	/** Armor it made or found: on, like a player shift-clicking it in the inventory (the better piece if it has two). */
+	private void wearArmor() {
+		var inv = player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (s.isEmpty()) continue;
+			net.minecraft.world.entity.EquipmentSlot slot = player.getEquipmentSlotForItem(s);
+			if (slot.getType() != net.minecraft.world.entity.EquipmentSlot.Type.HUMANOID_ARMOR) continue;
+			ItemStack worn = player.getItemBySlot(slot);
+			if (!worn.isEmpty() && armorValue(worn) >= armorValue(s)) continue;
+			player.setItemSlot(slot, s.copy());
+			inv.setItem(i, worn.copy());
+			journal("does", "puts on " + BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().replace('_', ' '));
+		}
+	}
+
+	private static int armorValue(ItemStack s) {
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		return n.startsWith("netherite") ? 6 : n.startsWith("diamond") ? 5 : n.startsWith("iron") ? 4 : n.startsWith("chainmail") ? 3
+				: n.startsWith("golden") ? 2 : n.startsWith("leather") || n.startsWith("turtle") ? 1 : 0;
+	}
+
 	/** Its legs: finding the way and walking it (it decides where to, and how bold it is on the way). */
 	final Walker walker = new Walker(this);
 
@@ -587,6 +642,9 @@ public final class Companion {
 	}
 
 	private int stuckSaidAt = -10000;
+
+	/** Truces, giving up, and what it wants for peace (see {@link Diplomacy}). */
+	final Diplomacy diplomacy = new Diplomacy(this);
 
 	/** When it's stuck: a way out it learns (see {@link Solver}). */
 	final Solver solver = new Solver(this);
@@ -730,6 +788,7 @@ public final class Companion {
 		}
 		fightingWhat = foe.getName().getString();
 		if (!(foe instanceof ServerPlayer)) fightingWhat = fightingWhat.toLowerCase(java.util.Locale.ROOT);
+		diplomacy.during(foe);                                        // a player or a Xen: it may talk (truce, give up)
 		return fighter.next(foe, hurtNow);
 	}
 
@@ -884,6 +943,7 @@ public final class Companion {
 			if (victim == null || victim.level() != player.level()) continue;
 			LivingEntity a = victim.getLastHurtByMob();
 			if (a == null || !a.isAlive() || a == player || a == o || player.isAlliedTo(a)) continue;
+			if (diplomacy.atPeace(a)) continue;                                   // a truce (unless they broke it)
 			if (a instanceof AbstractVillager || a instanceof AbstractGolem || a instanceof TamableAnimal t && t.isTame()) continue;
 			if (victim.tickCount - victim.getLastHurtByMobTimestamp() > 200 || player.distanceTo(a) > 16) continue;
 			if (victim == player && !attackedBy(a, now)) continue;                // a poke to get its attention isn't a fight
@@ -897,7 +957,7 @@ public final class Companion {
 		if (!mod.config.pvp.equals("teams")) return null;
 		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
 			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
-			if (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null) continue;
+			if (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other)) continue;
 			double d = player.distanceTo(other);
 			if (d < 24 && (best == null || d < player.distanceTo(best)) && (d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
 				best = other;
@@ -985,6 +1045,12 @@ public final class Companion {
 		lifeTicks = 0;
 		lifeReward = 0;
 		emotions.reset();
+		String how = source.type().msgId();
+		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion");
+		lostAt = gone || inArena ? null : player.blockPosition().immutable();   // its things are lying there: back for them after
+		lostDimension = player.level().dimension();
+		lostUntil = player.level().getGameTime() + 5200;              // (items last five minutes)
+		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
 		respawnIn = 60;                                               // three seconds, like pressing "Respawn"
 	}
 
@@ -1134,6 +1200,10 @@ public final class Companion {
 				return null;
 			}
 			if (trade) r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		}
+		if (r.intent().equals("peace")) {                                   // anyone may ask for peace (not only its owner)
+			say(diplomacy.asked(from));
+			return null;
 		}
 		String plan = null;
 		boolean refused = false;

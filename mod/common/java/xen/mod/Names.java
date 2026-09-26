@@ -11,7 +11,22 @@ import java.util.Set;
  * Always a valid player name: 3 to 16 letters, digits and underscores.
  */
 final class Names {
-	static final String[] STYLES = {"mixed", "fun", "gamer", "fantasy", "classic"};
+	static final String[] STYLES = {"player", "mixed", "fun", "gamer", "fantasy", "classic"};
+
+	// the way real players' names look now (made up here, never copied from anyone): short lowercase blends ("luvhi",
+	// "riftws"), a word with a little tag ("MeeroSG", "Luvcie"), two words ("cold_lemon"), a word and a year or a
+	// number ("Brushriver851"), a few capitals ("WBBM"), a name with an x around it ("xKairox")
+	private static final String[] SYL = {"ka", "ri", "lu", "vi", "mo", "no", "ze", "ae", "ly", "xo", "zu", "fi", "mi", "ra", "sol", "ren",
+			"kai", "rin", "yui", "mae", "ash", "bex", "cal", "dax", "eli", "fen", "gio", "hux", "isa", "jun", "kez", "lox", "mav", "nyx",
+			"oli", "pix", "quin", "ria", "sky", "tae", "vex", "wren", "yan", "zed", "luv", "hi", "rift", "yib", "bu", "mee", "ro", "cie",
+			"sza", "vy", "kou", "nami", "ember", "ivo", "jae", "koda", "lune", "miko", "nel", "ozzi", "peri", "rue", "seo", "tavi"};
+	private static final String[] TAIL = {"z", "sz", "ws", "ie", "y", "o", "ix", "ox", "zy", "ae", "er", "ly", "ts", "x", "n", "ii",
+			"i", "a", "e", "u", "ey", "zi", "rr", "k"};
+	private static final String[] WORD = {"lemon", "frost", "moss", "byte", "cloud", "neon", "echo", "void", "pixel", "drift", "ember",
+			"lunar", "milk", "honey", "static", "velvet", "orbit", "cherry", "maple", "glitch", "ghost", "soda", "mango", "ivory", "onyx",
+			"sage", "rain", "dusk", "fable", "nova", "river", "brush", "matcha", "mochi", "koi", "fern", "stray", "snow", "ash", "tide",
+			"hollow", "cedar", "plum", "blue", "sunny", "lazy", "cold", "soft", "quiet", "tiny", "sleepy", "lost", "silent", "wild"};
+	private static final String[] TAG = {"SG", "MC", "YT", "PvP", "TV", "HD", "xd", "OG", "UwU", "_", "__", "0", "1", "7"};
 
 	/** The classic little names of earlier versions. */
 	static final String[] CLASSIC = {"Pip", "Nova", "Bramble", "Juniper", "Pebble", "Rowan", "Sprocket", "Maple", "Fennel", "Tinker",
@@ -61,6 +76,7 @@ final class Names {
 			s = x < 0.35f ? "fun" : x < 0.5f ? "title" : x < 0.62f ? "gamer" : x < 0.8f ? "fantasy" : "classic";
 		}
 		String[] adj = ADJ[toneIndex(tone)];
+		if (s.equals("player")) return player(r);
 		return switch (s) {
 			case "fun" -> pick(adj, r) + pick(NOUN, r);
 			case "title" -> pick(TITLE[0], r) + pick(NOUN, r);
@@ -76,6 +92,30 @@ final class Names {
 			}
 			default -> pick(CLASSIC, r);
 		};
+	}
+
+	/** A name like real players have these days. */
+	static String player(Random r) {
+		String blend = pick(SYL, r) + pick(SYL, r) + (r.nextFloat() < 0.6f ? pick(TAIL, r) : "");
+		String w = pick(WORD, r), w2 = pick(WORD, r);
+		String cap = Character.toUpperCase(blend.charAt(0)) + blend.substring(1);
+		return switch (r.nextInt(10)) {
+			case 0, 1, 2 -> blend;                                               // luvhi, riftws
+			case 3 -> cap + pick(TAG, r);                                         // MeeroSG, Luvcie_
+			case 4 -> w + "_" + w2;                                               // cold_lemon
+			case 5 -> Character.toUpperCase(w.charAt(0)) + w.substring(1) + w2 + (100 + r.nextInt(900));   // Brushriver851
+			case 6 -> w + (r.nextBoolean() ? (2005 + r.nextInt(15)) : (1 + r.nextInt(99)));   // matcha2009, soda7
+			case 7 -> caps(r);                                                    // WBBM
+			case 8 -> "x" + cap + "x";                                            // xKairox
+			default -> r.nextBoolean() ? blend + "_" + w : cap;                    // kaeli_moss, Mikorue
+		};
+	}
+
+	private static String caps(Random r) {
+		StringBuilder sb = new StringBuilder();
+		int n = 3 + r.nextInt(4);
+		for (int i = 0; i < n; i++) sb.append((char) ('A' + r.nextInt(26)));
+		return sb.toString();
 	}
 
 	/** A name nobody has yet, or null after many tries. */

@@ -24,7 +24,7 @@ import java.util.UUID;
  * digs there with its own hands, and looks around when it knows of none.
  */
 final class Chores {
-	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE }
+	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE, MINE, SMELT }
 
 	/** The small redstone circuits Xen learned (xen/redstone, exported by scripts/export_circuits.py). */
 	static final com.google.gson.JsonObject CIRCUITS;
@@ -507,6 +507,8 @@ final class Chores {
 			case SHELTER -> shelterNext();
 			case REDSTONE -> redstoneNext();
 			case TRADE -> c.trader.villagerStep();
+			case MINE -> mineNext();
+			case SMELT -> smeltNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
 					cancel();
@@ -603,6 +605,220 @@ final class Chores {
 			return null;
 		}
 		return reach(t);
+	}
+
+	// ------------------------------------------------------------------------------ mining
+	/** Where it went down, which way its tunnels go, how deep, which tunnel it's on, and where that one ends. */
+	private BlockPos mineStart, mineBase;
+	private net.minecraft.core.Direction mineDir;
+	private int mineY, mineLeg;
+	private long legStarted;
+
+	/**
+	 * Go mining, like a player: a staircase down to where the ore is (iron and coal around y 16, diamonds deep down in
+	 * the deepslate), then branch tunnels two high, three blocks apart. It mines the ore it sees in the tunnel walls
+	 * (never ore it can't see), lights the way with torches if it has them, and stops when it has what it came for.
+	 */
+	String mine(int y, String what, int amount) {
+		int tier = Math.max(c.crafter.pickTier(), c.crafter.canMake(2) ? 2 : c.crafter.canMake(1) ? 1 : 0);
+		int need = what.equals("diamonds") ? 3 : what.equals("iron") ? 2 : 1;
+		if (tier < need) return "You can't go mining for " + what + " yet: you need " + Crafter.tierName(need) + " first.";
+		begin(Kind.MINE);
+		until = now() + 20 * 60 * 6;                                        // six minutes down there at most
+		if (what.equals("diamonds")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.GOLD, Blocks.COAL}, new String[] {"diamond"}, "diamonds", "diamond ore");
+		else if (tier >= 3) set(new int[] {Blocks.IRON, Blocks.GOLD, Blocks.COAL, Blocks.DIAMOND}, new String[] {"raw_iron"}, "iron", "iron ore");
+		else if (tier == 2) set(new int[] {Blocks.IRON, Blocks.COAL}, new String[] {"raw_iron"}, "iron", "iron ore");
+		else set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal ore");
+		want = Math.max(1, amount);
+		had = count(items);
+		mineStart = c.player.blockPosition();
+		mineBase = null;
+		mineDir = c.player.getDirection();
+		mineY = y;
+		mineLeg = 0;
+		legStarted = now();
+		return "You will go mining for " + what + ": a staircase down to about y " + y + ", then tunnels, mining the ore you see.";
+	}
+
+	private Action mineNext() {
+		int got = count(items) - had;
+		if (got >= want) {
+			finish("I got " + got + " " + what + "! Heading back up.");
+			return null;
+		}
+		ItemEntity drop = dropToPickUp();
+		if (drop != null) {
+			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
+			return c.walkTo(drop.position());
+		}
+		int[] ore = glance(cats);                                            // ore showing in the walls (the tunnel shows it)
+		if (ore != null && ore[1] <= c.player.getBlockY() + 4) {
+			doing = String.format(java.util.Locale.ROOT, "mining %s, %d of %d %s so far", Blocks.NAMES[ore[4]].replace(" ore", "") + " ore", got, want, what);
+			BlockPos t = new BlockPos(ore[0], ore[1], ore[2]);
+			if (!t.equals(target)) {
+				target = t;
+				closest = Double.MAX_VALUE;
+				lastCloser = now();
+			}
+			double d = distance(ore);
+			if (d < closest - 0.5) {
+				closest = d;
+				lastCloser = now();
+			} else if (now() - lastCloser > 200) {
+				skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
+				target = null;
+				return null;
+			}
+			return reach(t);
+		}
+		BlockPos feet = c.player.blockPosition();
+		net.minecraft.core.Direction right = mineDir.getClockWise();
+		BlockPos goal;
+		if (mineBase == null) {                                              // down the staircase
+			if (feet.getY() <= mineY + 1) {
+				mineBase = feet;
+				mineLeg = 0;
+				legStarted = now();
+				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
+				return null;
+			}
+			int down = feet.getY() - mineY;
+			goal = feet.relative(mineDir, down).below(down);
+			doing = "digging a staircase down (y " + feet.getY() + ")";
+		} else {                                                             // branch tunnels: 24 long, 3 apart, back and forth
+			int k = mineLeg;
+			int across = 3 * ((k + 1) / 2);
+			boolean far = k % 4 == 0 || k % 4 == 1;
+			goal = mineBase.relative(right, across).relative(mineDir, far ? 24 : 0);
+			doing = "branch mining, tunnel " + (k / 2 + 1);
+			if (feet.distManhattan(goal) <= 1 || now() - legStarted > 20 * 60) {
+				mineLeg++;
+				legStarted = now();
+				return null;
+			}
+		}
+		Action a = c.walkTo(Vec3.atBottomCenterOf(goal));
+		if (a == null) {                                                     // no way that way (lava, water): turn
+			mineDir = mineDir.getClockWise();
+			legStarted = now();
+		}
+		return a;
+	}
+
+	// ------------------------------------------------------------------------------ smelting
+	private BlockPos furnace;
+	private long checkFurnaceAt;
+
+	/**
+	 * Smelt its raw iron (or gold) in a furnace, like a player: one nearby, or one it carries or makes from 8
+	 * cobblestone, put down next to it; the ore on top, fuel below (coal, charcoal, or planks), and it waits by it and
+	 * takes the ingots out.
+	 */
+	String smelt() {
+		int raw = count("raw_iron") + count("raw_gold");
+		if (raw == 0) return "You have nothing to smelt.";
+		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
+		furnace = findFurnace();
+		if (furnace == null && countItem("furnace") == 0 && count("cobblestone") < 8) return "You need 8 cobblestone for a furnace.";
+		begin(Kind.SMELT);
+		until = now() + 20 * (12L * raw + 90);
+		want = raw;
+		had = countItem("iron_ingot") + countItem("gold_ingot");
+		checkFurnaceAt = 0;
+		return "You will smelt " + raw + " raw ore in a furnace.";
+	}
+
+	private int fuel() {
+		return count("coal") + countItem("charcoal") + countItem("coal_block") * 9 + (count("log") * 4 + countPlanks()) / 3;
+	}
+
+	private int countPlanks() {
+		var inv = c.player.getInventory();
+		int n = 0;
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack st = inv.getItem(i);
+			if (!st.isEmpty() && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_planks")) n += st.getCount();
+		}
+		return n;
+	}
+
+	private BlockPos findFurnace() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (BlockPos p : BlockPos.betweenClosed(feet.offset(-8, -3, -8), feet.offset(8, 3, 8))) {
+			if (level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.FURNACE) && (best == null || p.distSqr(feet) < best.distSqr(feet))) best = p.immutable();
+		}
+		return best;
+	}
+
+	private Action smeltNext() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		int made = countItem("iron_ingot") + countItem("gold_ingot") - had;
+		if (furnace != null && !level.getBlockState(furnace).is(net.minecraft.world.level.block.Blocks.FURNACE)) furnace = null;
+		if (furnace == null) furnace = findFurnace();
+		if (furnace == null) {
+			if (countItem("furnace") == 0) {                                  // make one (8 cobblestone, in its crafting table)
+				doing = "making a furnace";
+				if (!c.crafter.hasOrder()) c.crafter.orderRecipe("furnace", 1);
+				return null;
+			}
+			doing = "putting a furnace down";
+			BlockPos feet = c.player.blockPosition();
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				BlockPos at = feet.relative(d);
+				if (level.getBlockState(at).canBeReplaced() && level.getBlockState(at.below()).isCollisionShapeFullBlock(level, at.below())
+						&& c.hands.placeItem(at, st -> isItem(st, "furnace"), at.below(), net.minecraft.core.Direction.UP, -1)) {
+					furnace = at;
+					c.acted = true;
+					return Action.PLACE;
+				}
+			}
+			return lookAround();
+		}
+		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(furnace)) > c.player.blockInteractionRange() - 0.5) {
+			doing = "going to the furnace";
+			return c.walkTo(Vec3.atBottomCenterOf(furnace));
+		}
+		if (now() < checkFurnaceAt) {
+			doing = "waiting by the furnace (" + made + " of " + want + " done)";
+			return Action.IDLE;
+		}
+		checkFurnaceAt = now() + 100;                                        // every five seconds a look
+		c.hands.stop();
+		c.hands.use(furnace);
+		if (!(c.player.containerMenu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu menu)) return Action.IDLE;
+		// the ingots out, the ore in, fuel if the fire needs it
+		if (menu.getSlot(2).hasItem()) Compat.click(menu, 2, true, c.player);
+		int raw = count("raw_iron") + count("raw_gold");
+		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold"));
+		if (!menu.getSlot(1).hasItem() && (menu.getSlot(0).hasItem() || raw > 0)) {
+			if (!moveInto(menu, 1, st -> isItem(st, "coal") || isItem(st, "charcoal"))) moveInto(menu, 1, st -> {
+				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+				return n.endsWith("_planks") || n.endsWith("_log");
+			});
+		}
+		boolean empty = !menu.getSlot(0).hasItem() && !menu.getSlot(2).hasItem();
+		c.player.closeContainer();
+		Compat.swing(c.player);
+		c.acted = true;
+		if (empty && count("raw_iron") + count("raw_gold") == 0) {
+			made = countItem("iron_ingot") + countItem("gold_ingot") - had;
+			finish("Smelted " + made + " ingots!");
+			return null;
+		}
+		return Action.IDLE;
+	}
+
+	/** Pick up a stack from its inventory (in the open screen) and put it in a slot, like a player with the mouse. */
+	private boolean moveInto(net.minecraft.world.inventory.AbstractContainerMenu menu, int slot, java.util.function.Predicate<ItemStack> what) {
+		for (var s : menu.slots) {
+			if (s.index <= 2 || !s.hasItem() || !what.test(s.getItem())) continue;
+			Compat.click(menu, s.index, false, c.player);                       // pick it up
+			Compat.click(menu, slot, false, c.player);                          // put it down
+			if (!menu.getCarried().isEmpty()) Compat.click(menu, s.index, false, c.player);   // the rest back
+			return menu.getSlot(slot).hasItem();
+		}
+		return false;
 	}
 
 	/** Drops it came for (what it's gathering), close and on about its level; it walks over them to pick them up. */

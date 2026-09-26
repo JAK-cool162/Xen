@@ -41,6 +41,11 @@ public final class XenConfig {
 	public boolean personalities = true;
 	/** Free Xens choose their own goals (instant, short and long ones) and learn which ones they like. */
 	public boolean wants = true;
+	/**
+	 * Xens live their own life: a new Xen starts free and plays its own game (wood, tools, a house, mining, iron,
+	 * diamonds), like another player on the server; it comes along when you say "follow me".
+	 */
+	public boolean ownLife = true;
 	/** Xens say things on their own: what they see, want and feel, greetings, and questions you can answer. */
 	public boolean talk = true;
 	/** Xens near each other talk, and tell each other where things are. */
@@ -66,9 +71,12 @@ public final class XenConfig {
 	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
 	public boolean antics = true;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
-	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("random"));
-	/** How new Xens are named: "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax) or "classic" (Pip). */
-	public String nameStyle = "mixed";
+	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("modern"));
+	/**
+	 * How new Xens are named: "player" (like real players' names now: luvhi, MeeroSG, cold_lemon, Solen2009; made up,
+	 * never someone's), "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax) or "classic" (Pip).
+	 */
+	public String nameStyle = "player";
 
 	/** Teams: 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams. */
 	public int teams = 1;
@@ -93,7 +101,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 3;
+	public int version = 4;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -114,7 +122,12 @@ public final class XenConfig {
 				config = gson.fromJson(j, XenConfig.class);
 				if (!j.has("version") && config.followDistance == 10) config.followDistance = 4;   // it stayed too far behind
 				if ((!j.has("version") || j.get("version").getAsInt() < 3) && config.pvp.equals("defend")) config.pvp = "own";   // the new default
-				config.version = 3;
+				if (!j.has("version") || j.get("version").getAsInt() < 4) {           // 0.7: names and skins like real players now
+					if (config.nameStyle.equals("mixed")) config.nameStyle = "player";
+					if (config.skins.equals(java.util.List.of("random"))) config.skins = new java.util.ArrayList<>(java.util.List.of("modern"));
+					if (!j.has("ownLife")) config.ownLife = true;
+				}
+				config.version = 4;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

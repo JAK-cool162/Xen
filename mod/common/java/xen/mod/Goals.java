@@ -31,6 +31,9 @@ final class Goals {
 		WOOD("get some wood", "you have little wood"),
 		STONE("get some stone", "you have few blocks"),
 		ORE("look for ore", "you would like to find treasure"),
+		HOUSE("build a house", "you have no home yet and a real player builds one"),
+		MINE("go mining", "you want iron and diamonds for better tools"),
+		SMELT("smelt your iron", "raw iron has to be smelted before you can make tools of it"),
 		TRADE("trade with a villager", "you have things a villager may want"),
 		EXPLORE("explore", "you are curious");
 
@@ -162,8 +165,8 @@ final class Goals {
 	boolean think(boolean nearby) {
 		long now = c.player.level().getGameTime();
 		if (current != null) {
-			boolean over = current == Short.EXPLORE ? now > until : !c.chores.busy();
-			if (!over) return c.chores.busy();
+			boolean over = current == Short.EXPLORE ? now > until : current == Short.HOUSE ? !c.builder.busy() : !c.chores.busy();
+			if (!over) return c.chores.busy() && current != Short.HOUSE;
 			learn();
 		}
 		if (now < next) return false;
@@ -171,7 +174,7 @@ final class Goals {
 		Short best = null;
 		float bestScore = 0.25f;                                         // below this it's happy doing whatever it does
 		for (Short s : Short.values()) {
-			if (nearby && (s == Short.TRADE || s == Short.EXPLORE)) continue;   // those would take it away from its friend
+			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE)) continue;   // those would take it away from its friend
 			float score = (urgency(s) + dreamPull(s)) * (0.5f + liking.get(s)) + random.nextFloat() * 0.15f * c.personality.curiosity;
 			if (score > bestScore) {
 				bestScore = score;
@@ -183,10 +186,17 @@ final class Goals {
 		String plan = switch (best) {
 			case FOOD -> c.chores.hunt(2);
 			case SHELTER -> buildingHome ? c.chores.shelter("fort") : c.chores.shelter();
-			case WOOD -> c.chores.gather("wood", 4);
+			case WOOD -> c.chores.gather("wood", c.crafter.pickTier() == 0 ? 5 : 10);
 			case STONE -> needBlocksForTheNight() || c.crafter.pickTier() == 0 ? c.chores.gather("dirt", Math.max(4, 12 - blocks()))
-					: c.chores.gather("stone", 8);
+					: c.chores.gather("stone", 16);
 			case ORE -> c.chores.gather("ore", 2);
+			case HOUSE -> {
+				String h = c.builder.start("house");
+				yield h.startsWith("You will") ? h : "You can't: " + h;
+			}
+			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(-54, "diamonds", 3)
+					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", 6) : c.chores.mine(40, "coal", 8);
+			case SMELT -> c.chores.smelt();
 			case TRADE -> c.trader.withVillager(null);
 			case EXPLORE -> "";
 		};
@@ -226,6 +236,8 @@ final class Goals {
 		var level = c.player.level();
 		boolean outInTheDark = level.isDarkOutside() && level.canSeeSky(c.player.blockPosition().above());   // no roof yet
 		int tools = Math.max(c.crafter.pickTier(), c.crafter.canMake(1) ? 1 : 0);
+		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
+		boolean busyBuilding = c.builder.busy();
 		return switch (s) {
 			case FOOD -> items.getOrDefault("food", 0) > 0 ? 0 : Math.max(0, (16 - food) / 16f) * 1.2f;
 			case SHELTER -> outInTheDark && blocks >= 10 ? 0.9f * (1.2f - 0.6f * p.bravery) : 0;
@@ -236,7 +248,19 @@ final class Goals {
 			case ORE -> tools == 0 ? 0 : 0.3f * (0.5f + p.bravery);                         // no pickaxe: ore drops nothing
 			case TRADE -> c.mod.config.trading && c.trader.villagerNear() != null && c.trader.hasSomethingToTrade() ? 0.35f : 0;
 			case EXPLORE -> 0.3f * (0.5f + p.curiosity);
+			// the way a player gets on in the world: a real house once it has tools, then down for iron, then diamonds
+			case HOUSE -> home == null && !busyBuilding && c.crafter.pickTier() >= 2 && !evening() && !c.player.isCreative()
+					? 0.7f * (0.6f + p.diligence) : 0;
+			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
+					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? 0.5f * (0.5f + p.bravery)
+					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
+			case SMELT -> items.getOrDefault("raw_iron", 0) >= 3 && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
+					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0) ? 0.85f : 0;
 		};
+	}
+
+	private int diamonds() {
+		return c.items().getOrDefault("diamond", 0);
 	}
 
 	private int blocks() {
@@ -262,11 +286,10 @@ final class Goals {
 		var items = c.items();
 		int blocks = items.getOrDefault("dirt", 0) + items.getOrDefault("cobblestone", 0);
 		return switch (dream) {
-			case HOME -> s == Short.STONE && blocks < HOME_BLOCKS ? 0.35f
-					: s == Short.SHELTER && home == null && blocks >= HOME_BLOCKS && !c.player.level().isDarkOutside() ? 0.8f : 0;
+			case HOME -> s == Short.HOUSE && home == null ? 0.4f : s == Short.WOOD && home == null && items.getOrDefault("log", 0) < 24 ? 0.2f : 0;
 			case STOCKPILE -> s == Short.WOOD && items.getOrDefault("log", 0) < 32 || s == Short.STONE && items.getOrDefault("cobblestone", 0) < 64
 					? 0.35f : 0;
-			case TREASURE -> s == Short.ORE ? 0.45f : 0;
+			case TREASURE -> s == Short.ORE ? 0.3f : s == Short.MINE ? 0.35f : 0;
 			case TRADER -> s == Short.TRADE && urgency(Short.TRADE) > 0 ? 0.45f : s == Short.ORE ? 0.15f : 0;
 			case EXPLORER -> s == Short.EXPLORE ? 0.45f : 0;
 			case FRIENDS -> s == Short.EXPLORE ? 0.1f : 0;

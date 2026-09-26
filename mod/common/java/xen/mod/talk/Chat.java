@@ -63,7 +63,7 @@ public final class Chat {
 	// ------------------------------------------------------------------------------ requests
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
 	public static final String[] INTENTS = {"follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give",
-			"shelter", "eat", "stop", "redstone", "trade", "chat"};
+			"shelter", "eat", "stop", "redstone", "trade", "chat", "peace"};
 	/** Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks). */
 	static final String[] CRAFTABLE = {"crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?",
 			"torch(es)?", "sticks?", "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?",
@@ -73,6 +73,7 @@ public final class Chat {
 	private static final Pattern CRAFT_WORD = Pattern.compile("\\bcraft(ing)? (me |us )?(a |an |some |the |\\d+ )*([a-z_]+)");
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
+			{"peace", "\\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"},
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
@@ -153,7 +154,7 @@ public final class Chat {
 	}
 
 	/** Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins. */
-	static final String[][] THAI = {{"chat", "ขอบคุณ"}, {"trade", "แลก", "เทรด", "ซื้อ", "ขาย"}, {"stop", "หยุด", "พอแล้ว", "ยกเลิก"},
+	static final String[][] THAI = {{"peace", "สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว"}, {"chat", "ขอบคุณ"}, {"trade", "แลก", "เทรด", "ซื้อ", "ขาย"}, {"stop", "หยุด", "พอแล้ว", "ยกเลิก"},
 			{"stay", "ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่"}, {"follow", "ตาม", "มานี่", "มาทางนี้", "มาหา"}, {"give", "ขอ", "ส่ง"},
 			{"explore", "สำรวจ", "ไปเที่ยว", "ไปเล่น"}, {"redstone", "เรดสโตน", "วงจร"}, {"wood", "ไม้"}, {"coal", "ถ่าน"}, {"iron", "เหล็ก"},
 			{"stone", "หิน"}, {"mine", "ขุด", "แร่", "เพชร", "ทอง"}, {"food", "อาหาร", "ล่า", "หาของกิน"},

@@ -214,7 +214,7 @@ def carrying(inventory, limit=60):
 # ------------------------------------------------------------------------------ requests
 # What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do.
 INTENTS = ("follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give", "shelter", "eat",
-           "stop", "redstone", "trade", "chat")
+           "stop", "redstone", "trade", "chat", "peace")
 # Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks).
 CRAFTABLE = ("crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?", "torch(es)?", "sticks?",
              "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?", "axes?", "shovels?",
@@ -223,13 +223,14 @@ _CRAFT_THING = re.compile(r"\b((wooden|wood|stone|iron|golden|gold|diamond) )?("
 _CRAFT_WORD = re.compile(r"\bcraft(ing)? (me |us )?(a |an |some |the |\d+ )*([a-z_]+)")
 AMOUNT = {"wood": 8, "stone": 16, "coal": 8, "iron": 4, "mine": 8, "food": 3}
 # Requests in Thai: words to look for (Thai has no spaces between words), the first that matches wins.
-THAI = (("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด", "ซื้อ", "ขาย")), ("stop", ("หยุด", "พอแล้ว", "ยกเลิก")),
+THAI = (("peace", ("สงบศึก", "ขอโทษ", "ยอมแพ้", "ไม่สู้แล้ว")), ("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด", "ซื้อ", "ขาย")), ("stop", ("หยุด", "พอแล้ว", "ยกเลิก")),
         ("stay", ("ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่")), ("follow", ("ตาม", "มานี่", "มาทางนี้", "มาหา")),
         ("give", ("ขอ", "ส่ง")), ("explore", ("สำรวจ", "ไปเที่ยว", "ไปเล่น")), ("redstone", ("เรดสโตน", "วงจร")),
         ("wood", ("ไม้",)), ("coal", ("ถ่าน",)), ("iron", ("เหล็ก",)), ("stone", ("หิน",)), ("mine", ("ขุด", "แร่", "เพชร", "ทอง")),
         ("food", ("อาหาร", "ล่า", "หาของกิน")), ("build", ("สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
 _THAI_CHAR = re.compile("[\u0e00-\u0e7f]")
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
+    ("peace", r"\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"),
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),

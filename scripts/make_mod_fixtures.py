@@ -100,7 +100,8 @@ REQUESTS = ["Xen, get some wood", "xen follow me", "do you have wood?", "can you
             "random craft boat", "craft 4 torches", "make me a stone pickaxe", "xen craft a crafting table", "craft some planks",
             "make a chest", "craft a wooden sword", "make a shelter", "craft lantern", "random you had 20 woods", "craft 2 doors",
             "xen fallow me", "folow me pls", "cmere xen", "gimme 3 wod", "ตามมา", "ขอไม้ 5 ชิ้น", "หยุด", "ไม่ต้องตามแล้ว รอตรงนี้",
-            "ขอบคุณนะ", "ช่วยตัดไม้หน่อย", "สร้างบ้าน", "ไปสำรวจ", "ขุดเพชร", "หาของกินหน่อย"]
+            "ขอบคุณนะ", "ช่วยตัดไม้หน่อย", "สร้างบ้าน", "ไปสำรวจ", "ขุดเพชร", "หาของกินหน่อย",
+            "truce!", "ok ok i give up", "sorry", "stop fighting me", "peace?", "i surrender", "don't hit me", "ยอมแพ้แล้ว"]
 
 
 def main():

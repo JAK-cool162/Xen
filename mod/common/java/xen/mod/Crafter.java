@@ -98,12 +98,20 @@ final class Crafter {
 		int woodForSticks = sticks > 0 ? 2 : 0, woodForTable = tableNearOrCarried() ? 0 : 4;
 		if (tier <= 1) return wood() >= 3 + woodForSticks + woodForTable;
 		if (tier == 2) return count(Crafter::isStoneMaterial) >= 3 && wood() >= woodForSticks + woodForTable;
-		return false;                                                    // iron needs smelting: not yet
+		if (tier == 3) return count(n -> n.equals("iron_ingot")) >= 3 && wood() >= woodForSticks + woodForTable;   // (smelted first)
+		return count(n -> n.equals("diamond")) >= 3 && wood() >= woodForSticks + woodForTable;
 	}
 
 	/** What it would make now, most needed first (null: nothing). */
 	private String wanted() {
 		int tier = pickTier();
+		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
+		if (tier == 3 && diamonds >= 3 && canMake(4)) return "diamond_pickaxe";      // the next tier, like any player
+		if (tier == 2 && iron >= 3 && canMake(3)) return "iron_pickaxe";
+		if (tier >= 3 && iron >= 2 && !has("iron_sword") && !has("diamond_sword") && sticksOrWood(1, 0)) return "iron_sword";
+		if (tier >= 3 && diamonds >= 2 && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
+		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
+		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
 		if (tier >= 2 && has("_sword") && has("_axe")) return null;           // (most of the time: nothing to make)
 		if (wood() < 2 && count(n -> n.equals("stick")) == 0) return null;     // no wood, no tools
 		int stone = count(Crafter::isStoneMaterial);
@@ -126,7 +134,7 @@ final class Crafter {
 	/** Does it want to (and can it) make something now? */
 	boolean ready() {
 		if (c.player != null && c.player.isCreative() && order == null) return false;   // a creative player doesn't make tools
-		return c.player != null && (order != null || c.player.level().getGameTime() >= nextTry && wanted() != null);
+		return c.player != null && (order != null || placedTable != null || c.player.level().getGameTime() >= nextTry && wanted() != null);
 	}
 
 	// ------------------------------------------------------------------------ "craft a boat"
@@ -315,7 +323,7 @@ final class Crafter {
 		String goal = wanted();
 		if (goal == null) {
 			making = null;
-			return null;
+			return takeTableAlong();
 		}
 		if (making == null || !making.equals(goal)) c.chatter("I'll make a " + goal.replace('_', ' ') + ".", false);
 		making = goal;
@@ -333,6 +341,28 @@ final class Crafter {
 			return step(placeTable(), "a place for the table");
 		}
 		return step(craftAt(at, goal), goal);
+	}
+
+	/** A table it put down out in the wild (not at home): done with it, it takes it along, like a player does. */
+	private BlockPos placedTable;
+
+	private Action takeTableAlong() {
+		if (placedTable == null || c.builder.busy()) return null;         // (building: it keeps using it)
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos home = c.goals.home;
+		if (!isTable(level, placedTable) || home != null && home.distManhattan(placedTable) < 24
+				|| c.player.getEyePosition().distanceTo(Vec3.atCenterOf(placedTable)) > c.player.blockInteractionRange()) {
+			placedTable = null;                                               // (at home it stays: that's where the workshop is)
+			return null;
+		}
+		if (!c.hands.mine(placedTable)) {
+			placedTable = null;
+			return null;
+		}
+		c.acted = true;
+		c.goals.instant = "picking its crafting table back up";
+		if (level.getBlockState(placedTable).isAir()) placedTable = null;
+		return Action.MINE;
 	}
 
 	private Action step(boolean ok, String what) {
@@ -426,6 +456,7 @@ final class Crafter {
 			if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(below).isCollisionShapeFullBlock(level, below)) continue;
 			if (c.hands.placeItem(pos, s -> path(s).equals("crafting_table"), below, Direction.UP, -1)) {
 				table = tableSeen = pos;
+				placedTable = pos;
 				return true;
 			}
 		}
