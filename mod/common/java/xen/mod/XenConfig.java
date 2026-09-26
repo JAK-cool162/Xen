@@ -26,10 +26,10 @@ public final class XenConfig {
 	public boolean learn = true;
 	/** How many Xens one player may summon (0 = no limit; operators have no limit). */
 	public int maxPerPlayer = 1;
-	/** How many Xens the whole world may have (0 = no limit). */
-	public int maxXens = 0;
-	/** How many minions (/xen minions) one Xen may have (operators: no limit). Minions don't load chunks. */
-	public int maxMinions = 8;
+	/** How many Xens the whole world may have (0 = no limit; minions don't count). */
+	public int maxXens = 50;
+	/** How many minions (/xen minions) the whole world may have (0 = no limit). Minions don't load chunks. */
+	public int maxMinions = 100;
 	/** Load the chat model only when someone Xen knows is this close (blocks) or talks to it. */
 	public int chatWakeDistance = 32;
 	/** Unload the chat model after this many minutes with nobody around it knows and no chat. */
@@ -103,7 +103,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 4;
+	public int version = 5;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -129,7 +129,11 @@ public final class XenConfig {
 					if (config.skins.equals(java.util.List.of("random"))) config.skins = new java.util.ArrayList<>(java.util.List.of("modern"));
 					if (!j.has("ownLife")) config.ownLife = true;
 				}
-				config.version = 4;
+				if (!j.has("version") || j.get("version").getAsInt() < 5) {           // 0.7: 50 Xens, 100 minions per world
+					if (config.maxXens == 0) config.maxXens = 50;
+					if (!j.has("maxMinions") || config.maxMinions == 8) config.maxMinions = 100;
+				}
+				config.version = 5;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

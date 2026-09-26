@@ -161,9 +161,20 @@ final class Builder {
 		Direction front = c.player.getDirection().getOpposite();             // the door faces where it stood looking from
 		BlockPos feet = c.player.blockPosition();
 		boolean base = what.contains("base") || what.contains("underground") || what.contains("bunker");
+		boolean mobs = what.contains("mob") || what.contains("grinder") || what.contains("xp");
+		boolean farm = !mobs && (what.contains("farm") || what.contains("crop") || what.contains("wheat"));
+		boolean pen = what.contains("pen") || what.contains("barn") || what.contains("animal");
 		Architect.Palette p = palette(level, feet);
 		Architect.Plan made;
-		if (base) {
+		if (mobs || farm || pen) {
+			int w = mobs ? 5 : farm ? 11 : 9, d = mobs ? 5 : farm ? 11 : 9;
+			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, w, d);
+			if (corner == null) return "You can't build it here: it's all water or cliffs around. Somewhere with dry ground would work.";
+			Direction right = front.getCounterClockWise(), back = front.getOpposite();
+			made = mobs ? Architect.mobFarm(corner.relative(right, 2).relative(back, 3), front, creative)
+					: farm ? Architect.farm(corner.relative(right, 1).relative(back, 1), front, p, creative)
+					: Architect.pen(corner.relative(right, 1).relative(back, 1), front, p, creative);
+		} else if (base) {
 			BlockPos top = Architect.ground(level, feet);
 			if (top == null) return "You can't dig a base here: there's no solid ground.";
 			made = Architect.underground(top.above().relative(front.getOpposite(), 1), front, 7, 9, 7, p, creative);
@@ -195,7 +206,7 @@ final class Builder {
 		int blocks = (int) made.steps().stream().filter(s -> !s.dig()).count();
 		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
 		XenMod.LOG.info("{} starts building a {} at {} ({} blocks, {} palette)", c.name, made.name(), made.middle(), blocks, p.name());
-		return "You will build " + (made.name().startsWith("u") ? "an " : "a ") + made.name() + " here" + of + ": about " + blocks
+		return "You will build " + ("aeiou".indexOf(made.name().charAt(0)) >= 0 ? "an " : "a ") + made.name() + " here" + of + ": about " + blocks
 				+ " blocks, one at a time.";
 	}
 
@@ -244,6 +255,10 @@ final class Builder {
 		if (s.dig()) return here.isAir() || !here.getFluidState().isEmpty() && here.canBeReplaced();
 		if (s.state().is(net.minecraft.world.level.block.Blocks.DIRT) && s.phase() == Architect.SUPPORT) {
 			return !here.canBeReplaced();                                     // filling a hole: any ground will do
+		}
+		if (s.state().is(net.minecraft.world.level.block.Blocks.WATER)) return here.getFluidState().isSource();
+		if (s.state().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK) && s.phase() == Architect.SUPPORT) {
+			return here.is(net.minecraft.tags.BlockTags.DIRT);                 // (grass or dirt: grass grows back)
 		}
 		return here.getBlock() == s.state().getBlock();
 	}
@@ -345,7 +360,12 @@ final class Builder {
 		int miss = skipped.size();
 		XenMod.LOG.info("{} finished the {} ({} placed, {} dug, {} left out) in {} s", c.name, what, placed, dug, miss, (now() - started) / 20);
 		c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
-		c.goals.home = plan.middle();
+		switch (plan.name()) {
+			case "farm" -> c.goals.farm = plan.middle();
+			case "mob farm" -> c.goals.mobFarm = plan.middle();
+			case "animal pen" -> c.goals.pen = plan.middle();
+			default -> c.goals.home = plan.middle();                        // a house or a base: home
+		}
 		c.antics.celebrate();
 		c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;   // its own house: back to its life
 		c.anchor = plan.middle();
@@ -378,6 +398,11 @@ final class Builder {
 		String n = BuiltInRegistries.BLOCK.getKey(b).getPath();
 		java.util.function.Predicate<BlockPos> solid = q -> !level.getBlockState(q).canBeReplaced();
 		if (n.equals("wall_torch") || n.endsWith("_wall_torch")) {            // on the wall behind it
+			Direction f = facing(s.state());
+			BlockPos wall = pos.relative(f.getOpposite());
+			return solid.test(wall) ? new Object[] {wall, f} : null;
+		}
+		if (n.equals("ladder")) {                                            // on the wall behind it
 			Direction f = facing(s.state());
 			BlockPos wall = pos.relative(f.getOpposite());
 			return solid.test(wall) ? new Object[] {wall, f} : null;
@@ -439,6 +464,11 @@ final class Builder {
 			}
 			if (here.canBeReplaced()) s = new Architect.Step(s.pos(), net.minecraft.world.level.block.Blocks.FLOWER_POT.defaultBlockState(), s.phase(), s.decor());
 		}
+		if (s.state().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK) && s.phase() == Architect.SUPPORT && !creative) {
+			s = new Architect.Step(s.pos(), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), s.phase(), s.decor());   // (grass grows over it)
+		}
+		if (s.state().is(net.minecraft.world.level.block.Blocks.FARMLAND)) return till(level, s, here);
+		if (s.state().is(net.minecraft.world.level.block.Blocks.WATER)) return water(level, s, here);
 		if (!here.canBeReplaced()) return dig(level, new Architect.Step(s.pos(), null, s.phase(), s.decor()));   // something else there: out with it
 		Item item = itemFor(s.state());
 		if (item == Items.AIR) {
@@ -455,7 +485,7 @@ final class Builder {
 		String n = BuiltInRegistries.BLOCK.getKey(b).getPath();
 		Direction f = facing(s.state());
 		int yaw = -1;
-		if (b instanceof DoorBlock || b instanceof BedBlock || n.endsWith("_stairs")) yaw = yawIndex(f);
+		if (b instanceof DoorBlock || b instanceof BedBlock || n.endsWith("_stairs") || b instanceof net.minecraft.world.level.block.FenceGateBlock) yaw = yawIndex(f);
 		else if (n.equals("furnace") || n.equals("chest") || n.equals("barrel") || n.equals("smoker")) yaw = yawIndex(f.getOpposite());
 		boolean ok = c.hands.placeItem(s.pos(), st -> st.getItem() == item, wall, side, yaw);
 		int t = tries.merge(s.pos(), 1, Integer::sum);
@@ -477,6 +507,84 @@ final class Builder {
 
 	private void skip(BlockPos pos, String why) {
 		if (skipped.add(pos) && Companion.DEBUG) XenMod.LOG.info("[xen debug] {} skips {}: {}", c.name, pos, why);
+	}
+
+	/** Farmland, like a player makes it: dirt there (put some down if it's a hole), then a hoe on it. */
+	private Action till(ServerLevel level, Architect.Step s, BlockState here) {
+		boolean soil = here.is(net.minecraft.world.level.block.Blocks.DIRT) || here.is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)
+				|| here.is(net.minecraft.world.level.block.Blocks.DIRT_PATH) || here.is(net.minecraft.world.level.block.Blocks.COARSE_DIRT)
+				|| here.is(net.minecraft.world.level.block.Blocks.ROOTED_DIRT);
+		if (here.canBeReplaced()) return place(level, new Architect.Step(s.pos(), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), s.phase(), s.decor()));
+		if (!soil) return dig(level, new Architect.Step(s.pos(), null, s.phase(), s.decor()));
+		if (!level.getBlockState(s.pos().above()).isAir()) return dig(level, new Architect.Step(s.pos().above(), null, s.phase(), s.decor()));
+		if (creative) takeFromCreative(Items.IRON_HOE);
+		if (!c.hands.useWith(s.pos(), st -> st.getItem() instanceof net.minecraft.world.item.HoeItem)) {
+			if (!c.crafter.hasOrder()) c.crafter.orderRecipe("wooden_hoe", 1);   // a hoe first (two planks, two sticks)
+			if (tries.merge(s.pos(), 1, Integer::sum) > 8) skip(s.pos(), "no hoe");
+			return null;
+		}
+		c.acted = true;
+		progress(false);
+		return Action.PLACE;
+	}
+
+	/**
+	 * Water from a bucket, like a player: it pours it onto the block under the spot. In survival it needs a water bucket:
+	 * with an empty one it goes to fill it at the nearest water, with 3 iron it makes one; without, that water stays out.
+	 */
+	private Action water(ServerLevel level, Architect.Step s, BlockState here) {
+		if (!here.canBeReplaced() && here.getFluidState().isEmpty()) return dig(level, new Architect.Step(s.pos(), null, s.phase(), s.decor()));
+		if (creative) takeFromCreative(Items.WATER_BUCKET);
+		boolean full = count(x -> x.equals("water_bucket")) > 0;
+		if (!full) {
+			if (count(x -> x.equals("bucket")) > 0) return fillBucket(level);
+			if (count(x -> x.equals("iron_ingot")) >= 3) {
+				if (!c.crafter.hasOrder()) c.crafter.orderRecipe("bucket", 1);
+				return null;
+			}
+			skip(s.pos(), "no bucket for the water");
+			return null;
+		}
+		if (!c.hands.pour(s.pos(), Direction.UP)) {                          // onto the block under it
+			if (tries.merge(s.pos(), 1, Integer::sum) > 6) skip(s.pos(), "the water didn't go where it should");
+			return null;
+		}
+		c.acted = true;
+		progress(false);
+		return Action.PLACE;
+	}
+
+	private BlockPos waterSource;
+
+	/** An empty bucket: to the nearest water it can see, and scoop some up. */
+	private Action fillBucket(ServerLevel level) {
+		BlockPos feet = c.player.blockPosition();
+		if (waterSource == null || !level.getFluidState(waterSource).isSource() || !level.getFluidState(waterSource).is(net.minecraft.tags.FluidTags.WATER)) {
+			waterSource = null;
+			double best = Double.MAX_VALUE;
+			for (BlockPos q : BlockPos.betweenClosed(feet.offset(-24, -6, -24), feet.offset(24, 4, 24))) {
+				var f = level.getFluidState(q);
+				if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || plan != null && plan.inside().contains(Vec3.atCenterOf(q))) continue;
+				if (!level.getBlockState(q.above()).isAir()) continue;               // (open water it can see)
+				double d = q.distSqr(feet);
+				if (d < best) {
+					best = d;
+					waterSource = q.immutable();
+				}
+			}
+			if (waterSource == null) {
+				c.chatter("I need water for this, and there's none around here.", false);
+				for (Architect.Step st : left) if (st.state() != null && st.state().is(net.minecraft.world.level.block.Blocks.WATER)) skip(st.pos(), "no water nearby");
+				return null;
+			}
+		}
+		doing = "getting water in a bucket";
+		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(waterSource)) > c.player.blockInteractionRange() - 0.5) {
+			return c.walkTo(Vec3.atBottomCenterOf(waterSource.above()));
+		}
+		c.hands.bucket(Vec3.atCenterOf(waterSource).add(0, 0.3, 0), st -> st.getItem() == Items.BUCKET);
+		c.acted = true;
+		return Action.PLACE;
 	}
 
 	private void progress(boolean digging) {
@@ -504,8 +612,12 @@ final class Builder {
 		if (count(x -> x.equals(n)) > 0) return true;
 		String wood = woodType();
 		int logs = count(x -> x.endsWith("_log") || x.endsWith("_stem")), planks = count(x -> x.endsWith("_planks"));
+		if (n.startsWith("cobblestone_") && count(x -> x.equals("cobblestone")) >= 3) {   // slabs, stairs, walls: from its cobblestone
+			if (!c.crafter.hasOrder()) c.crafter.orderRecipe(n, 1);
+			return false;
+		}
 		boolean woodThing = n.endsWith("_planks") || n.endsWith("_stairs") && n.startsWith(wood) || n.endsWith("_slab") && n.startsWith(wood)
-				|| n.endsWith("_door") || n.endsWith("_fence") || n.endsWith("_trapdoor") || n.endsWith("_pressure_plate")
+				|| n.endsWith("_door") || n.endsWith("_fence") || n.endsWith("_fence_gate") || n.endsWith("_trapdoor") || n.endsWith("_pressure_plate")
 				|| n.equals("crafting_table") || n.equals("chest") || n.equals("barrel");
 		if (woodThing && logs + planks > 0) {
 			String order = n.startsWith(wood) || !n.contains("_") || n.equals("crafting_table") || n.equals("chest") || n.equals("barrel") ? n
@@ -695,20 +807,25 @@ final class Builder {
 		return !level.getBlockState(p).getCollisionShape(level, p).isEmpty();
 	}
 
-	/** Breadth first through the air around the plan (6 ways from each block), to the nearest of the goals. */
+	/** The shortest way through the air around the plan (A*, heading for the block it's going to), to one of the goals. */
 	private List<BlockPos> findRoute(ServerLevel level, BlockPos from, Set<BlockPos> goals) {
 		var box = bounds.minmax(new net.minecraft.world.phys.AABB(from).inflate(3));
+		BlockPos aim = goals.iterator().next();
 		Map<BlockPos, BlockPos> came = new HashMap<>();
-		java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
+		Map<BlockPos, Integer> cost = new HashMap<>();
+		java.util.PriorityQueue<Object[]> open = new java.util.PriorityQueue<>(java.util.Comparator.comparingInt(o -> (Integer) o[1]));
 		came.put(from, from);
-		open.add(from);
+		cost.put(from, 0);
+		open.add(new Object[] {from, from.distManhattan(aim)});
 		BlockPos found = null;
-		while (!open.isEmpty() && came.size() < 30000) {
-			BlockPos at = open.poll();
+		int expanded = 0;
+		while (!open.isEmpty() && expanded++ < 40000) {
+			BlockPos at = (BlockPos) open.poll()[0];
 			if (goals.contains(at)) {
 				found = at;
 				break;
 			}
+			int g = cost.get(at);
 			List<BlockPos> next = new ArrayList<>(10);
 			for (Direction d : Direction.values()) {
 				BlockPos n = at.relative(d);
@@ -720,9 +837,12 @@ final class Builder {
 				}
 			}
 			for (BlockPos n : next) {
-				if (came.containsKey(n) || !box.contains(Vec3.atCenterOf(n))) continue;
+				if (!box.contains(Vec3.atCenterOf(n)) || cost.getOrDefault(n, Integer.MAX_VALUE) <= g + 1) continue;
+				cost.put(n, g + 1);
 				came.put(n, at);
-				open.add(n);
+				int h = Integer.MAX_VALUE;
+				for (BlockPos goal : goals) h = Math.min(h, n.distManhattan(goal));
+				open.add(new Object[] {n, g + 1 + h});
 			}
 		}
 		searched = came.size();

@@ -104,7 +104,9 @@ public class XenSettingsScreen extends Screen {
 			}
 			case 1 -> {
 				choice("Xens per player", "maxPerPlayer", List.of(1, 2, 3, 5, 10, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens one player may summon.");
-				choice("Xens in the world", "maxXens", List.of(0, 5, 10, 20, 50, 100), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all.");
+				choice("Xens in the world", "maxXens", List.of(50, 5, 10, 20, 100, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all (minions don't count).");
+				choice("Minions in the world", "maxMinions", List.of(100, 10, 25, 50, 200, 0), n -> n == 0 ? "no limit" : "" + n,
+						"How many minions (/xen minions) the world may have. Minions don't load chunks: they freeze where nobody keeps the world loaded.");
 				onOff("Random names", "randomNames", "New Xens get names that fit their nature (off: Xen, Xen2, Xen3...).");
 				choice("Name style", "nameStyle", List.of("player", "mixed", "fun", "gamer", "fantasy", "classic"), s -> s,
 						"player: like real players' names now (luvhi, MeeroSG, cold_lemon, Solen2009), made up, never someone's. mixed: all kinds. fun: SneakyWaffle, GrumpyBadger. gamer: Pickle_42, xXWaffleXx. fantasy: Zorbax, Lumika. classic: Pip, Bramble.");

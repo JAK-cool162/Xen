@@ -5,10 +5,10 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 
 | file | what |
 |---|---|
-| `xen-companion-0.6.1-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
-| `xen-companion-0.6.1-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
-| `xen-companion-0.6.1-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
-| `xen-companion-0.6.1-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-0.7.0-alpha+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11 (Java 21): the mod, its brain and its chat model inside, about 400 MB |
+| `xen-companion-0.7.0-alpha+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 (Java 25) |
+| `xen-companion-0.7.0-alpha+mc1.21.11.jar` | the light mod for 1.21.11 (7 MB; the chat model downloads when needed). **Use this one on phones** |
+| `xen-companion-0.7.0-alpha+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `smollm2-360m-instruct-q8_0.gguf` | the chat model on its own (for the light jars): put it in `config/xen/`, or it downloads by itself |
 | `xen-brain.bin` | Xen's trained brain, already inside the jars. Copy it to `<world>/xen/brain.bin` to reset a world's Xens to it |
 | `xen-brain-30days-experimental.bin` | experimental: the same brain after 30 more days in real Minecraft with evolution. It fears zombies much more, but mines almost anything (even toward lava) and does worse on SimCraft's tests (reward per life 2.3 vs 32.6). Copy it to `<world>/xen/brain.bin` to experiment |
@@ -17,7 +17,73 @@ and chats, and plays fair. It only knows what it can sense and acts only through
 Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optional (settings screen). Install, phones and settings:
 [dist/README.md](https://github.com/JAK-cool162/Xen/blob/main/dist/README.md).
 
-### What's new in 0.6.1-alpha
+### What's new in 0.7.0-alpha
+
+**It lives its own life (on by default)**
+
+* **It plays its own game.** A new Xen starts free, like another player on the server: wood, a pickaxe, stone
+  tools, **its own house**, a **crop farm** next to it, **mining** (a staircase down to iron and coal, branch tunnels,
+  only the ore it can see in the walls), **smelting** at a furnace, **iron tools and armor** (it puts armor on), then
+  down to the deepslate for **diamonds**, and a **mob farm** when it has the stone for it. It comes along when you say
+  "follow me" (`ownLife` in the settings).
+* **It builds like a real builder**: before the first block of a house it works out the materials ("For this cottage
+  I need about 38 logs. I have 12. Getting it all first, like a real builder."), gathers them with a bit to spare,
+  then builds. **It levels the ground itself** (digs bumps away, fills holes) instead of saying the ground isn't flat,
+  for houses, shelters and redstone alike.
+* **New builds**: a cottage (framed, windows between the posts, overhanging stair roof, furnished), an **underground
+  base** (a staircase down, pillars, beams with lanterns, bed, chests, workshop), a **crop farm** (the wiki's 9x9 with
+  one water block in the middle, tilled with a hoe, sown), an **animal pen**, and a **mob farm** (the wiki's dark-room
+  kind: four dark arms with water that pushes monsters into a 22-block drop, hoppers into a chest, a room to hit them
+  from). Ask: "build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm".
+  In creative it flies and takes blocks from the creative inventory; in survival it makes what it needs.
+* **It takes its crafting table along** after crafting away from home, like a player. "Pick up the crafting table"
+  (or furnace, chest, bed, door, torches) works now; before, it went looking for ore.
+* **It goes back for its things** after it dies (unless they burned or fell in the void).
+
+**Path assist: legs that know how to walk**
+
+* Its own way-finding (no Baritone code): a search over the moves a player makes: walk and **sprint**, jump up,
+  **drop down** (as far as it dares), **sprint-jump gaps**, **swim**, **climb ladders**, **open doors**, **dig through
+  the ground** (never through builds), dig a **staircase up or down**, **bridge** across a gap and **tower up out of a
+  hole**. Its mind still decides where to go and how bold to be: a brave, healthy Xen jumps gaps and takes a bigger
+  drop, a hurt or scared one takes the long safe way. It only uses what it could know (dark caves far away are rock
+  to it until it sees them). On an obstacle course (a wall, a pit, a gap, water, a door, a ladder, a sealed box) it
+  got through all of them, on 1.21.11 and 26.1.2. No more being stuck at the water's edge.
+
+**The solver (Experimental): a second little mind for being stuck**
+
+* When its legs can't find a way, keep failing, or it gets no closer, the solver picks a way out (tower up, a
+  staircase up, dig straight through, a bolder way, go round, back off and look again, swim out, ask for help) and
+  **learns which ways work in which kind of place**. It also learns from players it trusts: seeing you tower out of a
+  hole counts like its own try that worked. All Xens share what it learns (`config/xen/solver.json`); every try is
+  written down (`config/xen/solver-tries.jsonl`).
+* **The journal**: what each Xen sees, thinks, says and hears, how it finds its way, what the solver tries. The
+  Experimental tab has **Copy log** and **Save log** (a file in `config/xen/logs/`); on a server, `/xen log`.
+
+**Fights end in talk**
+
+* Losing, a Xen asks for a **truce**; badly hurt, it **gives up**; winning, it tells the other to give up. The other
+  side decides by its health, its trust and its bravery: it takes the truce, **wants something for it** ("Only if you
+  give me your iron ingot." "Okay, it's yours. Truce."), or fights on. Breaking a truce costs a lot of trust. You can
+  say "truce", "peace", "sorry" or "I give up" too. It no longer stops to crouch and taunt a player mid-fight.
+
+**Minion Xens**
+
+* `/xen minions <count>`: sidekicks for your Xen with the same mind, to make a server feel full or to let a Xen build
+  its own little civilization. **They don't load the world** themselves: they freeze, mid-step, where nobody keeps it
+  loaded, and go on when someone comes by. They take orders only from their boss (and you); the boss gives them work
+  ("NFLR, get 12 wood.") and lays out a **village**: a house for each of them around its home.
+* Limits: **50 Xens and 100 minions per world** (settings: Xens tab).
+
+**Looks and names like real players**
+
+* A new **modern skin pack** (48 original skins in today's style: shaded hair with volume, hoodies, jackets, sweaters,
+  cargo trousers and sneakers, muted and pastel colours, many with slim arms), the new default. The old funny ones are
+  still there (`skins: fun`).
+* **Names like real players' names now** ("luvhi", "MeeroSG", "cold_lemon", "Brushriver851", "xKairox"), made up,
+  never copied from anyone. The old styles are still in the settings.
+
+### New in 0.6.1-alpha
 
 **It behaves more like a player (on by default)**
 

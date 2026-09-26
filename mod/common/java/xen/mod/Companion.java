@@ -1280,6 +1280,7 @@ public final class Companion {
 				}
 				case "wood", "stone", "coal", "iron", "mine" -> plan = chores.gather(r.intent(), r.amount());
 				case "food" -> plan = chores.hunt(r.amount());
+				case "pickup" -> plan = chores.pickUp(r.thing());
 				case "give" -> plan = chores.give(from, r.thing(), r.amount());
 				case "shelter" -> plan = chores.shelter();
 				case "eat" -> plan = chores.eat();

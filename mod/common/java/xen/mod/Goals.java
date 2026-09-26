@@ -34,6 +34,8 @@ final class Goals {
 		HOUSE("build a house", "you have no home yet and a real player builds one"),
 		MINE("go mining", "you want iron and diamonds for better tools"),
 		SMELT("smelt your iron", "raw iron has to be smelted before you can make tools of it"),
+		FARM("build a farm", "a farm by your house means food without hunting"),
+		MOBFARM("build a mob farm", "a mob farm brings bones, string, gunpowder and experience to your door"),
 		TRADE("trade with a villager", "you have things a villager may want"),
 		EXPLORE("explore", "you are curious");
 
@@ -68,7 +70,7 @@ final class Goals {
 	String instant = "";
 	Short current;
 	Long dream;
-	BlockPos home;
+	BlockPos home, farm, mobFarm, pen;
 	private int[] origin;
 	int achieved;
 	private long next, until;
@@ -165,8 +167,8 @@ final class Goals {
 	boolean think(boolean nearby) {
 		long now = c.player.level().getGameTime();
 		if (current != null) {
-			boolean over = current == Short.EXPLORE ? now > until : current == Short.HOUSE ? !c.builder.busy() : !c.chores.busy();
-			if (!over) return c.chores.busy() && current != Short.HOUSE;
+			boolean over = current == Short.EXPLORE ? now > until : building(current) ? !c.builder.busy() : !c.chores.busy();
+			if (!over) return c.chores.busy() && !building(current);
 			learn();
 		}
 		if (now < next) return false;
@@ -174,7 +176,7 @@ final class Goals {
 		Short best = null;
 		float bestScore = 0.25f;                                         // below this it's happy doing whatever it does
 		for (Short s : Short.values()) {
-			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE)) continue;   // those would take it away from its friend
+			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM)) continue;   // those would take it away from its friend
 			float score = (urgency(s) + dreamPull(s)) * (0.5f + liking.get(s)) + random.nextFloat() * 0.15f * c.personality.curiosity;
 			if (score > bestScore) {
 				bestScore = score;
@@ -197,6 +199,14 @@ final class Goals {
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(-54, "diamonds", 3)
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", 6) : c.chores.mine(40, "coal", 8);
 			case SMELT -> c.chores.smelt();
+			case FARM -> {
+				String h = c.builder.startNear("farm", nextTo(home, 13));
+				yield h.startsWith("You will") ? h : "You can't: " + h;
+			}
+			case MOBFARM -> {
+				String h = c.builder.startNear("mob farm", nextTo(home, 24));
+				yield h.startsWith("You will") ? h : "You can't: " + h;
+			}
 			case TRADE -> c.trader.withVillager(null);
 			case EXPLORE -> "";
 		};
@@ -254,9 +264,22 @@ final class Goals {
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
 					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? 0.5f * (0.5f + p.bravery)
 					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
+			case FARM -> home != null && farm == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
+			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
+					&& (c.player.isCreative() || items.getOrDefault("cobblestone", 0) >= 300) ? 0.45f * (0.5f + p.diligence) : 0;
 			case SMELT -> items.getOrDefault("raw_iron", 0) >= 3 && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
 					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0) ? 0.85f : 0;
 		};
+	}
+
+	/** A spot about that far from home, to one side (for its farm, its mob farm), in a direction that's the same for it each time. */
+	private BlockPos nextTo(BlockPos home, int far) {
+		double a = (c.name.hashCode() & 7) * Math.PI / 4 + far * 0.3;
+		return home.offset((int) Math.round(Math.cos(a) * far), 0, (int) Math.round(Math.sin(a) * far));
+	}
+
+	private static boolean building(Short s) {
+		return s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM;
 	}
 
 	private int diamonds() {
@@ -374,7 +397,21 @@ final class Goals {
 			h.add(origin[1]);
 			o.add("origin", h);
 		}
+		String[] names = {"farm", "mobfarm", "pen"};
+		BlockPos[] spots = {farm, mobFarm, pen};
+		for (int i = 0; i < names.length; i++) {
+			if (spots[i] == null) continue;
+			JsonArray h = new JsonArray();
+			h.add(spots[i].getX());
+			h.add(spots[i].getY());
+			h.add(spots[i].getZ());
+			o.add(names[i], h);
+		}
 		return o;
+	}
+
+	private static BlockPos at(JsonArray h) {
+		return new BlockPos(h.get(0).getAsInt(), h.get(1).getAsInt(), h.get(2).getAsInt());
 	}
 
 	void load(JsonObject likes, JsonObject dreams) {
@@ -397,6 +434,9 @@ final class Goals {
 			JsonArray h = dreams.getAsJsonArray("home");
 			home = new BlockPos(h.get(0).getAsInt(), h.get(1).getAsInt(), h.get(2).getAsInt());
 		}
+		if (dreams.has("farm")) farm = at(dreams.getAsJsonArray("farm"));
+		if (dreams.has("mobfarm")) mobFarm = at(dreams.getAsJsonArray("mobfarm"));
+		if (dreams.has("pen")) pen = at(dreams.getAsJsonArray("pen"));
 		if (dreams.has("origin")) {
 			JsonArray h = dreams.getAsJsonArray("origin");
 			origin = new int[] {h.get(0).getAsInt(), h.get(1).getAsInt()};

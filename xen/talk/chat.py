@@ -214,7 +214,7 @@ def carrying(inventory, limit=60):
 # ------------------------------------------------------------------------------ requests
 # What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do.
 INTENTS = ("follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give", "shelter", "eat",
-           "stop", "redstone", "trade", "chat", "peace")
+           "stop", "redstone", "trade", "chat", "peace", "pickup")
 # Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks).
 CRAFTABLE = ("crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?", "torch(es)?", "sticks?",
              "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?", "axes?", "shovels?",
@@ -227,14 +227,15 @@ THAI = (("peace", ("สงบศึก", "ขอโทษ", "ยอมแพ้"
         ("stay", ("ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่")), ("follow", ("ตาม", "มานี่", "มาทางนี้", "มาหา")),
         ("give", ("ขอ", "ส่ง")), ("explore", ("สำรวจ", "ไปเที่ยว", "ไปเล่น")), ("redstone", ("เรดสโตน", "วงจร")),
         ("wood", ("ไม้",)), ("coal", ("ถ่าน",)), ("iron", ("เหล็ก",)), ("stone", ("หิน",)), ("mine", ("ขุด", "แร่", "เพชร", "ทอง")),
-        ("food", ("อาหาร", "ล่า", "หาของกิน")), ("build", ("สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
+        ("food", ("อาหาร", "ล่า", "หาของกิน")), ("build", ("สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน", "ฟาร์ม", "คอก")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
 _THAI_CHAR = re.compile("[\u0e00-\u0e7f]")
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
+    ("pickup", r"\b(mine|break|pick up|pickup|take|grab|collect) (the |that |this |your |my |a )?(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\b"),
     ("peace", r"\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"),
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
-    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout)\b|\bunderground\b"),
+    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder)\b|\bunderground\b"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -315,8 +316,15 @@ def details(intent, words):
     if intent == "redstone":
         thing = next((k for k in ("and", "or", "wire") if re.search(rf"\b{k}\b", words)), "not")
         amount = 0
-    if intent == "build":                                        # a house, or a base under the ground
-        thing = "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else "house"
+    if intent == "pickup":                                       # "mine the crafting table" -> ("pickup", "crafting_table", 0)
+        m = re.search(r"\b(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\b", words)
+        b = m.group(1) if m else "crafting table"
+        thing = "crafting_table" if b in ("table", "workbench") else "torch" if b == "torches" else b.replace(" ", "_")
+        amount = 0
+    if intent == "build":                                        # a house, a base under the ground, a farm, a pen, a mob farm
+        thing = ("mob farm" if re.search(r"\b(mob|mobs|xp|grinder)\b", words) else "farm" if re.search(r"\bfarm\b", words)
+                 else "pen" if re.search(r"\b(pen|barn|animal)\b", words)
+                 else "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else "house")
         amount = 0
     if intent == "craft":                                        # "craft 4 torches" -> ("craft", "torch", 4)
         m = _CRAFT_THING.search(words)

@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.6.1-alpha
+# Xen Companion (Fabric mod), prototype 0.7.0-alpha
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -11,10 +11,10 @@ through a player's inputs.
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.6.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.6.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.6.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.6.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-0.7.0-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.7.0-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-0.7.0-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
+| `xen-companion-0.7.0-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -66,7 +66,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.6.1-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-0.7.0-alpha+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -351,8 +351,10 @@ slow a server away. Turn **Redstone** off to disable it.
 
 ## Names, personalities and skins
 
-* **Names**: new Xens get names that fit their nature, in the **Name style**
-  (`nameStyle`) you like: `fun` (a silly Xen may be WobblyNoodle or LilPickle,
+* **Names**: by default new Xens get **names like real players have now**
+  (`player`: luvhi, MeeroSG, cold_lemon, Brushriver851, xKairox), made up here,
+  never copied from anyone's account. Or names that fit their nature, in the
+  **Name style** (`nameStyle`) you like: `fun` (a silly Xen may be WobblyNoodle or LilPickle,
   a bold one IronComet, a grumpy one SaltyBadger), `gamer` (Pickle_42,
   xXWaffleXx, TheSneakyGoose), `fantasy` (Zorbax, Lumika), `classic` (Pip,
   Nova, Bramble) or `mixed` (all of them). Xen, Xen2... with **Random names**
@@ -386,9 +388,13 @@ slow a server away. Turn **Redstone** off to disable it.
   `jumpreset`, `strafe`, `counter`, `select`, `retreat`, `shield`). Its owner
   or an operator can do it, and it's saved with the world.
 * **Skins** (`skins`, any mix of these):
-  * `random` (the default): the mod's own 61 skins and Minecraft's 18;
-  * `pack`: only the mod's 61 ([see them](../docs/skins/README.md); free to
-    use, CC0). They're signed, so everyone sees them, with or without the mod;
+  * `modern` (the default): 48 skins in today's style: shaded hair with
+    volume, hoodies with drawstrings, jackets, sweaters, cargo trousers and
+    sneakers, muted and pastel colours, many with slim arms
+    ([see them](../docs/skins-modern/preview.png); original, free to use, CC0);
+  * `fun`: the funny 61 of earlier versions ([see them](../docs/skins/README.md));
+    `pack`: both. All of them are signed, so everyone sees them, with or without the mod;
+  * `random`: both packs and Minecraft's 18;
   * `default`: Minecraft's 18 (Steve, Alex, Ari, Efe, Kai, Makena, Noor, Sunny,
     Zuri, in both arm widths);
   * `folder`: **your own skins**. Put PNG skin files in `config/xen/skins/`
@@ -605,6 +611,82 @@ Meanwhile Xen talks in plain words. When nobody it knows is around to hear, it
 leaves notes on signs instead (if it carries signs): "Day 12: Diamonds here!
 -Pip", "Day 13: Careful, lava! -Pip", and a morning note saying what it's up to.
 
+## Its own life
+
+A new Xen starts **free** (`ownLife`), like another player on the server, and gets on in the world the way a
+player does:
+
+1. wood, a crafting table, a wooden pickaxe, stone tools (it takes its table along when it's away from home);
+2. **its own house**: it works out the materials first ("For this cottage I need about 38 logs. I have 12. Getting it
+   all first, like a real builder."), gathers them, levels the ground and builds;
+3. a **crop farm** by the house (tilled with a hoe, one water block in the middle, sown);
+4. **mining**: a staircase down to iron and coal (around y 16), branch tunnels two high and three apart, only the
+   ore it can see in the walls; it lights the way with torches;
+5. **smelting** at a furnace (one it makes from 8 cobblestone), then **iron tools and armor** (it puts armor on);
+6. down to the deepslate for **diamonds**, and a **mob farm** once it has the stone for one.
+
+At night it builds a shelter (or goes home), and after dying it goes back for its things. Its dream (a home,
+treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
+comes along (and gets on with things nearby while you're close); "explore" lets it go again.
+
+## Building
+
+Ask it ("build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm") or
+`/xen build <what>`. It builds block by block with its own hands, in the order a builder works: it clears and
+**levels the ground** (digging bumps away, filling holes), lays the foundation, the frame, the walls, the roof, then
+furnishes it and hangs the door last. In creative it flies and takes blocks from the creative inventory (it finds
+its way through the air around the walls, in by the door, over the roof); in survival it makes the planks, stairs,
+slabs, doors, fences and hoes itself, gets more wood and stone when it runs out, climbs on a pillar for the roof
+(and takes it down), fills a bucket at the nearest water, and leaves out decoration it has nothing to make from.
+
+* **Cottage**: a stone base, a log frame with posts every few blocks, plank walls with windows between the posts, a
+  steep stair roof that overhangs, a beam with a lantern; inside a bed, crafting table, furnace, chest, a table and
+  chair; outside shutters, a step, lamp posts and flowers. The look fits the biome in creative (oak, spruce, birch,
+  medieval, stone, desert); in survival it's its own wood.
+* **Underground base**: a staircase down with torches, a door, a room carved in the stone with log pillars, ceiling
+  beams and lanterns, a plank floor, chests, a barrel, a crafting table, furnaces, a bed, a table and chair.
+* **Crop farm** (the wiki's 9x9: one water block in the middle keeps every farmland block wet), a fence, a gate,
+  lanterns; **animal pen** (a fence, a gate, a water trough, hay); **mob farm** (the wiki's dark-room kind: four
+  dark arms, water flowing exactly to the edge of the hole, a 22-block drop that leaves a zombie with half a heart,
+  hoppers into a chest, and a room with a one-block gap to hit them through).
+
+## Path assist
+
+Its legs find the way (`pathAssist`), its own way-finding (no Baritone code): a search over the moves a player can
+make from where it stands, each costing about the time it takes (and the danger): walk and **sprint**, diagonals,
+jump up a block, **drop down** as far as it dares, **sprint-jump gaps** of up to 3, **swim**, **climb** ladders and
+vines, **open doors** and gates, **dig through** the ground (never through planks, glass or anything built), dig a
+**staircase** up or down, **bridge** across a gap (sneaking at the edge, a block against the side of the one it
+stands on) and **tower up** out of a hole. Its own mind decides where to go and how bold to be: a brave, healthy
+Xen jumps gaps and takes bigger drops; a hurt or scared one takes the long safe way. It only uses what it could
+know: close by it feels everything, further off only what's in the light (a dark cave far away is rock to it until
+it gets there). With many Xens, planning is spread over the server's ticks so it never stutters.
+
+## The solver and the journal
+
+Both in the settings' **Experimental** tab (with custom instructions and your script).
+
+* **The solver** (`solver`): a second little mind for being stuck. When its legs can't find a way, keep failing, or
+  it gets no closer, it looks at where it is (a hole? water? underground? is the goal above or below? blocks? a
+  pickaxe?) and picks a way out: tower up, a staircase up, dig through, a bolder way, go round, back off and look
+  again, swim out, or ask for help. Each try counts as working if it got closer within ten seconds; next time it
+  mostly picks what worked in a place like that (and now and then something else, to find out). It learns from
+  players it trusts too: seeing you tower out of a hole or swim out counts like its own try. All Xens share it
+  (`config/xen/solver.json`), and every try is written down in `config/xen/solver-tries.jsonl`.
+* **The journal** (`journal`): what each Xen sees, thinks, says and hears, how it finds its way and what the solver
+  tries, with the time. **Copy log** puts it on the clipboard, **Save log** writes a file to `config/xen/logs/` (on a
+  server, `/xen log`), to send or to read later: the way to find what to make better.
+
+## Minion Xens
+
+`/xen minions <count>` gives your Xen minions: sidekicks with the same mind, to make a server feel full or to let
+a Xen build its own little civilization. A minion is a real player like any Xen, but **it doesn't load the world
+around it**: it only lives where someone else (its boss, a player) keeps the world loaded, and freezes mid-step
+where nobody does, until someone comes by. Minions take orders only from their boss and you. The boss runs the
+crew: every minute it gives the idle ones work ("NFLR, get 12 wood.", "ivory53, get 3 food for the village."), and
+lays out a **village**: a house for each of them around its home. Without orders they live their own life close
+to their boss. Up to 100 minions per world (`maxMinions`); `/xen dismiss` sends them home with it.
+
 ## Settings: Mod Menu or commands
 
 ![Xen Companion settings in Mod Menu](../docs/screenshots/settings.png)
@@ -630,7 +712,12 @@ away in single player. On a server, operators use:
 | `gpu` | `"auto"` | the chat model on the graphics card: `"auto"`, `"on"` or `"off"` ([more](#the-chat-model-on-the-graphics-card)) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
-| `maxXens` | `0` | Xens the whole world may have (0 = no limit) |
+| `maxXens` | `50` | Xens the whole world may have (0 = no limit; minions don't count) |
+| `maxMinions` | `100` | [minions](#minion-xens) the whole world may have (0 = no limit) |
+| `ownLife` | `true` | a new Xen starts free and plays its own game ([more](#its-own-life)) |
+| `pathAssist` | `true` | its legs find the way: sprint, jump, drop, jump gaps, swim, climb, doors, dig, bridge, tower up ([more](#path-assist)) |
+| `solver` | `true` | (experimental) the [solver](#the-solver-and-the-journal): learns ways out when it's stuck |
+| `journal` | `true` | (experimental) keep the [journal](#the-solver-and-the-journal) of what Xens see, think, say and hear |
 | `randomNames` | `true` | names like Pip and Nova instead of Xen, Xen2... |
 | `personalities` | `true` | each Xen has its own nature |
 | `wants` | `true` | free Xens choose their own goals; following ones do things nearby on their own |
@@ -639,8 +726,8 @@ away in single player. On a server, operators use:
 | `trading` | `true` | Xen trades with villagers and bargains with players |
 | `refuse` | `true` | Xen may say no (and why) |
 | `copy` | `true` | Xen copies moves that work out for players it watches (the water clutch, a winning fighting style) |
-| `skins` | `["random"]` | `random`, `pack`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
-| `nameStyle` | `"mixed"` | `mixed`, `fun`, `gamer`, `fantasy` or `classic` |
+| `skins` | `["modern"]` | `modern`, `fun`, `pack` (both), `random`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
+| `nameStyle` | `"player"` | `player` (like real players' names), `mixed`, `fun`, `gamer`, `fantasy` or `classic` |
 | `antics` | `true` | dancing along, tricks, surprises in fights |
 | `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
 | `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
@@ -669,7 +756,10 @@ away in single player. On a server, operators use:
 | `/xen chat on\|off`, `/xen learn on\|off` | quick switches |
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
-| `/xen dismiss` | it goes home (operators and the console send every Xen home) |
+| `/xen minions <count>` | [minions](#minion-xens) for your Xen (up to 100 in the world) |
+| `/xen build <what>` | the same as asking it: `house`, `base`, `farm`, `pen`, `mob farm` |
+| `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
+| `/xen dismiss` | it goes home, with its minions (operators and the console send every Xen home) |
 
 * **Its bag**: right-click your Xen to open its inventory.
 * **Instincts**: it swims up in water, fights back against hostile monsters

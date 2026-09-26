@@ -311,7 +311,7 @@ final class Architect {
 			String[] flowers = {"poppy", "dandelion", "cornflower", "oxeye_daisy", "allium", "azure_bluet"};
 			for (int u = 1; u < w - 1; u++) if (u != c) L.put(u, -1, 0, flowers[random.nextInt(flowers.length)], OUTSIDE, true);
 		}
-		net.minecraft.world.phys.AABB inside = new net.minecraft.world.phys.AABB(L.pos(0, 0, 1).getCenter(), L.pos(w - 1, d - 1, h + 1 + w / 2).getCenter());
+		net.minecraft.world.phys.AABB inside = new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(0, 0, 1)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(w - 1, d - 1, h + 1 + w / 2)));
 		return new Plan(fancy ? "cottage" : "house", L.steps(), L.pos(c, 0, 1), L.pos(c, d / 2, 1), front, inside);
 	}
 
@@ -422,7 +422,149 @@ final class Architect {
 			L.put(du, 0, 1, p.light().equals("torch") ? "torch" : "lantern[hanging=false]", OUTSIDE, true);
 		}
 		return new Plan("underground base", L.steps(), L.pos(0, depth + 1, yr), L.pos(0, v0 + d / 2, yr), front,
-				new net.minecraft.world.phys.AABB(L.pos(-half, v0, yr).getCenter(), L.pos(half, v0 + d - 1, yr + 3).getCenter()));
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(-half, v0, yr)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(half, v0 + d - 1, yr + 3))));
+	}
+
+	// ---------------------------------------------------------------------------------- farms
+	/**
+	 * A crop farm the way the wiki shows it: 9 by 9, one water block in the middle (it keeps every block of farmland
+	 * within four wet), the rest tilled with a hoe and sown (wheat; a row of carrots and one of potatoes if it has
+	 * them), a fence round it with a gate at the front, lanterns on the corner posts, a composter and a chest by the
+	 * gate. origin is the front left corner of the field (its farmland level).
+	 */
+	static Plan farm(BlockPos origin, Direction front, Palette p, boolean fancy) {
+		Layout L = new Layout(origin, front);
+		int n = 9, c = n / 2;
+		String fence = p.fence(), gate = p.fence().replace("_fence", "_fence_gate");
+		for (int u = -1; u <= n; u++) {
+			for (int v = -1; v <= n; v++) {
+				for (int y = 0; y <= 3; y++) L.dig(u, v, y);                    // clear it (and a strip round it)
+				for (int y = -3; y <= -2; y++) L.put(u, v, y, "dirt", SUPPORT);
+				boolean edge = u < 0 || v < 0 || u >= n || v >= n;
+				if (edge) {
+					L.put(u, v, -1, "dirt", SUPPORT);
+					if (u == c && v == -1) L.put(u, v, 0, gate + "[facing={F}]", DOORS);
+					else L.put(u, v, 0, fence, WALLS);
+				} else if (u == c && v == c) {
+					L.put(u, v, -1, "water", FRAME);                               // the water (one block: the wiki's trick)
+				} else {
+					L.put(u, v, -1, "farmland", FRAME);                            // tilled with a hoe
+					String crop = !fancy || v >= 2 ? "wheat" : v == 0 ? "carrots" : "potatoes";
+					L.put(u, v, 0, crop, INSIDE, true);
+				}
+			}
+		}
+		for (int[] k : new int[][] {{-1, -1}, {n, -1}, {-1, n}, {n, n}}) {
+			L.put(k[0], k[1], 1, p.light().equals("torch") ? "torch" : "lantern[hanging=false]", OUTSIDE, true);
+		}
+		if (fancy) {
+			L.put(c - 2, -2, 0, "composter", OUTSIDE, true);
+			L.put(c + 2, -2, 0, "chest[facing={F}]", OUTSIDE, true);
+			L.put(c - 2, -2, -1, "dirt", SUPPORT);
+			L.put(c + 2, -2, -1, "dirt", SUPPORT);
+		}
+		return new Plan("farm", L.steps(), L.pos(c, -1, 0), L.pos(c, c, 0), front,
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(0, 0, 0)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(n - 1, n - 1, 1))));
+	}
+
+	/**
+	 * An animal pen: a fenced 7 by 7 on grass with a gate, a water trough, hay bales in a corner and a lantern post:
+	 * room for a few cows, sheep or pigs led in with wheat or carrots.
+	 */
+	static Plan pen(BlockPos origin, Direction front, Palette p, boolean fancy) {
+		Layout L = new Layout(origin, front);
+		int n = 7, c = n / 2;
+		String fence = p.fence(), gate = p.fence().replace("_fence", "_fence_gate");
+		for (int u = -1; u <= n; u++) {
+			for (int v = -1; v <= n; v++) {
+				for (int y = 1; y <= 3; y++) L.dig(u, v, y);
+				L.dig(u, v, 0);
+				L.put(u, v, -1, "grass_block", SUPPORT);
+				for (int y = -3; y <= -2; y++) L.put(u, v, y, "dirt", SUPPORT);
+				boolean edge = u < 0 || v < 0 || u >= n || v >= n;
+				if (!edge) continue;
+				if (u == c && v == -1) L.put(u, v, 0, gate + "[facing={F}]", DOORS);
+				else L.put(u, v, 0, fence, WALLS);
+			}
+		}
+		L.put(n - 1, n - 1, -1, "water", FRAME);                                  // a trough in the back corner
+		L.put(n - 2, n - 1, -1, "water", FRAME);
+		L.put(0, n - 1, 0, "hay_block", INSIDE, true);
+		L.put(1, n - 1, 0, "hay_block", INSIDE, true);
+		L.put(0, n - 2, 0, "hay_block", INSIDE, true);
+		L.put(0, n - 1, 1, "hay_block", INSIDE, true);
+		L.put(-1, -1, 1, p.light().equals("torch") ? "torch" : "lantern[hanging=false]", OUTSIDE, true);
+		L.put(n, -1, 1, p.light().equals("torch") ? "torch" : "lantern[hanging=false]", OUTSIDE, true);
+		return new Plan("animal pen", L.steps(), L.pos(c, -1, 0), L.pos(c, c, 0), front,
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(0, 0, 0)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(n - 1, n - 1, 1))));
+	}
+
+	/**
+	 * A mob farm, the tower kind players build (the "easiest mob farm"): up on a pillar, an open 17 by 17 platform of
+	 * stone bricks, four spawning floors with a cross of water channels sunk between them; open trapdoors along the
+	 * channels (a mob takes an open trapdoor for floor, steps on it and drops into the water); the water at the end of
+	 * each channel flows exactly 7 blocks, to the hole in the middle; they fall 22 blocks down the pillar (a zombie
+	 * lands with half a heart) onto a hopper that puts what they drop into a chest at the foot, with a torch each side
+	 * and a gap one block high above it to hit them through. Walls round the top keep them from walking off. It works at
+	 * night (monsters spawn on the dark platform). origin is the foot of the pillar (where they land).
+	 */
+	static Plan mobFarm(BlockPos origin, Direction front, boolean fancy) {
+		Layout L = new Layout(origin, front);
+		String brick = fancy ? "stone_bricks" : "cobblestone", trap = fancy ? "spruce_trapdoor" : "oak_trapdoor";
+		int q = 24, r = 8;                                                       // spawning floor on top at y q (mobs at q+1)
+		int channel = q - 2, water = q - 1;                                     // channel floor, water, trapdoors at q
+		// the pillar: open from 1 to channel, walled round (a hopper at the bottom, the chest in its front wall)
+		for (int y = 0; y <= channel; y++) {
+			if (y >= 1) L.dig(0, 0, y);
+			for (int u = -1; u <= 1; u++) {
+				for (int v = -1; v <= 1; v++) {
+					if (u == 0 && v == 0) continue;
+					if (y == channel && (u == 0 || v == 0)) continue;                  // (the channels' first floor blocks)
+					if (u == 0 && v == -1 && y <= 1) continue;                        // the chest, and the gap over it
+					L.put(u, v, y, brick, FRAME);
+				}
+			}
+		}
+		L.put(0, 0, 0, "hopper[facing={F}]", FRAME, true);                      // they land on it: drops go to the chest
+		L.put(0, -1, 0, "chest[facing={F}]", FRAME, true);
+		L.dig(0, -1, 1);                                                         // the gap: hit them here (they can't get out)
+		L.put(-1, -2, 1, "wall_torch[facing={F}]", OUTSIDE, true);
+		L.put(1, -2, 1, "wall_torch[facing={F}]", OUTSIDE, true);
+		for (int u = -1; u <= 1; u++) for (int v = -3; v <= -2; v++) L.put(u, v, -1, brick, SUPPORT);   // a step to stand on
+		// the platform
+		for (int u = -r - 1; u <= r + 1; u++) {
+			for (int v = -r - 1; v <= r + 1; v++) {
+				boolean rim = Math.abs(u) == r + 1 || Math.abs(v) == r + 1;
+				boolean chan = !rim && (u == 0 || v == 0);
+				if (rim) {                                                          // the wall round it
+					for (int y = channel; y <= q + 2; y++) L.put(u, v, y, brick, y <= q ? FRAME : WALLS);
+					continue;
+				}
+				for (int y = q + 1; y <= q + 3; y++) L.dig(u, v, y);
+				if (chan) {
+					if (!(u == 0 && v == 0)) L.put(u, v, channel, brick, FRAME);       // the channel's floor (not over the hole)
+					L.dig(u, v, water);
+					L.dig(u, v, q);
+				} else {                                                            // spawning floor, two thick (it holds the water in)
+					L.put(u, v, water, brick, FRAME);
+					L.put(u, v, q, brick, FRAME);
+				}
+			}
+		}
+		// water at the end of each channel (flows 7: to the hole's edge), trapdoors along the channels, open
+		int[][] axes = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (int[] a : axes) {
+			L.put(a[0] * r, a[1] * r, water, "water", WALLS);
+			for (int k = 1; k <= r; k++) {
+				int u = a[0] * k, v = a[1] * k;
+				String side = a[0] != 0 ? "{F}" : "{R}";                             // hung on the side of the floor next to it
+				L.put(u, v, q, trap + "[half=top,open=true,facing=" + side + "]", INSIDE, true);
+			}
+		}
+		L.dig(0, 0, water);
+		L.dig(0, 0, q);
+		return new Plan("mob farm", L.steps(), L.pos(0, -2, 0), L.pos(0, -2, 0), front,
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(-1, -3, 0)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(1, -2, 1))));
 	}
 
 	// ------------------------------------------------------------------------------------ sites

@@ -63,7 +63,7 @@ public final class Chat {
 	// ------------------------------------------------------------------------------ requests
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
 	public static final String[] INTENTS = {"follow", "stay", "explore", "wood", "stone", "coal", "iron", "mine", "food", "give",
-			"shelter", "eat", "stop", "redstone", "trade", "chat", "peace"};
+			"shelter", "eat", "stop", "redstone", "trade", "chat", "peace", "pickup"};
 	/** Things it can be asked to craft (the recipe is worked out from what it carries: "boat" is an oak boat with oak planks). */
 	static final String[] CRAFTABLE = {"crafting table", "pressure plate", "boats?", "chests?", "tables?", "furnaces?", "doors?",
 			"torch(es)?", "sticks?", "planks?", "beds?", "ladders?", "fences?", "bowls?", "shields?", "buckets?", "pickaxes?", "swords?",
@@ -73,11 +73,12 @@ public final class Chat {
 	private static final Pattern CRAFT_WORD = Pattern.compile("\\bcraft(ing)? (me |us )?(a |an |some |the |\\d+ )*([a-z_]+)");
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
+			{"pickup", "\\b(mine|break|pick up|pickup|take|grab|collect) (the |that |this |your |my |a )?(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\\b"},
 			{"peace", "\\b(truce|peace|ceasefire|i give up|i surrender|surrender|stop fighting|let'?s (stop fighting|not fight|be friends)|don'?t (hit|attack|kill|hurt) me)\\b|^(sorry|so sorry|my bad|i'?m sorry|ok ok|okay okay)[!. ]*$"},
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
-			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout)\\b|\\bunderground\\b"},
+			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder)\\b|\\bunderground\\b"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -158,7 +159,7 @@ public final class Chat {
 			{"stay", "ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่"}, {"follow", "ตาม", "มานี่", "มาทางนี้", "มาหา"}, {"give", "ขอ", "ส่ง"},
 			{"explore", "สำรวจ", "ไปเที่ยว", "ไปเล่น"}, {"redstone", "เรดสโตน", "วงจร"}, {"wood", "ไม้"}, {"coal", "ถ่าน"}, {"iron", "เหล็ก"},
 			{"stone", "หิน"}, {"mine", "ขุด", "แร่", "เพชร", "ทอง"}, {"food", "อาหาร", "ล่า", "หาของกิน"},
-			{"build", "สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน"}, {"shelter", "บ้าน", "ที่หลบ", "ที่พัก", "สร้าง"}, {"eat", "กิน"}};
+			{"build", "สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน", "ฟาร์ม", "คอก"}, {"shelter", "บ้าน", "ที่หลบ", "ที่พัก", "สร้าง"}, {"eat", "กิน"}};
 	private static final Pattern THAI_CHAR = Pattern.compile("[\\u0e00-\\u0e7f]");
 
 	/** What a player asks Xen to do, by keywords. Questions are just chat. */
@@ -209,8 +210,17 @@ public final class Chat {
 			}
 			amount = 0;
 		}
+		if (intent.equals("pickup")) {                                        // "mine the crafting table" is (pickup, crafting_table)
+			Matcher m = Pattern.compile("\\b(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\\b").matcher(words);
+			String b = m.find() ? m.group(1) : "crafting table";
+			thing = b.equals("table") || b.equals("workbench") ? "crafting_table" : b.equals("torches") ? "torch" : b.replace(' ', '_');
+			amount = 0;
+		}
 		if (intent.equals("build")) {                                         // a house, or a base under the ground
-			thing = Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : "house";
+			thing = Pattern.compile("\\b(mob|mobs|xp|grinder)\\b").matcher(words).find() ? "mob farm"
+					: Pattern.compile("\\bfarm\\b").matcher(words).find() ? "farm"
+					: Pattern.compile("\\b(pen|barn|animal)\\b").matcher(words).find() ? "pen"
+					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : "house";
 			amount = 0;
 		}
 		if (intent.equals("craft")) {                                         // "craft 4 torches" is (craft, torch, 4)

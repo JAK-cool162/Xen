@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.6.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.6.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-0.7.0-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-0.7.0-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -233,8 +233,13 @@ checked on both an x86-64 and an ARM64 machine
 ([`.github/workflows/check.yml`](.github/workflows/check.yml)).
 
 Put it in `mods/` with Fabric API and run `/xen summon`. Xen joins as a real
-player next to you and plays survival with you. It follows you, stays or lives
-on its own. It mines, fights back, swims, eats and learns. Right-click it to
+player next to you and **lives its own life** like another player: tools, its own
+house, a crop farm, mining for iron and diamonds, smelting, armor, a mob farm
+(or it follows you or stays when you ask). Its **path assist** finds the way like
+a good player (sprint, jump gaps, drop down, swim, climb, open doors, dig through,
+bridge, tower out of holes), a **solver** learns ways out when it's stuck (also
+from watching you), fights can end in a **truce**, and `/xen minions` gives it
+sidekicks that don't load chunks and help it build a village. It mines, fights back, swims, eats and learns. Right-click it to
 open its bag. `/xen spawn 50` (operators) brings in a crowd of Xens across the
 world, all sharing one brain. Everything runs inside the game (brain,
 learning, senses and chat), with no Python and no bridge. It was tested on

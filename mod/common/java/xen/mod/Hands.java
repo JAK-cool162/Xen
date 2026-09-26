@@ -546,6 +546,49 @@ public final class Hands {
 		return cantPlace.isEmpty();
 	}
 
+	/**
+	 * A bucket, like a player: it looks at the spot and right-clicks (a water bucket pours where it looks, onto the
+	 * face of that block; an empty one scoops up the water it looks at). False if it has no such bucket.
+	 */
+	boolean bucket(Vec3 lookAt, java.util.function.Predicate<ItemStack> which) {
+		int slot = findHotbar(which);
+		if (slot < 0) return false;
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		face(lookAt);
+		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 4;
+		return true;
+	}
+
+	/**
+	 * Pour a water (or lava) bucket into that block, looking at it, as a player who aims right does (the bucket empties
+	 * there; in survival an empty bucket is left in its hand). False if it has no full bucket or it didn't go.
+	 */
+	boolean pour(BlockPos into, Direction face) {
+		int slot = findHotbar(s -> s.getItem() instanceof net.minecraft.world.item.BucketItem && s.getItem() != net.minecraft.world.item.Items.BUCKET);
+		if (slot < 0) return false;
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		ItemStack stack = p.getInventory().getSelectedItem();
+		Vec3 at = Vec3.atCenterOf(into.relative(face.getOpposite())).add(Vec3.atLowerCornerOf(face.getUnitVec3i()).scale(0.5));
+		face(at);
+		var bucket = (net.minecraft.world.item.BucketItem) stack.getItem();
+		boolean ok = bucket.emptyContents(p, p.level(), into, new BlockHitResult(at, face, into.relative(face.getOpposite()), false));
+		if (ok) {
+			bucket.checkExtraContent(p, p.level(), stack, into);
+			if (!p.isCreative()) p.getInventory().setItem(slot, net.minecraft.world.item.BucketItem.getEmptySuccessItem(stack, p));
+		}
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 4;
+		return ok;
+	}
+
 	/** Right-click a block holding something (a plant into a flower pot). False if it has nothing like that. */
 	boolean useWith(BlockPos pos, java.util.function.Predicate<ItemStack> item) {
 		int slot = findHotbar(item);

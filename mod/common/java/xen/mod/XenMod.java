@@ -444,8 +444,7 @@ public class XenMod implements ModInitializer {
 								.then(Commands.argument("value", StringArgumentType.greedyString()).executes(ctx ->
 										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
 				.then(Commands.literal("build").then(Commands.argument("what", StringArgumentType.greedyString()).suggests((ctx, b) -> {
-									b.suggest("house");
-									b.suggest("base");
+									for (String w : new String[] {"house", "base", "farm", "pen", "mob farm"}) b.suggest(w);
 									return b.buildFuture();
 								}).executes(ctx -> each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: "
 										+ c.builder.start(StringArgumentType.getString(ctx, "what")), "")))))
@@ -651,8 +650,13 @@ public class XenMod implements ModInitializer {
 		roster.remember(c, name);
 	}
 
+	/** The world has all the Xens it may have (minions apart). */
 	private boolean full() {
-		return config.maxXens > 0 && companions.size() >= config.maxXens;
+		return config.maxXens > 0 && companions.stream().filter(c -> !c.minion).count() >= config.maxXens;
+	}
+
+	private long minionCount() {
+		return companions.stream().filter(c -> c.minion).count();
 	}
 
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
@@ -710,10 +714,10 @@ public class XenMod implements ModInitializer {
 			ctx.getSource().sendFailure(Component.literal("Summon a Xen first (/xen summon): minions work for a Xen."));
 			return 0;
 		}
-		int room = op(ctx) ? count : Math.max(0, config.maxMinions - boss.crew.minions.size());
+		int room = config.maxMinions <= 0 ? count : (int) Math.max(0, config.maxMinions - minionCount());
 		int made = 0;
 		java.util.Random random = new java.util.Random();
-		for (int i = 0; i < Math.min(count, room) && !full(); i++) {
+		for (int i = 0; i < Math.min(count, room); i++) {
 			Companion m = create(null, owner, null);
 			m.minion = true;
 			m.boss = boss;
@@ -733,7 +737,7 @@ public class XenMod implements ModInitializer {
 			made++;
 		}
 		int n = made;
-		if (made == 0) ctx.getSource().sendFailure(Component.literal(boss.name + " has all the minions it may have (" + config.maxMinions + ")."));
+		if (made == 0) ctx.getSource().sendFailure(Component.literal("The world has all the minions it may have (" + config.maxMinions + ")."));
 		else ctx.getSource().sendSuccess(() -> Component.literal(n + " minion" + (n == 1 ? "" : "s") + " for " + boss.name
 				+ ". They don't load the world themselves (they freeze where nobody keeps it loaded), take orders from " + boss.name
 				+ " and you, and build a village around " + boss.name + "'s home."), false);

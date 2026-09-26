@@ -24,7 +24,7 @@ import java.util.UUID;
  * digs there with its own hands, and looks around when it knows of none.
  */
 final class Chores {
-	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE, MINE, SMELT }
+	enum Kind { GATHER, HUNT, GIVE, SHELTER, HIDE, EAT, REDSTONE, TRADE, MINE, SMELT, PICKUP }
 
 	/** The small redstone circuits Xen learned (xen/redstone, exported by scripts/export_circuits.py). */
 	static final com.google.gson.JsonObject CIRCUITS;
@@ -508,6 +508,7 @@ final class Chores {
 			case REDSTONE -> redstoneNext();
 			case TRADE -> c.trader.villagerStep();
 			case MINE -> mineNext();
+			case PICKUP -> pickupNext();
 			case SMELT -> smeltNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
@@ -703,6 +704,65 @@ final class Chores {
 			legStarted = now();
 		}
 		return a;
+	}
+
+	// ------------------------------------------------------------------------------ picking up
+	private String pickupId;
+	private BlockPos pickupAt;
+	private long pickupGoneAt;
+
+	private static boolean isKind(String path, String id) {
+		return path.equals(id) || id.equals("torch") && path.endsWith("torch") || id.equals("bed") && path.endsWith("_bed")
+				|| id.equals("door") && path.endsWith("_door") && !path.startsWith("iron") || id.equals("lantern") && path.endsWith("lantern");
+	}
+
+	/** The nearest one it can see (a side open to the air), within 16 blocks. */
+	private BlockPos findVisible(String id) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -6, -16), feet.offset(16, 6, 16))) {
+			if (!isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath(), id)) continue;
+			boolean open = false;
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) open |= level.getBlockState(q.relative(d)).canBeReplaced();
+			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+		}
+		return best;
+	}
+
+	/** Pick up a block someone (or it) put down: a crafting table, a furnace, a chest, a bed, a door, torches... */
+	String pickUp(String id) {
+		BlockPos at = findVisible(id);
+		String name = id.replace('_', ' ');
+		if (at == null) return "You don't see a " + name + " around here to pick up.";
+		begin(Kind.PICKUP);
+		until = now() + 1200;
+		pickupId = id;
+		pickupAt = at;
+		pickupGoneAt = -1;
+		items = new String[] {id.equals("torch") ? "torch" : id};
+		what = name;
+		had = countItem(id);
+		return String.format(java.util.Locale.ROOT, "You will pick up the %s %.0f blocks away.", name, Math.sqrt(at.distSqr(c.player.blockPosition())));
+	}
+
+	private Action pickupNext() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (countItem(pickupId) > had || pickupId.equals("torch") && countItem("torch") > had) {
+			finish("Got the " + what + "!");
+			return null;
+		}
+		ItemEntity drop = dropToPickUp();
+		if (drop != null) {
+			doing = "picking up the " + what;
+			return c.walkTo(drop.position());
+		}
+		if (isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath(), pickupId)) {
+			doing = "breaking the " + what + " to take it";
+			return reach(pickupAt);
+		}
+		if (pickupGoneAt < 0) pickupGoneAt = now();
+		if (now() - pickupGoneAt > 60) finish("Hmm, the " + what + " is gone.");
+		return Action.IDLE;
 	}
 
 	// ------------------------------------------------------------------------------ smelting
