@@ -58,6 +58,22 @@ public final class XenSettings {
 		return problems;
 	}
 
+	/** The journal (what Xens see, think, say and hear), for copying; or why there's none. */
+	public static String journalText() {
+		if (XenMod.INSTANCE == null || XenMod.INSTANCE.journal == null) return "";
+		return XenMod.INSTANCE.journal.text();
+	}
+
+	/** The journal saved as a file: where it went (or what went wrong). */
+	public static String saveJournal() {
+		if (XenMod.INSTANCE == null || XenMod.INSTANCE.journal == null) return "No journal yet.";
+		try {
+			return "Saved: " + FabricLoader.getInstance().getGameDir().relativize(XenMod.INSTANCE.journal.save());
+		} catch (java.io.IOException | IllegalArgumentException e) {
+			return "Couldn't save it: " + e.getMessage();
+		}
+	}
+
 	public void save() {
 		config.save();
 		if (XenMod.INSTANCE != null) XenMod.INSTANCE.applySettings();

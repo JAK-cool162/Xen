@@ -317,6 +317,16 @@ public final class Hands {
 	}
 
 	/** How fast the best tool in its hotbar breaks a block (a fraction of it per tick). */
+	/** How fast it digs this with its best tool, standing on the ground (per tick; 1 = at once). */
+	float digSpeed(BlockState state, ServerLevel level, BlockPos pos) {
+		return bestSpeed(state, level, pos) * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1);
+	}
+
+	/** Is it digging right now? */
+	boolean isMining() {
+		return busy() && current == Action.MINE;
+	}
+
 	private float bestSpeed(BlockState state, ServerLevel level, BlockPos pos) {
 		int was = p.getInventory().getSelectedSlot();
 		selectBestTool(state);

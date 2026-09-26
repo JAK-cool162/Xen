@@ -150,11 +150,44 @@ public class XenSettingsScreen extends Screen {
 		addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose()).bounds(width - 10 - half, y, half, 20).build());
 	}
 
-	/** Custom instructions and the custom script: two text boxes. */
+	/**
+	 * Experiments: path assist, the solver and the journal (on or off), custom instructions and the custom script (two
+	 * text boxes), and the journal itself: copy it, or save it as a file (to send, or to read later).
+	 */
 	private void experimental() {
 		keys.add("instructions");
 		keys.add("script");
-		int bottom = height - 36, label = 12;
+		keys.add("pathAssist");
+		keys.add("solver");
+		keys.add("journal");
+		int third = (panelWidth - 8) / 3;
+		String[][] toggles = {
+				{"Path assist", "pathAssist", "Its legs find the way: walk, sprint, jump up, drop down, jump gaps, swim, climb ladders, open doors, dig through the ground, bridge and tower up out of holes. Its own mind still decides where to go, and how bold to be (brave Xens jump gaps, hurt or scared ones take the safe way)."},
+				{"Solver", "solver", "A second little mind for being stuck: it picks a way out (tower up, a staircase, dig through, a bolder way, go round, back off, swim out, ask for help) and learns which work where, also from watching players it trusts get out of holes. Its notes: config/xen/solver.json, every try in solver-tries.jsonl."},
+				{"Journal", "journal", "Keep a journal of what Xens see, think, say and hear, how they find their way and what the solver tries. Copy it or save it below."}};
+		for (int i = 0; i < toggles.length; i++) {
+			String key = toggles[i][1];
+			addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
+					.create(left + i * (third + 4), top, third, 20, Component.literal(toggles[i][0]), (b, v) -> settings.set(key, "" + v)))
+					.setTooltip(tip(Component.literal(toggles[i][2])));
+		}
+		top += 26;
+		// the journal: copy it, or save it as a file (bottom left, next to Reset and Done)
+		int by = height - 28, bw = Math.min(80, (panelWidth - 2 * Math.min(90, (panelWidth - 8) / 2) - 24) / 2);
+		StringWidget journalStatus = new StringWidget(left, by - 13, panelWidth, 12, Component.empty(), font);
+		if (bw >= 40) {
+			addRenderableWidget(Button.builder(Component.literal("Copy log"), b -> {
+				String text = XenSettings.journalText();
+				minecraft.keyboardHandler.setClipboard(text);
+				journalStatus.setMessage(Component.literal(text.isEmpty() ? "No journal yet (it starts with a world)." : "Copied the journal ("
+						+ text.lines().count() + " lines).").withStyle(ChatFormatting.GREEN));
+			}).bounds(left, by, bw, 20).tooltip(tip(Component.literal("Copy what Xens saw, thought, said and heard, and what the solver learned."))).build());
+			addRenderableWidget(Button.builder(Component.literal("Save log"), b -> journalStatus.setMessage(Component.literal(XenSettings.saveJournal())
+					.withStyle(ChatFormatting.GREEN))).bounds(left + bw + 4, by, bw, 20)
+					.tooltip(tip(Component.literal("Save the journal as a file in config/xen/logs (on a server: /xen log)."))).build());
+			addRenderableWidget(journalStatus);
+		}
+		int bottom = height - 50, label = 12;
 		int free = Math.max(80, bottom - top - 3 * label - 8);
 		int instructionsHeight = Math.max(36, free / 3), scriptHeight = Math.max(44, free - instructionsHeight);
 		int y = top;

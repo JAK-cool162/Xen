@@ -86,6 +86,8 @@ public class XenMod implements ModInitializer {
 		config = XenConfig.load(configDir.resolve("xen.json"));
 		Chat.gpuSetting = () -> config.gpu;
 		skins.prepare(configDir, config.skins);
+		solverMind.load(configDir.resolve("xen"));
+		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> config.chatModel, () -> config.downloadChatModel,
 				config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
@@ -167,7 +169,13 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
+	/** What all Xens have learned about getting unstuck (the solver). */
+	final Solver.Mind solverMind = new Solver.Mind();
+	/** What Xens see, think, say and hear (for the Experimental tab's log). */
+	public Journal journal;
+
 	private void save() {
+		solverMind.save();
 		Path file = brainFile();
 		try {
 			Files.createDirectories(file.getParent());
@@ -301,6 +309,7 @@ public class XenMod implements ModInitializer {
 	/** A player said something: if it's to a Xen (by name), it understands, does what was asked and answers. */
 	private void heard(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
+		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
 		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
 		chat.warmUp();
 		boolean toXen = false;
@@ -481,6 +490,15 @@ public class XenMod implements ModInitializer {
 							ctx.getSource().sendSuccess(() -> Component.literal(arena.status()), false);
 							return 1;
 						})))
+				.then(Commands.literal("log").executes(ctx -> {                // the journal, as a file (the Experimental tab copies it too)
+					try {
+						Path f = journal.save();
+						ctx.getSource().sendSuccess(() -> Component.literal("Xen's journal saved: " + f), false);
+					} catch (IOException e) {
+						ctx.getSource().sendFailure(Component.literal("Couldn't save the journal: " + e.getMessage()));
+					}
+					return 1;
+				}))
 				.then(Commands.literal("save").executes(ctx -> {
 					save();
 					ctx.getSource().sendSuccess(() -> Component.literal("Xen's brain saved (" + brain.steps + " steps lived)."), false);

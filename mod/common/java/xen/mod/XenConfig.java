@@ -51,6 +51,18 @@ public final class XenConfig {
 	public boolean refuse = true;
 	/** Xen watches players and copies moves that work out for them (the water clutch, a winning fighting style). */
 	public boolean copy = true;
+	/**
+	 * Path assist: its legs find the way (walk, sprint, jump up, drop down, jump gaps, swim, climb, open doors, dig
+	 * through the ground, bridge, tower up out of holes). Its own mind still decides where to go and how bold to be.
+	 */
+	public boolean pathAssist = true;
+	/**
+	 * (Experiment) The solver: a second little mind that, when a Xen is stuck, picks a way out (dig up, tower up, a
+	 * staircase, bridge, swim, go round, back off) and learns which ones work where, also from players it trusts.
+	 */
+	public boolean solver = true;
+	/** (Experiment) Keep a journal of what Xens see, think, say and hear (copy it or save it from the Experiment tab). */
+	public boolean journal = true;
 	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
 	public boolean antics = true;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */

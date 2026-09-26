@@ -149,11 +149,13 @@ public final class Companion {
 		lifeTicks++;
 		genTicks++;
 		hands.tick();
+		walker.tick();                                                  // on its way somewhere: the keys for the next step
 		hurtNow = player.getHealth() < tickHealth;
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
 		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
 		mimic.watch();                                                  // what are the players it sees doing?
+		solver.watch();                                                 // and how they get out of holes
 		antics.watch();
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
@@ -232,6 +234,7 @@ public final class Companion {
 		lastFood = player.getFoodData().getFoodLevel();
 		lastItems = items;
 		pillaring = acted = false;
+		walker.touched = false;
 		goals.instant = "";
 		if (!inArena) goals.everyDecision();
 		Action instinct = instinct();
@@ -248,7 +251,20 @@ public final class Companion {
 			if (w != null && w.level() == player.level()) hands.watching = w;
 		}
 		if (!fighting && action != Action.FORWARD.ordinal() && action != Action.JUMP.ordinal()) run(false);   // stopped: no more running
+		if (!walker.touched) walker.stop();                                // doing something else now: it lets go of the keys
 		if (!pillaring && !acted) hands.start(Action.values()[action]);
+		if (mod.config.journal) {
+			String thinking = Action.values()[action].verb + " - " + lastThought + (goals.instant.isEmpty() ? "" : " [" + goals.instant + "]");
+			if (!thinking.equals(journaledThought)) journal("thinks", thinking);
+			journaledThought = thinking;
+			if (player.tickCount - journaledSightAt > 100) {                  // what it sees, every five seconds when it changes
+				String seen = senses.describe();
+				if (!seen.equals(journaledSight)) journal("sees", seen + String.format(java.util.Locale.ROOT, " (at %d %d %d, health %.0f, food %d)",
+						player.getBlockX(), player.getBlockY(), player.getBlockZ(), player.getHealth(), player.getFoodData().getFoodLevel()));
+				journaledSight = seen;
+				journaledSightAt = player.tickCount;
+			}
+		}
 		if (DEBUG) XenMod.LOG.info("[xen debug] {} at {} ground={} yaw={} pitch={} -> {} ({})", name, player.position(), player.onGround(),
 				hands.yaw, hands.pitch, Action.values()[action], lastThought);
 		obs = next;
@@ -559,8 +575,47 @@ public final class Companion {
 		return h >= 16 ? 5 : h >= 12 ? 4 : 3;
 	}
 
-	/** Walk towards a place like a player: turn, walk, jump up steps, dig through, pillar up. Null if lava is in the way. */
+	/** Its legs: finding the way and walking it (it decides where to, and how bold it is on the way). */
+	final Walker walker = new Walker(this);
+
+	/** Trouble on the way (a move that didn't work): it tries another way; again and again, and it's stuck. */
+	void stuckOnTheWay(String why, int times) {
+		if (times >= 3 && player.tickCount - stuckSaidAt > 600) {
+			stuckSaidAt = player.tickCount;
+			if (DEBUG) XenMod.LOG.info("[xen debug] {} is stuck on its way ({} times): {}", name, times, why);
+		}
+	}
+
+	private int stuckSaidAt = -10000;
+
+	/** When it's stuck: a way out it learns (see {@link Solver}). */
+	final Solver solver = new Solver(this);
+
+	/**
+	 * Walk towards a place: its legs find the way (path assist); when they can't, or keep failing, or it gets no
+	 * closer, the solver picks a way out; and if all that's switched off, the old way: straight at it, digging.
+	 */
 	Action walkTo(Vec3 goal) {
+		if (mod.config.pathAssist) {
+			if (solver.active()) {
+				Action a = solver.next(goal);
+				if (a != null) return a;
+			}
+			Action w = walker.go(goal);
+			if (w != null && !walker.stuck()) return w;
+			String why = w == null ? "no way it knows of" : walker.lastProblem.isEmpty() ? "getting no closer" : walker.lastProblem;
+			if (solver.start(goal, why)) {
+				walker.stop();
+				Action a = solver.next(goal);
+				if (a != null) return a;
+			}
+			if (w != null) return w;
+		}
+		return digToward(goal);
+	}
+
+	/** The old way on foot: straight at it through what it knows, digging through, pillaring up. Null if lava is in the way. */
+	Action digToward(Vec3 goal) {
 		double dx = goal.x - player.getX(), dz = goal.z - player.getZ();
 		ServerLevel level = (ServerLevel) player.level();
 		BlockPos feet = player.blockPosition();
@@ -904,7 +959,16 @@ public final class Companion {
 
 	public void say(String text) {
 		server.getPlayerList().broadcastSystemMessage(Component.literal("<" + name + "> " + text), false);
+		journal("says", text);
 	}
+
+	/** A line in the journal (the Experimental tab's log): what it sees, thinks, says, how it goes. */
+	void journal(String kind, String text) {
+		if (mod.config.journal && mod.journal != null) mod.journal.add(name, kind, text);
+	}
+
+	private String journaledThought = "", journaledSight = "";
+	private long journaledSightAt;
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
