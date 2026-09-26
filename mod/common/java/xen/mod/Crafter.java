@@ -125,6 +125,52 @@ final class Crafter {
 		return null;
 	}
 
+	/**
+	 * The next thing worth making, like a player getting on: its tools first, then armor piece by piece (iron, then
+	 * diamond), a shield, a bucket, torches, a bed. Null if there's nothing it can make that it needs.
+	 */
+	String upgrade() {
+		String w = wanted();
+		if (w != null) return w;
+		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
+		String[] pieces = {"chestplate", "leggings", "helmet", "boots"};
+		int[] cost = {8, 7, 5, 4};
+		for (int i = 0; i < pieces.length; i++) {
+			boolean hasIt = has("_" + pieces[i]) || !c.player.getItemBySlot(slotOf(pieces[i])).isEmpty();
+			if (!hasIt && iron >= cost[i]) return "iron_" + pieces[i];
+		}
+		for (int i = 0; i < pieces.length; i++) {
+			var worn = c.player.getItemBySlot(slotOf(pieces[i]));
+			String n = worn.isEmpty() ? "" : path(worn);
+			if (!n.startsWith("diamond") && !n.startsWith("netherite") && !has("diamond_" + pieces[i]) && diamonds >= cost[i] + 3) return "diamond_" + pieces[i];
+		}
+		if (!has("shield") && c.player.getOffhandItem().isEmpty() && iron >= 1 && wood() >= 6) return "shield";
+		if (!has("bucket") && iron >= 3 && pickTier() >= 2) return "bucket";
+		if (c.skills.get(Skills.FIGHT) >= 0.45f && count(n -> n.equals("golden_apple")) < 2 && count(n -> n.equals("apple")) >= 1
+				&& count(n -> n.equals("gold_ingot")) >= 8) return "golden_apple";   // a fighter's gear: golden apples
+		int coal = count(n -> n.equals("coal") || n.equals("charcoal"));
+		if (count(n -> n.equals("torch")) < 16 && coal >= 1 && (count(n -> n.equals("stick")) > 0 || wood() >= 2)) return "torch";
+		if (!has("_bed") && wood() >= 3) {
+			var inv = c.player.getInventory();
+			java.util.Map<String, Integer> wool = new java.util.HashMap<>();
+			for (int i = 0; i < inv.getContainerSize(); i++) {
+				String n = inv.getItem(i).isEmpty() ? "" : path(inv.getItem(i));
+				if (n.endsWith("_wool")) wool.merge(n, inv.getItem(i).getCount(), Integer::sum);
+			}
+			for (var e : wool.entrySet()) if (e.getValue() >= 3) return e.getKey().replace("_wool", "_bed");
+		}
+		return null;
+	}
+
+	private static net.minecraft.world.entity.EquipmentSlot slotOf(String piece) {
+		return switch (piece) {
+			case "helmet" -> net.minecraft.world.entity.EquipmentSlot.HEAD;
+			case "chestplate" -> net.minecraft.world.entity.EquipmentSlot.CHEST;
+			case "leggings" -> net.minecraft.world.entity.EquipmentSlot.LEGS;
+			default -> net.minecraft.world.entity.EquipmentSlot.FEET;
+		};
+	}
+
 	/** Enough wood for the sticks (and a table, if there's none) plus extra planks? */
 	private boolean sticksOrWood(int sticks, int extra) {
 		int need = count(n -> n.equals("stick")) >= sticks ? 0 : 2;
@@ -325,7 +371,7 @@ final class Crafter {
 			making = null;
 			return takeTableAlong();
 		}
-		if (making == null || !making.equals(goal)) c.chatter("I'll make a " + goal.replace('_', ' ') + ".", false);
+		if (making == null || !making.equals(goal)) c.chatter("I'll make " + (goal.endsWith("s") ? "" : "aeiou".indexOf(goal.charAt(0)) >= 0 ? "an " : "a ") + goal.replace('_', ' ') + ".", false);
 		making = goal;
 		c.goals.instant = "making a " + goal.replace('_', ' ');
 		boolean wooden = goal.startsWith("wooden_");
@@ -486,7 +532,7 @@ final class Crafter {
 		boolean made = craftIn(menu, r);
 		c.player.closeContainer();
 		if (made) {
-			c.chatter("I made " + ("aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name.replace('_', ' ') + "!", false);
+			c.chatter("I made " + (name.endsWith("s") ? "" : "aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name.replace('_', ' ') + "!", false);
 			XenMod.LOG.info("{} made a {}", c.name, name);
 		}
 		making = null;

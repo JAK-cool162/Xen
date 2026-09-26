@@ -241,7 +241,7 @@ _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          #
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
-    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture)\b|\bunderground\b|\bstatue of\b"),
+    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture|tower|skyscraper|mansion)\b|\bunderground\b|\bstatue of\b"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -291,6 +291,13 @@ TYPOS = {"fallow": "follow", "folow": "follow", "follw": "follow", "flw": "follo
          "gimme": "give me", "stya": "stay", "sty": "stay"}
 
 
+def house_style(words):
+    """A house in the style asked for ("a modern house", "a house on stilts", "a tower"), or just "house"."""
+    return ("tower" if re.search(r"\b(tower|skyscraper)\b", words) else "stilt house" if re.search(r"\bstilts?\b", words)
+            else "modern house" if re.search(r"\b(modern|contemporary|minimalist)\b", words)
+            else "cottage" if re.search(r"\b(cottage|cabin|cozy|cosy)\b", words) else "house")
+
+
 def request_words(message, name="xen"):
     words = re.sub(rf"\b{re.escape(name.lower())}\b", " ", message.lower()).replace(",", " ").split()
     return " ".join(TYPOS.get(w, w) for w in words)
@@ -332,7 +339,7 @@ def details(intent, words):
         thing = ("statue:" + ("you" if not of.group(3) or of.group(3) == "yourself" else of.group(3)) if of
                  else "mob farm" if re.search(r"\b(mob|mobs|xp|grinder)\b", words) else "farm" if re.search(r"\bfarm\b", words)
                  else "pen" if re.search(r"\b(pen|barn|animal)\b", words)
-                 else "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else "house")
+                 else "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else house_style(words))
         amount = 0
     if intent == "craft":                                        # "craft 4 torches" -> ("craft", "torch", 4)
         m = _CRAFT_THING.search(words)

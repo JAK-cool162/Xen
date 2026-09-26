@@ -43,7 +43,7 @@ jobs:
         run: |
           cp mod/common/resources/assets/xen/brain.bin xen-brain.bin
           cp brains/*.bin . 2>/dev/null || true
-          sha256sum dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf | sed 's| dist/| |' > SHA256SUMS.txt
+          sha256sum dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf dist/TECHNICAL.txt | sed 's| dist/| |' > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Publish
@@ -57,4 +57,4 @@ jobs:
           gh release create "$TAG" $prerelease --target "$GITHUB_SHA" \
             --title "Xen Companion $TAG" \
             --notes-file dist/RELEASE_NOTES.md \
-            dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf SHA256SUMS.txt
+            dist/*.jar dist/TECHNICAL.txt xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf SHA256SUMS.txt

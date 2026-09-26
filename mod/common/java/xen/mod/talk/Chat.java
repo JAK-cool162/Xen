@@ -103,6 +103,15 @@ public final class Chat {
 	private static final Pattern CRAFT_THING = Pattern.compile("\\b((wooden|wood|stone|iron|golden|gold|diamond) )?("
 			+ String.join("|", CRAFTABLE) + ")\\b");
 	private static final Pattern CRAFT_WORD = Pattern.compile("\\bcraft(ing)? (me |us )?(a |an |some |the |\\d+ )*([a-z_]+)");
+	private static final Pattern TOWER = Pattern.compile("\\b(tower|skyscraper)\\b"), STILTS = Pattern.compile("\\bstilts?\\b"),
+			MODERN = Pattern.compile("\\b(modern|contemporary|minimalist)\\b"), COTTAGE = Pattern.compile("\\b(cottage|cabin|cozy|cosy)\\b");
+
+	/** A house in the style asked for ("a modern house", "a house on stilts", "a tower"), or just "house". */
+	static String houseStyle(String words) {
+		return TOWER.matcher(words).find() ? "tower" : STILTS.matcher(words).find() ? "stilt house" : MODERN.matcher(words).find() ? "modern house"
+				: COTTAGE.matcher(words).find() ? "cottage" : "house";
+	}
+
 	static final Map<String, Integer> AMOUNT = Map.of("wood", 8, "stone", 16, "coal", 8, "iron", 4, "mine", 8, "food", 3);
 	private static final String[][] RULES = {                                   // the first that matches wins
 			{"pickup", "\\b(mine|break|pick up|pickup|take|grab|collect) (the |that |this |your |my |a )?(crafting table|table|workbench|furnace|chest|bed|door|torch|torches|lantern|barrel|ladder)\\b"},
@@ -114,7 +123,7 @@ public final class Chat {
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
-			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture)\\b|\\bunderground\\b|\\bstatue of\\b"},
+			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture|tower|skyscraper|mansion)\\b|\\bunderground\\b|\\bstatue of\\b"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -260,7 +269,7 @@ public final class Chat {
 					: Pattern.compile("\\b(mob|mobs|xp|grinder)\\b").matcher(words).find() ? "mob farm"
 					: Pattern.compile("\\bfarm\\b").matcher(words).find() ? "farm"
 					: Pattern.compile("\\b(pen|barn|animal)\\b").matcher(words).find() ? "pen"
-					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : "house";
+					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : houseStyle(words);
 			amount = 0;
 		}
 		if (intent.equals("craft")) {                                         // "craft 4 torches" is (craft, torch, 4)

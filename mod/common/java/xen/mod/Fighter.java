@@ -36,8 +36,11 @@ final class Fighter {
 		this.c = c;
 	}
 
+	/** A fight gene (its style), played as well as its fighting skill allows (an unskilled Xen fumbles its own style). */
 	private float gene(int i) {
-		return c.personality.fightGenes[i];
+		float g = c.personality.fightGenes[i];
+		if (c.inArena) return g;
+		return Math.max(0f, Math.min(1f, g * (0.6f + 0.8f * c.skills.get(Skills.FIGHT))));
 	}
 
 	/** The fight is over (for now: if it was backing off to heal, it still is until it has healed). */
@@ -52,7 +55,7 @@ final class Fighter {
 		Hands h = c.hands;
 		int now = p.tickCount;
 		if (foe != lastFoe) {
-			if (foe instanceof Player && !c.inArena) c.chatter(c.personality.say("fight"), false);
+			if (foe instanceof Player && !c.inArena && !c.skills.sparringWith(foe.getUUID())) c.chatter(c.personality.say("fight"), false);
 			lastFoe = foe;
 			foeY = foe.getY();
 			sTap = 0;
@@ -74,6 +77,8 @@ final class Fighter {
 
 		float retreat = 0.4f * gene(8);
 		float health = p.getHealth() / p.getMaxHealth();
+		Action gear = c.kit.use(foe, d, fleeing || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
+		if (gear != null) return gear;
 		if (retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
 			if (!fleeing && !c.inArena) c.chatter(c.personality.say("flee"), false);
 			fleeing = true;                                                    // back off until it has healed a bit
@@ -183,6 +188,7 @@ final class Fighter {
 					String.format("%.2f", p.fallDistance), p.onGround(), String.format("%.1f", foe.getHealth()));
 		}
 		c.hands.hit(foe);
+		c.skills.practice(Skills.FIGHT, 0.004f);
 		c.acted = true;
 		return Action.ATTACK;
 	}

@@ -445,7 +445,31 @@
   [
    "build us a cozy cottage",
    "build",
-   "house",
+   "cottage",
+   0
+  ],
+  [
+   "build a modern house",
+   "build",
+   "modern house",
+   0
+  ],
+  [
+   "build a house on stilts",
+   "build",
+   "stilt house",
+   0
+  ],
+  [
+   "xen build a tower",
+   "build",
+   "tower",
+   0
+  ],
+  [
+   "make a skyscraper",
+   "build",
+   "tower",
    0
   ],
   [

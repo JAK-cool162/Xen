@@ -48,6 +48,13 @@ final class Places {
 		return dim(c.player.level());
 	}
 
+	/** Every world it has been to (walked in, or remembers a place in). */
+	java.util.Set<String> worlds() {
+		java.util.Set<String> s = new java.util.LinkedHashSet<>(crumbs.keySet());
+		for (Place p : places.values()) s.add(p.dim());
+		return s;
+	}
+
 	/** Remember a place (again: it moved, or it's the same). */
 	void remember(String name, BlockPos pos) {
 		if (c.player == null || pos == null) return;

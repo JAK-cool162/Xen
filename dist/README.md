@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod), prototype 0.7.1-alpha
+# Xen Companion (Fabric mod) 1.0.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -7,14 +7,15 @@ makes its own tools, trades with villagers and bargains with you, has goals
 of its own, and talks on its own and with other Xens. Every Xen has its own name,
 skin and personality, and with evolution the ones that do well pass their
 nature on. It plays fair: it only knows what it can sense, and it acts only
-through a player's inputs.
+through a player's inputs. Since 1.0.0 main Xens think with **Xen 2.0**, a
+learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-0.7.1-alpha+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.7.1-alpha+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-0.7.1-alpha+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (7 MB jar; best for phones) |
-| `xen-companion-0.7.1-alpha+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (7 MB jar) |
+| `xen-companion-1.0.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.0.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.0.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.0.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -25,6 +26,29 @@ which has the light jars). This is a prototype, so expect rough edges.
 runs on x86-64 PCs and ARM64 (phones, Raspberry Pi, Apple Silicon Macs). The
 chat model is plain Java too. Every change is checked on both an x86-64 and an
 ARM64 machine (GitHub Actions: the tests, both builds, and the chat model).
+
+How it all works inside (the networks, the training, the numbers) is in
+`TECHNICAL.txt` on the Releases page.
+
+## Xen 2.0: how it decides
+
+Every few seconds a main Xen picks what to do next out of 22 things a player
+does (get wood, get stone, craft, eat, build a house, farm, mine, smelt,
+store, explore, trade, follow, help, guard, fight, flee, sleep, enchant, go on
+an adventure...). It picks with **Xen 2.0**, three small neural networks:
+
+* a **reward critic** that guesses how much good each choice will bring,
+* a **fear critic** (like an amygdala) that guesses how much harm it risks:
+  a careful Xen weighs that more, a brave one less,
+* a **world model** that imagines a couple of steps ahead when it's unsure or
+  afraid, before it commits.
+
+It was trained from scratch over thousands of simulated lives with random
+personalities, and **keeps learning in your world** on a background thread
+(`<world>/xen/mind.bin`), so it doesn't slow the game. What it wants comes
+from its nature: kindness, loyalty, power and money pull it different ways.
+It only sees what a player could see. Minions keep the lighter classic brain
+(DMM); set `brain` to `"dmm"` to use that for every Xen.
 
 ## Requirements
 
@@ -66,7 +90,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-0.7.1-alpha+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.0.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -170,6 +194,12 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "Pip, how much for your logs?" / "I'll give you 2 iron for 16 logs" | names a price, bargains, and trades with you |
 | "Pip, what are you doing?" / "how are you?" / "what's your dream?" / "what do you have?" / "who are you?" | answers straight from what it knows (no chat model, so nothing made up) |
 | "Pip, what do you see?" / "thanks!" | just talks |
+| "dax come here" (the first 3 letters of its name are enough) | answers from any distance |
+| "I'm hungry" / "can I have some bread?" / "I need a pickaxe" | shares if it can spare it (a kind one more readily) |
+| "Pip, join my team" / "let's be a team" | joins your team if it likes you enough (Xens also pick teams by who they talk to and live near) |
+| "new rule: no fighting" / "from now on everyone works" | the village votes on it; passed rules are kept, broken ones punished |
+| "Pip, build a highway north" / "build an obsidian road east 200" | a tunnel highway in that direction ([more](#building)) |
+| "Pip, build a modern house" / "a house on stilts" / "a tower" / "a cottage" | builds its own design in that style |
 | "yes" / "no" (no name needed) | answers a question it just asked you, or its trade offer |
 | "Pip, watch this!" / "watch me" / "copy me" | keeps its eyes on you for a minute, to [learn from you](#learning-by-watching) |
 
@@ -464,7 +494,12 @@ can't read. With `/xen set script`, put `|` between rules.
 ## Teams and PvP
 
 * **Teams**: all Xens on one team, or split into 2-6 colored teams (red, blue,
-  green, yellow, purple, aqua). Teammates can't hurt each other.
+  green, yellow, purple, aqua). Xens choose and change teams on their own,
+  by who they talk to and live near. Teammates can hit each other too
+  (`friendlyFire`, on by default): a friend's hit is forgiven, a bully's isn't.
+* **Hidden nature**: each Xen is secretly aggressive, passive or friendly, and
+  trusts each person differently. An aggressive one may pick a fight with
+  someone weaker; a passive one walks away; a friendly one makes up.
 * **PvP**:
   * `own` (default): its own call. It fights back when a player attacks it
     or its owner with a weapon, lets a friend's mistake go (someone it trusts,
@@ -632,6 +667,24 @@ fish at the furnace, never looks an Enderman in the eyes, and after dying it goe
 treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
 comes along (and gets on with things nearby while you're close); "explore" lets it go again.
 
+## Villages: rules, jobs and punishments
+
+Xens that live together form a village with a **leader** (the one the others trust most). Anyone can propose a rule
+in chat ("new rule: no fighting", "from now on everyone shares food", "rule: curfew at night") and the villagers
+vote; the leader proposes some of its own. Rules it understands: no fighting, share food, everyone works, curfew,
+a tax, no strangers. Every morning the leader hands out **jobs** (woodcutter, miner, farmer, builder, guard,
+trader) and checks who worked; a rule-breaker is warned, then fined, then exiled. Minions have the same hidden
+nature: a disloyal or ambitious one, or one that's treated badly, can walk away from its boss (and even turn on
+it); once free it loads the world around it like any Xen. `/xen tribes` shows the rules, jobs and leader.
+
+## Every world: the Nether, the End and elytras
+
+Xens remember every world they've been to. They make portals and visit the Nether, go for the Ender Dragon when
+they're ready, and afterwards a brave or curious Xen goes back to the End for an **elytra**: through an End gateway
+(an ender pearl thrown into it), out to the outer islands, to an End city's ship. With an elytra and rockets it
+**flies** the long trips like a player (it jumps, opens the elytra, boosts with rockets and glides down where it's
+going). It enchants its gear at an **enchanting table** it makes itself.
+
 ## Building
 
 Ask it ("build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm",
@@ -661,6 +714,15 @@ slabs, doors, fences and hoes itself, gets more wood and stone when it runs out,
   hole in the middle, open trapdoors along them (a mob takes one for floor and drops into the water), a 22-block drop
   that leaves a zombie with half a heart, a hopper into a chest at the foot, and a gap to hit them through; it works
   at night).
+* **Styles**: ask for "a modern house" (white concrete, big windows, a flat roof), "a house on stilts" (raised on
+  log posts with a stair up), "a tower" (a small footprint, floors on floors with a ladder) or "a cottage"; or it
+  picks one its taste likes. Designs can have a **pond with a pergola**, a **workshop** stall, a fenced yard, flower
+  beds and bushes.
+* **Its mine** has an entrance: a framed doorway in the hillside with lanterns, and it goes back to the same mine.
+* **Highways** ("build a highway north", "an obsidian road east 300"): a tunnel 3 wide and 3 high with a floor of the block
+  you name (stone bricks otherwise) and torches. In the Overworld it runs **underground** (about 12 blocks under the
+  surface where it starts) so it never cuts through anyone's buildings; in the **Nether** it runs 5 blocks under the
+  bedrock roof, the way players build theirs. It builds it 24 blocks at a time, one block after another.
 * **Statue** ("build a statue of me", "of yourself", "of Steve"): a player's skin, one block for every pixel, 32
   blocks tall, the skin's outer layer (hair, hood, jacket) laid over it, each pixel the closest-coloured block
   (concrete, terracotta, wool, planks, stone). The skin comes from Mojang's skin server; offline players have none,
@@ -727,6 +789,7 @@ away in single player. On a server, operators use:
 | `downloadChatModel` | `true` | download the chat model the first time it's needed |
 | `chatThreads` | half the CPU cores (1-4) | CPU threads for the chat model |
 | `gpu` | `"auto"` | the chat model on the graphics card: `"auto"`, `"on"` or `"off"` ([more](#the-chat-model-on-the-graphics-card)) |
+| `brain` | `"xen2"` | how main Xens decide: `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides)) or `"dmm"` (the classic brain, which minions always use) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
 | `maxXens` | `50` | Xens the whole world may have (0 = no limit; minions don't count) |
@@ -753,6 +816,7 @@ away in single player. On a server, operators use:
 | `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
 | `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
+| `friendlyFire` | `true` | teammates can hurt each other |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
 | `generationDays` | `3` | Minecraft days per generation |
@@ -778,7 +842,7 @@ away in single player. On a server, operators use:
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
 | `/xen minions <count>` | [minions](#minion-xens) for your Xen (up to 100 in the world) |
-| `/xen build <what>` | the same as asking it: `house`, `base`, `farm`, `pen`, `mob farm` |
+| `/xen build <what>` | the same as asking it: `house`, `modern house`, `stilt house`, `tower`, `cottage`, `base`, `farm`, `pen`, `mob farm` |
 | `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
 | `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
 | `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
@@ -807,6 +871,9 @@ away in single player. On a server, operators use:
   hungry and can die.
 
 ## Its brain
+
+Xen 2.0's trained mind is inside the jar too; the world's copy, which keeps learning, is `<world>/xen/mind.bin`
+(delete it to start over from the trained one). The classic brain (DMM) is described next.
 
 The trained brain is inside the jar. It carries its latest 1000 trauma and joy
 memories, so learning in a safe world doesn't make it forget what hurt it.

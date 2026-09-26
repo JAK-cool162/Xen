@@ -39,6 +39,7 @@ final class Crew {
 		minions.removeIf(m -> m.player == null || m.player.isRemoved() && m.respawning() < 0);
 		if (minions.isEmpty() || boss.player == null || now() < nextRound) return;
 		nextRound = now() + 1200;
+		thinkAboutTheBoss(now());
 		BlockPos home = boss.goals.home != null ? boss.goals.home : boss.player.blockPosition();
 		for (Companion m : minions) {
 			if (m.player == null || m.chores.busy() || m.builder.busy() || !m.awake()) continue;
@@ -79,7 +80,39 @@ final class Crew {
 	 * world alive around them); a minion lets the others do it. (ChunkMap's own switch for that, found by what it
 	 * takes, so it works whatever the method is called in this version.)
 	 */
+	/** A minion that went its own way: it loads the world around it again, like any Xen. */
+	static void startLoading(ServerPlayer p) {
+		try {
+			if (updatePlayerStatus == null) stopLoading(null);                 // (finds the method)
+			if (updatePlayerStatus != null) updatePlayerStatus.invoke(((ServerLevel) p.level()).getChunkSource().chunkMap, p, true);
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			XenMod.LOG.warn("A free minion couldn't load chunks: {}", e.toString());
+		}
+	}
+
+	/**
+	 * Minions are people too: now and then each thinks about its boss. One that doesn't trust it (the boss hit it,
+	 * never shares), or that is out for power or money more than loyal, may walk away (and turn on the boss, if it's
+	 * aggressive and thinks it can win). Loyal ones stay unless badly treated. The ones that leave are free Xens: they
+	 * live their own life and load the world around them.
+	 */
+	void thinkAboutTheBoss(long now) {
+		for (Companion m : new ArrayList<>(minions)) {
+			if (m.player == null || !m.awake() || boss.player == null) continue;
+			if (random.nextFloat() > 0.05f) continue;                          // (now and then)
+			var p = m.personality;
+			float trust = m.trust(boss.player.getUUID());
+			boolean mistreated = trust < -0.2f;
+			boolean ambitious = p.loyalty < 0.35f && (p.power > 0.6f || p.money > 0.6f) && random.nextFloat() < 0.15f;
+			if (p.loyalty > 0.6f && trust > -0.4f || !mistreated && !ambitious) continue;
+			boolean turn = p.aggressive() && p.power > 0.5f && m.player.getHealth() >= boss.player.getHealth();
+			m.goFree(turn ? "I'm done taking orders from you, " + boss.name + "!" : mistreated ? "I've had enough, " + boss.name + ". I'm leaving."
+					: "I'm going my own way, " + boss.name + ". No hard feelings.", turn ? boss.player : null);
+		}
+	}
+
 	static void stopLoading(ServerPlayer p) {
+		if (p == null && updatePlayerStatus != null) return;
 		try {
 			if (updatePlayerStatus == null) {
 				for (Method m : ChunkMap.class.getDeclaredMethods()) {
@@ -91,6 +124,7 @@ final class Crew {
 					}
 				}
 			}
+			if (p == null) return;                                           // (only finding the method)
 			if (updatePlayerStatus != null) updatePlayerStatus.invoke(((ServerLevel) p.level()).getChunkSource().chunkMap, p, false);
 		} catch (ReflectiveOperationException | RuntimeException e) {
 			XenMod.LOG.warn("A minion couldn't be taken off chunk loading (it loads chunks like a normal Xen): {}", e.toString());

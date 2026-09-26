@@ -38,6 +38,8 @@ final class Tribe {
 	private int houses;
 	/** Its economy: its money, prices, shops (see {@link Market}). */
 	final Market market = new Market(this);
+	/** Its own rules, jobs and punishments (see {@link Laws}). */
+	final Laws laws = new Laws(this);
 	private Companion watch;
 	private long watchSince;
 
@@ -73,7 +75,22 @@ final class Tribe {
 	}
 
 	/** Someone attacked one of them with a weapon: the tribe stands together (unless it's a member, or a friend of the owner). */
+	/** When each member was last attacked (the others may come and guard them). */
+	final Map<Companion, Long> attackedAt = new java.util.WeakHashMap<>();
+
+	/** A member (not c) attacked in the last half minute, close enough to go and help; or null. */
+	Companion inDanger(Companion c) {
+		long now = c.player.level().getGameTime();
+		for (var e : attackedAt.entrySet()) {
+			Companion m = e.getKey();
+			if (m == c || m.player == null || now - e.getValue() > 600 || m.player.level() != c.player.level()) continue;
+			if (m.player.distanceTo(c.player) < 64 && members.contains(m)) return m;
+		}
+		return null;
+	}
+
 	void alarm(Companion victim, ServerPlayer attacker) {
+		if (victim.player != null) attackedAt.put(victim, victim.player.level().getGameTime());
 		if (member(attacker) || attacker.getUUID().equals(victim.owner) || !victim.mod.config.tribes || victim.mod.config.pvp.equals("off")) return;
 		long now = victim.player.level().getGameTime();
 		boolean fresh = !enemy(attacker, now);
@@ -156,6 +173,7 @@ final class Tribe {
 			t.admire();
 			t.share();
 			t.market.tick(t.members.get(0).player.level().getGameTime());
+			t.laws.tick(t.members.get(0).player.level().getGameTime());
 			t.guard();
 		}
 	}
@@ -342,6 +360,10 @@ final class Tribe {
 		if (!enemies.isEmpty()) sb.append(" Your tribe is fighting someone who attacked one of you.");
 		String economy = market.describe();
 		if (!economy.isEmpty()) sb.append(' ').append(economy);
+		String job = laws.jobOf(c);
+		if (job != null) sb.append(" Your job in the village: ").append(job).append('.');
+		var rules = laws.describe();
+		if (!rules.isEmpty()) sb.append(" Village rules: ").append(String.join("; ", rules)).append('.');
 		return sb.toString();
 	}
 
@@ -351,6 +373,14 @@ final class Tribe {
 		for (int i = 0; i < members.size(); i++) sb.append(i > 0 ? ", " : "").append(members.get(i).name);
 		if (center != null) sb.append("; village at ").append(center.toShortString());
 		if (!storage.isEmpty()) sb.append("; ").append(storage.size()).append(" shared chests");
+		Companion leader = laws.leader();
+		if (leader != null && members.size() >= 3) sb.append("; led by ").append(leader.name);
+		var rules = laws.describe();
+		if (!rules.isEmpty()) sb.append("; rules: ").append(String.join(", ", rules));
+		if (!laws.jobs.isEmpty()) {
+			sb.append("; jobs:");
+			for (var e : laws.jobs.entrySet()) sb.append(' ').append(e.getKey().name).append('=').append(e.getValue().word);
+		}
 		return sb.toString();
 	}
 

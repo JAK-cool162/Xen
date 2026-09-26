@@ -95,6 +95,9 @@ public class XenSettingsScreen extends Screen {
 		switch (tab) {
 			case 0 -> {
 				onOff("Chat", "chat", "Xen answers and understands chat.");
+				onOff("Local chat", "localChat", "What anyone says (players and Xens) only reaches those within the chat range, and only Xens that close hear it. Someone standing nearby can overhear, and a Xen that overhears a plot against its friend may tell them. Off: chat reaches the whole server.");
+				choice("Chat range", "chatRange", List.of(32, 16, 48, 64, 128), n -> n + " blocks" + (n == 32 ? " (2 chunks)" : ""), "How far local chat and local death messages carry.");
+				onOff("Local death messages", "localDeaths", "A death message only reaches those within the chat range of where it happened (it turns the show_death_messages game rule off and sends them itself).");
 				choice("AI chat (on this device)", "chatModel", List.of("auto", "on", "off"), s -> s,
 						"The small AI chat model runs on your own device (your computer or phone), never online: a 400 MB download once, and some memory and power while it talks. auto = only when the game has about 3 GB of memory. off = it never runs: Xens still understand what you ask and answer simply, from what they know. It only wakes when someone a Xen knows is near or talks.");
 				choice("AI chat size", "chatModelSize", List.of("auto", "small", "normal"), s -> s.equals("small") ? "small (phones)" : s,
@@ -119,6 +122,8 @@ public class XenSettingsScreen extends Screen {
 			case 2 -> {
 				onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, trading, exploring) and a dream to work toward, and learn which they like.");
 				onOff("Antics", "antics", "Xen does unpredictable things for fun: dances along when you crouch-dance, shows off tricks (that don't always work), surprises in fights. Playful Xens more.");
+				choice("Brain", "brain", List.of("xen2", "dmm"), s -> s.equals("xen2") ? "Xen 2.0" : "classic (DMM)",
+						"What decides what a Xen does next. Xen 2.0: a bigger mind trained from scratch in a simulated survival life (a reward critic, a fear critic and a world model that thinks a few steps ahead), choosing between skills (wood, mining, building, farming, eating, sleeping, helping, guarding, fighting...) by its own motives, and it keeps learning in your world. Classic: the small brain with hand-made goals. Minions always use the classic one.");
 				onOff("Tribes", "tribes", "Xens that live together (yours, a team, free ones that get on) share food, iron and chests, build their houses around one village, keep watch over it at night, and stand together when one of them is attacked.");
 				onOff("Adventures", "adventures", "Free Xens go for the Ender Dragon on their own when they're ready (the Nether for blaze rods, ender pearls, eyes of ender, the stronghold, the End), and take on trial chambers they find.");
 				onOff("Loot chests", "loot", "Xens open chests they find out in the world that nobody has opened yet (dungeons, camps, trial chambers) and loot them. Chests players put down they leave alone.");
@@ -130,7 +135,8 @@ public class XenSettingsScreen extends Screen {
 						"From which generation of evolution Xens know that a block in the Nether is eight in the overworld (so they build their way home at x/8, z/8) and find strongholds from two eye throws. Younger Xens can be taught: say \"the Nether is 8 times smaller\".");
 			}
 			case 3 -> {
-				choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams (no friendly fire).");
+				choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams. New Xens join the team of those around them they like most; they may switch later, and you can ask them to join yours.");
+				onOff("Team members can fight", "friendlyFire", "Being on a team doesn't stop a fight: each Xen decides who to fight, by its temper, its motives and who it trusts."); 
 				choice("PvP", "pvp", List.of("own", "off", "defend", "teams"), s -> s,
 						"own: its own call: it fights back when someone attacks it or its owner with a weapon, lets a friend's mistake go, and gets away when it's losing. A poke with an empty hand only gets its attention. defend: always fights back against armed attacks. teams: Xens of different teams fight too.");
 			}

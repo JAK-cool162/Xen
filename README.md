@@ -218,8 +218,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-0.7.1-alpha+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-0.7.1-alpha+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-1.0.0+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-1.0.0+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -239,7 +239,15 @@ house, a crop farm, mining for iron and diamonds, smelting, armor, a mob farm
 a good player (sprint, jump gaps, drop down, swim, climb, open doors, dig through,
 bridge, tower out of holes), a **solver** learns ways out when it's stuck (also
 from watching you), fights can end in a **truce**, and `/xen minions` gives it
-sidekicks that don't load chunks and help it build a village. It mines, fights back, swims, eats and learns. Right-click it to
+sidekicks that don't load chunks and help it build a village. It mines, fights back, swims, eats and learns.
+Since 1.0.0 main Xens decide with **Xen 2.0**: an option-level mind with a reward
+critic, a fear (harm) critic and a world model that imagines ahead, trained from
+scratch in a simulated survival life and still learning in your world (minions keep
+the classic brain). Xens have a hidden nature (aggressive, passive or friendly;
+kindness, loyalty, power and money), pick their own teams, make village rules and
+jobs and punish those who break them, build houses in styles (modern, on stilts,
+towers, cottages, with ponds and workshops), dig highways (underground, or under the
+Nether roof), and fly with elytras. Right-click it to
 open its bag. `/xen spawn 50` (operators) brings in a crowd of Xens across the
 world, all sharing one brain. Everything runs inside the game (brain,
 learning, senses and chat), with no Python and no bridge. It was tested on
@@ -724,7 +732,9 @@ mod/                  Fabric mod: Xen Companion
                       personalities, names and skins, teams, evolution, redstone, signs, settings,
                       Fighter (1.9+ PvP), Arena (red vs blue self-play), Goals (now, soon, its dream),
                       Crafter (tools with the recipe book), Trader (villagers, bargaining, trust),
-                      Talker (talking on its own and with other Xens), Mimic (learning by watching)
+                      Talker (talking on its own and with other Xens), Mimic (learning by watching),
+                      core/Mind + core/SimLife (Xen 2.0 and its trainer), MindSense, Laws (village rules,
+                      jobs, punishments), Needs, Enchanter, Voyager (worlds, elytra), Highway
   common/java/.../client/  the Mod Menu settings screen (tabs)
   common/test/        crossCheck: Java == Python for senses, brain, memories, paths and chat rules
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)

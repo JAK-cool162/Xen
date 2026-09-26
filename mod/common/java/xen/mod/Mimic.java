@@ -238,15 +238,16 @@ final class Mimic {
 				c.chatter(hurt ? "Ouch... almost." : "Yes! I did the water clutch!", true);
 				if (!hurt) {
 					improve(CLUTCH, 0.1f);                                       // it gets better by doing it
+					c.skills.practice(Skills.MOVE, 0.05f);
 					c.antics.celebrate();
 				}
 			}
 			placed = null;
 			return true;
 		}
-		float s = skill(CLUTCH);
+		float s = Math.max(c.mod.config.copy ? skill(CLUTCH) : 0, c.skills.get(Skills.MOVE) - 0.35f);   // (an agile Xen gets the idea by itself)
 		boolean falling = !p.onGround() && !p.isInWater() && p.getDeltaMovement().y < -0.4 && p.fallDistance > 4;
-		if (!falling || s <= 0 || !c.mod.config.copy) {
+		if (!falling || s <= 0) {
 			if (p.onGround() || p.isInWater()) {
 				if (tried && p.hurtTime > 0) c.chatter("Too late! I'll get it next time.", false);
 				aimAt = Double.NaN;

@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
@@ -43,6 +44,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -67,6 +69,12 @@ public class XenMod implements ModInitializer {
 
 	XenConfig config;
 	Brain brain;
+	/** Xen 2.0's mind (what to do next: one for all main Xens, it keeps learning); null: the old way. */
+	xen.mod.core.Mind mind;
+	/** How many of its choices Xen 2.0 has seen turn out (in this world), and learned from. */
+	long mindExperiences;
+	private long mindTrained;
+	private final Random mindRandom = new Random();
 	Chat chat;
 	MinecraftServer server;
 
@@ -102,6 +110,20 @@ public class XenMod implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STOPPING.register(this::stopping);
 		ServerTickEvents.END_SERVER_TICK.register(this::tick);
 		ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> heard(sender, message.signedContent()));
+		ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {   // local chat: only those close by hear it
+			if (!config.localChat || sender instanceof XenPlayer) return true;
+			var out = net.minecraft.network.chat.OutgoingChatMessage.create(message);
+			for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+				if (p instanceof XenPlayer || p != sender && !inRange(p, sender)) continue;
+				p.sendChatMessage(out, sender.shouldFilterMessageTo(p), params);
+			}
+			LOG.info("<{}> {} (local chat)", sender.getName().getString(), message.signedContent());
+			heard(sender, message.signedContent());                               // (the Xens close enough hear it)
+			return false;
+		});
+		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+			if (entity instanceof ServerPlayer victim && server != null) died(victim, source);
+		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> ownerLeft(handler.getPlayer()));
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> ownerJoined(handler.getPlayer()));
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
@@ -131,7 +153,16 @@ public class XenMod implements ModInitializer {
 			LOG.warn("Starting Xen with a newborn brain: {}", e.toString());
 			brain = new Brain(Perception.OBS_DIM);
 		}
+		Path mindFile = brainFile().resolveSibling("mind.bin");
+		try (InputStream in = Files.exists(mindFile) ? Files.newInputStream(mindFile) : XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
+			mind = in == null ? null : xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
+			if (mind != null) LOG.info("Xen 2.0's mind loaded ({} learning steps){}", mind.updates, Files.exists(mindFile) ? "" : " - trained in SimLife");
+		} catch (IOException e) {
+			LOG.warn("No Xen 2.0 mind ({}): Xens choose the old way", e.toString());
+			mind = null;
+		}
 		loadAway();
+		deathMessages();
 		later(60, () -> comeBack(o -> !o.has("owner")));                          // the free ones: back when the world is up
 		running = true;
 		trainer = new Thread(this::train, "xen-learning");
@@ -148,6 +179,9 @@ public class XenMod implements ModInitializer {
 				if (pendingTraining.get() > 0) {
 					pendingTraining.decrementAndGet();
 					brain.trainStep();
+				} else if (mind != null && config.learn && mindTrained < mindExperiences * 8) {   // Xen 2.0: 8 lessons per choice it saw through
+					mindTrained++;
+					mind.learn(32, mindRandom);
 				} else {
 					Thread.sleep(50);
 				}
@@ -194,6 +228,13 @@ public class XenMod implements ModInitializer {
 				brain.write(out);
 			}
 			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			if (mind != null && mindExperiences > 0) {
+				Path mtmp = file.resolveSibling("mind.bin.tmp");
+				try (var out = new java.io.DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(mtmp)))) {
+					mind.save(out);
+				}
+				Files.move(mtmp, file.resolveSibling("mind.bin"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			}
 		} catch (IOException e) {
 			LOG.warn("Could not save Xen's brain: {}", e.toString());
 		}
@@ -239,6 +280,16 @@ public class XenMod implements ModInitializer {
 				LOG.warn("Xen tribes stumbled: {}", e.toString(), e);
 			}
 			if (config.evolution) evolve();
+		}
+		if (s.getTickCount() % 6000 == 3000) {                                // every five minutes: its team, its rules
+			for (Companion c : companions) {
+				if (c.player == null || c.minion || c.inArena) continue;
+				try {
+					rethinkTeam(c);
+				} catch (RuntimeException e) {
+					LOG.warn("Xen team thinking stumbled: {}", e.toString());
+				}
+			}
 		}
 	}
 
@@ -391,7 +442,7 @@ public class XenMod implements ModInitializer {
 
 	private final List<Object[]> laterJobs = new ArrayList<>();
 
-	private void later(int ticks, Runnable job) {
+	void later(int ticks, Runnable job) {
 		synchronized (laterJobs) {
 			laterJobs.add(new Object[] {server.getTickCount() + ticks, job});
 		}
@@ -446,14 +497,69 @@ public class XenMod implements ModInitializer {
 	}
 
 	/** A player said something: if it's to a Xen (by name), it understands, does what was asked and answers. */
+	/** Close enough to hear someone (local chat: within the chat range, in the same world). */
+	boolean inRange(net.minecraft.world.entity.Entity a, net.minecraft.world.entity.Entity b) {
+		return a.level() == b.level() && a.distanceTo(b) <= config.chatRange;
+	}
+
+	/** Can this Xen hear what that player says? (With local chat only close by; else anywhere.) */
+	private boolean hears(Companion c, ServerPlayer sender) {
+		return c.player() != null && (!config.localChat || inRange(c.player(), sender));
+	}
+
+	/** Something said out loud by a player or a Xen: the Xens close by overhear it (rumors, plots: spies). */
+	void overheardBy(ServerPlayer speaker, String name, String text) {
+		if (speaker == null) return;
+		for (Companion o : companions) {
+			if (o.player() == null || o.player() == speaker || !inRange(o.player(), speaker)) continue;
+			o.rumors.overheard(name, speaker.getUUID(), text);
+		}
+	}
+
+	/**
+	 * Someone died. With local death messages, only those within the chat range get the message; and the Xens close by
+	 * (and the killer) remember it: who killed whom.
+	 */
+	private void died(ServerPlayer victim, net.minecraft.world.damagesource.DamageSource source) {
+		if (config.localDeaths) {
+			Component msg = source.getLocalizedDeathMessage(victim);
+			for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+				if (!(p instanceof XenPlayer) && (p == victim || inRange(p, victim))) p.sendSystemMessage(msg);
+			}
+			LOG.info("{} (local death message)", msg.getString());
+		}
+		var killer = source.getEntity();
+		for (Companion o : companions) {
+			if (o.player() == null || o.player() == victim) continue;
+			if (o.player() == killer || inRange(o.player(), victim)) o.rumors.witnessed(victim, killer);
+		}
+	}
+
+	private boolean deathRuleOff;
+
+	/** Local death messages: the game's own (to everyone) off, it sends them itself; back on when the setting goes off. */
+	private void deathMessages() {
+		if (server == null) return;
+		if (!config.localDeaths && !deathRuleOff) return;
+		var src = server.createCommandSourceStack().withSuppressedOutput();
+		for (String rule : new String[] {"show_death_messages", "showDeathMessages"}) {   // (its name in 1.21.11 and 26.x, and before)
+			try {
+				server.getCommands().performPrefixedCommand(src, "gamerule " + rule + " " + !config.localDeaths);
+			} catch (RuntimeException ignored) {
+			}
+		}
+		deathRuleOff = config.localDeaths;
+	}
+
 	private void heard(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
+		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
 		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
 		chat.warmUp();
 		boolean toXen = false;
 		for (Companion c : companions) {
-			if (c.player() != null && java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
+			if (hears(c, sender) && java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
 					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) toXen = true;
 		}
 		if (toXen && !chat.hasModel() && toldAboutModel.add(sender.getUUID())) {   // once: why its answers are simple
@@ -461,10 +567,27 @@ public class XenMod implements ModInitializer {
 					+ ". Until it's ready, Xens understand requests and answer simply.").withStyle(net.minecraft.ChatFormatting.GRAY));
 		}
 		for (Companion c : companions) {
-			if (c.player() == null) continue;
+			if (!hears(c, sender)) continue;
 			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
 					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) continue;
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
+					reply -> server.execute(() -> c.say(reply)));
+			return;
+		}
+		Companion byStart = null;                                              // "riv, come here": the start of its name will do
+		String asked = null;
+		for (Companion c : companions) {
+			if (!hears(c, sender) || c.player().level() != sender.level()) continue;
+			String t = calledByStart(text, c.name);
+			if (t != null && (byStart == null || c.player().distanceTo(sender) < byStart.player().distanceTo(sender))) {
+				byStart = c;
+				asked = t;
+			}
+		}
+		if (byStart != null) {
+			Companion c = byStart;
+			String t = asked;
+			chat.ask(sender.getName().getString(), t, c.name, request -> onServer(() -> c.request(request, sender, t)),
 					reply -> server.execute(() -> c.say(reply)));
 			return;
 		}
@@ -484,6 +607,33 @@ public class XenMod implements ModInitializer {
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> c.say(reply)));
 		}
+	}
+
+	private static final java.util.Set<String> NOT_NAMES = java.util.Set.of("the", "and", "you", "can", "get", "come", "all", "not", "for", "but",
+			"are", "was", "how", "why", "who", "yes", "now", "hey", "lol", "bro", "what", "where", "when", "stop", "stay", "give", "follow", "please",
+			"hello", "help", "make", "build", "sleep", "go", "let", "lets", "okay", "yeah", "nah", "nope", "one", "two", "its", "it's", "this",
+			"that", "they", "them", "there", "here", "have", "has", "had", "did", "does", "don", "dont", "wait", "look", "see", "use", "put", "take",
+			"mine", "wood", "stone", "iron", "food", "eat", "run", "hit", "kill", "fight", "attack", "trade", "join", "team", "our", "your", "his", "her",
+			"any", "some", "more", "less", "very", "much", "many", "too", "also", "just", "only", "then", "than", "with", "from", "into", "out", "off",
+			"on", "in", "at", "to", "of", "up", "down", "bed", "sit", "try", "want", "need", "like", "love", "hate", "good", "bad", "nice", "cool");
+
+	/**
+	 * Called by the start of its name (3 letters or more) as the first word or with a comma after it ("riv come here",
+	 * "hey neo", "holl, stop"): the message with its whole name in, or null. Common words don't count.
+	 */
+	static String calledByStart(String text, String name) {
+		String n = name.toLowerCase(java.util.Locale.ROOT), letters = n.replaceAll("[^a-z]", "");
+		var m = java.util.regex.Pattern.compile("^\\s*([a-z0-9_]{3,})\\b|\\b(?:hey|yo|oi|hi|hello)\\s+([a-z0-9_]{3,})\\b|\\b([a-z0-9_]{3,})\\s*[,:]")
+				.matcher(text.toLowerCase(java.util.Locale.ROOT));
+		while (m.find()) {
+			String w = m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3);
+			if (w == null || NOT_NAMES.contains(w) || w.length() >= n.length()) continue;
+			if (n.startsWith(w) || letters.length() >= 3 && letters.startsWith(w)) {
+				return text.substring(0, m.start(m.group(1) != null ? 1 : m.group(2) != null ? 2 : 3)) + name
+						+ text.substring(m.end(m.group(1) != null ? 1 : m.group(2) != null ? 2 : 3));
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -587,7 +737,12 @@ public class XenMod implements ModInitializer {
 					return 1;
 				}))
 				.then(Commands.literal("chat").then(Commands.literal("on").executes(ctx -> setting(ctx, "chat", true)))
-						.then(Commands.literal("off").executes(ctx -> setting(ctx, "chat", false))))
+						.then(Commands.literal("off").executes(ctx -> {
+							int r = setting(ctx, "chat", false);
+							ctx.getSource().sendSuccess(() -> Component.literal("(Xens won't listen to chat at all now. To keep them listening but turn off only the AI chat model: /xen chat on, then /xen set chatModel off.)")
+									.withStyle(net.minecraft.ChatFormatting.GRAY), false);
+							return r;
+						})))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
 				.then(Commands.literal("settings").executes(this::showSettings))
@@ -618,6 +773,7 @@ public class XenMod implements ModInitializer {
 														case "build" -> Personality.BUILDS;
 														case "material" -> Personality.MATERIALS;
 														case "tone" -> Personality.TONES;
+														case "temper" -> Personality.TEMPERS;
 														default -> new String[] {"0", "0.5", "1"};
 													};
 													for (String v : values) b.suggest(v);
@@ -673,7 +829,8 @@ public class XenMod implements ModInitializer {
 		return arena.running() ? 1 : 0;
 	}
 
-	private static final String[] TRAITS = {"fight", "build", "material", "tone", "bravery", "curiosity", "chattiness", "diligence", "crit", "charge",
+	private static final String[] TRAITS = {"fight", "build", "material", "tone", "temper", "bravery", "curiosity", "chattiness", "diligence", "kindness",
+			"loyalty", "power", "money", "crit", "charge",
 			"spacing", "wtap", "jumpreset", "strafe", "counter", "select", "retreat", "shield"};
 
 	/** /xen style: set one of a Xen's traits by hand (its owner, or an operator). */
@@ -685,12 +842,25 @@ public class XenMod implements ModInitializer {
 				ctx.getSource().sendFailure(Component.literal(c.name + " isn't yours."));
 				return 0;
 			}
+			int skill = java.util.Arrays.asList(Skills.NAMES).indexOf(trait.toLowerCase(java.util.Locale.ROOT));
+			if (skill >= 0) {                                                  // a skill: "/xen style Pip fighting 0.9"
+				try {
+					c.skills.level[skill] = Math.max(0f, Math.min(1f, Float.parseFloat(value)));
+				} catch (NumberFormatException e) {
+					ctx.getSource().sendFailure(Component.literal(trait + " is a number from 0 to 1"));
+					return 0;
+				}
+				roster.remember(c, teamOf(c));
+				ctx.getSource().sendSuccess(() -> Component.literal(c.name + ": " + c.skills.describe()), false);
+				return 1;
+			}
 			String error = c.personality.set(trait, value);
 			if (error != null) {
 				ctx.getSource().sendFailure(Component.literal(error));
 				return 0;
 			}
 			c.applyPersonality();
+			if (trait.equals("loner")) joinTeam(c);                              // (a lone wolf leaves its team)
 			roster.remember(c, teamOf(c));
 			roster.save();
 			ctx.getSource().sendSuccess(() -> Component.literal(c.name + ": " + c.personality.describe() + "; " + c.personality.style() + "."), false);
@@ -736,9 +906,13 @@ public class XenMod implements ModInitializer {
 		if (known != null && known.has("known")) {
 			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
 		}
+		if (known == null) c.skills.born();                                   // a new Xen: its own talents
 		if (known != null) {
 			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
 			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
+			if (known.has("abilities")) c.skills.load(known.getAsJsonObject("abilities"));
+			else c.skills.born();
+			if (known.has("rumors")) c.rumors.load(known.getAsJsonObject("rumors"));
 			if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString());
 			if (known.has("places")) c.places.load(known.getAsJsonObject("places"));
 			if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests"));
@@ -746,6 +920,13 @@ public class XenMod implements ModInitializer {
 			if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT);
 			if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops"));
 			if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste"));
+			if (known.has("mine")) {
+				com.google.gson.JsonObject mine = known.getAsJsonObject("mine");
+				c.chores.mineRecordY = mine.get("y").getAsInt();
+				c.chores.mineRecordLeg = mine.get("leg").getAsInt();
+				var d = net.minecraft.core.Direction.byName(mine.get("dir").getAsString());
+				if (d != null) c.chores.mineRecordDir = d;
+			}
 			c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean();
 			if (known.has("band")) c.band = known.get("band").getAsString();
 			if (known.has("trust")) {
@@ -780,7 +961,7 @@ public class XenMod implements ModInitializer {
 			return;
 		}
 		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
-		if (n == 0) {
+		if (n == 0 || c.personality.loner) {                            // (a lone wolf is on nobody's team)
 			if (teamOf(c) != null) board.removePlayerFromTeam(c.name);
 			return;
 		}
@@ -791,6 +972,7 @@ public class XenMod implements ModInitializer {
 			var known = roster.get(c.name);
 			String had = known != null && known.has("team") ? known.get("team").getAsString() : null;
 			int index = had == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(had.replace("xen_", ""));
+			if (index < 0 || index >= n) index = likedTeam(c, n, null);           // the team of those around it it likes most
 			if (index < 0 || index >= n) {
 				int[] size = new int[n];
 				for (Companion o : companions) {
@@ -807,10 +989,64 @@ public class XenMod implements ModInitializer {
 		if (team == null) {
 			team = board.addPlayerTeam(name);
 			Compat.teamColor(team, n == 1 ? net.minecraft.ChatFormatting.AQUA : TEAM_FORMATS[java.util.Arrays.asList(TEAM_COLORS).indexOf(name.replace("xen_", ""))]);
-			team.setAllowFriendlyFire(false);
 		}
+		team.setAllowFriendlyFire(config.friendlyFire);                          // (same team or not: whether to fight is each Xen's own call)
 		board.addPlayerToTeam(c.name, team);
 		roster.remember(c, name);
+	}
+
+	/** Which team's people around it (Xens and players, 64 blocks) it likes most, by trust and closeness; -1 if none. */
+	int likedTeam(Companion c, int n, double[] scores) {
+		if (c.player == null) return -1;
+		double[] s = scores != null ? scores : new double[n];
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p == c.player || p.level() != c.player.level()) continue;
+			var t = server.getScoreboard().getPlayersTeam(p.getScoreboardName());
+			if (t == null || !t.getName().startsWith("xen_")) continue;
+			int i = java.util.Arrays.asList(TEAM_COLORS).indexOf(t.getName().substring(4));
+			double d = p.distanceTo(c.player);
+			if (i < 0 || i >= n || d > 64) continue;
+			s[i] += c.trust(p.getUUID()) / (1 + d / 16);
+		}
+		int best = -1;
+		for (int i = 0; i < n; i++) if (s[i] > 0.3 && (best < 0 || s[i] > s[best])) best = i;
+		return best;
+	}
+
+	/**
+	 * Now and then a Xen thinks about its team: if the people of another team around it are the ones it likes (and
+	 * it isn't very loyal to its own), it goes over to them.
+	 */
+	void rethinkTeam(Companion c) {
+		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
+		if (n < 2 || c.arenaTeam != null || c.player == null || c.personality.loyalty > 0.7f || c.personality.loner) return;
+		String now = teamOf(c);
+		int mine = now == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(now.replace("xen_", ""));
+		double[] s = new double[n];
+		int best = likedTeam(c, n, s);
+		if (best < 0 || best == mine || mine >= 0 && s[best] < s[mine] + 0.8) return;
+		moveToTeam(c, TEAM_COLORS[best]);
+		c.say(c.pick3("I'm joining the " + TEAM_COLORS[best] + " team. I like it there.", "Team " + TEAM_COLORS[best] + " it is!",
+				"I'm with " + TEAM_COLORS[best] + " now."));
+	}
+
+	/** Put it on that team (a color); false if there's no such team here. */
+	boolean moveToTeam(Companion c, String color) {
+		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
+		int i = java.util.Arrays.asList(TEAM_COLORS).indexOf(color);
+		if (n < 2 || i < 0 || i >= n) return false;
+		var board = server.getScoreboard();
+		String name = "xen_" + color;
+		var team = board.getPlayerTeam(name);
+		if (team == null) {
+			team = board.addPlayerTeam(name);
+			Compat.teamColor(team, TEAM_FORMATS[i]);
+		}
+		team.setAllowFriendlyFire(config.friendlyFire);
+		board.addPlayerToTeam(c.name, team);
+		roster.remember(c, name);
+		c.journal("does", "joins the " + color + " team (its own choice)");
+		return true;
 	}
 
 	/** The world has all the Xens it may have (minions apart). */
@@ -974,6 +1210,7 @@ public class XenMod implements ModInitializer {
 		if (server == null) return;
 		server.execute(() -> {
 			for (Companion c : companions) if (c.player() != null) joinTeam(c);
+			deathMessages();
 			if (!config.chat || config.chatModel.equalsIgnoreCase("off")) chat.sleep();
 		});
 	}

@@ -512,6 +512,7 @@ final class Trader {
 			return null;
 		}
 		int trades = trade(menu, v);
+		if (trades > 0) c.skills.practice(Skills.TRADE, 0.03f);
 		c.player.closeContainer();                                       // what's left in the trade slots comes back
 		c.acted = true;
 		String what = changes(before, bag());

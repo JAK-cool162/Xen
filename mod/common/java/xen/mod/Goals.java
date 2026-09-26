@@ -3,8 +3,11 @@ package xen.mod;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import xen.mod.core.Action;
+import xen.mod.core.Mind;
 
 import java.util.EnumMap;
 import java.util.Locale;
@@ -191,6 +194,7 @@ final class Goals {
 			learn();
 			next = now;                                                      // done: straight on to the next thing, like a player
 		}
+		if (useMind()) return thinkMind(nearby, now);
 		if (now < next) return false;
 		next = now + THINK;
 		Short best = null;
@@ -205,6 +209,11 @@ final class Goals {
 			}
 		}
 		if (best == null) return false;
+		return begin(best, nearby, now) && c.chores.busy();
+	}
+
+	/** Get on with a short goal (it chose it, or Xen 2.0 did). False if it can't right now. */
+	private boolean begin(Short best, boolean nearby, long now) {
 		buildingHome = best == Short.SHELTER && dream == Long.HOME && home == null && !c.player.level().isDarkOutside();
 		String plan = switch (best) {
 			case FOOD -> c.chores.hunt(2);
@@ -246,7 +255,7 @@ final class Goals {
 		until = now + EXPLORE_TICKS;
 		c.chores.own = true;
 		c.chatter(buildingHome ? "I'm going to build my home here!" : nearby ? pickNearby(best) : "I want to " + best.what + ".", nearby);
-		return c.chores.busy();
+		return true;
 	}
 
 	/** What it says when it gets on with something while its friend is close. */
@@ -450,6 +459,12 @@ final class Goals {
 		buildingHome = false;
 		c.chores.own = false;
 		current = null;
+		if (option >= 0) finishOption(false);
+	}
+
+	/** No new goal for a while (it's catching up with its friend). */
+	void pause(int ticks) {
+		next = Math.max(next, c.player.level().getGameTime() + ticks);
 	}
 
 	/** Someone asked it for something: that comes first. */
@@ -457,6 +472,293 @@ final class Goals {
 		current = null;
 		buildingHome = false;
 		c.chores.own = false;
+		if (option >= 0) finishOption(false);
+	}
+
+	// ----------------------------------------------------------------------------- Xen 2.0
+	/** Xen 2.0's choice now (a {@link Mind} option), what it knew when it chose, when, until when; -1: none. */
+	int option = -1;
+	private float[] optionFeatures;
+	private long optionAt, optionUntil;
+	private java.util.UUID followWho;
+	private Companion guardWho;
+	private Vec3 fleeFrom;
+	String optionHow = "";
+
+	/** Does Xen 2.0 decide for it (the setting; minions keep the small brain)? */
+	boolean useMind() {
+		return c.mod.mind != null && !c.minion && "xen2".equals(c.mod.config.brain);
+	}
+
+	/** Leanings on top of what Xen 2.0 values: its village's rules and job, and what it's good at (people do what they're good at). */
+	private float[] bias(Tribe t) {
+		float[] b = t == null ? new float[Mind.N] : t.laws.bias(c);
+		Skills k = c.skills;
+		b[Mind.MINE] += 0.3f * (k.get(Skills.MINE) - 0.5f);
+		b[Mind.HOUSE] += 0.3f * (k.get(Skills.BUILD) - 0.5f);
+		b[Mind.FARM] += 0.3f * (k.get(Skills.FARM) - 0.5f);
+		b[Mind.TRADE] += 0.3f * (k.get(Skills.TRADE) - 0.5f);
+		b[Mind.FIGHT] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
+		b[Mind.GUARD] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
+		return b;
+	}
+
+	private boolean thinkMind(boolean nearby, long now) {
+		if (option >= 0 && current == null) {                              // one of its own kind of choices (rest, follow, eat, help...)
+			if (!extraOver(now)) return c.chores.busy();
+			finishOption(false);
+			next = now;
+		}
+		if (option >= 0) return c.chores.busy();
+		if (now < next) return false;
+		next = now + 60;                                                       // (if nothing starts, it looks again in 3 s)
+		Mind mind = c.mod.mind;
+		float[] f = MindSense.features(c);
+		boolean[] can = MindSense.allowed(c, f, nearby);
+		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
+		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
+		for (int tries = 0; tries < 5; tries++) {
+			Tribe t = c.tribe();
+			Mind.Choice ch = mind.choose(f, can, caution, explore, random, bias(t));
+			if (!startOption(ch.option, nearby, now)) {                       // it couldn't after all: the next best
+				can[ch.option] = false;
+				continue;
+			}
+			option = ch.option;
+			optionFeatures = f;
+			optionAt = now;
+			optionHow = ch.how;
+			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + ch.how + ")");
+			return c.chores.busy();
+		}
+		return false;
+	}
+
+	private static final Short[] AS_SHORT = new Short[Mind.N];
+	static {
+		AS_SHORT[Mind.WOOD] = Short.WOOD;
+		AS_SHORT[Mind.STONE] = Short.STONE;
+		AS_SHORT[Mind.FOOD] = Short.FOOD;
+		AS_SHORT[Mind.SHELTER] = Short.SHELTER;
+		AS_SHORT[Mind.HOUSE] = Short.HOUSE;
+		AS_SHORT[Mind.FARM] = Short.FARM;
+		AS_SHORT[Mind.MINE] = Short.MINE;
+		AS_SHORT[Mind.SMELT] = Short.SMELT;
+		AS_SHORT[Mind.STORE] = Short.STORE;
+		AS_SHORT[Mind.EXPLORE] = Short.EXPLORE;
+		AS_SHORT[Mind.TRADE] = Short.TRADE;
+		AS_SHORT[Mind.ADVENTURE] = Short.ADVENTURE;
+	}
+
+	/** Start what Xen 2.0 chose. False if it can't right now. */
+	private boolean startOption(int o, boolean nearby, long now) {
+		if (AS_SHORT[o] != null) {
+			if (o == Mind.ADVENTURE && dragonDown && c.voyager.wantsQuest()) {    // the dragon's beaten: next, an elytra in the End
+				c.voyager.startQuest();
+				c.chatter("Next adventure: an elytra from an End city!", true);
+				optionUntil = now + 20 * 60 * 30;
+				return true;
+			}
+			if (o == Mind.EXPLORE && c.personality.curiosity > 0.6f && !c.nether.busy() && c.places.get("portal") != null && random.nextFloat() < 0.3f) {
+				String trip = c.nether.go("visit", 0);                           // every world: a curious one goes to see the Nether
+				if (trip.startsWith("You will")) {
+					optionUntil = now + 20 * 60 * 3;
+					c.chatter("I want to see more of the Nether.", false);
+					return true;
+				}
+			}
+			if (o == Mind.HOUSE && home == null && c.moveIn()) {               // living together instead: its (and their) call
+				optionUntil = now + 40;
+				return true;
+			}
+			if (o == Mind.SHELTER && home != null && !c.player.blockPosition().closerThan(home, 12)) {   // a home: it goes back there for the night
+				optionUntil = now + 1200;
+				followWho = null;
+				return true;
+			}
+			return begin(AS_SHORT[o], nearby, now);
+		}
+		switch (o) {
+			case Mind.REST -> {
+				optionUntil = now + 100 + random.nextInt(200);
+				return true;
+			}
+			case Mind.CRAFT -> {
+				String u = c.crafter.upgrade();
+				if (u == null) return false;
+				c.crafter.orderRecipe(u, u.equals("torch") ? 4 : 1);
+				optionUntil = now + 600;
+				c.chatter("I'll make " + (u.endsWith("s") ? "" : "aeiou".indexOf(u.charAt(0)) >= 0 ? "an " : "a ") + u.replace('_', ' ') + ".", false);
+				return c.crafter.hasOrder();
+			}
+			case Mind.EAT -> {
+				optionUntil = now + 200;
+				return c.chores.eat().startsWith("You will");
+			}
+			case Mind.SLEEP -> {
+				optionUntil = now + 12000;
+				return c.hasBed();
+			}
+			case Mind.FOLLOW -> {
+				ServerPlayer f = MindSense.friend(c);
+				if (f == null) return false;
+				followWho = f.getUUID();
+				optionUntil = now + 600;
+				return true;
+			}
+			case Mind.HELP -> {
+				String plan = c.needs.help();
+				if (plan == null || !plan.startsWith("You will")) return false;
+				c.chatter(xen.mod.talk.Chat.firstPerson(plan), true);
+				return true;
+			}
+			case Mind.GUARD -> {
+				Tribe t = c.tribe();
+				guardWho = t == null ? null : t.inDanger(c);
+				if (guardWho == null) return false;
+				optionUntil = now + 600;
+				c.chatter(c.pick3("Hang on, " + guardWho.name + "! I'm coming!", "Nobody touches " + guardWho.name + ".", "On my way, " + guardWho.name + "!"), true);
+				return true;
+			}
+			case Mind.FIGHT -> {
+				LivingEntity foe = MindSense.threat(c);
+				if (foe == null) foe = MindSense.enemy(c);
+				if (foe == null) return false;
+				c.chosenFoe = foe;
+				if (foe instanceof ServerPlayer) c.lastPickedFight = now;
+				optionUntil = now + 400;
+				if (foe instanceof ServerPlayer p) {
+					c.journal("fight", "picks a fight with " + p.getName().getString() + " (its own choice)");
+					c.chatter(c.personality.say("fight"), true);
+				}
+				return true;
+			}
+			case Mind.FLEE -> {
+				LivingEntity from = MindSense.threat(c);
+				if (from == null) from = MindSense.enemy(c);
+				if (from == null) return false;
+				fleeFrom = from.position();
+				optionUntil = now + 160;
+				c.chatter(c.personality.say("flee"), false);
+				return true;
+			}
+			case Mind.ENCHANT -> {
+				optionUntil = now + 2400;
+				return c.enchanter.start().startsWith("You will");
+			}
+			default -> {
+				return false;
+			}
+		}
+	}
+
+	/** Is one of its own kind of choices (not a short goal) over? */
+	private boolean extraOver(long now) {
+		boolean late = now > optionUntil;
+		return switch (option) {
+			case Mind.CRAFT -> !c.crafter.hasOrder() || late;
+			case Mind.EAT -> !c.chores.busy() || late;
+			case Mind.SLEEP -> !c.player.level().isDarkOutside() && !c.player.isSleeping() || late;
+			case Mind.HELP -> !c.chores.busy();
+			case Mind.FIGHT -> late || c.chosenFoe == null || !c.chosenFoe.isAlive() || c.chosenFoe.level() != c.player.level()
+					|| c.chosenFoe.distanceTo(c.player) > 24 || c.diplomacy.atPeace(c.chosenFoe);
+			case Mind.ENCHANT -> !c.enchanter.on || late;
+			case Mind.SHELTER -> late || home != null && c.player.blockPosition().closerThan(home, 6);
+			default -> late;
+		};
+	}
+
+	/** Its own kind of choices, this moment (null: nothing to do for it now; it rests, looks about). */
+	Action mindStep() {
+		if (option < 0 || current != null) return null;
+		ServerPlayer p = c.player;
+		switch (option) {
+			case Mind.FOLLOW -> {
+				ServerPlayer f = followWho == null ? null : c.server.getPlayerList().getPlayer(followWho);
+				if (f == null || f.level() != p.level()) return null;
+				instant = "staying with " + f.getName().getString();
+				if (f.distanceTo(p) > 4) {
+					c.run(f.distanceTo(p) > 10);
+					return c.walkTo(f.position());
+				}
+				return null;
+			}
+			case Mind.GUARD -> {
+				if (guardWho == null || guardWho.player == null) return null;
+				instant = "guarding " + guardWho.name;
+				if (guardWho.player.distanceTo(p) > 5) {
+					c.run(true);
+					return c.walkTo(guardWho.player.position());
+				}
+				return null;
+			}
+			case Mind.FIGHT -> {
+				LivingEntity foe = c.chosenFoe;
+				if (foe == null || !foe.isAlive()) return null;
+				instant = "going after " + foe.getName().getString();
+				if (foe.distanceTo(p) > p.entityInteractionRange()) {
+					c.run(true);
+					return c.walkTo(foe.position());
+				}
+				return null;                                                   // in reach: its fighting instinct takes over
+			}
+			case Mind.FLEE -> {
+				if (fleeFrom == null) return null;
+				instant = "getting away";
+				Vec3 away = p.position().subtract(fleeFrom);
+				if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
+				c.run(true);
+				return c.walkTo(p.position().add(away.normalize().scale(12)));
+			}
+			case Mind.SHELTER -> {
+				if (home == null) return null;
+				instant = "going home for the night";
+				c.run(p.blockPosition().distSqr(home) > 400);
+				return c.walkTo(Vec3.atBottomCenterOf(home));
+			}
+			case Mind.ENCHANT -> {
+				instant = "enchanting";
+				return c.enchanter.next();
+			}
+			case Mind.EAT -> {
+				return c.chores.busy() ? c.chores.next() : null;
+			}
+			case Mind.HELP -> {
+				return c.chores.busy() ? c.chores.next() : null;
+			}
+			default -> {
+				return null;                                                   // rest, craft (its crafting goes on its own), sleep (its bedtime habit)
+			}
+		}
+	}
+
+	/** Its choice is over (or it died): how did it go? Xen 2.0 remembers and learns from it. */
+	void finishOption(boolean died) {
+		int o = option;
+		float[] before = optionFeatures;
+		option = -1;
+		optionFeatures = null;
+		c.chosenFoe = null;
+		fleeFrom = null;
+		guardWho = null;
+		followWho = null;
+		if (o < 0 || before == null || c.mod.mind == null || c.player == null) return;
+		long now = c.player.level().getGameTime();
+		float minutes = Math.max(0.05f, (now - optionAt) / 1200f);
+		float[] after = MindSense.features(c);
+		if (died) after[Mind.HEALTH] = 0;
+		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);
+		c.mod.mind.remember(before, o, r, h, after, died, minutes, Mind.bits(MindSense.allowed(c, after, false)));
+		c.mod.mindExperiences++;
+		if (o == Mind.MINE && c.places.get("mine hut") == null && c.places.get("mine") != null && !c.builder.busy() && !c.player.isCreative()
+				&& c.chores.mineRecordY != Integer.MIN_VALUE && c.player.blockPosition().closerThan(c.places.get("mine"), 24)) {   // its mine gets a proper entrance
+			String hut = c.builder.startPlan(Architect.mineEntrance(c.places.get("mine"), c.chores.mineRecordDir,
+					Architect.ofWood(MindSense.count(c, n -> n.startsWith("spruce_")) > 8 ? "spruce" : "oak", true, false)), "", "mine");
+			c.chatter("My mine needs a proper entrance. " + xen.mod.talk.Chat.firstPerson(hut), false);
+		}
+		Tribe t = c.tribe();
+		if (t != null) t.laws.didWork(c, o);
+		c.journal("learns", String.format(Locale.ROOT, "Xen 2.0: %s took %.1f min, reward %+.2f, harm %.2f%s", Mind.OPTIONS[o], minutes, r, h, died ? " (died)" : ""));
 	}
 
 	// -------------------------------------------------------------------------------- words

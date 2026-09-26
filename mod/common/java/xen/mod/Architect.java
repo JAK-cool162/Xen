@@ -117,7 +117,7 @@ final class Architect {
 	private static final class Layout {
 		final BlockPos origin;
 		final Direction front, back, right, left;
-		final Map<BlockPos, Step> at = new LinkedHashMap<>();
+		final Map<BlockPos, Step> at;
 
 		Layout(BlockPos origin, Direction front) {
 			this.origin = origin;
@@ -125,6 +125,23 @@ final class Architect {
 			this.back = front.getOpposite();
 			this.right = front.getCounterClockWise();
 			this.left = right.getOpposite();
+			this.at = new LinkedHashMap<>();
+			this.dug = new LinkedHashSet<>();
+		}
+
+		private Layout(Layout of, int dy) {
+			this.origin = of.origin.above(dy);
+			this.front = of.front;
+			this.back = of.back;
+			this.right = of.right;
+			this.left = of.left;
+			this.at = of.at;
+			this.dug = of.dug;
+		}
+
+		/** The same plan seen from dy higher (or lower): for what stands on the ground under a raised house. */
+		Layout shifted(int dy) {
+			return new Layout(this, dy);
 		}
 
 		BlockPos pos(int u, int v, int y) {
@@ -147,7 +164,7 @@ final class Architect {
 		}
 
 		/** Where it digs out first, even where a block goes later (a door in the way in: dug now, the door last). */
-		final Set<BlockPos> dug = new LinkedHashSet<>();
+		final Set<BlockPos> dug;
 
 		/** Is a block planned here already? */
 		boolean has(int u, int v, int y) {
@@ -348,18 +365,36 @@ final class Architect {
 	 * floor level; the door faces front.
 	 */
 	static Plan designed(BlockPos origin, Direction front, Taste.Design ds, Palette p, Random random) {
-		Layout L = new Layout(origin, front);
-		int w = ds.w(), d = ds.d(), h = ds.wallH(), c = w / 2, o = 1;
-		int span = ds.roof() == Taste.Roof.FLAT ? 1 : ds.roof() == Taste.Roof.HIP ? Math.min(w, d) : ds.ridgeAlongWidth() ? d : w;
+		Taste.Style style = ds.style();
+		boolean modern = style == Taste.Style.MODERN, stilt = style == Taste.Style.STILT, tower = style == Taste.Style.TOWER;
+		int raise = stilt ? 3 : 0;
+		Layout L = new Layout(origin.above(raise), front);
+		Layout G = raise > 0 ? L.shifted(-raise) : L;                           // (the ground's level: what stands outside stands there)
+		int w = ds.w(), d = ds.d(), storey = ds.wallH(), c = w / 2, o = 1;
+		int floors = tower ? (w >= 9 ? 3 : 2) : 1, h = floors * (storey + 1) - 1;   // (a tower: floors on floors)
+		Taste.Roof roofKind = modern ? Taste.Roof.FLAT : ds.roof();
+		int span = roofKind == Taste.Roof.FLAT ? 1 : roofKind == Taste.Roof.HIP ? Math.min(w, d) : ds.ridgeAlongWidth() ? d : w;
 		int top = h + 2 + (span + 2 * o) / 2;                                    // (the roof's highest block, about)
 		String base = p.base(), wall = p.wall(), frame = p.frame(), floor = p.floor();
 		String stairs = stairsOf(p.roof()), slab = slabOf(p.roof());
+		boolean anyBlock = p.light().equals("lantern");                             // (a creative palette: any block it likes)
+		if (modern) {                                                               // white walls, a pale frame, a flat roof, big windows
+			wall = anyBlock ? "white_concrete" : wall;
+			frame = anyBlock ? "light_gray_concrete" : wall;
+			floor = anyBlock ? "polished_andesite" : floor;
+			slab = anyBlock ? "smooth_quartz_slab" : slab;
+		}
 		// the ground: cleared (with a strip around to walk on), holes under it filled
 		for (int u = -2; u <= w + 1; u++) {
 			for (int v = -3; v <= d + 1; v++) {
 				boolean out = u < 0 || v < 0 || u >= w || v >= d;
-				for (int y = out ? 0 : 1; y <= top + 1; y++) L.dig(u, v, y);
-				if (!out) for (int y = -4; y <= -1; y++) L.put(u, v, y, ds.base() && y == -1 && (u == 0 || v == 0 || u == w - 1 || v == d - 1) ? base : "dirt", SUPPORT);
+				if (out) {
+					for (int y = 0; y <= top + 1 + raise; y++) G.dig(u, v, y);
+				} else {
+					for (int y = 1; y <= top + 1; y++) L.dig(u, v, y);
+					if (raise > 0) for (int y = 0; y < raise; y++) G.dig(u, v, y);      // (under a house on stilts: open)
+					else for (int y = -4; y <= -1; y++) L.put(u, v, y, ds.base() && y == -1 && (u == 0 || v == 0 || u == w - 1 || v == d - 1) ? base : "dirt", SUPPORT);
+				}
 			}
 		}
 		// the floor
@@ -367,6 +402,15 @@ final class Architect {
 			for (int v = 0; v < d; v++) {
 				boolean edge = u == 0 || v == 0 || u == w - 1 || v == d - 1;
 				L.put(u, v, 0, edge && ds.base() ? base : floor, SUPPORT);
+			}
+		}
+		if (raise > 0) {                                                            // the stilts it stands on, in the ground
+			List<Integer> su = w >= 9 ? List.of(0, c, w - 1) : List.of(0, w - 1), sv = d >= 9 ? List.of(0, d / 2, d - 1) : List.of(0, d - 1);
+			for (int u : su) {
+				for (int v : sv) {
+					ground(G, u, v);
+					for (int y = -raise; y <= -1; y++) L.put(u, v, y, frame + "[axis=y]", SUPPORT);
+				}
 			}
 		}
 		// the frame: posts at the corners (and every few blocks with a log frame), a top plate
@@ -399,12 +443,15 @@ final class Architect {
 		List<int[]> windows = new ArrayList<>();
 		for (int y = 1; y <= h; y++) {
 			String fill = y == 1 && ds.lowerStone() ? base : wall;
-			boolean windowRow = y == 2 || y == 3 && h >= 4;
+			int yy = (y - 1) % (storey + 1) + 1;                                       // (the height within its floor)
+			boolean between = tower && y % (storey + 1) == 0;                          // (a tower's floor level: a solid band)
+			if (between) fill = ds.frame() ? frame + "[axis={U}]" : wall;
+			boolean windowRow = !between && (modern ? yy <= storey - 1 : yy == 2 || yy == 3 && storey >= 4);
 			for (int u = 1; u < w - 1; u++) {
 				for (int v : new int[] {0, d - 1}) {
 					if ((v == 0 ? front0 : pu).contains(u)) continue;
 					if (v == 0 && u == c && y <= 2) continue;                          // the doorway
-					boolean window = windowRow && isWindow(u, v == 0 ? front0 : pu, true) && !(v == 0 && u == c);
+					boolean window = windowRow && (modern || isWindow(u, v == 0 ? front0 : pu, true)) && !(v == 0 && u == c);
 					if (window) {
 						if (!p.window().equals("air")) L.put(u, v, y, p.window(), WALLS);   // (no glass yet: an open window)
 						if (y == 2) windows.add(new int[] {u, v});
@@ -416,14 +463,14 @@ final class Architect {
 			for (int v = 1; v < d - 1; v++) {
 				for (int u : new int[] {0, w - 1}) {
 					if (pv.contains(v)) continue;
-					boolean window = windowRow && isWindow(v, pv) && !(ds.loft() && u == 0 && v == mid - 1);   // (not behind the ladder)
+					boolean window = windowRow && (modern || isWindow(v, pv)) && !(ds.loft() && u == 0 && v == mid - 1) && !(tower && u == 0 && v == 1);   // (not behind a ladder)
 					if (!window) L.put(u, v, y, fill, WALLS);
 					else if (!p.window().equals("air")) L.put(u, v, y, p.window(), WALLS);
 				}
 			}
 		}
 		// the roof
-		switch (ds.roof()) {
+		switch (roofKind) {
 			case FLAT -> {
 				for (int u = -o; u < w + o; u++) {
 					for (int v = -o; v < d + o; v++) {
@@ -479,8 +526,16 @@ final class Architect {
 				}
 			}
 		}
-		if (ds.roof() != Taste.Roof.FLAT) {                                        // a beam across the middle (the lamp hangs from it)
+		if (roofKind != Taste.Roof.FLAT) {                                          // a beam across the middle (the lamp hangs from it)
 			for (int u = 1; u < w - 1; u++) L.put(u, mid, h + 1, ds.frame() ? frame + "[axis={U}]" : wall, FRAME);
+		}
+		if (tower) {                                                                // the floors between, a ladder up through them
+			for (int k = 1; k < floors; k++) {
+				int y = k * (storey + 1);
+				for (int u = 1; u < w - 1; u++) for (int v = 1; v < d - 1; v++) if (!(u == 1 && v == 1)) L.put(u, v, y, floor, WALLS);
+				L.put(c, mid, y - 1, "lantern[hanging=true]", INSIDE, true);
+			}
+			for (int y = 1; y <= (floors - 1) * (storey + 1) + 1; y++) L.put(1, 1, y, "ladder[facing={R}]", INSIDE);
 		}
 		// ---- outside. The floor is a step up from the ground: out here the ground is y -1, and what stands outside stands
 		// on it (from y 0 up), with the ground made good under it first (nothing floats)
@@ -493,25 +548,32 @@ final class Architect {
 		if (ds.porch()) {                                          // a deck level with the floor, posts, a roof against the wall, a step
 			for (int u = c - 2; u <= c + 2; u++) {
 				for (int v = -2; v <= -1; v++) {
-					ground(L, u, v);
-					L.put(u, v, 0, floor, SUPPORT);
-					if (!L.has(u, v, h + 1)) L.put(u, v, h + 1, slab + "[type=bottom]", OUTSIDE, true);   // (the eaves are there already)
+					ground(G, u, v);
+					G.put(u, v, 0, floor, SUPPORT);
+					if (!G.has(u, v, h + 1)) G.put(u, v, h + 1, slab + "[type=bottom]", OUTSIDE, true);   // (the eaves are there already)
 				}
 			}
-			for (int u : new int[] {c - 2, c + 2}) for (int y = 1; y <= h; y++) L.put(u, -2, y, p.fence(), OUTSIDE, true);
-			L.put(c - 1, -2, 1, p.fence(), OUTSIDE, true);                              // a railing each side, a lamp on one
-			L.put(c + 1, -2, 1, p.fence(), OUTSIDE, true);
-			L.put(c - 1, -2, 2, light, OUTSIDE, true);
-			ground(L, c, -3);
-			L.put(c, -3, 0, stairsOf(floor) + "[facing={B},half=bottom,shape=straight]", OUTSIDE, true);
+			for (int u : new int[] {c - 2, c + 2}) for (int y = 1; y <= h; y++) G.put(u, -2, y, p.fence(), OUTSIDE, true);
+			G.put(c - 1, -2, 1, p.fence(), OUTSIDE, true);                              // a railing each side, a lamp on one
+			G.put(c + 1, -2, 1, p.fence(), OUTSIDE, true);
+			G.put(c - 1, -2, 2, light, OUTSIDE, true);
+			ground(G, c, -3);
+			G.put(c, -3, 0, stairsOf(floor) + "[facing={B},half=bottom,shape=straight]", OUTSIDE, true);
 			way = -4;
+		} else if (raise > 0) {                                     // stairs down from the door to the ground, a step held up under each
+			for (int k = 0; k < raise; k++) {
+				L.put(c, -1 - k, -k, stairsOf(floor) + "[facing={B},half=bottom,shape=straight]", SUPPORT);
+				L.put(c, -1 - k, -1 - k, floor, SUPPORT);
+			}
+			ground(G, c, -raise);
+			way = -1 - raise;
 		} else {
-			ground(L, c, -1);
-			L.put(c, -1, 0, stairsOf(floor) + "[facing={B},half=bottom,shape=straight]", DOORS, true);
+			ground(G, c, -1);
+			G.put(c, -1, 0, stairsOf(floor) + "[facing={B},half=bottom,shape=straight]", DOORS, true);
 			for (int du : new int[] {-1, 1}) {                                         // a lamp on a post each side of the door
-				ground(L, c + du, -1);
-				L.put(c + du, -1, 0, p.fence(), OUTSIDE, true);
-				L.put(c + du, -1, 1, light, OUTSIDE, true);
+				ground(G, c + du, -1);
+				G.put(c + du, -1, 0, p.fence(), OUTSIDE, true);
+				G.put(c + du, -1, 1, light, OUTSIDE, true);
 			}
 			way = -2;
 		}
@@ -519,15 +581,15 @@ final class Architect {
 		// a path out from the door (a shovel on the grass), lamp posts where it starts
 		int len = 4 + w / 4, end = way - len + 1;
 		for (int v = way; v >= end; v--) {
-			L.put(c, v, -1, "dirt_path", OUTSIDE, true);
-			L.dig(c, v, 0);
-			L.dig(c, v, 1);
+			G.put(c, v, -1, "dirt_path", OUTSIDE, true);
+			G.dig(c, v, 0);
+			G.dig(c, v, 1);
 		}
 		for (int du : new int[] {-1, 1}) {
-			ground(L, c + du, end);
-			L.put(c + du, end, 0, p.fence(), OUTSIDE, true);
-			L.put(c + du, end, 1, p.fence(), OUTSIDE, true);
-			L.put(c + du, end, 2, light, OUTSIDE, true);
+			ground(G, c + du, end);
+			G.put(c + du, end, 0, p.fence(), OUTSIDE, true);
+			G.put(c + du, end, 1, p.fence(), OUTSIDE, true);
+			G.put(c + du, end, 2, light, OUTSIDE, true);
 		}
 		// shutters by the front windows
 		if (ds.shutters()) {
@@ -542,47 +604,47 @@ final class Architect {
 		}
 		// a chimney up the side, with smoke
 		if (ds.chimney()) {
-			for (int y = -1; y <= top; y++) L.put(w, d - 2, y, "cobblestone", OUTSIDE, true);
-			L.put(w, d - 2, top + 1, "campfire[lit=true]", OUTSIDE, true);
+			for (int y = -1; y <= top + raise; y++) G.put(w, d - 2, y, "cobblestone", OUTSIDE, true);
+			G.put(w, d - 2, top + raise + 1, "campfire[lit=true]", OUTSIDE, true);
 		}
 		// bushes along the front (bigger ones at the corners), flower beds between them and along the path
 		for (int u = 0; u < w; u++) {
 			if (Math.abs(u - c) <= keepClear) continue;
 			boolean bush = ds.bushes() && (!ds.garden() || u % 2 == 0);
 			if (!bush && !ds.garden()) continue;
-			ground(L, u, -1);
-			L.put(u, -1, 0, bush ? leaves : flowers[random.nextInt(flowers.length)], OUTSIDE, true);
+			ground(G, u, -1);
+			G.put(u, -1, 0, bush ? leaves : flowers[random.nextInt(flowers.length)], OUTSIDE, true);
 		}
 		if (ds.bushes()) {
 			for (int[] at : new int[][] {{-1, -1}, {w, -1}, {-1, d}, {w, d}}) {
 				if (ds.chimney() && at[0] == w && at[1] == d) continue;
-				ground(L, at[0], at[1]);
-				L.put(at[0], at[1], 0, leaves, OUTSIDE, true);
-				if (at[1] < 0) L.put(at[0], at[1], 1, leaves, OUTSIDE, true);
+				ground(G, at[0], at[1]);
+				G.put(at[0], at[1], 0, leaves, OUTSIDE, true);
+				if (at[1] < 0) G.put(at[0], at[1], 1, leaves, OUTSIDE, true);
 			}
 		}
 		if (ds.garden()) {
 			for (int v = way - 1; v > end; v--) {
 				for (int du : new int[] {-1, 1}) {
-					ground(L, c + du, v);
-					L.put(c + du, v, 0, flowers[random.nextInt(flowers.length)], OUTSIDE, true);
+					ground(G, c + du, v);
+					G.put(c + du, v, 0, flowers[random.nextInt(flowers.length)], OUTSIDE, true);
 				}
 			}
 			for (int v = 1; v < d - 1; v += 2) {                                       // and along the right side
 				if (ds.chimney() && v == d - 2) continue;
-				ground(L, w, v);
-				L.put(w, v, 0, flowers[random.nextInt(flowers.length)], OUTSIDE, true);
+				ground(G, w, v);
+				G.put(w, v, 0, flowers[random.nextInt(flowers.length)], OUTSIDE, true);
 			}
 		}
 		// a woodpile and a barrel by the left wall (a bigger house)
-		if (w >= 9) {
+		if (w >= 9 && !ds.workshop()) {
 			for (int v = 1; v <= 2; v++) {
-				ground(L, -1, v);
-				L.put(-1, v, 0, frame + "[axis={V}]", OUTSIDE, true);
+				ground(G, -1, v);
+				G.put(-1, v, 0, frame + "[axis={V}]", OUTSIDE, true);
 			}
-			L.put(-1, 1, 1, frame + "[axis={V}]", OUTSIDE, true);
-			ground(L, -1, 3);
-			L.put(-1, 3, 0, "barrel[facing=up]", OUTSIDE, true);
+			G.put(-1, 1, 1, frame + "[axis={V}]", OUTSIDE, true);
+			ground(G, -1, 3);
+			G.put(-1, 3, 0, "barrel[facing=up]", OUTSIDE, true);
 		}
 		// a fenced yard round it all, a gate where the path goes out (lamps on the gate posts)
 		if (ds.yard()) {
@@ -590,21 +652,67 @@ final class Architect {
 			for (int u = u0; u <= u1; u++) {
 				for (int v = v0; v <= v1; v++) {
 					if (u != u0 && u != u1 && v != v0 && v != v1) continue;
-					if (L.has(u, v, 0) && !(v == v0 && Math.abs(u - c) == 1)) continue;
-					ground(L, u, v);
-					L.dig(u, v, 1);
-					L.put(u, v, 0, u == c && v == v0 ? p.fence() + "_gate[facing={B}]" : p.fence(), OUTSIDE, true);
+					if (G.has(u, v, 0) && !(v == v0 && Math.abs(u - c) == 1)) continue;
+					ground(G, u, v);
+					G.dig(u, v, 1);
+					G.put(u, v, 0, u == c && v == v0 ? p.fence() + "_gate[facing={B}]" : p.fence(), OUTSIDE, true);
 				}
 			}
 			for (int u : new int[] {u0, u1}) {
-				L.put(u, v0, 1, light, OUTSIDE, true);
+				G.put(u, v0, 1, light, OUTSIDE, true);
 			}
+		}
+		if (ds.pond()) {                                                            // a little pond with lily pads, a pergola with a bench by it
+			int ponU = c + 3, ponV = way - 3;
+			for (int u = ponU; u <= ponU + 2; u++) {
+				for (int v = ponV; v >= ponV - 1; v--) {
+					G.put(u, v, -2, "dirt", SUPPORT);
+					G.put(u, v, -1, "water", OUTSIDE, true);
+					G.dig(u, v, 0);
+					G.dig(u, v, 1);
+				}
+			}
+			G.put(ponU + 1, ponV, 0, "lily_pad", OUTSIDE, true);
+			G.put(ponU + 2, ponV - 1, 0, "lily_pad", OUTSIDE, true);
+			int qu = c - 5, qv = way - 3;                                           // the pergola: four posts, a roof of slabs and leaves
+			for (int u = qu; u <= qu + 2; u++) for (int v = qv; v >= qv - 2; v--) {
+				G.dig(u, v, 0);
+				G.dig(u, v, 1);
+				G.dig(u, v, 2);
+			}
+			for (int[] q : new int[][] {{qu, qv}, {qu + 2, qv}, {qu, qv - 2}, {qu + 2, qv - 2}}) {
+				ground(G, q[0], q[1]);
+				G.put(q[0], q[1], 0, p.fence(), OUTSIDE, true);
+				G.put(q[0], q[1], 1, p.fence(), OUTSIDE, true);
+			}
+			for (int u = qu; u <= qu + 2; u++) for (int v = qv; v >= qv - 2; v--) G.put(u, v, 2, (u + v) % 2 == 0 ? leaves : slab + "[type=bottom]", OUTSIDE, true);
+			ground(G, qu + 1, qv - 1);
+			G.put(qu + 1, qv - 1, 0, stairsOf(floor) + "[facing={F},half=bottom,shape=straight]", OUTSIDE, true);
+			G.put(qu + 1, qv - 1, 1, "lantern[hanging=true]", OUTSIDE, true);
+		}
+		if (ds.workshop()) {                                                        // a workshop against the left wall: a roof on posts, a table, a chest
+			for (int u = -3; u <= -1; u++) for (int v = 1; v <= 3; v++) for (int y = 0; y <= 2; y++) G.dig(u, v, y);
+			for (int v : new int[] {1, 3}) {
+				ground(G, -3, v);
+				G.put(-3, v, 0, p.fence(), OUTSIDE, true);
+				G.put(-3, v, 1, p.fence(), OUTSIDE, true);
+			}
+			for (int u = -3; u <= -1; u++) for (int v = 1; v <= 3; v++) G.put(u, v, 2, slab + "[type=bottom]", OUTSIDE, true);
+			for (int v = 1; v <= 3; v++) ground(G, -1, v);
+			G.put(-1, 1, 0, "crafting_table", OUTSIDE, true);
+			G.put(-1, 2, 0, "chest[facing={L}]", OUTSIDE, true);
+			G.put(-1, 3, 0, "barrel[facing=up]", OUTSIDE, true);
+			ground(G, -3, 2);
+			G.put(-3, 2, 0, "hay_block", OUTSIDE, true);
+			G.put(-2, 2, 1, "lantern[hanging=true]", OUTSIDE, true);
 		}
 		// inside
 		if (ds.loft()) {                                                            // a loft over the back half, a ladder up
 			for (int u = 1; u < w - 1; u++) for (int v = mid; v < d - 1; v++) L.put(u, v, 3, slab + "[type=top]", INSIDE);
 			for (int y = 1; y <= 3; y++) L.put(1, mid - 1, y, "ladder[facing={R}]", INSIDE);
 			L.put(w - 2, d - 3, 4, "red_bed[facing={B},part=foot]", INSIDE, true);
+		} else if (tower) {
+			L.put(w - 2, d - 3, (floors - 1) * (storey + 1) + 1, "red_bed[facing={B},part=foot]", INSIDE, true);   // (up top)
 		} else {
 			L.put(1, d - 3, 1, "red_bed[facing={B},part=foot]", INSIDE, true);
 		}
@@ -618,7 +726,7 @@ final class Architect {
 			L.put(c, mid, 1, stairsOf(floor) + "[facing={L},half=bottom,shape=straight]", INSIDE, true);
 			for (int v = 2; v < d - 2; v++) if (v != mid) L.put(c, v, 1, "red_carpet", INSIDE, true);
 		}
-		L.put(1, 1, 1, "potted_poppy", INSIDE, true);
+		L.put(tower ? 2 : 1, 1, 1, "potted_poppy", INSIDE, true);
 		if (w >= 9) {                                                                  // a bigger house: books, plants, more light
 			for (int y = 1; y <= 2; y++) {
 				L.put(w - 5, d - 2, y, "bookshelf", INSIDE, true);
@@ -641,6 +749,68 @@ final class Architect {
 	/** Outside the house: the ground made good under something that stands there (a hole filled; grass is fine as it is). */
 	private static void ground(Layout L, int u, int v) {
 		if (!L.has(u, v, -1)) L.put(u, v, -1, "dirt", SUPPORT);
+	}
+
+	/**
+	 * The mouth of its mine, dressed up like players do: log posts either side of the staircase down, a beam across
+	 * with lanterns under it, a little roof, a chest and a barrel by the door, and a path of gravel and coarse dirt out
+	 * front. entrance: the top of the staircase; down: the way the staircase goes.
+	 */
+	static Plan mineEntrance(BlockPos entrance, Direction down, Palette p) {
+		Layout L = new Layout(entrance.relative(down.getCounterClockWise(), 2), down.getOpposite());   // (u across, v into the mine)
+		String log = p.frame() + "[axis=y]";
+		for (int u : new int[] {0, 4}) {
+			for (int v : new int[] {0, 2}) {
+				L.put(u, v, -1, "cobblestone", SUPPORT);
+				for (int y = 0; y <= 2; y++) L.put(u, v, y, log, FRAME);
+			}
+		}
+		for (int u = 0; u <= 4; u++) {
+			L.put(u, 0, 3, p.frame() + "[axis={U}]", FRAME);
+			L.put(u, 2, 3, p.frame() + "[axis={U}]", FRAME);
+			L.put(u, 1, 3, stairsOf(p.roof()) + "[facing={B},half=bottom,shape=straight]", ROOF);
+			L.put(u, -1, 3, stairsOf(p.roof()) + "[facing={B},half=bottom,shape=straight]", ROOF, true);
+		}
+		L.put(1, 0, 2, "lantern[hanging=true]", INSIDE, true);
+		L.put(3, 0, 2, "lantern[hanging=true]", INSIDE, true);
+		L.put(1, -1, 0, "chest[facing={F}]", OUTSIDE, true);
+		L.put(3, -1, 0, "barrel[facing=up]", OUTSIDE, true);
+		String[] path = {"gravel", "coarse_dirt", "dirt_path", "gravel"};
+		for (int v = -1; v >= -4; v--) L.put(2, v, -1, path[(-v) % path.length], OUTSIDE, true);
+		net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(0, -1, 0)),
+				net.minecraft.world.phys.Vec3.atCenterOf(L.pos(4, 2, 3)));
+		return new Plan("mine entrance", L.steps(), L.pos(2, 0, 0), L.pos(2, 1, 0), down, box);
+	}
+
+	/**
+	 * A stretch of highway: 3 wide, len long, from start (its middle lane) in dir: the floor laid in the ground (the
+	 * block it chose: obsidian, stone...), 3 blocks of room above it dug out, and in a tunnel (the Nether) a torch on the
+	 * wall every 8 blocks.
+	 */
+	static Plan highway(BlockPos start, Direction dir, int len, String floor) {
+		return highway(start, dir, len, floor, start.getY() - 1);
+	}
+
+	/**
+	 * The same, with its floor at floorY: it starts with a staircase from where it stands (a block up or down each
+	 * step), then runs level (underground, out of the way of what's built above; in the Nether, under the roof).
+	 */
+	static Plan highway(BlockPos start, Direction dir, int len, String floor, int floorY) {
+		Layout L = new Layout(start.relative(dir.getCounterClockWise(), 1), dir.getOpposite());   // (u across, v along the way)
+		int dy = floorY - (start.getY() - 1), sign = Integer.signum(dy), last = -1;
+		for (int v = 0; v < len; v++) {
+			int fy = -1 + sign * Math.min(v + 1, Math.abs(dy));                      // the floor here (relative), stepping to the level
+			last = fy;
+			for (int u = 0; u < 3; u++) {
+				L.put(u, v, fy, floor, SUPPORT);
+				for (int y = fy + 1; y <= fy + 3; y++) L.dig(u, v, y);
+				if (sign > 0) L.dig(u, v, fy);                                      // (going up: room for the head on the step before)
+			}
+			if (v % 8 == 4) L.put(0, v, fy + 2, "wall_torch[facing={R}]", OUTSIDE, true);
+		}
+		net.minecraft.world.phys.AABB lane = new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(0, 0, -1)),
+				net.minecraft.world.phys.Vec3.atCenterOf(L.pos(2, len - 1, last + 3)));
+		return new Plan("highway", L.steps(), L.pos(1, 0, 0), L.pos(1, len - 1, last + 1), dir, lane);
 	}
 
 	/** A roof block: j along the ridge, i across it (the ridge along the width or the depth). */

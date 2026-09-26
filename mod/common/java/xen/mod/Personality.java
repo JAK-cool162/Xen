@@ -83,6 +83,25 @@ public final class Personality {
 	public String material = "any";
 	public int generation;
 	public String parents = "";
+	/**
+	 * Hidden (it never says them, you find out from what it does): what moves it most. Kindness (helping others),
+	 * loyalty (standing by its friend, its tribe, its boss), power (strength, weapons, winning, being feared), money
+	 * (emeralds, diamonds, trade, owning things). Each 0 to 1; its choices weigh them.
+	 */
+	public float kindness = 0.5f, loyalty = 0.5f, power = 0.3f, money = 0.3f;
+	/** Hidden too: how it meets others. "friendly" (greets, shares), "passive" (keeps out of trouble), "aggressive" (picks fights). */
+	public String temper = "friendly";
+	static final String[] TEMPERS = {"friendly", "passive", "aggressive"};
+	/** Hidden too: a lone wolf never joins a team (it may still have friends). */
+	public boolean loner;
+
+	boolean aggressive() {
+		return temper.equals("aggressive");
+	}
+
+	boolean passive() {
+		return temper.equals("passive");
+	}
 
 	static Personality random(Random r) {
 		Personality p = new Personality();
@@ -96,6 +115,20 @@ public final class Personality {
 		for (int i = 0; i < p.fightGenes.length; i++) p.fightGenes[i] = mutate(p.fightGenes[i], r);
 		p.build = BUILDS[r.nextInt(BUILDS.length)];
 		p.material = MATERIALS[r.nextInt(MATERIALS.length)];
+		p.kindness = r.nextFloat();
+		p.loyalty = r.nextFloat();
+		p.power = r.nextFloat();
+		p.money = r.nextFloat();
+		float[] m = {p.kindness, p.loyalty, p.power, p.money};             // one of them stands out (what drives it)
+		int top = r.nextInt(4);
+		m[top] = 0.7f + 0.3f * r.nextFloat();
+		p.kindness = m[0];
+		p.loyalty = m[1];
+		p.power = m[2];
+		p.money = m[3];
+		float t = r.nextFloat();
+		p.temper = t < 0.5f ? "friendly" : t < 0.75f ? "passive" : "aggressive";
+		p.loner = r.nextFloat() < 0.06f + 0.25f * (1 - p.loyalty) * (1 - p.kindness);   // (about one in eight)
 		return p;
 	}
 
@@ -122,6 +155,12 @@ public final class Personality {
 		c.material = pick(material, other.material, MATERIALS, r);
 		c.generation = Math.max(generation, other.generation) + 1;
 		c.parents = names;
+		c.kindness = mutate(r.nextBoolean() ? kindness : other.kindness, r);
+		c.loyalty = mutate(r.nextBoolean() ? loyalty : other.loyalty, r);
+		c.power = mutate(r.nextBoolean() ? power : other.power, r);
+		c.money = mutate(r.nextBoolean() ? money : other.money, r);
+		c.temper = pick(temper, other.temper, TEMPERS, r);
+		c.loner = r.nextFloat() < 0.1f ? !(r.nextBoolean() ? loner : other.loner) : r.nextBoolean() ? loner : other.loner;
 		return c;
 	}
 
@@ -194,17 +233,23 @@ public final class Personality {
 				bravery, curiosity, chattiness, diligence, tone, fight, material, build, generation);
 	}
 
-	static final String TRAITS_HELP = "Traits: tone, fight, build, material (words); bravery, curiosity, chattiness, diligence, and the fight "
+	static final String TRAITS_HELP = "Traits: tone, fight, build, material, temper (words); loner (true/false); bravery, curiosity, chattiness, diligence, kindness, loyalty, power, money, and the fight "
 			+ "genes " + String.join(", ", GENES) + " (0 to 1).";
 
 	/** Change one trait by hand (/xen style). Null if it worked, else what's wrong. */
 	String set(String trait, String value) {
 		String v = value.toLowerCase(Locale.ROOT);
+		if (trait.equals("loner")) {
+			if (!v.equals("true") && !v.equals("false")) return "loner is true or false";
+			loner = v.equals("true");
+			return null;
+		}
 		String[] choices = switch (trait) {
 			case "tone" -> TONES;
 			case "fight" -> FIGHTS;
 			case "build" -> BUILDS;
 			case "material" -> MATERIALS;
+			case "temper" -> TEMPERS;
 			default -> null;
 		};
 		if (choices != null) {
@@ -216,6 +261,7 @@ public final class Personality {
 					fightGenes = preset(v);
 				}
 				case "build" -> build = v;
+				case "temper" -> temper = v;
 				default -> material = v;
 			}
 			return null;
@@ -238,6 +284,10 @@ public final class Personality {
 			case "curiosity" -> curiosity = f;
 			case "chattiness" -> chattiness = f;
 			case "diligence" -> diligence = f;
+			case "kindness" -> kindness = f;
+			case "loyalty" -> loyalty = f;
+			case "power" -> power = f;
+			case "money" -> money = f;
 			default -> {
 				return TRAITS_HELP;
 			}
@@ -260,6 +310,12 @@ public final class Personality {
 		o.addProperty("material", material);
 		o.addProperty("generation", generation);
 		o.addProperty("parents", parents);
+		o.addProperty("kindness", kindness);
+		o.addProperty("loyalty", loyalty);
+		o.addProperty("power", power);
+		o.addProperty("money", money);
+		o.addProperty("temper", temper);
+		o.addProperty("loner", loner);
 		return o;
 	}
 
@@ -279,6 +335,12 @@ public final class Personality {
 		if (o.has("material")) p.material = o.get("material").getAsString();
 		if (o.has("generation")) p.generation = o.get("generation").getAsInt();
 		if (o.has("parents")) p.parents = o.get("parents").getAsString();
+		if (o.has("kindness")) p.kindness = o.get("kindness").getAsFloat();
+		if (o.has("loyalty")) p.loyalty = o.get("loyalty").getAsFloat();
+		if (o.has("power")) p.power = o.get("power").getAsFloat();
+		if (o.has("money")) p.money = o.get("money").getAsFloat();
+		if (o.has("temper")) p.temper = o.get("temper").getAsString();
+		if (o.has("loner")) p.loner = o.get("loner").getAsBoolean();
 		return p;
 	}
 

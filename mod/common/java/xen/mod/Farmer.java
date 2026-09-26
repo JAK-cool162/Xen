@@ -305,6 +305,7 @@ final class Farmer {
 					return c.walkTo(stand != null ? Vec3.atBottomCenterOf(stand) : Vec3.atBottomCenterOf(q.above()));
 				}
 				if (c.hands.mine(q.above())) {
+					c.skills.practice(Skills.FARM, 0.004f);
 					c.acted = true;
 					return Action.MINE;
 				}

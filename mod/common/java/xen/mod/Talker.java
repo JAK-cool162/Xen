@@ -85,7 +85,9 @@ final class Talker {
 	/** Say something to whoever is close enough to hear (48 blocks), not the whole server. */
 	void sayNear(String text) {
 		Component line = Component.literal("<" + c.name + "> " + text);
-		for (ServerPlayer p : listeners(48)) p.sendSystemMessage(line);
+		double range = c.mod.config.localChat ? Math.min(48, c.mod.config.chatRange) : 48;
+		for (ServerPlayer p : listeners(range)) p.sendSystemMessage(line);
+		c.mod.overheardBy(c.player, c.name, text);                           // Xens close by hear it too
 	}
 
 	// ----------------------------------------------------------------------------- each decision
@@ -221,7 +223,7 @@ final class Talker {
 							"Can I go now? I'm bored.", "Um... could I go explore a little?", "I'm going to scout ahead, okay?", "Can I go on an adventure?"))) != null) {
 				return q;
 			}
-			if (!c.mod.config.wants && c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.chores.busy()   // (with its own goals it just goes)
+			if (!c.mod.config.wants && !c.player.isCreative() && c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.chores.busy() && !c.builder.busy()   // (with its own goals it just goes)
 					&& (q = ask("wood", friend, null, 0, "I need a pickaxe. Should I go get some wood?")) != null) return q;
 		}
 		if (c.mod.config.trading) {
@@ -341,6 +343,11 @@ final class Talker {
 		} else if (o.goals.current != null) {
 			line(o, "I'm off to " + o.goals.current.what + ".", t += 60, null);
 			line(c, pick("Good luck!", "Take care.", "Don't get lost.", "B-be careful.", "Go get it!", "Bring me a souvenir!"), t += 50, null);
+		}
+		String rumor = c.rumors.gossip();                                   // gossip: that's how rumors get around
+		if (rumor != null) {
+			line(c, rumor, t += 60, () -> o.rumors.overheard(c.name, me, rumor));
+			line(o, pick("Really? Good to know.", "No way!", "Huh. I'll keep that in mind.", "Seriously?", "I heard that too."), t += 50, null);
 		}
 		line(c, pick("See you around!", "Bye for now.", "Later.", "Bye...", "See you!", "Toodles!"), t + 60, () -> {
 			c.trust(them, 0.1f);                                         // a nice chat: they like each other a bit more

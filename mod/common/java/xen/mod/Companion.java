@@ -53,7 +53,7 @@ public final class Companion {
 	final MinecraftServer server;
 	public final String name;
 	public UUID owner;
-	final String ownerName;
+	String ownerName;
 	/** Who it follows: its owner, or whoever asked an ownerless Xen to follow them. */
 	UUID leader;
 	public Mode mode = Mode.FOLLOW;
@@ -175,6 +175,32 @@ public final class Companion {
 		return respawnIn;
 	}
 
+	/**
+	 * A minion goes its own way (it chose to: it didn't trust its boss, or wanted more for itself): a free Xen now,
+	 * living its own life and loading the world around it. turnOn: the boss it now fights.
+	 */
+	void goFree(String says, ServerPlayer turnOn) {
+		if (!minion) return;
+		Companion was = boss;
+		say(says);
+		journal("does", "leaves " + (was == null ? "its boss" : was.name) + (turnOn != null ? " and turns on them" : "") + " (its own choice)");
+		XenMod.LOG.info("{} leaves its boss {}{}", name, was == null ? "?" : was.name, turnOn != null ? " and turns on them" : "");
+		if (was != null) was.crew.minions.remove(this);
+		minion = false;
+		boss = null;
+		owner = null;
+		ownerName = "";
+		mode = Mode.FREE;
+		if (player != null) Crew.startLoading(player);
+		if (turnOn != null) {
+			trust(turnOn.getUUID(), -0.6f);
+			chosenFoe = turnOn;
+			Tribe t = tribe();
+			if (t != null) t.enemies.put(turnOn.getUUID(), player.level().getGameTime() + 20 * 60);
+		}
+		mod.roster.remember(this, mod.teamOf(this));
+	}
+
 	/** Is it in the world someone keeps loaded (a minion only lives there)? */
 	boolean awake() {
 		return player != null && (!minion || ((ServerLevel) player.level()).isPositionEntityTicking(player.blockPosition()));
@@ -202,12 +228,22 @@ public final class Companion {
 		if (player.tickCount % 10 == 0) {
 			places.tick();                                               // the way it walked, remembered
 			totems();
+			rumors.look();                                               // who's that? (a shock, a warning to pass on)
+		}
+		skills.checkSpar();
+		if (player.tickCount % 1200 == 600) {
+			skills.think(lostFight, rumors.heardOfStronger());          // does it want to train?
+			lostFight = false;
 		}
 		if (mode == Mode.FOLLOW && leader != null) nether.watchLeader(server.getPlayerList().getPlayer(leader));
 		if (player.tickCount % 20 == 5) farmer.look();                  // (farmland by water: that's how farms work)
 		if (hurtNow && player.getLastHurtByMob() != null) learnFromHurt(player.getLastHurtByMob());
 		dontStareAtEndermen();
 		hurtNow = player.getHealth() < tickHealth;
+		if (hurtNow && !inArena) {                                      // its tribe may come to guard it
+			Tribe hurtTribe = tribe();
+			if (hurtTribe != null) hurtTribe.attackedAt.put(this, player.level().getGameTime());
+		}
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
 		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
@@ -222,7 +258,9 @@ public final class Companion {
 			hitBy(by);
 		}
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
-		if (++decisions % Math.max(1, mod.config.decisionTicks / 5) != 0 && !fighting) return;   // in a fight, every tick
+		if (player.tickCount % 40 == 0) watched = watchedByAPlayer();
+		int every = Math.max(1, mod.config.decisionTicks / 5) * (watched || inArena || hurtNow ? 1 : 3);   // far from any player: it thinks less often
+		if (++decisions % every != 0 && !fighting) return;   // in a fight, every tick
 		decide();
 	}
 
@@ -352,6 +390,17 @@ public final class Companion {
 	 * (or where it was told to stay) it doesn't wander off, unless something scares it. Otherwise it waits and watches
 	 * its friend, or looks around. Null: the brain's choice is fine.
 	 */
+	/** Is a real player (not a Xen) within 96 blocks? If not, it lives a bit slower (less work for the server). */
+	private boolean watched = true;
+
+	private boolean watchedByAPlayer() {
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+			if (p instanceof XenPlayer || p.level() != player.level()) continue;
+			if (p.distanceToSqr(player) < 96 * 96) return true;
+		}
+		return false;
+	}
+
 	private Action sensible(Action a) {
 		switch (a) {
 			case JUMP -> {                                               // only with something to jump onto (or in water)
@@ -514,6 +563,8 @@ public final class Companion {
 			return fight;
 		}
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
+		Action shocked = rumors.shockStep();                          // someone it killed, alive; the one they say nobody beats
+		if (shocked != null) return shocked;
 		Action creak = awayFromCreaking();                            // a creaking can't be hurt: it keeps away from it
 		if (creak != null) return creak;
 		Action end = dragon.next();                                    // in the End: the dragon fight
@@ -540,7 +591,11 @@ public final class Companion {
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
 			chores.cancel();
 			goals.drop();
-			chatter("Coming!", true);
+			goals.pause(20 * 20);                                         // (no new errand for a bit: it keeps up first)
+			if (player.tickCount - saidComingAt > 400) {
+				saidComingAt = player.tickCount;
+				chatter("Coming!", true);
+			}
 		}
 		if (chores.busy()) {
 			Action chore = chores.next();
@@ -561,6 +616,10 @@ public final class Companion {
 			Action n = nether.next();
 			if (n != null) return n;
 		}
+		if (voyager.onQuest()) {                                       // after the dragon: an elytra from an End city
+			Action v = voyager.questStep();
+			if (v != null) return v;
+		}
 		if (adventure.on) {                                            // on its way to the Ender Dragon
 			Action a = adventure.next();
 			if (a != null) return a;
@@ -574,6 +633,8 @@ public final class Companion {
 		if (player.tickCount % 100 == 0 && mode == Mode.FREE) trials.spot();
 		Action deal = trader.next();
 		if (deal != null) return deal;
+		Action drill = skills.step();                                  // training (sparring, practising its swings, parkour)
+		if (drill != null) return drill;
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.think()) {   // free: what does it want?
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
@@ -593,6 +654,11 @@ public final class Companion {
 			Action keep = shop.next();                                     // its shop: the stall, the sign, the goods
 			if (keep != null) return keep;
 			if (storage.busy() || nether.busy() || builder.busy() || chores.busy()) return null;
+			if (goals.useMind()) {                                          // Xen 2.0: its choice, this moment
+				Action m = goals.mindStep();
+				if (m != null) return m;
+				if (goals.current != Goals.Short.EXPLORE) return null;       // (resting, crafting, sleeping: it looks about)
+			}
 			if (goals.current == Goals.Short.EXPLORE || goals.current == null) return goals.exploreStep();   // out to see what's there
 		}
 		// Following a friend who's close: it doesn't just stand there. Like a friend playing along, it gets on with what
@@ -600,6 +666,10 @@ public final class Companion {
 		if (mode == Mode.FOLLOW && mod.config.wants && !inArena && !catchingUp && leaderWithin(NEARBY) && goals.think(true)) {
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
+		}
+		if (mode == Mode.FOLLOW && goals.useMind() && !catchingUp && leaderWithin(NEARBY)) {
+			Action m = goals.mindStep();
+			if (m != null) return m;
 		}
 		Vec3 goal = null;
 		if (mode == Mode.FOLLOW && leader != null) {
@@ -777,6 +847,51 @@ public final class Companion {
 	 * also makes it come back there if it dies); it gets up in the morning. Not while it's following you out somewhere,
 	 * or on a job.
 	 */
+	/**
+	 * Instead of building its own house: moving in with someone of its tribe whose house has room (it saves the
+	 * wood; a thrifty or close Xen likes that). They decide too: a kind one who trusts it says yes. True if it moved in.
+	 */
+	boolean moveIn() {
+		Tribe t = tribe();
+		if (t == null || goals.home != null || !mod.config.tribes) return false;
+		var p = personality;
+		boolean wants = p.money > 0.5f || p.diligence < 0.4f || p.loyalty > 0.6f || p.kindness > 0.7f;
+		if (!wants) return false;
+		for (Companion m : t.members) {
+			if (m == this || m.player == null || m.goals.home == null || m.player.level() != player.level()) continue;
+			Taste.Design d = m.taste.last;
+			int size = d == null ? 25 : d.w() * d.d(), living = 0;
+			for (Companion o : t.members) if (m.goals.home.equals(o.goals.home)) living++;
+			if (size < 30 * (living + 1)) continue;                            // (about 30 blocks of floor each)
+			float yes = m.personality.kindness + m.trust(player.getUUID()) + (m.personality.money > 0.6f ? -0.3f : 0);
+			if (yes < 0.8f) continue;
+			goals.home = m.goals.home;
+			say(pick3("Can I move in with you, " + m.name + "? No point building two houses.", m.name + ", room for one more at yours?",
+					"Mind if I live with you, " + m.name + "?"));
+			m.say(m.pick3("Sure, move in!", "Of course. Make yourself at home.", "Okay, but you do the dishes."));
+			journal("does", "moves in with " + m.name + " (they both chose to)");
+			return true;
+		}
+		return false;
+	}
+
+	/** A bed at home it knows of (it looks around its home now and then). */
+	boolean hasBed() {
+		if (goals.home == null) return false;
+		var level = (ServerLevel) player.level();
+		if (bedAt != null && level.getBlockState(bedAt).getBlock() instanceof net.minecraft.world.level.block.BedBlock) return true;
+		bedAt = null;
+		if (level.getGameTime() - lookedForBedAt < 600) return false;
+		lookedForBedAt = level.getGameTime();
+		for (BlockPos q : BlockPos.betweenClosed(goals.home.offset(-8, -3, -8), goals.home.offset(8, 3, 8))) {
+			if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+				bedAt = q.immutable();
+				break;
+			}
+		}
+		return bedAt != null;
+	}
+
 	private Action bedtime() {
 		var level = (ServerLevel) player.level();
 		if (player.isSleeping()) {
@@ -876,6 +991,14 @@ public final class Companion {
 	final Trials trials = new Trials(this);
 	/** What it knows of how the game works, and what it doesn't yet (see {@link Knowledge}). */
 	final Knowledge knowledge = new Knowledge(this);
+	/** What people around it need (it may help: its choice). */
+	final Needs needs = new Needs(this);
+	/** Highways it builds (in the Nether from a portal, or roads). */
+	final Highway highway = new Highway(this);
+	/** Going far: elytra flights, the End-city quest, the worlds it has been to. */
+	final Voyager voyager = new Voyager(this);
+	/** Enchanting its gear at an enchanting table. */
+	final Enchanter enchanter = new Enchanter(this);
 	/** How it likes to build (learned from its houses, what people say, its tribe). */
 	final Taste taste = new Taste(this);
 	/** Its crop farm (see {@link Farmer}). */
@@ -954,7 +1077,8 @@ public final class Companion {
 			"emerald", "iron_ingot", "gold_ingot", "raw_iron", "raw_gold", "totem_of_undying", "golden_apple", "enchanted_golden_apple", "string",
 			"feather", "gunpowder", "flint", "heavy_core", "breeze_rod", "wind_charge", "obsidian", "name_tag", "saddle", "book", "enchanted_book",
 			"music_disc_bounce", "bread", "cooked_beef", "cooked_porkchop", "nether_wart", "gold_nugget", "iron_nugget", "coal", "wheat", "wheat_seeds",
-			"carrot", "potato", "beetroot", "beetroot_seeds", "bone_meal");
+			"carrot", "potato", "beetroot", "beetroot_seeds", "bone_meal", "elytra", "firework_rocket", "lapis_lazuli", "sugar_cane", "leather",
+			"paper", "experience_bottle", "shulker_shell", "netherite_scrap", "ancient_debris");
 	private final Set<UUID> leftLying = new java.util.HashSet<>();
 	private UUID goingFor;
 	private long goingSince;
@@ -1034,6 +1158,10 @@ public final class Companion {
 	 * closer, the solver picks a way out; and if all that's switched off, the old way: straight at it, digging.
 	 */
 	Action walkTo(Vec3 goal) {
+		if (voyager.flying() || voyager.shouldFly(goal)) {                 // far, under the sky, with an elytra: it flies there
+			Action f = voyager.flyTo(goal);
+			if (f != null) return f;
+		}
 		if (mod.config.pathAssist) {
 			if (solver.active()) {
 				Action a = solver.next(goal);
@@ -1168,13 +1296,13 @@ public final class Companion {
 		}
 		fightingWhat = foe.getName().getString();
 		if (!(foe instanceof ServerPlayer)) fightingWhat = fightingWhat.toLowerCase(java.util.Locale.ROOT);
-		diplomacy.during(foe);                                        // a player or a Xen: it may talk (truce, give up)
+		if (!(foe instanceof ServerPlayer sp && skills.sparringWith(sp.getUUID()))) diplomacy.during(foe);   // it may talk (truce, give up); not in a spar
 		return fighter.next(foe, hurtNow);
 	}
 
 	private String fightingWhat = "";
 
-	private final Fighter fighter = new Fighter(this);
+	final Fighter fighter = new Fighter(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */
@@ -1183,6 +1311,14 @@ public final class Companion {
 	final Crafter crafter = new Crafter(this);
 	/** Building houses and bases. */
 	final Builder builder = new Builder(this);
+	/** What it's good at (and training). */
+	final Skills skills = new Skills(this);
+	/** What it has heard about people (who's strong, whom it killed, plots), and its shocks. */
+	final Rumors rumors = new Rumors(this);
+	/** Potions, cobwebs, pearls, golden apples: the fighting gear, when it's good enough to use it. */
+	final PvpKit kit = new PvpKit(this);
+	/** It lost a fight lately (it may want to train). */
+	boolean lostFight;
 	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
 	final Map<UUID, Float> trust = new HashMap<>();
 
@@ -1218,6 +1354,9 @@ public final class Companion {
 	private void hitBy(ServerPlayer by) {
 		long now = player.level().getGameTime();
 		UUID u = by.getUUID();
+		if (skills.sparringWith(u)) return;                            // a sparring partner: that's the game
+		Tribe home = tribe();
+		if (home != null && by instanceof XenPlayer xp && xp.companion != null && isWeapon(by.getMainHandItem())) home.laws.hit(xp.companion, this);
 		if (isWeapon(by.getMainHandItem()) || by.getAttackStrengthScale(0) > 0 && player.getHealth() < tickHealthBefore - 3) {
 			armedHitAt.put(u, now);
 			trust(u, -0.3f);                                           // it remembers who hit it
@@ -1289,6 +1428,10 @@ public final class Companion {
 	private float tickHealth, tickHealthBefore;
 	private boolean fighting, hurtNow;
 
+	boolean fightingNow() {
+		return fighting;
+	}
+
 	/** A player (not its owner, not a teammate) close by with a sword or axe in hand: it can see that. */
 	private boolean armedStranger() {
 		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
@@ -1300,9 +1443,44 @@ public final class Companion {
 		return false;
 	}
 
+	private static final java.util.regex.Pattern SLEEP = java.util.regex.Pattern.compile("\\b(go(es)? to (bed|sleep)|go sleep|bed ?time|sleep now|time to sleep|get some sleep)\\b|^\\s*sleep\\s*[!.]*$");
+	private static final java.util.regex.Pattern TEAM_JOIN = java.util.regex.Pattern.compile(
+			"\\b(join|be on|come to|switch to|be in)\\s+(my|our|the)?\\s*(team|side)\\b|\\bjoin\\s+(the\\s+)?(red|blue|green|yellow|purple|aqua)(\\s+team)?\\b|\\bjoin us\\b");
+
+	/** Asked to join a team: it decides, by how much it trusts whoever asks and how loyal it is to its own. Null if not asked. */
+	private String teamAsked(ServerPlayer from, String words) {
+		var m = TEAM_JOIN.matcher(words.toLowerCase(java.util.Locale.ROOT));
+		if (!m.find()) return null;
+		String color = m.group(5);
+		if (color == null) {
+			var t = server.getScoreboard().getPlayersTeam(from.getScoreboardName());
+			if (t == null || !t.getName().startsWith("xen_")) return "You don't have a team for me to join. Make one first (/team), or tell me a color.";
+			color = t.getName().substring(4);
+		}
+		if (personality.loner) return pick3("I don't do teams. I work alone.", "Thanks, but I'm better on my own.", "No teams for me. Nothing personal.");
+		String now = mod.teamOf(this);
+		if (now != null && now.equals("xen_" + color)) return "I'm already on the " + color + " team!";
+		float trust = trust(from.getUUID());
+		boolean agree = trust >= 0.45f && (now == null || personality.loyalty < 0.7f || trust >= 0.8f);
+		if (!agree) {
+			return trust < 0.2f ? "Why would I join you? I don't even know you." : "No thanks, I'm staying with my team.";
+		}
+		if (!mod.moveToTeam(this, color)) return "There's no " + color + " team here (the world has " + mod.config.teams + (mod.config.teams == 1 ? " team)." : " teams).");
+		return pick3("Okay, I'm on the " + color + " team now!", "Sure. Team " + color + "!", "Alright, " + from.getName().getString() + ", count me in.");
+	}
+
+	/** Who Xen 2.0 chose to fight (its own call: a monster, or a player it's against, even one of its team). */
+	LivingEntity chosenFoe;
+	private int saidComingAt = -10000;
+	/** When it last picked a fight with a player (an aggressive one doesn't do it every minute). */
+	long lastPickedFight = -100000;
+
 	private LivingEntity foe() {
 		if (inArena) return duelFoe != null && duelFoe.isAlive() && duelFoe.level() == player.level() && player.distanceTo(duelFoe) < 32
 				? duelFoe : null;
+		if (chosenFoe != null && diplomacy.atPeace(chosenFoe)) chosenFoe = null;   // a truce is a truce: it keeps its word
+		if (chosenFoe != null && chosenFoe.isAlive() && chosenFoe.level() == player.level() && player.distanceTo(chosenFoe) < 6
+				&& player.hasLineOfSight(chosenFoe) && !(chosenFoe instanceof ServerPlayer sp && (sp.isCreative() || sp.isSpectator()))) return chosenFoe;
 		for (var creeper : player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class,
 				player.getBoundingBox().inflate(5), x -> x.isAlive() && x.getSwellDir() > 0)) {
 			if (player.distanceTo(creeper) < 5) return creeper;           // hissing close by: it hears that (and runs)
@@ -1324,8 +1502,9 @@ public final class Companion {
 		for (LivingEntity victim : new LivingEntity[] {player, o}) {               // who hurt it, or its owner, just now
 			if (victim == null || victim.level() != player.level()) continue;
 			LivingEntity a = victim.getLastHurtByMob();
-			if (a == null || !a.isAlive() || a == player || a == o || player.isAlliedTo(a)) continue;
+			if (a == null || !a.isAlive() || a == player || a == o) continue;             // (a teammate who hits it with a weapon too: its call)
 			if (diplomacy.atPeace(a)) continue;                                   // a truce (unless they broke it)
+			if (a instanceof ServerPlayer sp0 && skills.sparringWith(sp0.getUUID())) continue;   // (sparring: that's the game)
 			if (a instanceof AbstractVillager || a instanceof AbstractGolem || a instanceof TamableAnimal t && t.isTame()) continue;
 			if (victim.tickCount - victim.getLastHurtByMobTimestamp() > 200 || player.distanceTo(a) > 16) continue;
 			if (victim == player && !attackedBy(a, now)) continue;                // a poke to get its attention isn't a fight
@@ -1425,7 +1604,14 @@ public final class Companion {
 	}
 
 	public void say(String text) {
-		server.getPlayerList().broadcastSystemMessage(Component.literal("<" + name + "> " + text), false);
+		Component line = Component.literal("<" + name + "> " + text);
+		if (mod.config.localChat && player != null) {                     // local chat: only those close by hear it
+			for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer) && mod.inRange(p, player)) p.sendSystemMessage(line);
+			XenMod.LOG.info("<{}> {} (local chat)", name, text);
+		} else {
+			server.getPlayerList().broadcastSystemMessage(line, false);
+		}
+		if (player != null) mod.overheardBy(player, name, text);          // and the Xens close by
 		journal("says", text);
 	}
 
@@ -1439,6 +1625,9 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
+		if (goals.option >= 0) goals.finishOption(true);                  // Xen 2.0 learns what that choice led to
+		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
+		if (skills.partner != null) skills.endSpar(false);
 		if (obs != null && !inArena) {
 			float harm = lastHealth / 20f + 1f;
 			mod.learn(obs, lastAction, 0, harm, obs, true, emotions, name);
@@ -1481,7 +1670,8 @@ public final class Companion {
 		return String.format("%s (%s; %s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. Goals: %s. %s Last thought: %s",
 				name, personality.describe(), personality.style(), goals.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
 				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), goals.status(),
-				senses.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe()), lastThought);
+				senses.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe()) + " " + skills.describe()
+						+ (personality.loner ? " (a loner)" : ""), lastThought);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */
@@ -1495,7 +1685,8 @@ public final class Companion {
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
 				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
 				+ join(places.describe(), storage.describe(), tribe() == null ? "" : tribe().describe(this), nether.describe(), adventure.describe(),
-						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe())
+						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe(),
+						skills.describe(), rumors.describe())
 				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
@@ -1583,6 +1774,58 @@ public final class Companion {
 		known.add(u);                                                 // now it knows them
 		String who = from.getName().getString();
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
+		needs.heard(from, words);                                      // "I'm hungry", "I need wood": it may help (its choice)
+		Tribe village = tribe();
+		if (village != null && village.members.size() >= 2) {             // "new rule: no fighting in the village": they vote
+			String vote = village.laws.propose(words, from, who);
+			if (vote != null) {
+				say(vote);
+				return null;
+			}
+		}
+		if (owner == null || owner.equals(u) || trust(u) >= 0.5f) {         // "build a highway north out of obsidian"
+			String road = highway.asked(words);
+			if (road != null) {
+				goals.drop();
+				say(xen.mod.talk.Chat.firstPerson(road));
+				return null;
+			}
+		}
+		String train = skills.asked(from, words);                      // "train your fighting", "practice mining"
+		if (train != null) {
+			if (skills.trainingNow()) goals.drop();
+			say(train);
+			return null;
+		}
+		String teamAnswer = teamAsked(from, words);                    // "join my team", "join the red team": its call
+		if (teamAnswer != null) {
+			say(teamAnswer);
+			return null;
+		}
+		if (SLEEP.matcher(words).find() && !r.intent().equals("give")) {  // "go to bed", "sleep"
+			if (!player.level().isDarkOutside()) say(pick3("It's not night yet!", "Sleep? It's still day.", "Too early for bed."));
+			else if (!hasBed()) say(pick3("I don't have a bed yet.", "No bed at home... yet.", "I'd need a bed for that."));
+			else {
+				goals.drop();
+				mode = Mode.FREE;
+				say(pick3("Good idea. Night!", "Off to bed.", "Yeah, I'm tired."));
+			}
+			return null;
+		}
+		Needs.Need need = needs.pending();
+		if (need != null && need.who().equals(u) && (r.intent().equals("chat") || r.intent().equals("food")) && need.item().equals("food")
+				&& words.matches("(?s).*\\b(i'?m|im|i am|so|very)\\s+(hungry|starving|starved).*")) {   // "I'm hungry": share or not, its call
+			boolean share = personality.kindness + 0.5f * trust(u) > 0.6f && needs.canHelp();
+			if (share) {
+				String plan = needs.help();
+				say(plan != null && plan.startsWith("You will") ? pick3("Here, have some of mine.", "Take some food!", "I've got you. Here.")
+						: "I only have enough for myself, sorry.");
+			} else {
+				needs.clear();
+				say(needs.canHelp() ? pick3("I need my food myself.", "Get your own food.", "Sorry, I'm keeping mine.") : "I don't have any food either.");
+			}
+			return null;
+		}
 		if (r.intent().equals("chat") && FRIENDLY.matcher(words).find()) trust(u, 0.05f);   // kind words
 		script.heard(words, from);
 		talkingWith = u;                                              // a conversation: for the next half minute, no name needed

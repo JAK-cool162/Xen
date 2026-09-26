@@ -656,10 +656,47 @@ final class Chores {
 		mineY = y;
 		mineLeg = 0;
 		legStarted = now();
-		return "You will go mining for " + what + ": a staircase down to about y " + y + ", then tunnels, mining the ore you see.";
+		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
+		BlockPos entrance = c.places.get("mine");
+		toMine = null;
+		if (entrance != null && mineRecordY != Integer.MIN_VALUE && Math.abs(mineRecordY - y) <= 8 && entrance.closerThan(c.player.blockPosition(), 300)) {
+			toMine = entrance;
+			mineDir = mineRecordDir;
+			mineY = mineRecordY;
+			mineLeg = mineRecordLeg;
+			mineBase = c.places.get("mine base");
+			return "You will go back to your mine for " + what + " (down the staircase at " + entrance.getX() + " " + entrance.getZ() + ", on with tunnel "
+					+ (mineLeg / 2 + 1) + ").";
+		}
+		BlockPos home = c.goals.home;                                          // a new one: by its home, like players dig theirs
+		if (home != null && home.closerThan(c.player.blockPosition(), 48)) toMine = home.relative(c.player.getDirection(), 6);
+		mineRecordY = y;
+		mineRecordDir = mineDir;
+		mineRecordLeg = 0;
+		c.places.forget("mine base");
+		return "You will dig your own mine for " + what + ": a staircase down to about y " + y + " (you'll come back to it), then tunnels, mining the ore you see.";
 	}
 
+	/** Its mine: the depth it's dug to, the way it goes, the tunnel it's on (kept with the Xen). */
+	int mineRecordY = Integer.MIN_VALUE, mineRecordLeg;
+	net.minecraft.core.Direction mineRecordDir = net.minecraft.core.Direction.NORTH;
+	private BlockPos toMine;
+
 	private Action mineNext() {
+		if (toMine != null) {                                                  // first to the mine's entrance
+			if (c.player.blockPosition().closerThan(toMine, 2.5)) {
+				if (c.places.get("mine") == null || !c.places.get("mine").closerThan(toMine, 3)) c.places.remember("mine", toMine);
+				toMine = null;
+				mineStart = c.player.blockPosition();
+				legStarted = now();
+			} else {
+				doing = "going to its mine";
+				c.run(c.player.blockPosition().distSqr(toMine) > 400);
+				Action a = c.walkTo(Vec3.atBottomCenterOf(toMine));
+				if (a == null) toMine = null;                                     // (no way there: it digs where it is)
+				return a;
+			}
+		}
 		int got = count(items) - had;
 		if (got >= want) {
 			finish("I got " + got + " " + what + "! Heading back up.");
@@ -698,6 +735,8 @@ final class Chores {
 				mineBase = feet;
 				mineLeg = 0;
 				legStarted = now();
+				c.places.remember("mine base", feet);
+				if (c.places.get("mine") == null) c.places.remember("mine", mineStart);
 				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
 				return null;
 			}
@@ -712,6 +751,8 @@ final class Chores {
 			doing = "branch mining, tunnel " + (k / 2 + 1);
 			if (feet.distManhattan(goal) <= 1 || now() - legStarted > 20 * 60) {
 				mineLeg++;
+				mineRecordLeg = mineLeg;
+				mineRecordDir = mineDir;
 				legStarted = now();
 				return null;
 			}

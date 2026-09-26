@@ -215,7 +215,9 @@ final class Builder {
 		} else {
 			// No template: it designs the house itself, from what it has come to like (and what's worked before)
 			boolean starter = !creative && c.goals.home == null;            // its first house: what a few trees give
-			Taste.Design ds = c.taste.design(starter, creative);
+			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
+					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
+			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked);
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, ds.w() + 1, ds.d() + 1);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 			if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
@@ -228,6 +230,13 @@ final class Builder {
 		}
 		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
 		return begin(made, of, p.name());
+	}
+
+	/** Start on a plan someone else made (a stretch of highway...). */
+	String startPlan(Architect.Plan made, String of, String look) {
+		creative = c.player.isCreative();
+		design = null;
+		return begin(made, of, look);
 	}
 
 	/** Start on a plan (a house, a farm, a statue...): what it tells itself it will do. */
@@ -477,6 +486,8 @@ final class Builder {
 			case "mob farm" -> c.goals.mobFarm = plan.middle();
 			case "animal pen" -> c.goals.pen = plan.middle();
 			case "nether portal" -> c.nether.built(plan.middle(), plan.front());
+			case "highway" -> c.highway.built(plan.middle());
+			case "mine entrance" -> c.places.remember("mine hut", plan.middle());
 			default -> {
 				if (!plan.name().startsWith("statue")) c.goals.home = plan.middle();   // a house or a base: home
 			}
@@ -528,6 +539,24 @@ final class Builder {
 			if (c.hands.canSee(level, q, face, Vec3.atCenterOf(q).add(Vec3.atLowerCornerOf(face.getUnitVec3i()).scale(0.5)))) return new Object[] {q, face};
 		}
 		return a;                                                              // (none: it moves and tries again)
+	}
+
+	/** A lily pad, like a player puts one down: it looks at the water and right-clicks (once the water is in). */
+	private Action lilyPad(ServerLevel level, Architect.Step s) {
+		int t = tries.merge(s.pos(), 1, Integer::sum);
+		if (!level.getFluidState(s.pos().below()).is(net.minecraft.tags.FluidTags.WATER)) {
+			notNow.put(s.pos(), now() + 60);                                  // no water there yet: in a moment
+			if (t > 8) skip(s.pos(), "no water under it");
+			return null;
+		}
+		if (!c.hands.bucket(Vec3.atCenterOf(s.pos().below()).add(0, 0.3, 0), st -> st.getItem() == Items.LILY_PAD)) {
+			if (t > 6) skip(s.pos(), "no lily pad in hand");
+			return null;
+		}
+		c.acted = true;
+		if (level.getBlockState(s.pos()).is(net.minecraft.world.level.block.Blocks.LILY_PAD)) progress(false);
+		else if (t > 6) skip(s.pos(), "it didn't stay");
+		return Action.PLACE;
 	}
 
 	private Object[] against(ServerLevel level, Architect.Step s) {
@@ -615,6 +644,7 @@ final class Builder {
 			return null;
 		}
 		if (creative) takeFromCreative(item);
+		if (item == Items.LILY_PAD) return lilyPad(level, s);                // (used on the water, not clicked onto a block)
 		Object[] a = against(level, s);
 		if (a == null) return null;
 		a = seenFace(level, s, a);                                          // a face it can see from where it is
@@ -627,7 +657,7 @@ final class Builder {
 		int yaw = -1;
 		if (b instanceof DoorBlock || b instanceof BedBlock || n.endsWith("_stairs") || b instanceof net.minecraft.world.level.block.FenceGateBlock) yaw = yawIndex(f);
 		else if (n.equals("furnace") || n.equals("chest") || n.equals("barrel") || n.equals("smoker")) yaw = yawIndex(f.getOpposite());
-		c.hands.strictSight = true;
+		c.hands.strictSight = tries.getOrDefault(s.pos(), 0) < 3;             // (one it can't see from anywhere, boxed in by what it built, goes in anyway)
 		boolean ok = c.hands.placeItem(s.pos(), st -> st.getItem() == item, wall, side, b instanceof DoorBlock || b instanceof BedBlock
 				|| b instanceof net.minecraft.world.level.block.FenceGateBlock ? yaw : -1);   // (stairs: turned to the plan after; its eyes stay on the spot)
 		c.hands.strictSight = false;
@@ -756,7 +786,10 @@ final class Builder {
 	private void progress(boolean digging) {
 		lastProgress = now();
 		if (digging) dug++;
-		else placed++;
+		else {
+			placed++;
+			c.skills.practice(Skills.BUILD, 0.001f);
+		}
 		if ((placed + dug) % 60 == 0 && placed + dug > 0) {
 			c.chatter(left.size() > 0 ? String.format(java.util.Locale.ROOT, "%d blocks down, about %d to go.", placed + dug, left.size())
 					: "Almost done!", false);

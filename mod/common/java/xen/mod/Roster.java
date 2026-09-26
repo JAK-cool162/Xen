@@ -57,6 +57,8 @@ final class Roster {
 		c.trust.forEach((u, t) -> trust.addProperty(u.toString(), t));
 		o.add("trust", trust);
 		o.add("skills", c.mimic.toJson());
+		o.add("abilities", c.skills.toJson());
+		o.add("rumors", c.rumors.toJson());
 		JsonArray memories = new JsonArray();
 		for (String m : c.memories) memories.add(m);
 		o.add("memories", memories);
@@ -64,6 +66,13 @@ final class Roster {
 		o.add("chests", c.storage.toJson());
 		o.add("knows", c.knowledge.toJson());
 		o.add("taste", c.taste.toJson());
+		if (c.chores.mineRecordY != Integer.MIN_VALUE) {
+			JsonObject mine = new JsonObject();
+			mine.addProperty("y", c.chores.mineRecordY);
+			mine.addProperty("leg", c.chores.mineRecordLeg);
+			mine.addProperty("dir", c.chores.mineRecordDir.getName());
+			o.add("mine", mine);
+		}
 		o.add("crops", c.farmer.toJson());
 		if (c.adventure.on) o.addProperty("adventure", true);
 		if (c.band != null) o.addProperty("band", c.band);

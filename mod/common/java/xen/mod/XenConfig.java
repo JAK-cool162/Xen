@@ -89,6 +89,26 @@ public final class XenConfig {
 	 * the stronghold, the End), and take on trial chambers they find.
 	 */
 	public boolean adventures = true;
+	/**
+	 * What decides what a Xen does next: "xen2" (Xen 2.0: a bigger mind trained from scratch in SimLife, with a
+	 * reward critic, a fear critic and a world model that thinks ahead; it keeps learning) or "dmm" (the classic small
+	 * brain with hand-made goals). Minions always use the classic one.
+	 */
+	public String brain = "xen2";
+	/**
+	 * Team members can hurt each other: being on a team doesn't stop a fight (each Xen decides for itself who to fight,
+	 * by its temper, its motives and who it trusts).
+	 */
+	public boolean friendlyFire = true;
+	/**
+	 * Chat is local: what a player (or a Xen) says reaches only those within chatRange blocks (2 chunks), and only the
+	 * Xens that close hear it, so someone nearby can overhear (a spy). Off: chat reaches the whole server.
+	 */
+	public boolean localChat = true;
+	/** How far local chat (and local death messages) carry, in blocks (32 = 2 chunks). */
+	public int chatRange = 32;
+	/** Death messages reach only those within chatRange blocks of where it happened (this turns the show_death_messages game rule off). */
+	public boolean localDeaths = true;
 	/** The generation (of evolution) from which Xens know the Nether portal math (and triangulate strongholds). */
 	public int smartsAtGeneration = 4;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */

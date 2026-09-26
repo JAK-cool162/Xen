@@ -315,6 +315,7 @@ public final class Hands {
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
 		if (progress >= 1f) {
+			if (p.companion != null && BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath().endsWith("_ore")) p.companion.skills.practice(Skills.MINE, 0.02f);
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, face(),
 					level.getMaxY(), 0);
 			digging = null;
@@ -572,7 +573,15 @@ public final class Hands {
 			p.setYRot(YAW[facing]);
 			p.setYHeadRot(YAW[facing]);
 		}
+		var clicked = level.getBlockState(against).getBlock();                // a chest, a table, a door...: sneak, or the click opens it
+		boolean sneak = clicked instanceof net.minecraft.world.level.block.EntityBlock || clicked instanceof net.minecraft.world.level.block.CraftingTableBlock
+				|| clicked instanceof net.minecraft.world.level.block.DoorBlock || clicked instanceof net.minecraft.world.level.block.TrapDoorBlock
+				|| clicked instanceof net.minecraft.world.level.block.FenceGateBlock || clicked instanceof net.minecraft.world.level.block.ButtonBlock
+				|| clicked instanceof net.minecraft.world.level.block.LeverBlock || clicked instanceof net.minecraft.world.level.block.DiodeBlock
+				|| clicked instanceof net.minecraft.world.level.block.AnvilBlock;
+		if (sneak) p.setShiftKeyDown(true);
 		var result = p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
+		if (sneak) p.setShiftKeyDown(false);
 		Compat.swing(p);
 		current = Action.PLACE;
 		ticks = 0;
