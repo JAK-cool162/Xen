@@ -38,6 +38,10 @@ public class XenPlayer extends ServerPlayer {
 			connection.resetPosition();
 			level().getChunkSource().move(this);          // load the world around it, like a player
 		}
+		if (getAbilities().flying) {                        // flying (creative): space up, shift down, as a game client does
+			double up = (jumping ? 1 : 0) - (isShiftKeyDown() ? 1 : 0);
+			if (up != 0) setDeltaMovement(getDeltaMovement().add(0, up * getAbilities().getFlyingSpeed() * 3, 0));
+		}
 		super.tick();
 		double x = getX(), y = getY(), z = getZ();
 		doTick();                                          // player physics a client would normally drive

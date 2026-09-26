@@ -437,6 +437,48 @@
    5
   ],
   [
+   "xen build a house",
+   "build",
+   "house",
+   0
+  ],
+  [
+   "build us a cozy cottage",
+   "build",
+   "house",
+   0
+  ],
+  [
+   "dig an underground base",
+   "build",
+   "base",
+   0
+  ],
+  [
+   "make a base",
+   "build",
+   "base",
+   0
+  ],
+  [
+   "build a hut",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "build a shelter",
+   "shelter",
+   "",
+   0
+  ],
+  [
+   "\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e1a\u0e49\u0e32\u0e19",
+   "build",
+   "house",
+   0
+  ],
+  [
    "any diamonds?",
    "chat",
    "",
@@ -594,8 +636,8 @@
   ],
   [
    "\u0e2a\u0e23\u0e49\u0e32\u0e07\u0e1a\u0e49\u0e32\u0e19",
-   "shelter",
-   "",
+   "build",
+   "house",
    0
   ],
   [

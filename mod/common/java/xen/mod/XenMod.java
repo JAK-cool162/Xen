@@ -432,6 +432,12 @@ public class XenMod implements ModInitializer {
 								})
 								.then(Commands.argument("value", StringArgumentType.greedyString()).executes(ctx ->
 										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
+				.then(Commands.literal("build").then(Commands.argument("what", StringArgumentType.greedyString()).suggests((ctx, b) -> {
+									b.suggest("house");
+									b.suggest("base");
+									return b.buildFuture();
+								}).executes(ctx -> each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: "
+										+ c.builder.start(StringArgumentType.getString(ctx, "what")), "")))))
 				.then(Commands.literal("style")
 						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
 									for (Companion c : companions) b.suggest(c.name);

@@ -75,6 +75,8 @@ final class Chores {
 	private int waited;
 	private List<Part> circuit;
 	private String circuitName;
+	/** Before a circuit: what's in the way (dug out) and the holes under it (filled). */
+	private List<BlockPos> clearing = List.of(), filling = List.of();
 	private int cycles, fails;
 	private int[] buildSide;                                            // where it stands to reach far parts
 	/** Is this chore one it chose itself (its own want)? Then it doesn't report every step. */
@@ -284,17 +286,20 @@ final class Chores {
 			plan = shelterPlan(feet, build);
 		}
 		List<BlockPos> holes = new java.util.ArrayList<>();
-		for (BlockPos p : plan) {                                      // walls need ground under them: it fills small holes first
-			BlockPos under = p.below();
-			if (p.getY() == feet.getY() && level.getBlockState(p).canBeReplaced()
-					&& !level.getBlockState(under).isCollisionShapeFullBlock(level, under)) {
-				if (level.getBlockState(under).canBeReplaced() && level.getBlockState(under.below()).isCollisionShapeFullBlock(level, under.below())
-						&& level.getFluidState(under).isEmpty()) {
-					holes.add(under);
-				} else {
-					return "You can't build a shelter here because the ground isn't flat.";
-				}
+		for (BlockPos p : plan) {                                      // walls need ground under them: it fills the holes first,
+			BlockPos under = p.below();                               // from the bottom up, like a player levelling the spot
+			if (p.getY() != feet.getY() || !level.getBlockState(p).canBeReplaced() || !level.getBlockState(under).canBeReplaced()) continue;
+			List<BlockPos> column = new java.util.ArrayList<>();
+			BlockPos q = under;
+			while (level.getBlockState(q).canBeReplaced() && column.size() < 4) {
+				if (!level.getFluidState(q).isEmpty() && level.getFluidState(q).isSource() && column.size() > 1) break;   // (deep water: it builds on what it has)
+				column.add(0, q);
+				q = q.below();
 			}
+			if (level.getBlockState(q).canBeReplaced()) {
+				return "You can't build a shelter here because the ground drops away (a big hole or deep water).";
+			}
+			holes.addAll(column);
 		}
 		if (!holes.isEmpty()) {
 			holes.addAll(plan);
@@ -351,17 +356,25 @@ final class Chores {
 			for (int k = 0; k < 4; k++) if (Perception.DIRS[k][0] == wx && Perception.DIRS[k][1] == wz) facing = k;
 			plan.add(new Part(pos, a.get(2).getAsString(), facing, a.get(4).getAsInt()));
 		}
-		int width = spec.get("width").getAsInt();                    // the ground where it goes must be flat and clear
+		int width = spec.get("width").getAsInt();                    // the ground where it goes must be flat and clear:
+		List<BlockPos> clear = new java.util.ArrayList<>(), fill = new java.util.ArrayList<>();   // it clears and levels it first
 		for (int cx = 0; cx < width; cx++) {
 			for (int cz = -depth / 2; cz < depth - depth / 2; cz++) {
 				BlockPos pos = feet.offset(fwd[0] * (2 + cx) + right[0] * cz, 0, fwd[1] * (2 + cx) + right[1] * cz);
-				if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(pos.below()).isCollisionShapeFullBlock(level, pos.below())) {
-					return "You can't build the " + name + " here because the ground in front of you isn't flat and clear.";
+				for (int y = 0; y <= 1; y++) if (!level.getBlockState(pos.above(y)).canBeReplaced()) clear.add(pos.above(y));
+				BlockPos under = pos.below();
+				if (!level.getBlockState(under).isCollisionShapeFullBlock(level, under)) {
+					if (!level.getBlockState(under).canBeReplaced()) clear.add(under);            // a slab, a path: out, and a block instead
+					if (level.getBlockState(under.below()).canBeReplaced()) {
+						return "You can't build the " + name + " here because the ground in front of you drops away.";
+					}
+					fill.add(under);
 				}
 			}
 		}
 		java.util.Map<String, Integer> need = new java.util.TreeMap<>();
 		for (Part p : plan) need.merge(p.kind().equals("block") ? "block" : ITEM.get(p.kind()), 1, Integer::sum);
+		if (!fill.isEmpty()) need.merge("block", fill.size(), Integer::sum);
 		StringBuilder missing = new StringBuilder();
 		for (var e : need.entrySet()) {
 			int have = e.getKey().equals("block") ? count("dirt", "cobblestone") : countItem(e.getKey());
@@ -375,6 +388,8 @@ final class Chores {
 		plan.sort(java.util.Comparator.comparingInt(p -> ORDER.indexOf(p.kind())));
 		circuit = plan;
 		circuitName = name;
+		clearing = clear;
+		filling = fill;
 		buildSide = Perception.forward((yaw + 3) % 4);                 // the left side of it, fixed while it builds
 		cycles = fails = 0;
 		c.mode = Companion.Mode.STAY;
@@ -394,6 +409,24 @@ final class Chores {
 
 	private Action redstoneNext() {
 		ServerLevel level = (ServerLevel) c.player.level();
+		for (BlockPos p : clearing) {                                  // first the ground: clear, then level
+			if (level.getBlockState(p).canBeReplaced()) continue;
+			doing = "clearing the ground for a " + circuitName;
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) > c.player.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(p));
+			if (c.hands.mine(p)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+		}
+		for (BlockPos p : filling) {
+			if (!level.getBlockState(p).canBeReplaced()) continue;
+			doing = "levelling the ground for a " + circuitName;
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) > c.player.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(p.above()));
+			if (c.hands.placeAt(p)) {
+				c.acted = true;
+				return Action.PLACE;
+			}
+		}
 		for (Part p : circuit) {
 			if (!level.getBlockState(p.pos()).canBeReplaced()) {
 				String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p.pos()).getBlock()).getPath();

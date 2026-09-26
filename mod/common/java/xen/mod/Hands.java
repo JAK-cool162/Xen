@@ -47,7 +47,44 @@ public final class Hands {
 	}
 
 	boolean busy() {
-		return ticks < limit;
+		return ticks < limit || flyTarget != null;
+	}
+
+	/** Creative: where it's flying to (forward to it, space to go up, shift to go down, like a player), and until when. */
+	private Vec3 flyTarget;
+	private int flyTicks;
+
+	void flyToward(Vec3 target) {
+		flyTarget = target;
+		flyTicks = 0;
+		if (target == null) {
+			p.zza = p.xxa = 0;
+			p.setJumping(false);
+			p.setShiftKeyDown(false);
+		}
+	}
+
+	private void fly() {
+		Vec3 d = flyTarget.subtract(p.position());
+		double flat = Math.hypot(d.x, d.z);
+		// onto a floor: it holds shift till it lands on it (the floor stops it), and hops up if it's below it (under a
+		// doorway there's no room to float). In the air it can't hold still to a hair, so only well off does it go up or down.
+		BlockPos at = BlockPos.containing(flyTarget);
+		boolean land = flyTarget.y - Math.floor(flyTarget.y) < 0.05
+				&& !p.level().getBlockState(at.below()).getCollisionShape(p.level(), at.below()).isEmpty();
+		double dy = d.y, up = land ? 0.05 : 0.25, low = land ? -0.05 : -0.25;
+		if (flat < 0.2 && dy < 0.3 && dy > low || ++flyTicks > 80) {       // there (or it can't get closer): stop
+			flyToward(null);
+			p.setDeltaMovement(p.getDeltaMovement().scale(0.2));
+			return;
+		}
+		float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
+		p.setYRot(yRot);
+		p.setYHeadRot(yRot);
+		p.setXRot(0);
+		p.zza = flat > 0.15 ? (float) Math.min(1, flat * 0.6) : 0;          // slower as it gets close
+		p.setJumping(dy > up);
+		p.setShiftKeyDown(dy < low);
 	}
 
 	/** Can what it's doing be dropped at once (like letting go of a key)? Not a jump or a swing (crits need them), or eating. */
@@ -159,6 +196,10 @@ public final class Hands {
 
 	/** Called every server tick while an action runs. */
 	void tick() {
+		if (flyTarget != null) {
+			fly();
+			return;
+		}
 		if (!busy()) {
 			p.xxa = p.zza = 0;
 			p.setJumping(false);
@@ -193,6 +234,7 @@ public final class Hands {
 	void stop() {
 		pillar = false;
 		aim = null;
+		if (flyTarget != null) flyToward(null);
 		if (digging != null) {
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP,
 					p.level().getMaxY(), 0);
@@ -215,7 +257,7 @@ public final class Hands {
 			return;
 		}
 		selectBestTool(state);
-		if (state.getDestroyProgress(p, level, pos) < 1f / 200) {      // more than 10 seconds with what it has: not worth it
+		if (tooSlow(state.getDestroyProgress(p, level, pos))) {       // more than 10 seconds with what it has: not worth it
 			cantMine = pos.immutable();
 			limit = 2;
 			return;
@@ -229,6 +271,14 @@ public final class Hands {
 			digging = null;
 			limit = 2;
 		}
+	}
+
+	/**
+	 * More than 10 seconds to break with the best it has, even standing on the ground (in the air or under water a
+	 * player digs 5 times slower, and it can get down first)? In creative everything breaks at once.
+	 */
+	private boolean tooSlow(float progressPerTick) {
+		return !p.isCreative() && progressPerTick * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) < 1f / 200;
 	}
 
 	private void keepMining() {
@@ -298,7 +348,7 @@ public final class Hands {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
 		ServerLevel level = (ServerLevel) p.level();
 		BlockState state = level.getBlockState(pos);
-		if (state.getDestroySpeed(level, pos) < 0 || bestSpeed(state, level, pos) < 1f / 200) {   // bedrock, or far too slow
+		if (state.getDestroySpeed(level, pos) < 0 || tooSlow(bestSpeed(state, level, pos))) {   // bedrock, or far too slow
 			cantMine = pos.immutable();
 			return false;
 		}
@@ -476,13 +526,24 @@ public final class Hands {
 			p.setYRot(YAW[facing]);
 			p.setYHeadRot(YAW[facing]);
 		}
-		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
+		var result = p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
 		Compat.swing(p);
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 4;
-		cantPlace = level.getBlockState(pos).canBeReplaced() ? "it didn't stay" : "";
+		cantPlace = level.getBlockState(pos).canBeReplaced() ? "it didn't stay (" + result + ", clicked " + level.getBlockState(against).getBlock()
+				+ " " + side + ", holding " + p.getInventory().getSelectedItem() + ")" : "";
 		return cantPlace.isEmpty();
+	}
+
+	/** Right-click a block holding something (a plant into a flower pot). False if it has nothing like that. */
+	boolean useWith(BlockPos pos, java.util.function.Predicate<ItemStack> item) {
+		int slot = findHotbar(item);
+		if (slot < 0) return false;
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		use(pos);
+		return true;
 	}
 
 	/** Right-click a block, like a player (a repeater: one more tick of delay). */

@@ -125,6 +125,7 @@ final class Crafter {
 
 	/** Does it want to (and can it) make something now? */
 	boolean ready() {
+		if (c.player != null && c.player.isCreative() && order == null) return false;   // a creative player doesn't make tools
 		return c.player != null && (order != null || c.player.level().getGameTime() >= nextTry && wanted() != null);
 	}
 
@@ -188,6 +189,7 @@ final class Crafter {
 
 	/** Asked to craft something: the plan, in words (to itself: "You will craft a spruce boat."). */
 	String request(String thing, int amount) {
+		quietOrder = false;
 		if (thing == null || thing.isEmpty()) return "You don't know what to craft.";
 		String id = recipeFor(thing);
 		if (id == null) return "You don't know how to craft " + thing.replace('_', ' ') + ".";
@@ -209,6 +211,18 @@ final class Crafter {
 		if (MASS.contains(last) || last.endsWith("s")) return name;
 		return name + (last.endsWith("ch") || last.endsWith("sh") || last.endsWith("x") ? "es" : "s");
 	}
+
+	/** Make an exact recipe (for the builder: "spruce_stairs"), without talking about it. */
+	void orderRecipe(String id, int amount) {
+		if (recipe(id) == null) return;
+		order = id;
+		orderName = id.replace('_', ' ');
+		orderLeft = Math.max(1, amount);
+		orderSteps = 0;
+		quietOrder = true;
+	}
+
+	private boolean quietOrder;
 
 	/** What a recipe needs that it doesn't have, in words ("5 planks"), or "" if it has it all. */
 	private String missing(RecipeHolder<CraftingRecipe> r) {
@@ -246,7 +260,7 @@ final class Crafter {
 	private Action orderNext() {
 		RecipeHolder<CraftingRecipe> r = recipe(order);
 		if (r == null || ++orderSteps > 12) {
-			c.chatter("I couldn't make the " + orderName + ", sorry.", true);
+			if (!quietOrder) c.chatter("I couldn't make the " + orderName + ", sorry.", true);
 			order = null;
 			return null;
 		}
@@ -258,7 +272,7 @@ final class Crafter {
 			boolean sticks = lack.contains("stick") && count(n -> n.endsWith("_planks")) >= 2;
 			if (planks) return step(craftSmall(planksRecipe()), "planks");
 			if (sticks) return step(craftSmall("stick"), "sticks");
-			c.chatter("I can't make the " + orderName + ": I need " + lack + ".", true);
+			if (!quietOrder) c.chatter("I can't make the " + orderName + ": I need " + lack + ".", true);
 			order = null;
 			making = null;
 			return null;
@@ -282,7 +296,7 @@ final class Crafter {
 		int got = count(n -> n.equals(order)) - before;
 		if (made && got > 0) orderLeft -= got;
 		if (orderLeft <= 0 || made && got == 0) {
-			c.chatter(got > 1 || orderName.endsWith("s") ? "Done! I made " + (before + got) + " " + plural(orderName, before + got) + "."
+			if (!quietOrder) c.chatter(got > 1 || orderName.endsWith("s") ? "Done! I made " + (before + got) + " " + plural(orderName, before + got) + "."
 					: "Done! Here's my " + orderName + ".", true);
 			XenMod.LOG.info("{} crafted {}", c.name, order);
 			order = null;

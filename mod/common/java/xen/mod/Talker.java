@@ -165,7 +165,7 @@ final class Talker {
 		if (goals.current != null) {
 			options.put("goal " + goals.current, "I want to " + goals.current.what + ", " + xen.mod.talk.Chat.firstPerson("because " + goals.current.why) + ".");
 		}
-		if (c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3) {
+		if (c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.player.isCreative()) {
 			options.put("pickaxe", pick("I need some wood to make a pickaxe.", "First thing: wood, for a pickaxe.", "No pickaxe. I need wood.",
 					"I don't have a pickaxe yet...", "I need wood for tools.", "No pickaxe, no fun. Wood first!"));
 		}

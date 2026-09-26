@@ -227,12 +227,13 @@ THAI = (("chat", ("ขอบคุณ",)), ("trade", ("แลก", "เทรด
         ("stay", ("ไม่ต้องตาม", "รอ", "อยู่ตรงนี้", "อยู่นี่")), ("follow", ("ตาม", "มานี่", "มาทางนี้", "มาหา")),
         ("give", ("ขอ", "ส่ง")), ("explore", ("สำรวจ", "ไปเที่ยว", "ไปเล่น")), ("redstone", ("เรดสโตน", "วงจร")),
         ("wood", ("ไม้",)), ("coal", ("ถ่าน",)), ("iron", ("เหล็ก",)), ("stone", ("หิน",)), ("mine", ("ขุด", "แร่", "เพชร", "ทอง")),
-        ("food", ("อาหาร", "ล่า", "หาของกิน")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
+        ("food", ("อาหาร", "ล่า", "หาของกิน")), ("build", ("สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน")), ("shelter", ("บ้าน", "ที่หลบ", "ที่พัก", "สร้าง")), ("eat", ("กิน",)))
 _THAI_CHAR = re.compile("[\u0e00-\u0e7f]")
 _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          # the first that matches wins
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
+    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout)\b|\bunderground\b"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -312,6 +313,9 @@ def details(intent, words):
     thing = ""
     if intent == "redstone":
         thing = next((k for k in ("and", "or", "wire") if re.search(rf"\b{k}\b", words)), "not")
+        amount = 0
+    if intent == "build":                                        # a house, or a base under the ground
+        thing = "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else "house"
         amount = 0
     if intent == "craft":                                        # "craft 4 torches" -> ("craft", "torch", 4)
         m = _CRAFT_THING.search(words)

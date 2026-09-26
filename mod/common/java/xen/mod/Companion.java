@@ -393,6 +393,11 @@ public final class Companion {
 			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;
 			if (chore != null || chores.busy()) return chore;
 		}
+		if (builder.busy()) {                                          // building its house (or base)
+			Action b = builder.next();
+			if (!builder.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = builder.doing;
+			if (b != null || builder.busy()) return b;
+		}
 		Action deal = trader.next();
 		if (deal != null) return deal;
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.think()) {   // free: what does it want?
@@ -682,6 +687,8 @@ public final class Companion {
 	final Trader trader = new Trader(this);
 	/** Making its tools. */
 	final Crafter crafter = new Crafter(this);
+	/** Building houses and bases. */
+	final Builder builder = new Builder(this);
 	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
 	final Map<UUID, Float> trust = new HashMap<>();
 
@@ -948,7 +955,8 @@ public final class Companion {
 		}
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
-				+ " " + goals.describe() + " " + crafter.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
+				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
+				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
 				+ (trader.market().isEmpty() ? "" : " " + trader.market())
@@ -1076,6 +1084,7 @@ public final class Companion {
 			if (!r.intent().equals("chat")) {                           // a new request replaces what it was doing
 				chores.cancel();
 				crafter.cancelOrder();
+				builder.cancel();
 				hands.stop();
 			}
 			switch (r.intent()) {
@@ -1111,6 +1120,7 @@ public final class Companion {
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
 				case "craft" -> plan = crafter.request(r.thing(), r.amount());
+				case "build" -> plan = builder.start(r.thing());
 				default -> {}
 			}
 		}
@@ -1167,7 +1177,7 @@ public final class Companion {
 	UUID talkingWith;
 	long talkingUntil;
 
-	private String pick3(String a, String b, String c3) {
+	String pick3(String a, String b, String c3) {
 		int r = random.nextInt(3);
 		return r == 0 ? a : r == 1 ? b : c3;
 	}
