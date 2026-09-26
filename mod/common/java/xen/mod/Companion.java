@@ -231,6 +231,7 @@ public final class Companion {
 			rumors.look();                                               // who's that? (a shock, a warning to pass on)
 		}
 		skills.checkSpar();
+		life.tick();                                                    // a nod, a shake of the head, a wave; a new day
 		if (player.tickCount % 1200 == 600) {
 			skills.think(lostFight, rumors.heardOfStronger());          // does it want to train?
 			lostFight = false;
@@ -467,6 +468,10 @@ public final class Companion {
 			Action s = sensible(brain);
 			return s == null ? brain : s;
 		}
+		Action hobby = life.idle();                                    // free time: its hobby, its dog
+		if (hobby != null) return hobby;
+		String gift = life.gift();                                     // a present for a close friend
+		if (gift != null && chores.busy()) return chores.next();
 		long now = player.tickCount;
 		ServerPlayer near = personToWatch();
 		if (near != null) {
@@ -1317,6 +1322,8 @@ public final class Companion {
 	final Rumors rumors = new Rumors(this);
 	/** Potions, cobwebs, pearls, golden apples: the fighting gear, when it's good enough to use it. */
 	final PvpKit kit = new PvpKit(this);
+	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
+	final Life life = new Life(this);
 	/** It lost a fight lately (it may want to train). */
 	boolean lostFight;
 	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
@@ -1612,6 +1619,7 @@ public final class Companion {
 			server.getPlayerList().broadcastSystemMessage(line, false);
 		}
 		if (player != null) mod.overheardBy(player, name, text);          // and the Xens close by
+		life.said(text);                                                // a nod, a shake of the head, a wave
 		journal("says", text);
 	}
 
@@ -1662,7 +1670,12 @@ public final class Companion {
 		p.removeAllEffects();
 		hands.stop();
 		server.getPlayerList().remove(p);
-		join(spot.newLevel(), spot.position(), spot.yRot());
+		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
+		try {
+			join(spot.newLevel(), spot.position(), spot.yRot());
+		} finally {
+			XenMod.quietJoin = false;
+		}
 	}
 
 	public String status() {
@@ -1686,7 +1699,7 @@ public final class Companion {
 				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
 				+ join(places.describe(), storage.describe(), tribe() == null ? "" : tribe().describe(this), nether.describe(), adventure.describe(),
 						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe(),
-						skills.describe(), rumors.describe())
+						skills.describe(), rumors.describe(), life.describe())
 				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())

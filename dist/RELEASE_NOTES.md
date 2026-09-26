@@ -1,13 +1,23 @@
-**Xen Companion 1.0.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.1.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### New in 1.1.0
+
+* **Xen 5.2**: the mind that decides what a Xen does next, made from the two best trained versions merged. In the
+  same 300 test lives it dies less (17% vs 23%), gets iron in 84% of lives (was 71%) and diamonds in 63% (was 51%).
+* **More human**: Xens nod when they agree, shake their heads when they refuse and wave hello; grudges fade with time;
+  kind Xens give close friends gifts; they tame dogs and name them; each has a hobby (flowers, stargazing, sunsets,
+  dogs); they notice how many days they've lived in your world.
+* **Fixes**: no truce arguments after a friendly spar, no "joined the game" when a Xen respawns, lily pads and
+  building next to chests work properly.
 
 ### What Xens can do
 
 * **Get on in the world like players**: wood, tools, stone, iron, diamonds, armor, enchanting; their own mine they keep
   going back to; crop farms; furnaces; chests; they pick up useful things lying around.
-* **Think for themselves (Xen 2.0)**: a new, bigger mind trained from scratch in a simulated survival life. It chooses
+* **Think for themselves (Xen 5.2)**: a bigger mind trained from scratch in a simulated survival life. It chooses
   what to do next by what it is: kind, loyal, power-hungry or money-driven; friendly, passive or aggressive. When it
   isn't sure, it thinks ahead, and it keeps learning in your world. Far less standing around or wandering at random.
 * **Build their own houses**, no templates: cottages, modern houses, houses on stilts, towers, with porches, chimneys,
@@ -34,12 +44,12 @@ controls.
 
 | file | what |
 |---|---|
-| `xen-companion-1.0.0+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
-| `xen-companion-1.0.0+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
-| `xen-companion-1.0.0+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
-| `xen-companion-1.0.0+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-1.1.0+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
+| `xen-companion-1.1.0+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
+| `xen-companion-1.1.0+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
+| `xen-companion-1.1.0+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `SmolLM2-135M-Instruct-Q8_0.gguf`, `smollm2-360m-instruct-q8_0.gguf` | the chat models on their own (small for phones, normal for PCs) |
-| `TECHNICAL.txt` | **how it all works**: Xen 2.0, the settings, the commands, every change |
+| `TECHNICAL.txt` | **how it all works**: Xen 5.2, the settings, the commands, every change |
 | `xen-brain*.bin`, `SHA256SUMS.txt` | the classic brain (already inside the jars), checksums |
 
 **Install**: Fabric Loader 0.16+ and Fabric API, then one of the jars in your mods folder. Mod Menu (optional) gives a

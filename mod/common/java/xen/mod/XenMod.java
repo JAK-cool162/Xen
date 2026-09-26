@@ -121,6 +121,8 @@ public class XenMod implements ModInitializer {
 			heard(sender, message.signedContent());                               // (the Xens close enough hear it)
 			return false;
 		});
+		ServerMessageEvents.ALLOW_GAME_MESSAGE.register((srv, message, overlay) ->   // a Xen respawning isn't "joining"
+				!(quietJoin && message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t && t.getKey().startsWith("multiplayer.player.joined")));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
 			if (entity instanceof ServerPlayer victim && server != null) died(victim, source);
 		});
@@ -156,7 +158,7 @@ public class XenMod implements ModInitializer {
 		Path mindFile = brainFile().resolveSibling("mind.bin");
 		try (InputStream in = Files.exists(mindFile) ? Files.newInputStream(mindFile) : XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
 			mind = in == null ? null : xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
-			if (mind != null) LOG.info("Xen 2.0's mind loaded ({} learning steps){}", mind.updates, Files.exists(mindFile) ? "" : " - trained in SimLife");
+			if (mind != null) LOG.info("Xen 5.2's mind loaded ({} learning steps){}", mind.updates, Files.exists(mindFile) ? "" : " - trained in SimLife");
 		} catch (IOException e) {
 			LOG.warn("No Xen 2.0 mind ({}): Xens choose the old way", e.toString());
 			mind = null;
@@ -536,6 +538,8 @@ public class XenMod implements ModInitializer {
 	}
 
 	private boolean deathRuleOff;
+	/** A Xen is coming back after dying (its "joined the game" isn't said). */
+	static volatile boolean quietJoin;
 
 	/** Local death messages: the game's own (to everyone) off, it sends them itself; back on when the setting goes off. */
 	private void deathMessages() {
@@ -906,13 +910,18 @@ public class XenMod implements ModInitializer {
 		if (known != null && known.has("known")) {
 			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
 		}
-		if (known == null) c.skills.born();                                   // a new Xen: its own talents
+		if (known == null) {                                                    // a new Xen: its own talents, its hobby
+			c.skills.born();
+			c.life.born();
+		}
 		if (known != null) {
 			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
 			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
 			if (known.has("abilities")) c.skills.load(known.getAsJsonObject("abilities"));
 			else c.skills.born();
 			if (known.has("rumors")) c.rumors.load(known.getAsJsonObject("rumors"));
+			if (known.has("life")) c.life.load(known.getAsJsonObject("life"));
+			if (c.life.hobby == null) c.life.born();
 			if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString());
 			if (known.has("places")) c.places.load(known.getAsJsonObject("places"));
 			if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests"));

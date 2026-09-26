@@ -1,7 +1,43 @@
-XEN COMPANION 1.0.0: TECHNICAL NOTES
+XEN COMPANION 1.1.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.1.0
+===================
+
+Xen 5.2, the mind. Two trained versions of the mind were good at different things: v2 (the one in 1.0.0) got its
+tools, iron and diamonds early; v4 (v2 trained on with resting limited to night) built farms more and wasted less
+of the day. Xen 5.2 is the two merged: every weight is the average of v2's and v4's (a "model soup": both come from
+the same training run, so their averages are a working mind). Measured on the same 300 fresh 5-day lives:
+
+                     died   pickaxe   stone   iron         home         farm   diamonds
+    v2 (1.0.0)       23%    day 0.45  0.77    71% (2.33)   93% (1.02)   93%    51%
+    v4               27%    day 0.91  1.40    48% (2.38)   84% (1.06)   96%    31%
+    70/30 merge      24%    day 0.46  0.70    77% (2.06)   83% (1.37)   97%    49%
+    Xen 5.2 (50/50)  17%    day 0.50  0.71    84% (1.96)   89% (1.38)   98%    63%
+
+It dies less, gets iron in more lives and sooner, finds diamonds in more, and farms nearly always. Its home comes a
+little later. It rests 11% of the daytime in SimLife; in the game resting is only allowed at night, when it's hurt
+or when it's told to stay. Worlds that already have a mind.bin keep theirs (delete it to get Xen 5.2).
+
+The little human things (new):
+  - Body language: it nods when it agrees ("Okay", "Sure"), shakes its head when it refuses ("No", "I can't") and
+    waves (a few arm swings) when it says hi.
+  - Forgiveness: every morning grudges fade a little: fast for a kind Xen, slowly for an aggressive one. Only
+    negative trust fades; friendship doesn't.
+  - Gifts: now and then (every 8 to 16 minutes at most) a kind Xen gives a close friend nearby (trust 0.7 or more)
+    something it has plenty of: food, logs, iron, a diamond.
+  - A dog: with a bone and a wild wolf in sight, it tames one (a bone at a time, a 1 in 3 chance each, like a player)
+    and names it (Biscuit, Luna, Mochi...). Two dogs at most, four for dog lovers.
+  - A hobby for its free time, from its nature: picking flowers (a few a day), watching the stars (once a night, out
+    under the sky, when it's safe), watching the sunset (it turns west at dusk), or dogs.
+  - Milestones: every 10 days it notices how long it has lived in this world.
+
+Fixes: after a spar the two don't argue about a truce or take revenge for the last hits; a Xen coming back after dying
+doesn't show "joined the game" to everyone; lily pads are used on the water like a player does; blocks placed against
+a chest, table, door or furnace are placed with a sneak-click (no more opening the chest instead).
 
 
 XEN 2.0: HOW A XEN DECIDES
@@ -39,8 +75,8 @@ returns), tool and armor tiers, a home, a farm, a mine, enchanting, eating when 
 motives (money: emeralds and diamonds; power: weapons, armor, winning fights; kindness: helping; loyalty: staying with
 its friend when asked, guarding the tribe; curiosity: exploring). Harm: health lost, dying.
 Size: 256x256 hidden layers for each of the three nets (about 300 000 weights), 200 000 training steps.
-In 300 test lives of 5 days: first pickaxe by day 0.4, stone tools by 0.7, home by day 1.2 (89% of lives), iron by
-day 2.2 (69%), a farm in 90%.
+In 300 test lives of 5 days (1.0.0's mind, v2): first pickaxe by day 0.4, stone tools by 0.7, home by day 1.2 (89% of
+lives), iron by day 2.2 (69%), a farm in 90%. Xen 5.2 (1.1.0): see "What's new in 1.1.0" above.
 In the game it keeps learning: every choice it sees through (what it knew before, after, how long, what it gained,
 the harm) goes to its memory and a background thread learns from it (8 lessons per choice). Saved as
 <world>/xen/mind.bin (the bundled one comes back if you delete it). Setting: brain = xen2 or dmm (classic).
@@ -102,7 +138,7 @@ a modern house", "build a house on stilts", "build a tower".
     in the Nether 5 blocks under the bedrock roof (floor at y 118).
 
 
-SKILLS ADDED IN 1.0.0
+SKILLS ADDED IN 1.1.0
 =====================
   - Enchanting: makes an enchanting table (a book, 2 diamonds, 4 obsidian), puts it at home, puts its best
     unenchanted iron or diamond tool or armor in with lapis, picks the strongest enchantment its levels pay for.
@@ -124,7 +160,7 @@ PERFORMANCE
   - A Xen with no real player within 96 blocks thinks a third as often.
 
 
-CHANGES IN 1.0.0 (EARLIER DRAFTED AS 0.7.1)
+CHANGES IN 1.1.0 (EARLIER DRAFTED AS 0.7.1)
 ===========================================
 
 Villages: tribes that share, stand together and trade

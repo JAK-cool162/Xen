@@ -59,6 +59,7 @@ final class Roster {
 		o.add("skills", c.mimic.toJson());
 		o.add("abilities", c.skills.toJson());
 		o.add("rumors", c.rumors.toJson());
+		o.add("life", c.life.toJson());
 		JsonArray memories = new JsonArray();
 		for (String m : c.memories) memories.add(m);
 		o.add("memories", memories);

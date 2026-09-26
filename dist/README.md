@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.0.0
+# Xen Companion (Fabric mod) 1.1.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -7,15 +7,15 @@ makes its own tools, trades with villagers and bargains with you, has goals
 of its own, and talks on its own and with other Xens. Every Xen has its own name,
 skin and personality, and with evolution the ones that do well pass their
 nature on. It plays fair: it only knows what it can sense, and it acts only
-through a player's inputs. Since 1.0.0 main Xens think with **Xen 2.0**, a
+through a player's inputs. Since 1.1.0 main Xens think with **Xen 2.0**, a
 learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.0.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.0.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.0.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.0.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.1.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.1.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.1.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.1.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -44,7 +44,8 @@ an adventure...). It picks with **Xen 2.0**, three small neural networks:
   afraid, before it commits.
 
 It was trained from scratch over thousands of simulated lives with random
-personalities, and **keeps learning in your world** on a background thread
+personalities; since 1.1.0 it's **Xen 5.2**, two trained versions merged into one
+that dies less and gets iron and diamonds more often. It **keeps learning in your world** on a background thread
 (`<world>/xen/mind.bin`), so it doesn't slow the game. What it wants comes
 from its nature: kindness, loyalty, power and money pull it different ways.
 It only sees what a player could see. Minions keep the lighter classic brain
@@ -90,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.0.0+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.1.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -666,6 +667,14 @@ At night it **sleeps in its bed** at home (or builds a shelter when it has no ho
 fish at the furnace, never looks an Enderman in the eyes, and after dying it goes back for its things. Its dream (a home,
 treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
 comes along (and gets on with things nearby while you're close); "explore" lets it go again.
+
+## The little human things
+
+Xens nod when they agree, shake their heads when they refuse and wave when they say hi. Grudges fade with time (fast
+for a kind Xen, slowly for an aggressive one). A kind Xen now and then gives a close friend something it has plenty
+of. With a bone and a wild wolf around it tames a dog and names it. Each Xen has a hobby for its free time: picking
+flowers, watching the stars at night, watching the sunset, or dogs. And every 10 days it notices how long it has
+lived in your world.
 
 ## Villages: rules, jobs and punishments
 
