@@ -625,14 +625,15 @@ player does:
 5. **smelting** at a furnace (one it makes from 8 cobblestone), then **iron tools and armor** (it puts armor on);
 6. down to the deepslate for **diamonds**, and a **mob farm** once it has the stone for one.
 
-At night it builds a shelter (or goes home), and after dying it goes back for its things. Its dream (a home,
+At night it **sleeps in its bed** at home (or builds a shelter when it has no home yet), it cooks its raw meat and
+fish at the furnace, never looks an Enderman in the eyes, and after dying it goes back for its things. Its dream (a home,
 treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
 comes along (and gets on with things nearby while you're close); "explore" lets it go again.
 
 ## Building
 
-Ask it ("build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm") or
-`/xen build <what>`. It builds block by block with its own hands, in the order a builder works: it clears and
+Ask it ("build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm",
+"build a statue of me") or `/xen build <what>`. It builds block by block with its own hands, in the order a builder works: it clears and
 **levels the ground** (digging bumps away, filling holes), lays the foundation, the frame, the walls, the roof, then
 furnishes it and hangs the door last. In creative it flies and takes blocks from the creative inventory (it finds
 its way through the air around the walls, in by the door, over the roof); in survival it makes the planks, stairs,
@@ -646,9 +647,15 @@ slabs, doors, fences and hoes itself, gets more wood and stone when it runs out,
 * **Underground base**: a staircase down with torches, a door, a room carved in the stone with log pillars, ceiling
   beams and lanterns, a plank floor, chests, a barrel, a crafting table, furnaces, a bed, a table and chair.
 * **Crop farm** (the wiki's 9x9: one water block in the middle keeps every farmland block wet), a fence, a gate,
-  lanterns; **animal pen** (a fence, a gate, a water trough, hay); **mob farm** (the wiki's dark-room kind: four
-  dark arms, water flowing exactly to the edge of the hole, a 22-block drop that leaves a zombie with half a heart,
-  hoppers into a chest, and a room with a one-block gap to hit them through).
+  lanterns; **animal pen** (a fence, a gate, a water trough, hay); **mob farm** (the tower kind players build: an
+  open 17x17 stone-brick platform on a pillar, four spawning floors, a cross of water channels flowing exactly to the
+  hole in the middle, open trapdoors along them (a mob takes one for floor and drops into the water), a 22-block drop
+  that leaves a zombie with half a heart, a hopper into a chest at the foot, and a gap to hit them through; it works
+  at night).
+* **Statue** ("build a statue of me", "of yourself", "of Steve"): a player's skin, one block for every pixel, 32
+  blocks tall, the skin's outer layer (hair, hood, jacket) laid over it, each pixel the closest-coloured block
+  (concrete, terracotta, wool, planks, stone). The skin comes from Mojang's skin server; offline players have none,
+  so then it's a statue of the Xen itself. In survival it only uses blocks it carries.
 
 ## Path assist
 

@@ -267,7 +267,7 @@ final class Goals {
 			case FARM -> home != null && farm == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
 					&& (c.player.isCreative() || items.getOrDefault("cobblestone", 0) >= 300) ? 0.45f * (0.5f + p.diligence) : 0;
-			case SMELT -> items.getOrDefault("raw_iron", 0) >= 3 && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
+			case SMELT -> (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
 					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0) ? 0.85f : 0;
 		};
 	}

@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -184,6 +185,12 @@ final class Builder {
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 			made = Architect.cottage(corner, front, w, d, p, creative, random);
 		}
+		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
+		return begin(made, of, p.name());
+	}
+
+	/** Start on a plan (a house, a farm, a statue...): what it tells itself it will do. */
+	private String begin(Architect.Plan made, String of, String look) {
 		cancel();
 		modeBefore = c.mode;
 		prepared = creative;
@@ -204,10 +211,62 @@ final class Builder {
 		c.mode = Companion.Mode.STAY;                                         // it's working here now
 		c.anchor = made.middle();
 		int blocks = (int) made.steps().stream().filter(s -> !s.dig()).count();
-		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
-		XenMod.LOG.info("{} starts building a {} at {} ({} blocks, {} palette)", c.name, made.name(), made.middle(), blocks, p.name());
+		XenMod.LOG.info("{} starts building a {} at {} ({} blocks, {} palette)", c.name, made.name(), made.middle(), blocks, look);
 		return "You will build " + ("aeiou".indexOf(made.name().charAt(0)) >= 0 ? "an " : "a ") + made.name() + " here" + of + ": about " + blocks
 				+ " blocks, one at a time.";
+	}
+
+	/**
+	 * A statue of someone: "me" (whoever asked), "you" (itself), or a name (a player online, or a Xen). Their skin comes
+	 * from Mojang's skin server first (a moment), then it builds it, block by block. Offline players have no skin to
+	 * go by: then it makes one of itself.
+	 */
+	String statue(String who, ServerPlayer asker) {
+		String texture = null, name = null;
+		if (who.equals("me") && asker != null) {
+			texture = Statue.textureOf(asker);
+			name = asker.getName().getString();
+		} else if (!who.isEmpty() && !who.equals("you") && !who.equalsIgnoreCase(c.name)) {
+			ServerPlayer p = c.server.getPlayerList().getPlayerByName(who);
+			if (p instanceof XenPlayer x && x.companion != null) texture = Statue.textureOf(x.companion.skin);
+			else if (p != null) texture = Statue.textureOf(p);
+			name = p != null ? p.getName().getString() : who;
+		}
+		String note = "";
+		if (texture == null) {                                               // itself (or nobody's skin to go by: itself)
+			if (name != null) note = " (you can't see what " + name + " looks like, so it's one of yourself)";
+			texture = Statue.textureOf(c.skin);
+			name = c.name;
+		}
+		if (texture == null) return "You can't build a statue: you don't know what anyone looks like here (the skins aren't online).";
+		ServerLevel level = (ServerLevel) c.player.level();
+		Direction front = c.player.getDirection().getOpposite();
+		BlockPos corner = Architect.site(level, c.player.blockPosition().relative(front.getOpposite(), 6), front, 16, 10);
+		if (corner == null) return "You can't build a statue here: it's all water or cliffs around.";
+		BlockPos origin = corner.relative(front.getCounterClockWise(), 4).relative(front.getOpposite(), 3);
+		String t = texture, n = name;
+		Thread fetch = new Thread(() -> {
+			try {
+				Object[] got = Statue.download(t);
+				c.server.execute(() -> {
+					if (c.player == null) return;
+					boolean creativeNow = c.player.isCreative();
+					java.util.List<String> palette = creativeNow ? null : Statue.carried(c.player);
+					if (palette != null && palette.size() < 2) {
+						c.say("I need blocks of a few colours for a statue (planks, stone, dirt, wool...). I only have " + palette.size() + " kind.");
+						return;
+					}
+					creative = creativeNow;
+					String plan = begin(Statue.plan(origin, front, (java.awt.image.BufferedImage) got[0], (Boolean) got[1], palette, n), "", "skin");
+					c.chatter("Got the skin. " + xen.mod.talk.Chat.firstPerson(plan), true);
+				});
+			} catch (Exception e) {
+				c.server.execute(() -> c.say("I couldn't get the skin for the statue (" + e.getMessage() + ")."));
+			}
+		}, "xen-statue");
+		fetch.setDaemon(true);
+		fetch.start();
+		return "You will build a statue of " + n + note + ", 32 blocks tall, block by block (getting the skin first).";
 	}
 
 	/** The look: in creative one of the designed palettes (fitting where it is); in survival its own wood. */
@@ -518,7 +577,7 @@ final class Builder {
 		if (!soil) return dig(level, new Architect.Step(s.pos(), null, s.phase(), s.decor()));
 		if (!level.getBlockState(s.pos().above()).isAir()) return dig(level, new Architect.Step(s.pos().above(), null, s.phase(), s.decor()));
 		if (creative) takeFromCreative(Items.IRON_HOE);
-		if (!c.hands.useWith(s.pos(), st -> st.getItem() instanceof net.minecraft.world.item.HoeItem)) {
+		if (!c.hands.useWith(s.pos(), st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_hoe"))) {
 			if (!c.crafter.hasOrder()) c.crafter.orderRecipe("wooden_hoe", 1);   // a hoe first (two planks, two sticks)
 			if (tries.merge(s.pos(), 1, Integer::sum) > 8) skip(s.pos(), "no hoe");
 			return null;

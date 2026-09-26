@@ -774,8 +774,30 @@ final class Chores {
 	 * cobblestone, put down next to it; the ore on top, fuel below (coal, charcoal, or planks), and it waits by it and
 	 * takes the ingots out.
 	 */
+	/** Raw food it would cook (a player cooks it: it fills you up far more). */
+	private static final String[] RAW_FOOD = {"beef", "porkchop", "chicken", "mutton", "rabbit", "cod", "salmon", "potato"};
+
+	int rawFood() {
+		int n = 0;
+		for (String f : RAW_FOOD) n += countItem(f);
+		return n;
+	}
+
+	private static boolean isRawFood(ItemStack st) {
+		String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+		for (String f : RAW_FOOD) if (n.equals(f)) return true;
+		return false;
+	}
+
+	private int cooked() {
+		int n = countItem("iron_ingot") + countItem("gold_ingot");
+		for (String f : new String[] {"cooked_beef", "cooked_porkchop", "cooked_chicken", "cooked_mutton", "cooked_rabbit", "cooked_cod",
+				"cooked_salmon", "baked_potato"}) n += countItem(f);
+		return n;
+	}
+
 	String smelt() {
-		int raw = count("raw_iron") + count("raw_gold");
+		int raw = count("raw_iron") + count("raw_gold") + rawFood();
 		if (raw == 0) return "You have nothing to smelt.";
 		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
 		furnace = findFurnace();
@@ -783,9 +805,9 @@ final class Chores {
 		begin(Kind.SMELT);
 		until = now() + 20 * (12L * raw + 90);
 		want = raw;
-		had = countItem("iron_ingot") + countItem("gold_ingot");
+		had = cooked();
 		checkFurnaceAt = 0;
-		return "You will smelt " + raw + " raw ore in a furnace.";
+		return "You will smelt " + raw + " raw ore and food in a furnace.";
 	}
 
 	private int fuel() {
@@ -813,7 +835,7 @@ final class Chores {
 
 	private Action smeltNext() {
 		ServerLevel level = (ServerLevel) c.player.level();
-		int made = countItem("iron_ingot") + countItem("gold_ingot") - had;
+		int made = cooked() - had;
 		if (furnace != null && !level.getBlockState(furnace).is(net.minecraft.world.level.block.Blocks.FURNACE)) furnace = null;
 		if (furnace == null) furnace = findFurnace();
 		if (furnace == null) {
@@ -849,8 +871,8 @@ final class Chores {
 		if (!(c.player.containerMenu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu menu)) return Action.IDLE;
 		// the ingots out, the ore in, fuel if the fire needs it
 		if (menu.getSlot(2).hasItem()) Compat.click(menu, 2, true, c.player);
-		int raw = count("raw_iron") + count("raw_gold");
-		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold"));
+		int raw = count("raw_iron") + count("raw_gold") + rawFood();
+		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold") || isRawFood(st));
 		if (!menu.getSlot(1).hasItem() && (menu.getSlot(0).hasItem() || raw > 0)) {
 			if (!moveInto(menu, 1, st -> isItem(st, "coal") || isItem(st, "charcoal"))) moveInto(menu, 1, st -> {
 				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
@@ -861,9 +883,9 @@ final class Chores {
 		c.player.closeContainer();
 		Compat.swing(c.player);
 		c.acted = true;
-		if (empty && count("raw_iron") + count("raw_gold") == 0) {
-			made = countItem("iron_ingot") + countItem("gold_ingot") - had;
-			finish("Smelted " + made + " ingots!");
+		if (empty && count("raw_iron") + count("raw_gold") + rawFood() == 0) {
+			made = cooked() - had;
+			finish("Done at the furnace: " + made + " smelted and cooked!");
 			return null;
 		}
 		return Action.IDLE;

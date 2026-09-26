@@ -32,10 +32,15 @@ Use **one** mod jar. Needs Fabric Loader 0.16+ and Fabric API. Mod Menu is optio
   for houses, shelters and redstone alike.
 * **New builds**: a cottage (framed, windows between the posts, overhanging stair roof, furnished), an **underground
   base** (a staircase down, pillars, beams with lanterns, bed, chests, workshop), a **crop farm** (the wiki's 9x9 with
-  one water block in the middle, tilled with a hoe, sown), an **animal pen**, and a **mob farm** (the wiki's dark-room
-  kind: four dark arms with water that pushes monsters into a 22-block drop, hoppers into a chest, a room to hit them
-  from). Ask: "build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm".
+  one water block in the middle, tilled with a hoe, sown), an **animal pen**, and a **mob farm** (the tower kind
+  players build: an open 17x17 stone-brick platform high on a pillar, four spawning floors, a cross of water channels
+  with open trapdoors along them, a 22-block drop down the pillar onto a hopper into a chest, a gap to hit them through). Ask: "build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm".
   In creative it flies and takes blocks from the creative inventory; in survival it makes what it needs.
+* **Statues**: "build a statue of me" (or "of yourself", "of <name>"): your skin, pixel by pixel, one block for each
+  pixel, 32 blocks tall (the skin's outer layer too), each pixel the closest-coloured block. It gets the skin from
+  Mojang's skin server first; offline players have none, so then it makes one of itself.
+* **Player habits**: at night it **sleeps in its bed** at home (and respawns there), it **cooks** raw meat, fish and
+  potatoes in the furnace, and it **never looks an Enderman in the eyes**.
 * **It takes its crafting table along** after crafting away from home, like a player. "Pick up the crafting table"
   (or furnace, chest, bed, door, torches) works now; before, it went looking for ore.
 * **It goes back for its things** after it dies (unless they burned or fell in the void).

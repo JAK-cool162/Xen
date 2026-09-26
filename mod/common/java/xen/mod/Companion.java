@@ -174,6 +174,7 @@ public final class Companion {
 		genTicks++;
 		hands.tick();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
+		dontStareAtEndermen();
 		hurtNow = player.getHealth() < tickHealth;
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
@@ -424,6 +425,8 @@ public final class Companion {
 		}
 		Action back = backForMyThings();                              // it died: its things are lying where it fell
 		if (back != null) return back;
+		Action bed = bedtime();                                       // night, and a bed at home: it sleeps, like a player
+		if (bed != null) return bed;
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
 		if (light != null) return light;
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
@@ -606,6 +609,58 @@ public final class Companion {
 	private int maxDrop() {
 		float h = player.getHealth();
 		return h >= 16 ? 5 : h >= 12 ? 4 : 3;
+	}
+
+	/** Like a player: never look an Enderman in the eyes (it would come for you); it looks down instead. */
+	private void dontStareAtEndermen() {
+		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(40),
+				x -> x.isAlive() && BuiltInRegistries.ENTITY_TYPE.getKey(x.getType()).getPath().equals("enderman") && x.getTarget() != player)) {
+			Vec3 look = player.getViewVector(1f).normalize(), to = e.getEyePosition().subtract(player.getEyePosition());
+			double d = to.length();
+			if (look.dot(to.normalize()) > 1 - 0.08 / d && player.hasLineOfSight(e)) {
+				player.setXRot(Math.min(90, player.getXRot() + 35));             // eyes down
+				return;
+			}
+		}
+	}
+
+	private BlockPos bedAt;
+	private long lookedForBedAt = -10000;
+
+	/**
+	 * Bedtime: at night, with a bed at home (its house has one) and nothing to fight, it goes to bed and sleeps (that
+	 * also makes it come back there if it dies); it gets up in the morning. Not while it's following you out somewhere,
+	 * or on a job.
+	 */
+	private Action bedtime() {
+		var level = (ServerLevel) player.level();
+		if (player.isSleeping()) {
+			goals.instant = "sleeping";
+			return Action.IDLE;
+		}
+		long time = Compat.timeOfDay(level) % 24000;
+		boolean night = time >= 12600 && time <= 23400;
+		if (!night || fighting || goals.home == null || mode == Mode.FOLLOW || chores.busy() || builder.busy()
+				|| player.distanceToSqr(Vec3.atCenterOf(goals.home)) > 64 * 64) return null;
+		if (bedAt == null || !(level.getBlockState(bedAt).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
+			bedAt = null;
+			if (level.getGameTime() - lookedForBedAt < 600) return null;
+			lookedForBedAt = level.getGameTime();
+			for (BlockPos q : BlockPos.betweenClosed(goals.home.offset(-8, -3, -8), goals.home.offset(8, 3, 8))) {
+				if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+					bedAt = q.immutable();
+					break;
+				}
+			}
+			if (bedAt == null) return null;
+		}
+		goals.instant = "going to bed";
+		if (player.getEyePosition().distanceTo(Vec3.atCenterOf(bedAt)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(bedAt));
+		hands.stop();
+		hands.use(bedAt);                                             // (monsters close by: it can't, like anyone)
+		acted = true;
+		if (player.isSleeping()) chatter(pick3("Good night!", "Time to sleep. Night night.", "Zzz..."), false);
+		return Action.IDLE;
 	}
 
 	/** Where it died, with its things lying there, and until when they're there. */
@@ -1286,7 +1341,8 @@ public final class Companion {
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
 				case "craft" -> plan = crafter.request(r.thing(), r.amount());
-				case "build" -> plan = builder.start(r.thing());
+				case "build" -> plan = r.thing().startsWith("statue") ? builder.statue(r.thing().substring(Math.min(r.thing().length(), 7)), from)
+						: builder.start(r.thing());
 				default -> {}
 			}
 		}

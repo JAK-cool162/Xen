@@ -235,7 +235,7 @@ _RULES = tuple((intent, re.compile(pattern)) for intent, pattern in (          #
     ("give", r"\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\b"),
     ("redstone", r"\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\b"),
     ("craft", r"\b(craft|crafting)\b|\bmake (me |us )?(a |an |some |the |\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + "|".join(CRAFTABLE) + ")"),
-    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder)\b|\bunderground\b"),
+    ("build", r"\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture)\b|\bunderground\b|\bstatue of\b"),
     ("wood", r"\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\b"),
     ("coal", r"\bcoal\b"),
     ("iron", r"\biron\b"),
@@ -322,7 +322,9 @@ def details(intent, words):
         thing = "crafting_table" if b in ("table", "workbench") else "torch" if b == "torches" else b.replace(" ", "_")
         amount = 0
     if intent == "build":                                        # a house, a base under the ground, a farm, a pen, a mob farm
-        thing = ("mob farm" if re.search(r"\b(mob|mobs|xp|grinder)\b", words) else "farm" if re.search(r"\bfarm\b", words)
+        of = re.search(r"\b(statue|sculpture)( of ([a-z0-9_]+))?", words)
+        thing = ("statue:" + ("you" if not of.group(3) or of.group(3) == "yourself" else of.group(3)) if of
+                 else "mob farm" if re.search(r"\b(mob|mobs|xp|grinder)\b", words) else "farm" if re.search(r"\bfarm\b", words)
                  else "pen" if re.search(r"\b(pen|barn|animal)\b", words)
                  else "base" if re.search(r"\b(underground|base|bunker|hideout|dig)\b", words) else "house")
         amount = 0

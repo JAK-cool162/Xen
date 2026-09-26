@@ -78,7 +78,7 @@ public final class Chat {
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
-			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder)\\b|\\bunderground\\b"},
+			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture)\\b|\\bunderground\\b|\\bstatue of\\b"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -217,7 +217,9 @@ public final class Chat {
 			amount = 0;
 		}
 		if (intent.equals("build")) {                                         // a house, or a base under the ground
-			thing = Pattern.compile("\\b(mob|mobs|xp|grinder)\\b").matcher(words).find() ? "mob farm"
+			Matcher of = Pattern.compile("\\b(statue|sculpture)( of ([a-z0-9_]+))?").matcher(words);
+			thing = of.find() ? "statue:" + (of.group(3) == null || of.group(3).equals("yourself") ? "you" : of.group(3))
+					: Pattern.compile("\\b(mob|mobs|xp|grinder)\\b").matcher(words).find() ? "mob farm"
 					: Pattern.compile("\\bfarm\\b").matcher(words).find() ? "farm"
 					: Pattern.compile("\\b(pen|barn|animal)\\b").matcher(words).find() ? "pen"
 					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : "house";
