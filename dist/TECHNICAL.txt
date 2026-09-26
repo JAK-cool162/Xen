@@ -1,7 +1,27 @@
-XEN COMPANION 1.1.0: TECHNICAL NOTES
+XEN COMPANION 1.1.1: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.1.1
+===================
+
+Walking back and forth, fixed. The cause: the walker planned a fresh path every 3 seconds, and for a far goal (or one
+it can't fully see) a plan only reaches the best spot it can see; as it saw more, that spot switched sides, and it
+turned around. Now:
+  - it keeps to its plan until the plan is done, the goal really moves (more than 1.5 to 6 blocks, by how far it is),
+    a move fails, or what it sees blocks one of its next four moves;
+  - a new plan costs 2.5x for going back over blocks it walked in the last 20 seconds;
+  - it watches itself: 8+ blocks walked in 8 seconds while ending up less than 2 blocks away is pacing; then for 10
+    seconds it keeps to one way (going back costs 6x, small goal changes are ignored).
+Going back for its things after dying (the case in the screenshots): only if items really dropped there (checked
+when it respawns: keepInventory, lava or someone taking them means nothing to go back for); only for items it can see
+(or right next to it); and after 30 seconds without getting closer it gives up ("Forget it, my things are gone.").
+In a test with its things sealed in an obsidian box it gave up after 38 seconds (before: 5 minutes of pacing).
+
+Go to a block: "go to x y z" / "go to x z" in chat (its owner, or someone it trusts), or /xen goto x y z. It walks to
+that very block (arrived = standing on it), says so, and stays there. It gives up after 4 minutes with no way there.
 
 
 WHAT'S NEW IN 1.1.0

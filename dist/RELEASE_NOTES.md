@@ -1,7 +1,16 @@
-**Xen Companion 1.1.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.1.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### Fixed in 1.1.1
+
+* **No more walking back and forth**: a Xen keeps to the way it planned instead of re-planning every few seconds,
+  doesn't walk back over the blocks it just crossed, and if it notices it's pacing it commits to one way. Going back
+  for its things after dying: only if something really dropped there (not with keepInventory), only for things it
+  can see, and after half a minute without getting closer it gives up instead of pacing for five minutes.
+* **Go to a block**: "Pip, go to 120 64 -40" (or "go to 120 -40"), or `/xen goto 120 64 -40`: it walks to that exact
+  block and stays there.
 
 ### New in 1.1.0
 
@@ -44,10 +53,10 @@ controls.
 
 | file | what |
 |---|---|
-| `xen-companion-1.1.0+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
-| `xen-companion-1.1.0+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
-| `xen-companion-1.1.0+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
-| `xen-companion-1.1.0+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-1.1.1+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
+| `xen-companion-1.1.1+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
+| `xen-companion-1.1.1+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
+| `xen-companion-1.1.1+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `SmolLM2-135M-Instruct-Q8_0.gguf`, `smollm2-360m-instruct-q8_0.gguf` | the chat models on their own (small for phones, normal for PCs) |
 | `TECHNICAL.txt` | **how it all works**: Xen 5.2, the settings, the commands, every change |
 | `xen-brain*.bin`, `SHA256SUMS.txt` | the classic brain (already inside the jars), checksums |

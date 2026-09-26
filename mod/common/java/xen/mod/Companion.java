@@ -570,6 +570,8 @@ public final class Companion {
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
 		Action shocked = rumors.shockStep();                          // someone it killed, alive; the one they say nobody beats
 		if (shocked != null) return shocked;
+		Action told = goToStep();                                     // "go to 120 64 -40": to that very block
+		if (told != null) return told;
 		Action creak = awayFromCreaking();                            // a creaking can't be hurt: it keeps away from it
 		if (creak != null) return creak;
 		Action end = dragon.next();                                    // in the End: the dragon fight
@@ -930,6 +932,8 @@ public final class Companion {
 
 	/** Where it died, with its things lying there, and until when they're there. */
 	private BlockPos lostAt;
+	private double lostBest;
+	private long lostProgressAt;
 	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lostDimension;
 	private long lostUntil;
 	private boolean saidGoingBack;
@@ -945,17 +949,39 @@ public final class Companion {
 		}
 		if (!saidGoingBack) {
 			saidGoingBack = true;
+			lostBest = Double.MAX_VALUE;
+			lostProgressAt = now;
 			chatter("My stuff! I'm going back for it.", true);
 		}
 		goals.instant = "going back for its things";
-		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) > 3) return walkTo(Vec3.atBottomCenterOf(lostAt));
-		for (var item : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(6), e -> e.isAlive())) {
-			return walkTo(item.position());
+		Vec3 target = Vec3.atBottomCenterOf(lostAt);
+		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) <= 3) {        // there: its things, the ones it can see (or right by it)
+			target = null;
+			for (var item : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(6),
+					e -> e.isAlive() && (e.distanceTo(player) < 2 || player.hasLineOfSight(e)))) {
+				if (target == null || item.position().distanceTo(player.position()) < target.distanceTo(player.position())) target = item.position();
+			}
+			if (target == null) {
+				lostAt = null;
+				saidGoingBack = false;
+				chatter("Got my things back!", true);
+				return null;
+			}
 		}
-		lostAt = null;
-		saidGoingBack = false;
-		chatter("Got my things back!", true);
-		return null;
+		double gap = target.distanceTo(player.position());                    // getting closer? (closer to the spot, then to each thing)
+		if (gap < lostBest - 0.5) {
+			lostBest = gap;
+			lostProgressAt = now;
+		}
+		if (now - lostProgressAt > 600) {                                    // half a minute and no closer: it lets it go, like a player
+			lostAt = null;
+			saidGoingBack = false;
+			walker.stop();
+			chatter(pick3("I can't get to my stuff. Oh well.", "Forget it, my things are gone.", "I'll never reach it. Starting over!"), true);
+			journal("does", "gives up on its lost things (no way to them)");
+			return null;
+		}
+		return walkTo(target);
 	}
 
 	/** Armor it made or found: on, like a player shift-clicking it in the inventory (the better piece if it has two). */
@@ -1324,6 +1350,60 @@ public final class Companion {
 	final PvpKit kit = new PvpKit(this);
 	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
 	final Life life = new Life(this);
+	/** Where it was told to go ("go to 120 64 -40", /xen goto), and since when. */
+	BlockPos commandedTo;
+	private long commandedAt;
+	private static final java.util.regex.Pattern COORDS = java.util.regex.Pattern.compile("(-?\\d+)[\\s,]+(-?\\d+)(?:[\\s,]+(-?\\d+))?");
+	private static final java.util.regex.Pattern GO_TO = java.util.regex.Pattern.compile("\\b(?:go|walk|move|head|come|run)\\s+(?:to|over to)\\s+(?:x\\s*)?-?\\d+");
+
+	/**
+	 * Go to a block: "x y z" (or "x z": the ground there). It walks to that very block and stays there. Its answer.
+	 */
+	String goTo(String where) {
+		var m = COORDS.matcher(where);
+		if (!m.find() || player == null) return "Where? Tell me the spot: x y z (or x z).";
+		int x = Integer.parseInt(m.group(1)), y, z;
+		if (m.group(3) != null) {
+			y = Integer.parseInt(m.group(2));
+			z = Integer.parseInt(m.group(3));
+		} else {
+			z = Integer.parseInt(m.group(2));
+			ServerLevel level = (ServerLevel) player.level();
+			y = level.isLoaded(new BlockPos(x, 0, z)) ? level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+					: player.getBlockY();
+		}
+		commandedTo = new BlockPos(x, y, z);
+		commandedAt = player.level().getGameTime();
+		chores.cancel();
+		goals.drop();
+		return String.format(java.util.Locale.ROOT, "Okay, going to %d %d %d (%.0f blocks from here).", x, y, z,
+				Math.sqrt(player.blockPosition().distSqr(commandedTo)));
+	}
+
+	/** On its way to where it was told: the next step, or null when it's there (it stays) or gave up. */
+	private Action goToStep() {
+		if (commandedTo == null) return null;
+		BlockPos at = player.blockPosition();
+		if (at.getX() == commandedTo.getX() && at.getZ() == commandedTo.getZ() && Math.abs(at.getY() - commandedTo.getY()) <= 1) {
+			walker.stop();
+			mode = Mode.STAY;
+			anchor = at;
+			say(String.format(java.util.Locale.ROOT, "I'm here: %d %d %d.", at.getX(), at.getY(), at.getZ()));
+			commandedTo = null;
+			return Action.IDLE;
+		}
+		if (player.level().getGameTime() - commandedAt > 20 * 60 * 4) {
+			say("I can't find a way there. I'll stay here.");
+			mode = Mode.STAY;
+			anchor = at;
+			commandedTo = null;
+			return null;
+		}
+		goals.instant = "going to " + commandedTo.toShortString();
+		Action a = walkTo(Vec3.atBottomCenterOf(commandedTo));
+		return a != null ? a : Action.IDLE;
+	}
+
 	/** It lost a fight lately (it may want to train). */
 	boolean lostFight;
 	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
@@ -1670,6 +1750,11 @@ public final class Companion {
 		p.removeAllEffects();
 		hands.stop();
 		server.getPlayerList().remove(p);
+		if (lostAt != null) {                                          // did anything drop? (keepInventory, lava, someone took it: nothing to go back for)
+			ServerLevel where = server.getLevel(lostDimension);
+			if (where != null && where.isLoaded(lostAt) && where.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
+					new net.minecraft.world.phys.AABB(lostAt).inflate(5), e -> e.isAlive()).isEmpty()) lostAt = null;
+		}
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
 		try {
 			join(spot.newLevel(), spot.position(), spot.yRot());
@@ -1803,6 +1888,10 @@ public final class Companion {
 				say(xen.mod.talk.Chat.firstPerson(road));
 				return null;
 			}
+		}
+		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).find()) {
+			say(goTo(words.substring(GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).results().findFirst().get().start())));
+			return null;                                               // "go to 120 64 -40"
 		}
 		String train = skills.asked(from, words);                      // "train your fighting", "practice mining"
 		if (train != null) {

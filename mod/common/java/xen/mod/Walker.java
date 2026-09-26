@@ -62,6 +62,12 @@ final class Walker {
 	String doing = "", lastProblem = "";
 	private String journaled = "";
 
+	/** The blocks it walked on lately, and when: a new plan doesn't go back over them unless it has to (no back and forth). */
+	private final Map<Long, Long> walked = new HashMap<>();
+	/** Where it stood every second lately: to tell when it's pacing back and forth. */
+	private final java.util.ArrayDeque<Vec3> trail = new java.util.ArrayDeque<>();
+	private long lastTrail, lockedUntil;
+
 	/** The one portal block it means to walk into (following someone through, going to the Nether), else none. */
 	BlockPos portalOk;
 
@@ -110,8 +116,14 @@ final class Walker {
 			bestAt = now();
 		}
 		boolean settled = p.onGround() || p.isInWater() || p.onClimbable();
-		boolean replan = path == null || goal == null || goal.distanceTo(to) > 1.5 || index >= path.size()
-				|| now() - plannedAt > 60 && settled;                        // (every 3 s it looks again: it sees more on the way)
+		pace();
+		// A goal that moved a little isn't a new goal (far away, a few blocks either way are the same way), and while it
+		// was pacing back and forth it keeps to the way it chose for a while.
+		double tolerance = now() < lockedUntil ? 12 : Math.max(1.5, Math.min(6, 0.15 * gap));
+		boolean moved = goal == null || goal.distanceTo(to) > tolerance;
+		// It keeps to its way (like a player who knows where they're going): a new plan only when the way is done, the goal
+		// moved, a move failed, or what it sees now blocks the next steps.
+		boolean replan = path == null || moved || index >= path.size() || now() - plannedAt > 20 && settled && !stillGood();
 		if (replan && !settled && path != null) replan = false;             // not in the middle of a jump or a fall
 		if (replan && !budget(p.level().getServer().getTickCount())) {     // many Xens thinking at once: its turn next tick
 			if (path == null) {
@@ -121,7 +133,7 @@ final class Walker {
 			replan = false;
 		}
 		if (replan) {
-			goal = to;
+			if (moved || goal == null) goal = to;
 			bold();
 			Move was = path != null && index < path.size() ? path.get(index) : null;
 			path = plan((ServerLevel) p.level(), p.blockPosition(), to);
@@ -314,7 +326,7 @@ final class Walker {
 				best = n;
 			}
 			for (Move m : moves(n.pos, n.placedFloor, blocks - n.placed)) {
-				double cost = m.cost() * (1 + bad.getOrDefault(key(m), 0) * 4);
+				double cost = m.cost() * (1 + bad.getOrDefault(key(m), 0) * 4) * back(m.to(), target);
 				if (cost >= INF) continue;
 				Node next = nodes.computeIfAbsent(m.to().asLong(), k -> new Node(m.to()));
 				if (next.closed || n.g + cost >= next.g && next.parent != null) continue;
@@ -331,6 +343,58 @@ final class Walker {
 		List<Move> out = new ArrayList<>();
 		for (Node n = best; n.via != null; n = n.parent) out.add(0, n.via);
 		return out;
+	}
+
+	/** Going back over blocks it walked on in the last 20 seconds costs more (much more while it's been pacing). */
+	private double back(BlockPos to, BlockPos target) {
+		Long at = walked.get(to.asLong());
+		if (at == null || to.equals(target) || now() - at > 400) return 1;
+		return now() < lockedUntil ? 6 : 2.5;
+	}
+
+	/** Are the next few moves of its way still good, by what it sees now (not walled off, no lava)? */
+	private boolean stillGood() {
+		if (path == null) return false;
+		level = (ServerLevel) c.player.level();
+		eyes = c.player.blockPosition();
+		for (int i = index; i < Math.min(path.size(), index + 4); i++) {
+			Move m = path.get(i);
+			for (BlockPos b : new BlockPos[] {m.to(), m.to().above()}) {
+				if (!m.dig().contains(b) && !passable(b) && m.kind() != Kind.PILLAR && m.kind() != Kind.CLIMB_UP && m.kind() != Kind.SWIM) return false;
+			}
+			if (lava(m.to()) || lava(m.to().below())) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Where it has been: the blocks it walked on (for the next plan) and, every second, where it stands. Walking eight
+	 * blocks or more in eight seconds and ending up where it started is pacing back and forth: then it keeps to one way.
+	 */
+	private void pace() {
+		var p = c.player;
+		walked.put(p.blockPosition().asLong(), now());
+		if (walked.size() > 400) walked.values().removeIf(t -> now() - t > 400);
+		if (now() - lastTrail < 20) return;
+		lastTrail = now();
+		trail.addLast(p.position());
+		if (trail.size() > 8) trail.removeFirst();
+		if (trail.size() < 8 || now() < lockedUntil) return;
+		double walkedFar = 0;
+		Vec3 prev = null;
+		for (Vec3 v : trail) {
+			if (prev != null) walkedFar += Math.hypot(v.x - prev.x, v.z - prev.z);
+			prev = v;
+		}
+		Vec3 first = trail.peekFirst();
+		if (walkedFar > 8 && Math.hypot(prev.x - first.x, prev.z - first.z) < 2) {
+			lockedUntil = now() + 200;                                        // ten seconds on one way, no turning back
+			plannedAt = 0;
+			XenMod.LOG.info("{} was pacing back and forth ({} blocks walked, {} from where it was): it keeps to one way now",
+					c.name, String.format(java.util.Locale.ROOT, "%.0f", walkedFar), String.format(java.util.Locale.ROOT, "%.1f", Math.hypot(prev.x - first.x, prev.z - first.z)));
+			c.journal("way", "was pacing back and forth: keeps to one way");
+			trail.clear();
+		}
 	}
 
 	/** At best a sprint the whole way (a little more: it would rather find a good way than the shortest one). */

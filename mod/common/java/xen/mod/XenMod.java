@@ -762,6 +762,8 @@ public class XenMod implements ModInitializer {
 									return b.buildFuture();
 								}).executes(ctx -> each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: "
 										+ c.builder.start(StringArgumentType.getString(ctx, "what")), "")))))
+				.then(Commands.literal("goto").then(Commands.argument("where", StringArgumentType.greedyString())
+						.executes(ctx -> each(ctx, c -> c.name + ": " + c.goTo(StringArgumentType.getString(ctx, "where"))))))
 				.then(Commands.literal("style")
 						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
 									for (Companion c : companions) b.suggest(c.name);
