@@ -11,6 +11,9 @@ controls.
 * **Eyes on every block**: a yes or no for every block in view (out to 48 blocks, a full sweep every 1.5 s): ore,
   trees, grass for seeds, chests, water, crops, what people build. Caves and other people's houses are spotted from
   what they see, and chores go for what they saw (no more "looking for tall grass" for minutes).
+* **A simple rule for ore**: dark stone or deepslate under the grass is where ore hides; with no ore in sight, they
+  go and mine into it (cave walls, dark rock they saw).
+* **Swimming**: they swim up waterfalls and flowing water (holding space), and swim fast against a current.
 * **Smarter when stuck**: they never ask you for help; after three failed tries they pick another target.
 * **No more cliff deaths**: they crouch at edges they don't mean to go over, and a dark pit counts as deep.
 * **Mobs**: shield up when a skeleton draws its bow (a side step without one); out of the water when drowned are
@@ -20,7 +23,7 @@ controls.
   the Nether for ancient debris, smelt it, and make netherite ingots.
 * **Teams: auto** (the new default): like an SMP, Xens start and join their own teams, and their names take the
   team's color. They fight players too: near their base, fighters looking for a duel, bullies. Say "1v1 me".
-* **Talk**: they answer from what they're really doing: "what are you doing?", "why?", "what's your plan?", "what
+* **Talk**: a question to a Xen by name is only answered by that Xen. They answer from what they're really doing: "what are you doing?", "why?", "what's your plan?", "what
   do you need?", "how many logs do you have?", "what's in your bag?", "found anything?", "what team are you on?".
 * **/xen summon random 5**: five Xens with random names and skins.
 * **Lighter**: less RAM (the brain's replay memory is half the size, learning state only when learning), and the

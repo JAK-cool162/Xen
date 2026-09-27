@@ -94,7 +94,7 @@ final class MobPath {
 			if (at.equals(prev)) continue;
 			boolean wet = n.type == PathType.WATER || n.type == PathType.WATER_BORDER || !level.getFluidState(at).isEmpty();
 			int dx = at.getX() - prev.getX(), dy = at.getY() - prev.getY(), dz = at.getZ() - prev.getZ();
-			if (Math.abs(dx) > 1 || Math.abs(dz) > 1 || dy > 1) return out.isEmpty() ? null : out;   // (not a step: stop there)
+			if (Math.abs(dx) > 1 || Math.abs(dz) > 1 || dy > 1 && !wet) return out.isEmpty() ? null : out;   // (not a step: stop there; up water it swims)
 			Walker.Kind k = wet ? Walker.Kind.SWIM : dy > 0 ? Walker.Kind.ASCEND : dy < 0 ? Walker.Kind.FALL
 					: dx != 0 && dz != 0 ? Walker.Kind.DIAGONAL : Walker.Kind.WALK;
 			out.add(new Walker.Move(k, prev, at, List.of(), 1));

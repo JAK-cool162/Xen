@@ -34,6 +34,15 @@ mining go for the nearest one seen (48 blocks) when none is close; mineFor (seed
 too; 5 dark air blocks in a row under the ground within 32 blocks: a cave (with room around it, not lit); 12 built
 blocks within 8 of each other, not its home: someone's house.
 
+Ore rule. A sight line that stops at stone, deepslate, tuff, andesite, diorite or granite right after dim air under
+the ground (sky light 7 or less, the surface 4+ blocks above) remembers it as "deepstone". Gathering or mining ore with
+none seen: the nearest such block within 24 goes (mining it opens the rock around it to its eyes).
+Swimming. In water, a move whose block is level with it or higher holds space (up waterfalls and flowing water);
+swimming moves over a block long sprint (with food over 6). The mob pathfinder's way may go up water more than a
+block at a time.
+Chat. A message that starts with a Xen's name is only for that Xen (if it's out of earshot, nobody else answers).
+"1v1 me", accepted: it drops what it's doing and goes to fight (a minute at most, a truce ends it).
+
 Stuck. The solver never asks for help. When its way fails three times in a row, the target it was going for goes on
 its skip list and it picks another (a chore that runs out of time says so and moves on).
 

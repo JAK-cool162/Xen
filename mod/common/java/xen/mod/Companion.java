@@ -635,7 +635,7 @@ public final class Companion {
 		Action fight = fightBack();
 		if (fight != null) {
 			if (antics.busy()) antics.next(true);                     // a fight ends the fun
-			if (goals.instant.isEmpty()) goals.instant = "fighting the " + fightingWhat;
+			if (goals.instant.isEmpty()) goals.instant = "fighting " + (fightingWhat.equals(fightingWhat.toLowerCase(java.util.Locale.ROOT)) ? "the " : "") + fightingWhat;
 			return fight;
 		}
 		Action care = critters.danger();                              // arrows coming, drowned about, poison

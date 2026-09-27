@@ -74,7 +74,7 @@ final class SmallTalk {
 	private String aboutItself(ServerPlayer from, String w) {
 		var g = c.goals;
 		if (DOING.matcher(w).find()) {
-			String now = !g.instant.isEmpty() ? g.instant : g.current != null ? g.current.what : "";
+			String now = Talker.mine(!g.instant.isEmpty() ? g.instant : g.current != null ? g.current.what : "");
 			because = g.optionHow == null ? "" : g.optionHow.replace("the plan: ", "");
 			if (now.isEmpty()) return c.pick3("Not much. Looking around.", "Taking a breather.", "Just thinking about what's next.");
 			return c.pick3("I'm " + now + ".", "Right now? " + cap(now) + ".", cap(now) + ". Busy busy.");
@@ -129,8 +129,7 @@ final class SmallTalk {
 			if (c.player.getHealth() < 12) return "Not now, I'm hurt. Later.";
 			if (!armed && c.personality.bravery < 0.7f) return "Let me get a sword first.";
 			if (c.personality.passive() && c.personality.bravery < 0.5f) return c.pick3("I'd rather not.", "No thanks, I'm not a fighter.", "Fight? Me? No.");
-			c.chosenFoe = from;
-			c.lastPickedFight = c.player.level().getGameTime();
+			c.goals.duel(from);                                                // over to them, and fight
 			c.journal("fight", "accepts a duel with " + from.getName().getString());
 			return c.pick3("You're on!", "Alright, let's go. Don't cry after.", "1v1? Fine. Ready when you are.");
 		}

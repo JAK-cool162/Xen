@@ -159,9 +159,17 @@ final class Eyes {
 			}
 			String k = kind(s);
 			if (k != null) remember(k, m, t);
+			else if (darkRun > 0 && !open && deepStone(s)) remember("deepstone", m, t);   // dark stone under the grass: where ore is
+
 			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) return;               // rock, a wall: that's as far as it sees
 			if (!s.getFluidState().isEmpty() && t > 16) return;                  // (deep water: murky)
 		}
+	}
+
+	/** Stone or deepslate (the rock ore hides in). */
+	static boolean deepStone(BlockState s) {
+		String n = BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+		return n.equals("stone") || n.equals("deepslate") || n.equals("tuff") || n.equals("andesite") || n.equals("diorite") || n.equals("granite");
 	}
 
 	private void remember(String kind, BlockPos at, double t) {
@@ -210,7 +218,7 @@ final class Eyes {
 			BlockPos p = BlockPos.of(key);
 			double d = p.distSqr(here);
 			if (d >= bestD || skip != null && skip.test(key)) continue;
-			if (!level.isLoaded(p) || !kind.equals(kind(level.getBlockState(p)))) {
+			if (!level.isLoaded(p) || !(kind.equals("deepstone") ? deepStone(level.getBlockState(p)) : kind.equals(kind(level.getBlockState(p))))) {
 				it.remove();                                                    // gone
 				continue;
 			}

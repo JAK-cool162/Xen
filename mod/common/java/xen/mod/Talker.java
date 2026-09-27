@@ -409,10 +409,15 @@ final class Talker {
 	 * Everyday questions it answers straight from what it knows (no language model, so nothing made up). Null: not
 	 * one of those.
 	 */
+	/** Its doings are noted as "its" ("picking its crafting table back up"); said by itself, they're "my". */
+	static String mine(String doing) {
+		return doing.replaceAll("\\bitself\\b", "myself").replaceAll("\\bits\\b", "my");
+	}
+
 	String answer(String words) {
 		if (DOING.matcher(words).lookingAt()) {
 			String now = c.goals.instant.isEmpty() ? "looking around" : c.goals.instant;
-			return "I'm " + xen.mod.talk.Chat.firstPerson(now) + (c.goals.current != null ? ", because I want to " + c.goals.current.what : "") + ".";
+			return "I'm " + mine(xen.mod.talk.Chat.firstPerson(now)) + (c.goals.current != null ? ", because I want to " + c.goals.current.what : "") + ".";
 		}
 		if (HOW.matcher(words).lookingAt()) {
 			float h = c.player.getHealth();

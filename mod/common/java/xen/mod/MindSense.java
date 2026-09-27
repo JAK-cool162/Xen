@@ -108,8 +108,12 @@ final class MindSense {
 			float trust = c.trust(p.getUUID());
 			boolean weaker = p.getHealth() + 2 * armor(p) < c.player.getHealth() + 2 * armor(c.player) + 4;   // a bully picks on the weaker
 			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker;
-			if (!foe && smp && (myTeam == null || c.server.getScoreboard().getPlayersTeam(p.getScoreboardName()) != myTeam)
-					&& !(p instanceof XenPlayer x && x.companion != null && t != null && t.members.contains(x.companion))) {
+			Companion other = p instanceof XenPlayer x ? x.companion : null;
+			var theirTeam = c.server.getScoreboard().getPlayersTeam(p.getScoreboardName());
+			boolean rival = other == null ? myTeam == null || theirTeam != myTeam                   // a player: anyone not on its team
+					: myTeam != null && theirTeam != null && theirTeam != myTeam                          // a Xen: only one of another team (team wars)
+							&& !(other.owner != null && other.owner.equals(c.owner)) && !(t != null && t.members.contains(other));
+			if (!foe && smp && rival) {
 				boolean onItsLand = c.goals.home != null && p.blockPosition().closerThan(c.goals.home, 24) && trust < 0.5f;
 				foe = onItsLand && armed || duelist && trust < 0.5f;
 			}

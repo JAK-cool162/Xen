@@ -584,6 +584,20 @@ final class Goals {
 		return false;
 	}
 
+	/** A duel it accepted ("1v1 me"): whatever it was doing waits; it goes over to them and fights (a truce ends it). */
+	void duel(ServerPlayer foe) {
+		drop();
+		c.chores.cancel();
+		long now = c.player.level().getGameTime();
+		option = Mind.FIGHT;
+		optionFeatures = MindSense.features(c);
+		optionAt = now;
+		optionUntil = now + 20 * 60;
+		optionHow = "a duel";
+		c.chosenFoe = foe;
+		c.lastPickedFight = now;
+	}
+
 	/** Why the plan picked what it picked (for its thoughts). */
 	private String agendaWhy = "";
 

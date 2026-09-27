@@ -1372,6 +1372,14 @@ final class Chores {
 				bestCat = cat;
 			}
 		}
+		if (best == null && c.crafter.pickTier() >= 1) {                     // no ore in sight: the simple rule, dark stone under the grass has ore
+			boolean ore = false;
+			for (int cat : cats) ore |= cat == Blocks.COAL || cat == Blocks.IRON || cat == Blocks.GOLD || cat == Blocks.DIAMOND;
+			if (ore) {
+				best = c.eyes.nearest("deepstone", 24, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+				if (best != null) bestCat = Blocks.STONE;
+			}
+		}
 		return best == null ? null : new int[] {best.getX(), best.getY(), best.getZ(), 1, bestCat};
 	}
 

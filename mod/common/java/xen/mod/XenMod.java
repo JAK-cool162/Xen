@@ -600,6 +600,10 @@ public class XenMod implements ModInitializer {
 					reply -> server.execute(() -> c.say(reply)));
 			return;
 		}
+		for (Companion c : companions) {                                       // said to a Xen by name that can't hear it: not for anyone else
+			if (c.player() != null && java.util.regex.Pattern.compile("^\\W*" + java.util.regex.Pattern.quote(c.name) + "\\b",
+					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) return;
+		}
 		Companion byStart = null;                                              // "riv, come here": the start of its name will do
 		String asked = null;
 		for (Companion c : companions) {

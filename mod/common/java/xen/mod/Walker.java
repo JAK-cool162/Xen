@@ -814,6 +814,7 @@ final class Walker {
 				doing = "swimming";
 				double dy = m.to().getY() + 0.1 - p.getY();
 				p.setJumping(dy > -0.3 || p.isUnderWater() && dy > -1.2 && flat > 0.3);   // up for air, like a player holding space
+				if (flat > 1 && p.isInWater() && p.getFoodData().getFoodLevel() > 6) p.setSprinting(true);   // swimming fast (against a current too)
 				p.setShiftKeyDown(dy < -0.8);
 				if (dy < -0.8) face(to.add(0, -1, 0));
 			}
@@ -830,6 +831,8 @@ final class Walker {
 				}
 			}
 		}
+		// in water and the way goes up (a waterfall, flowing water, a bank): hold space and it swims up it, like a player
+		if (p.isInWater() && m.to().getY() + 0.2 >= p.getY() && m.kind() != Kind.FALL) p.setJumping(true);
 		// stuck against a block edge (it happens): a hop, like a player
 		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 10) p.setJumping(true);
 		// an edge it doesn't mean to go over (a cliff, a ravine, a dark one too: a player sees a pit is deep): it
