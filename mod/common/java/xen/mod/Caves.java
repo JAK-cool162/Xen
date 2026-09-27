@@ -8,9 +8,11 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Caves, the way players use them: the fastest way to ore (the walls show it, no digging needed). A Xen notices a cave
@@ -25,6 +27,10 @@ final class Caves {
 	final List<BlockPos> known = new ArrayList<>();
 	/** Cave spots it has been to lately (so it goes on to new parts, not round in circles). */
 	private final Map<Long, Long> been = new HashMap<>();
+	/** Wide dark pockets with natural stone walls: the walls are more likely to expose ore. */
+	private final Set<Long> orePockets = new HashSet<>();
+	/** Last ore-wall check for each known cave, to avoid repeating block scans every sight sweep. */
+	private final Map<Long, Long> oreChecked = new HashMap<>();
 	private long nextScan;
 
 	Caves(Companion c) {
@@ -43,14 +49,11 @@ final class Caves {
 		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
 		BlockPos at = c.player.blockPosition();
 		BlockPos spot = sample(level, at, 24, -18, 6, 600, false);
-		if (spot == null) return;
-		for (BlockPos k : known) if (k.closerThan(spot, 24)) return;           // (one it knows already)
-		known.add(spot);
-		if (known.size() > 12) known.remove(0);
+		if (spot == null || !remember(level, spot)) return;
 		c.places.remember("cave", spot);
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
-		c.chatter(c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave."), false);
+		c.chatter(caveLine(spot), false);
 	}
 
 	/**
@@ -61,24 +64,56 @@ final class Caves {
 		if (c.player == null) return;
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
-		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7) return;
-		for (BlockPos k : known) if (k.closerThan(spot, 24)) return;           // (one it knows already)
-		known.add(spot);
-		if (known.size() > 12) known.remove(0);
+		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7 || !remember(level, spot)) return;
 		c.eyes.caves++;
 		c.places.remember("cave", spot);
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
-		c.chatter(c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave."), false);
+		c.chatter(caveLine(spot), false);
+	}
+
+	/** Remember a cave once; a roomy, stone-walled pocket gets a small mining preference. */
+	private boolean remember(ServerLevel level, BlockPos spot) {
+		long now = now();
+		for (BlockPos k : known) {
+			if (!k.closerThan(spot, 24)) continue;
+			long key = k.asLong();
+			if (!orePockets.contains(key) && now - oreChecked.getOrDefault(key, Long.MIN_VALUE / 2) >= 100) {
+				oreChecked.put(key, now);
+				if (orePocket(level, spot)) orePockets.add(key);
+			}
+			return false;
+		}
+		known.add(spot.immutable());
+		long key = spot.asLong();
+		oreChecked.put(key, now);
+		if (orePocket(level, spot)) orePockets.add(key);
+		if (known.size() > 12) {
+			long removed = known.remove(0).asLong();
+			orePockets.remove(removed);
+			oreChecked.remove(removed);
+		}
+		return true;
+	}
+
+	private String caveLine(BlockPos spot) {
+		return orePockets.contains(spot.asLong())
+				? c.pick3("Big dark pocket, stone walls. There might be ore here.", "Stone all around a cave like this can mean ore nearby.", "That cave looks promising. I'll check the stone walls.")
+				: c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave.");
 	}
 
 	/** The nearest cave it knows (within that far), or null. */
 	BlockPos nearest(double far) {
 		if (c.player == null) return null;
 		BlockPos best = null;
+		double bestScore = Double.MAX_VALUE;
 		for (BlockPos k : known) {
 			if (!k.closerThan(c.player.blockPosition(), far)) continue;
-			if (best == null || k.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = k;
+			double score = k.distSqr(c.player.blockPosition()) - (orePockets.contains(k.asLong()) ? 16 * 16 : 0);
+			if (score < bestScore) {
+				bestScore = score;
+				best = k;
+			}
 		}
 		return best;
 	}
@@ -130,6 +165,29 @@ final class Caves {
 		return n;
 	}
 
+	/**
+	 * A large dark air pocket with natural stone or deepslate in at least four directions is a useful ore clue.
+	 * The clue is probabilistic: it only changes which cave Xen prefers, never claims ore is guaranteed.
+	 */
+	private static boolean orePocket(ServerLevel level, BlockPos q) {
+		if (air(level, q) < 16) return false;                   // most of the 3x3x3 space is open
+		int stoneSides = 0;
+		for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+			for (int distance = 2; distance <= 8; distance++) {
+				BlockPos wall = q.relative(side, distance);
+				if (!level.isLoaded(wall)) break;
+				var state = level.getBlockState(wall);
+				if (Eyes.deepStone(state)) {
+					stoneSides++;
+					break;
+				}
+				if (!state.isAir()) break;
+			}
+			if (stoneSides >= 4) return true;
+		}
+		return false;
+	}
+
 	private static boolean lavaNear(ServerLevel level, BlockPos q) {
 		for (BlockPos b : BlockPos.betweenClosed(q.offset(-2, -1, -2), q.offset(2, 1, 2))) if (level.getFluidState(b).is(net.minecraft.tags.FluidTags.LAVA)) return true;
 		return false;
@@ -137,6 +195,7 @@ final class Caves {
 
 	String describe() {
 		BlockPos n = nearest(200);
-		return n == null ? "" : "You know a cave at " + n.getX() + " " + n.getY() + " " + n.getZ() + " (caves are the quickest way to ore).";
+		return n == null ? "" : "You know a cave at " + n.getX() + " " + n.getY() + " " + n.getZ()
+				+ (orePockets.contains(n.asLong()) ? " (a wide dark pocket with natural stone walls; ore may be nearby)." : " (caves are the quickest way to ore).");
 	}
 }
