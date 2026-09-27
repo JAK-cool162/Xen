@@ -557,10 +557,63 @@ public final class Companion {
 		};
 	}
 
+	/**
+	 * Under water with a roof over its head (a flooded tunnel, an aquifer it dug into): swimming straight up only bumps
+	 * the roof, so it swims to the nearest air it can get to (back the way it came, most often), like a player would.
+	 */
+	private Action toAir() {
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos head = BlockPos.containing(player.getEyePosition());
+		for (int k = 1; k <= 6; k++) {                                // open water over it: up is the way
+			var s = level.getBlockState(head.above(k));
+			if (s.getFluidState().isEmpty() && s.getCollisionShape(level, head.above(k)).isEmpty()) return null;
+			if (s.getFluidState().isEmpty()) break;
+		}
+		java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
+		Map<BlockPos, BlockPos> from = new HashMap<>();
+		BlockPos start = player.blockPosition();
+		open.add(start);
+		from.put(start, start);
+		BlockPos air = null;
+		while (!open.isEmpty() && from.size() < 1500) {
+			BlockPos q = open.poll();
+			if (!q.equals(start) && breathable(level, q.above())) {
+				air = q;
+				break;
+			}
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+				BlockPos n = q.relative(d);
+				if (from.containsKey(n) || n.distManhattan(start) > 16 || !swimmable(level, n)) continue;
+				from.put(n, q);
+				open.add(n);
+			}
+		}
+		if (air == null) return null;
+		BlockPos step = air;
+		while (!from.get(step).equals(start)) step = from.get(step);  // the first step of the way there
+		goals.instant = "swimming to air";
+		hands.steer = Vec3.atBottomCenterOf(step);
+		hands.face(Vec3.atCenterOf(step));
+		return Action.JUMP;
+	}
+
+	private static boolean swimmable(ServerLevel level, BlockPos p) {
+		var s = level.getBlockState(p);
+		return !s.getFluidState().is(net.minecraft.tags.FluidTags.LAVA) && (s.getCollisionShape(level, p).isEmpty() || !s.getFluidState().isEmpty() && s.getCollisionShape(level, p).isEmpty());
+	}
+
+	private static boolean breathable(ServerLevel level, BlockPos p) {
+		var s = level.getBlockState(p);
+		return s.getFluidState().isEmpty() && s.getCollisionShape(level, p).isEmpty();
+	}
+
 	/** Companion instincts that come before the brain's own choice. */
 	private Action instinct() {
 		hands.watching = null;
 		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
+			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) walker.stop();   // (its way led under: air first)
+			Action out = toAir();
+			if (out != null) return out;
 			goals.instant = "swimming up for air";
 			return Action.JUMP;                                       // hold space to swim up, like a player
 		}
@@ -872,7 +925,7 @@ public final class Companion {
 		}
 	}
 
-	private BlockPos bedAt;
+	BlockPos bedAt;
 	private long lookedForBedAt = -10000;
 
 	/**

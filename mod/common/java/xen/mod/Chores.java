@@ -682,7 +682,8 @@ final class Chores {
 		// A cave it knows: the quickest way to ore (the walls show it). In, with torches, down it goes.
 		caveMode = false;
 		caveTarget = null;
-		BlockPos cave = c.caves.nearest(160);
+		boolean dark = c.player.level().isDarkOutside();                      // at night: no long walks in the dark to get there
+		BlockPos cave = c.caves.nearest(dark ? 24 : 160);
 		if (cave != null) {
 			caveMode = true;
 			toMine = cave;
@@ -692,7 +693,7 @@ final class Chores {
 		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
 		BlockPos entrance = c.places.get("mine");
 		toMine = null;
-		if (entrance != null && mineRecordY != Integer.MIN_VALUE && Math.abs(mineRecordY - y) <= 8 && entrance.closerThan(c.player.blockPosition(), 300)) {
+		if (entrance != null && mineRecordY != Integer.MIN_VALUE && Math.abs(mineRecordY - y) <= 8 && entrance.closerThan(c.player.blockPosition(), dark ? 32 : 300)) {
 			toMine = entrance;
 			mineDir = mineRecordDir;
 			mineY = mineRecordY;
@@ -703,11 +704,65 @@ final class Chores {
 		}
 		BlockPos home = c.goals.home;                                          // a new one: by its home, like players dig theirs
 		if (home != null && home.closerThan(c.player.blockPosition(), 48)) toMine = home.relative(c.player.getDirection(), 6);
+		BlockPos top = toMine != null ? toMine : c.player.blockPosition();
+		net.minecraft.core.Direction dry = dryWay(top, top.getY() - y);
+		if (dry == null) {                                                     // water all round (a shore, a swamp): somewhere drier
+			BlockPos away = drySpot(top);
+			if (away != null) {
+				toMine = away;
+				dry = dryWay(away, away.getY() - y);
+			}
+		}
+		if (dry != null) mineDir = dry;
 		mineRecordY = y;
 		mineRecordDir = mineDir;
 		mineRecordLeg = 0;
 		c.places.forget("mine base");
 		return "You will dig your own mine for " + what + ": a staircase down to about y " + y + " (you'll come back to it), then tunnels, mining the ore you see.";
+	}
+
+	/**
+	 * A way down that doesn't go under water (a staircase under a lake or a river floods and drowns you): of the four,
+	 * the first with no water on or over its first steps (what it can see from up here), or null.
+	 */
+	private net.minecraft.core.Direction dryWay(BlockPos from, int down) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		net.minecraft.core.Direction d = c.player.getDirection();
+		for (int r = 0; r < 4; r++, d = d.getClockWise()) {
+			boolean wet = false;
+			for (int i = 0; i <= Math.min(Math.max(down, 4), 20) && !wet; i++) {
+				BlockPos step = from.relative(d, i).below(i);
+				for (int up = 0; up <= i + 3 && !wet; up++) {                    // the step and all above it to the surface
+					BlockPos q = step.above(up);
+					wet = !level.getFluidState(q).isEmpty() || !level.getFluidState(q.relative(d.getClockWise())).isEmpty()
+							|| !level.getFluidState(q.relative(d.getCounterClockWise())).isEmpty();
+				}
+			}
+			if (!wet) return d;
+		}
+		return null;
+	}
+
+	/** Dry ground a little way off (no water within 4 blocks of it), for a mine's staircase; null if none near. */
+	private BlockPos drySpot(BlockPos from) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (int r = 8; r <= 32; r += 8) {
+			for (int k = 0; k < 8; k++) {
+				double a = k * Math.PI / 4;
+				int x = from.getX() + (int) Math.round(r * Math.cos(a)), z = from.getZ() + (int) Math.round(r * Math.sin(a));
+				if (!level.isLoaded(new BlockPos(x, from.getY(), z))) continue;
+				BlockPos q = BlockPos.containing(XenMod.surface(level, x, z));
+				boolean wet = false;
+				for (BlockPos n : BlockPos.betweenClosed(q.offset(-4, -3, -4), q.offset(4, 1, 4))) {
+					if (!level.getFluidState(n).isEmpty()) {
+						wet = true;
+						break;
+					}
+				}
+				if (!wet) return q.immutable();
+			}
+		}
+		return null;
 	}
 
 	/** Its mine: the depth it's dug to, the way it goes, the tunnel it's on (kept with the Xen). */
@@ -1300,6 +1355,7 @@ final class Chores {
 		BlockPos feet = c.player.blockPosition();
 		BlockPos hit = t.getY() >= feet.getY() ? hitFromHere(t) : null;   // (below its feet: the staircase way, never straight down)
 		if (hit != null) {
+			if (floods((ServerLevel) c.player.level(), hit)) return giveUp(t);   // (water behind it: not worth a flooded tunnel)
 			Action a = mine(hit);
 			if (a != null) return a;
 		}
@@ -1368,7 +1424,7 @@ final class Chores {
 		if (dangerBelow(level, step)) return giveUp(t);
 		for (BlockPos b : new BlockPos[] {ahead.above(), ahead, step}) {
 			if (level.getBlockState(b).canBeReplaced()) continue;
-			if (lavaNext(level, b)) return giveUp(t);
+			if (lavaNext(level, b) || floods(level, b)) return giveUp(t);
 			return mine(b);
 		}
 		if (k != c.hands.yaw) return Math.floorMod(k - c.hands.yaw, 4) == 3 ? Action.TURN_LEFT : Action.TURN_RIGHT;
@@ -1411,6 +1467,21 @@ final class Chores {
 	private static boolean lavaNext(ServerLevel level, BlockPos b) {
 		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
 			if (level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Under the ground, water next to it (a source, or water coming down from above): dig it and the tunnel floods, and
+	 * a flooded tunnel is how you drown. Up in the open it doesn't matter (the water just runs out).
+	 */
+	private boolean floods(ServerLevel level, BlockPos b) {
+		BlockPos feet = c.player.blockPosition();
+		if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()) <= feet.getY() + 2) return false;
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (d == net.minecraft.core.Direction.DOWN) continue;
+			var f = level.getFluidState(b.relative(d));
+			if (f.is(net.minecraft.tags.FluidTags.WATER) && (f.isSource() || d == net.minecraft.core.Direction.UP)) return true;
 		}
 		return false;
 	}

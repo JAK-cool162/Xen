@@ -1,7 +1,20 @@
-**Xen Companion 1.2.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.2.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.2.2: real progress, far fewer deaths
+
+* **A player's plan**: Xens now follow the steps every player knows (eat when hungry; at night a bed, a roof or the
+  mine, never wandering in the dark; the next tool; iron; a house; armor; diamonds). Before, they gathered wood and
+  stone over and over and got nowhere in 3 days. Their own mind still decides everything else (farms, trading,
+  exploring, adventures), and it learns from the plan.
+* **No more drowning**: under water with a roof overhead (a flooded tunnel), they swim to the nearest air instead of
+  bumping the ceiling; they don't dig into water that would flood a tunnel, don't start a mine next to a lake, and
+  don't walk along lake bottoms.
+* They stop gathering what they have plenty of, don't explore at night, and don't walk far to a mine in the dark.
+* Less "pacing back and forth" when it's really just working around a tree or a rock.
+* New mod icon.
 
 ### 1.2.1
 

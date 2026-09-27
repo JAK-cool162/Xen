@@ -555,6 +555,18 @@ final class Goals {
 		boolean[] can = MindSense.allowed(c, f, nearby);
 		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
+		int planned = agenda(f, can);                                          // the obvious next step, like any player: that first
+		if (planned >= 0) {
+			if (startOption(planned, nearby, now)) {
+				option = planned;
+				optionFeatures = f;
+				optionAt = now;
+				optionHow = "the plan: " + agendaWhy;
+				c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (the plan: " + agendaWhy + ")");
+				return c.chores.busy();
+			}
+			can[planned] = false;                                              // it couldn't: its mind picks from the rest
+		}
 		for (int tries = 0; tries < 5; tries++) {
 			Tribe t = c.tribe();
 			Mind.Choice ch = mind.choose(f, can, caution, explore, random, bias(t));
@@ -568,6 +580,88 @@ final class Goals {
 			optionHow = ch.how;
 			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + ch.how + ")");
 			return c.chores.busy();
+		}
+		return false;
+	}
+
+	/** Why the plan picked what it picked (for its thoughts). */
+	private String agendaWhy = "";
+
+	/**
+	 * How players get on, step by step: eat when hungry; at night a bed, a roof or the mine (never out in the dark);
+	 * the next tool; iron; a house; armor; diamonds. When one of these is clearly next, it does that (its mind learns
+	 * from it too); when nothing is, its mind and its likes decide (farms, trading, exploring, adventures). It also
+	 * stops gathering what it has plenty of (a chest full of logs doesn't get you anywhere). -1: its mind's call.
+	 */
+	private int agenda(float[] f, boolean[] can) {
+		var items = c.items();
+		int wood = MindSense.count(c, n -> n.endsWith("_planks")) + 4 * items.getOrDefault("log", 0);
+		int stone = items.getOrDefault("cobblestone", 0);
+		if (wood >= (home == null ? 96 : 64)) can[Mind.WOOD] = false;              // plenty: on with something else
+		if (stone >= 64) can[Mind.STONE] = false;
+		if (c.player.isCreative() || c.mode == Companion.Mode.STAY || c.mode == Companion.Mode.FOLLOW) return -1;
+		if (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // danger, a friend in need: its own call
+		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);
+		int tier = c.crafter.pickTier();
+		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
+		boolean dark = f[Mind.NIGHT] > 0.5f || f[Mind.DUSK] > 0.5f;
+		boolean below = f[Mind.UNDERGROUND] > 0.5f;
+		if (can[Mind.EAT] && hunger < 14) return why(Mind.EAT, "hungry");
+		if (dark) {
+			if (can[Mind.SLEEP]) return why(Mind.SLEEP, "night: bed");
+			boolean bedWithIt = items.keySet().stream().anyMatch(k -> k.endsWith("_bed"));
+			if (bedWithIt && (home == null || !c.player.blockPosition().closerThan(home, 64))) return why(Mind.REST, "night: it camps with its bed");
+			BlockPos mine = c.places.get("mine");
+			if (tier >= 2 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), 32)) && wantsOre(tier, iron))
+				return why(Mind.MINE, "night: mining (safe under the ground)");
+			if (f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below) return why(Mind.REST, "night: staying in");
+			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
+			return -1;
+		}
+		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
+		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
+		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {
+			c.chores.forWool = false;
+			return why(Mind.FOOD, "low on food");
+		}
+		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || c.bedAt != null;
+		if (!bed && tier >= 1 && can[Mind.FOOD] && wool() < 3 && sheepNear()) {
+			c.chores.forWool = true;
+			return why(Mind.FOOD, "wool for a bed");
+		}
+		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
+		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
+		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");
+		if (tier >= 3 && home == null) {
+			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home");
+			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for a house");
+		}
+		if (tier >= 3 && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f ? "iron for armor" : "diamonds");
+		return -1;
+	}
+
+	private int why(int option, String why) {
+		agendaWhy = why;
+		return option;
+	}
+
+	/** More to mine for: iron for tools and armor, then diamonds. */
+	private boolean wantsOre(int tier, int iron) {
+		boolean armor = true;
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) armor &= !c.player.getItemBySlot(slot).isEmpty();
+		return tier == 2 ? iron < 3 : !armor && iron < 24 || diamonds() < 3;
+	}
+
+	private int wool() {
+		int n = 0;
+		for (var e : c.items().entrySet()) if (e.getKey().endsWith("_wool")) n += e.getValue();
+		return n;
+	}
+
+	private boolean sheepNear() {
+		for (var sheep : c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, c.player.getBoundingBox().inflate(24), x -> x.isAlive())) {
+			if (c.player.hasLineOfSight(sheep)) return true;
 		}
 		return false;
 	}
@@ -609,7 +703,7 @@ final class Goals {
 				optionUntil = now + 40;
 				return true;
 			}
-			if (o == Mind.SHELTER && home != null && !c.player.blockPosition().closerThan(home, 12)) {   // a home: it goes back there for the night
+			if (o == Mind.SHELTER && home != null && !c.player.blockPosition().closerThan(home, 12) && c.player.blockPosition().closerThan(home, 96)) {   // a home: it goes back there for the night
 				optionUntil = now + 1200;
 				followWho = null;
 				return true;
@@ -701,7 +795,7 @@ final class Goals {
 			case Mind.FIGHT -> late || c.chosenFoe == null || !c.chosenFoe.isAlive() || c.chosenFoe.level() != c.player.level()
 					|| c.chosenFoe.distanceTo(c.player) > 24 || c.diplomacy.atPeace(c.chosenFoe);
 			case Mind.ENCHANT -> !c.enchanter.on || late;
-			case Mind.SHELTER -> late || home != null && c.player.blockPosition().closerThan(home, 6);
+			case Mind.SHELTER -> late || home != null && c.player.blockPosition().closerThan(home, 6) || !c.chores.busy() && (home == null || !c.player.blockPosition().closerThan(home, 96));
 			default -> late;
 		};
 	}

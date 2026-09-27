@@ -133,7 +133,14 @@ final class Walker {
 			replan = false;
 		}
 		if (replan) {
-			if (moved || goal == null) goal = to;
+			if (moved || goal == null) {
+				boolean flip = false;                                         // back to a goal it just left: that's dithering
+				for (Vec3 g : recentGoals) flip |= g.distanceTo(to) < 2;
+				if (!flip) trail.clear();                                     // a new goal (the next log, the next ore): not pacing
+				recentGoals.addLast(to);
+				if (recentGoals.size() > 4) recentGoals.removeFirst();
+				goal = to;
+			}
 			bold();
 			Move was = path != null && index < path.size() ? path.get(index) : null;
 			path = plan((ServerLevel) p.level(), p.blockPosition(), to);
@@ -574,7 +581,7 @@ final class Walker {
 	private double under(BlockPos p) {
 		if (!water(p.above())) return 0;
 		var body = c.player;
-		return body.getAirSupply() < body.getMaxAirSupply() / 2 ? INF : 12;
+		return body.getAirSupply() < body.getMaxAirSupply() * 0.8 ? INF : 30;
 	}
 
 	/** Lava next to the way, a drop into the void: it keeps well clear. */
@@ -792,6 +799,8 @@ final class Walker {
 	}
 
 	private long lastHop;
+	/** The last few goals it walked to (going back to one it just left is dithering, not work). */
+	private final java.util.ArrayDeque<Vec3> recentGoals = new java.util.ArrayDeque<>();
 
 	/** The next n moves are plain walking the same way on the level, with room over its head (for a sprint-jump). */
 	private boolean flatAhead(int n) {

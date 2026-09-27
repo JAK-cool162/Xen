@@ -239,7 +239,7 @@ final class MindSense {
 		a[Mind.SMELT] = (items.getOrDefault("raw_iron", 0) >= 1 || c.chores.rawFood() >= 1) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
 				&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0);
 		a[Mind.STORE] = c.storage.wantsToStore() && (c.goals.home != null || c.tribe() != null && c.tribe().center != null);
-		a[Mind.EXPLORE] = true;
+		a[Mind.EXPLORE] = !night && f[Mind.DUSK] < 0.5f;                       // (not off into the dark)
 		a[Mind.TRADE] = cfg.trading && c.trader.villagerNear() != null && c.trader.hasSomethingToTrade();
 		a[Mind.FOLLOW] = f[Mind.HASFRIEND] > 0.5f;
 		a[Mind.HELP] = c.needs.pending() != null && c.needs.canHelp();

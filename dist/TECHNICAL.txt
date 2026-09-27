@@ -1,7 +1,44 @@
-XEN COMPANION 1.2.1: TECHNICAL NOTES
+XEN COMPANION 1.2.2: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.2.2
+===================
+
+Why they got nowhere. In a 3-day test (3 new free Xens, normal difficulty) the 1.2.1 Xens reached stone tools in the
+first minutes and then, for more than a day, chose "get some wood" and "get some stone" again and again: Xen 5.2's
+values for its choices are about 40 with gaps of 1 or 2, each short gathering trip earns a little reward, and the
+leanings added on top (0.1 to 0.35) were too small to move it on. Nights found them outside. They died 6 times in
+the first day (2 drowned, 4 killed by mobs at night) and never got iron.
+
+A player's plan (Goals.agenda). Before Xen 5.2 chooses, the plan checks what any player would clearly do next, in
+this order, and does it when it can:
+  - hungry (food under 14) with food on it: eat;
+  - dusk or night: sleep (a bed at home); a bed carried and away from home: stay put (it puts the bed down); stone
+    pickaxe or better, more ore wanted, and under the ground or within 32 blocks of its mine: mine (safe down there);
+    under a roof (home or its dugout): stay in; otherwise a shelter first (home within 96 blocks, else dig in);
+  - day: better gear it can craft now; 3+ raw iron to smelt; food (under 2 food items and hunger under 18); wool for
+    a bed (no bed, under 3 wool, a sheep in sight within 24 blocks); no pickaxe: wood; wooden pickaxe: stone; stone
+    pickaxe and under 3 iron: mining for iron; iron pickaxe and no home: a house (wood for it first); then mining
+    for iron armour (24 iron) and diamonds (3).
+Danger, a friend who needs help, following, staying or creative: no plan, its own call. Nothing clearly next: Xen 5.2
+decides as before (farms, trading, exploring, adventures), and it learns from what the plan chose like from its own
+choices. Plenty stops gathering: no more wood from 96 planks' worth (64 once it has a home), no more stone from 64
+cobblestone. Exploring isn't allowed at dusk or night; at night it mines only in a cave within 24 blocks or its own
+mine within 32 (else a new staircase right there).
+
+Drowning. Under water with no open water above its head (a flooded tunnel, an aquifer), swimming up only bumps the
+roof: it now searches the water and air around it (up to 16 blocks, 1500 spots) for the nearest spot with air above,
+and swims there along the way it found. With under 60% of its air left it drops its planned way (it may lead under).
+Under the ground it never digs a block with a water source beside it or water above it (the tunnel would flood).
+A new mine's staircase goes the way with no water on or over its first 20 steps; with water every way (a shore, a
+swamp) it first walks to dry ground up to 32 blocks away. The walker's price for moving with its head under water is
+30 (was 12), and it won't plan that way at all under 80% air (was 50%).
+
+Pacing. Walking 8+ blocks in 8 seconds and ending up where it started counted as pacing even while it worked around
+one tree or rock (a new goal each log). Now only walking to the same goal, or back to one of its last 4 goals, counts.
 
 
 WHAT'S NEW IN 1.2.0
