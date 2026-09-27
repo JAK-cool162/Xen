@@ -52,7 +52,7 @@ final class Tribe {
 		if (c.minion && c.boss != null) return key(c.boss);
 		if (c.owner != null) return "owner:" + c.owner;
 		String team = c.mod.teamOf(c);
-		if (team != null && c.mod.config.teams > 1) return "team:" + team;
+		if (team != null && (c.mod.config.teams > 1 || c.mod.config.teams < 0 && c.mod.ownTeam(team))) return "team:" + team;   // (auto: the teams they made)
 		return c.band != null ? c.band : "solo:" + c.name;
 	}
 

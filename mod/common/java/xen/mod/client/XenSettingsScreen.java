@@ -133,7 +133,7 @@ public class XenSettingsScreen extends Screen {
 						"From which generation of evolution Xens know that a block in the Nether is eight in the overworld (so they build their way home at x/8, z/8) and find strongholds from two eye throws. Younger Xens can be taught: say \"the Nether is 8 times smaller\".");
 			}
 			case 3 -> {
-				choice("Teams", "teams", List.of(0, 1, 2, 3, 4, 6), n -> n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "Put Xens on teams. New Xens join the team of those around them they like most; they may switch later, and you can ask them to join yours.");
+				choice("Teams", "teams", List.of(-1, 0, 1, 2, 3, 4, 6), n -> n < 0 ? "auto" : n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "auto: like an SMP, Xens start and join teams on their own, and anyone not on their team is a rival they may fight (fighters, bullies, anyone near their base). Or put Xens on teams: new Xens join the team of those around them they like most; they may switch later, and you can ask them to join yours.");
 				onOff("Team members can fight", "friendlyFire", "Being on a team doesn't stop a fight: each Xen decides who to fight, by its temper, its motives and who it trusts."); 
 				choice("PvP", "pvp", List.of("own", "off", "defend", "teams"), s -> s,
 						"own: its own call: it fights back when someone attacks it or its owner with a weapon, lets a friend's mistake go, and gets away when it's losing. A poke with an empty hand only gets its attention. defend: always fights back against armed attacks. teams: Xens of different teams fight too.");

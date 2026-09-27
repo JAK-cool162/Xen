@@ -733,6 +733,25 @@ public final class Hands {
 		return true;
 	}
 
+	/**
+	 * Where a player keeps a shield: in the off hand, always (never in the sword hand). A shield in its bag or hotbar
+	 * goes to the off hand when that's free or holds something less useful there (a totem stays when it's in danger);
+	 * one that ended up in its main hand (picked up, just crafted) moves over too. A shield still raised with no fight
+	 * comes down.
+	 */
+	void shieldToOffhand(boolean fighting) {
+		if (!fighting) lowerShield();
+		if (isShield(p.getOffhandItem())) return;
+		ItemStack off = p.getOffhandItem();
+		if (isTotem(off) && (p.getHealth() <= 10 || p.companion != null && p.companion.dangerous())) return;   // the totem stays
+		Inventory inv = p.getInventory();
+		int slot = -1;
+		for (int i = 0; i < 36 && slot < 0; i++) if (isShield(inv.getItem(i))) slot = i;
+		if (slot < 0) return;
+		p.setItemInHand(InteractionHand.OFF_HAND, inv.getItem(slot));
+		inv.setItem(slot, off);
+	}
+
 	/** Let go of the right mouse button (a raised shield comes down). */
 	void lowerShield() {
 		if (p.isUsingItem() && isShield(p.getUseItem())) p.releaseUsingItem();

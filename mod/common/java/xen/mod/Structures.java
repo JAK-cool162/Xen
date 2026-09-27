@@ -77,6 +77,25 @@ final class Structures {
 		if (random.nextFloat() < 0.5f) c.chatter(c.pick3("Someone lives there.", "Nice house over there.", "A house. Not mine, though."), false);
 	}
 
+	/**
+	 * Its eyes keep seeing blocks people build (planks, glass, doors, beds, bricks...): a dozen close together, not
+	 * its own home, is someone's house (or a village's).
+	 */
+	void builtSeen(BlockPos at, it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap built) {
+		if (c.goals.home != null && c.goals.home.closerThan(at, 20)) return;
+		BlockPos had = found.get("house");
+		if (had != null && had.closerThan(at, 24)) return;
+		int near = 0;
+		for (var it = built.keySet().iterator(); it.hasNext(); ) if (BlockPos.of(it.nextLong()).closerThan(at, 8)) near++;
+		if (near < 12) return;
+		found.put("house", at);
+		c.eyes.houses++;
+		c.places.remember("house", at);
+		c.journal("sees", "someone's house at " + at.toShortString());
+		XenMod.LOG.info("{} found a house at {}", c.name, at.toShortString());
+		if (random.nextFloat() < 0.5f) c.chatter(c.pick3("Someone lives there.", "Nice house over there.", "A house. Not mine, though."), false);
+	}
+
 	String describe() {
 		if (found.isEmpty()) return "";
 		StringBuilder sb = new StringBuilder("Places you found:");

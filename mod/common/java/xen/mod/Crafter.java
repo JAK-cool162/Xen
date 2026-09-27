@@ -146,6 +146,8 @@ final class Crafter {
 		}
 		if (!has("shield") && c.player.getOffhandItem().isEmpty() && iron >= 1 && wood() >= 6) return "shield";
 		if (!has("bucket") && iron >= 3 && pickTier() >= 2) return "bucket";
+		if (!has("shears") && iron >= 4 && pickTier() >= 3) return "shears";   // wool without killing the sheep
+		if (count(n -> n.equals("netherite_scrap")) >= 4 && count(n -> n.equals("gold_ingot")) >= 4) return "netherite_ingot";   // netherite: 4 scrap, 4 gold
 		if (c.skills.get(Skills.FIGHT) >= 0.45f && count(n -> n.equals("golden_apple")) < 2 && count(n -> n.equals("apple")) >= 1
 				&& count(n -> n.equals("gold_ingot")) >= 8) return "golden_apple";   // a fighter's gear: golden apples
 		int coal = count(n -> n.equals("coal") || n.equals("charcoal"));

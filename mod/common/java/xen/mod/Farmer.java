@@ -129,8 +129,7 @@ final class Farmer {
 		}
 		hoeTries = 0;
 		if (seeds() == 0 && unplanted(level) > 0 || seeds() == 0 && plot.isEmpty()) {   // seeds from the grass
-			String grass = visible(level, "short_grass", 14) != null ? "short_grass" : "tall_grass";
-			c.chores.mineFor(grass, "wheat_seeds", 6, "seeds");
+			c.chores.mineFor("grass", "wheat_seeds", 6, "seeds");                // any grass or fern it can see (its eyes remember further ones)
 			c.chores.own = true;
 			line("First some seeds. Grass drops them sometimes.");
 			return null;

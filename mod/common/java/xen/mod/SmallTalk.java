@@ -46,6 +46,15 @@ final class SmallTalk {
 	private static final Pattern BOT = p("\\b(are you (a )?(bot|robot|ai|real|human|npc)|you'?re a bot)\\b");
 	private static final Pattern LAUGH = p("^(lol|lmao|lmfao|haha+|hehe+|xd|rofl)\\b");
 	private static final Pattern SAD = p("\\bi'?m (so |really |very )?(sad|bored|tired|lonely|upset|scared)\\b");
+	private static final Pattern DOING = p("\\b(what (are|r) (you|u) (doing|up to)|wyd|whatcha doing|what you doing|what'?s up with you)\\b");
+	private static final Pattern WHY = p("^(why|why\\?|how come|but why|why tho|why though)\\??$");
+	private static final Pattern PLAN = p("\\b(what'?s (your|the) plan|what (will|are) you (do|going to do)|what next|what'?s next|your goal)\\b");
+	private static final Pattern NEED = p("\\b(what do you need|need anything|what are you missing|need help with)\\b");
+	private static final Pattern HOW_MANY = p("\\b(how (many|much) ([a-z_ ]+?)( do you have| have you got| you got)?\\??$|do you have (any |some |a |an )?([a-z_]+))");
+	private static final Pattern BAG = p("\\b(what'?s in your (bag|inventory|pockets)|what do you have|show (me )?your (stuff|inventory|items))\\b");
+	private static final Pattern FOUND = p("\\b(found anything|find anything|what did you find|seen any(thing)?|any (caves|villages|diamonds|iron) (around|near))\\b");
+	private static final Pattern TEAM = p("\\b(what team|your team|who'?s on your team|are you (on|in) a team|which team)\\b");
+	private static final Pattern DUEL = p("\\b(1v1|1 v 1|fight me|duel( me)?|pvp me|wanna fight|let'?s fight|square up)\\b");
 	private static final Pattern THINK_OF = p("\\b(what do you think (of|about)|do you know|who is) ([a-z0-9_]{3,16})\\b");
 
 	private static final String[] JOKES = {
@@ -57,6 +66,103 @@ final class SmallTalk {
 			"Why was the zombie so good at school? He was always dead serious.",
 			"I told a joke to a chicken. It laid an egg.",
 			"Why do villagers never win arguments? They only say hmm."};
+
+	/** The last thing it explained (for a "why?" after it). */
+	private String because = "";
+
+	/** Questions about itself, answered from what it's really doing, has and knows (not made up). Null if not one. */
+	private String aboutItself(ServerPlayer from, String w) {
+		var g = c.goals;
+		if (DOING.matcher(w).find()) {
+			String now = !g.instant.isEmpty() ? g.instant : g.current != null ? g.current.what : "";
+			because = g.optionHow == null ? "" : g.optionHow.replace("the plan: ", "");
+			if (now.isEmpty()) return c.pick3("Not much. Looking around.", "Taking a breather.", "Just thinking about what's next.");
+			return c.pick3("I'm " + now + ".", "Right now? " + cap(now) + ".", cap(now) + ". Busy busy.");
+		}
+		if (WHY.matcher(w).find()) {
+			if (because.isEmpty()) because = g.optionHow == null ? "" : g.optionHow.replace("the plan: ", "");
+			if (because.isEmpty()) return c.pick3("It felt right.", "Why not?", "Just because.");
+			String b = because;
+			because = "";
+			return b.startsWith("night") ? "It's dark out. " + cap(b.replaceFirst("night: ", "")) + "."
+					: c.pick3("Because " + b + " comes next.", "I need " + b + ". That's how you get ahead.", "The plan: " + b + ".");
+		}
+		if (PLAN.matcher(w).find() || NEED.matcher(w).find()) {
+			String next = nextStep();
+			because = next;
+			return NEED.matcher(w).find() ? "I could use " + next + ". If you have some, I won't say no." : c.pick3("Next up: " + next + ".", "The plan? " + cap(next) + ".", cap(next) + ", then we'll see.");
+		}
+		if (BAG.matcher(w).find()) {
+			var items = c.items();
+			if (items.isEmpty()) return "Nothing. Empty pockets.";
+			StringBuilder sb = new StringBuilder();
+			items.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(6)
+					.forEach(e -> sb.append(sb.length() == 0 ? "" : ", ").append(e.getValue()).append(' ').append(e.getKey().replace('_', ' ')));
+			return "I've got " + sb + ".";
+		}
+		var hm = HOW_MANY.matcher(w);
+		if (hm.find()) {
+			String thing = (hm.group(3) != null ? hm.group(3) : hm.group(6)).trim();
+			if (thing.length() < 3 || thing.contains("you") || thing.split(" ").length > 2
+					|| thing.matches("(time|dog|dogs|pet|pets|cat|cats|home|house|base|team|friends?|job|name|idea|plan|fun|days?)")) return null;
+			int n = countOf(thing);
+			return n == 0 ? c.pick3("No " + thing + ", sorry.", "None right now.", "Zero " + thing + ". Want to help?")
+					: c.pick3("I have " + n + " " + thing + ".", n + ".", n + " " + thing + ", why?");
+		}
+		if (FOUND.matcher(w).find()) {
+			StringBuilder sb = new StringBuilder();
+			if (!c.caves.known.isEmpty()) sb.append(c.caves.known.size()).append(c.caves.known.size() == 1 ? " cave" : " caves");
+			for (var e : c.structures.found.entrySet()) sb.append(sb.length() == 0 ? "" : ", ").append("a ").append(e.getKey());
+			String eyes = c.eyes.describe();
+			if (sb.length() == 0 && eyes.isEmpty()) return "Nothing special yet.";
+			return (sb.length() > 0 ? "I found " + sb + ". " : "") + eyes;
+		}
+		if (TEAM.matcher(w).find()) {
+			var team = c.server.getScoreboard().getPlayersTeam(c.name);
+			if (team == null) return c.personality.loner ? "No team. I go solo." : "No team yet. Maybe I'll start one.";
+			StringBuilder mates = new StringBuilder();
+			for (String n : team.getPlayers()) if (!n.equals(c.name) && mates.length() < 60) mates.append(mates.length() == 0 ? "" : ", ").append(n);
+			return "I'm with the " + team.getDisplayName().getString() + (mates.length() > 0 ? ": " + mates + "." : ". Just me so far.");
+		}
+		if (DUEL.matcher(w).find()) {
+			boolean armed = MindSense.count(c, n -> n.endsWith("_sword") || n.endsWith("_axe")) > 0;
+			if (c.player.getHealth() < 12) return "Not now, I'm hurt. Later.";
+			if (!armed && c.personality.bravery < 0.7f) return "Let me get a sword first.";
+			if (c.personality.passive() && c.personality.bravery < 0.5f) return c.pick3("I'd rather not.", "No thanks, I'm not a fighter.", "Fight? Me? No.");
+			c.chosenFoe = from;
+			c.lastPickedFight = c.player.level().getGameTime();
+			c.journal("fight", "accepts a duel with " + from.getName().getString());
+			return c.pick3("You're on!", "Alright, let's go. Don't cry after.", "1v1? Fine. Ready when you are.");
+		}
+		return null;
+	}
+
+	private static String cap(String s) {
+		return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+	}
+
+	/** What it needs next, the way it plans (tools, iron, a house, armor, diamonds, netherite). */
+	private String nextStep() {
+		int tier = c.crafter.pickTier();
+		var items = c.items();
+		if (tier == 0) return "wood for a pickaxe";
+		if (tier == 1) return "stone for stone tools";
+		if (tier == 2) return "iron (a trip down the mine)";
+		if (c.goals.home == null) return "a house of my own";
+		if (c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()) return "iron for armor";
+		if (tier < 4 || items.getOrDefault("diamond", 0) < 3) return "diamonds";
+		return "netherite, from the Nether";
+	}
+
+	/** How many of a thing it carries ("logs", "iron", "diamonds", "food", "torches"...). */
+	private int countOf(String thing) {
+		String t = thing.replaceAll("s$", "").replace(' ', '_');
+		if (t.equals("wood") || t.equals("log")) return MindSense.count(c, n -> n.endsWith("_log")) + MindSense.count(c, n -> n.endsWith("_planks")) / 4;
+		if (t.equals("iron")) return MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot"));
+		if (t.equals("food")) return c.items().getOrDefault("food", 0);
+		if (t.equals("stone") || t.equals("cobble")) return MindSense.count(c, n -> n.equals("cobblestone") || n.equals("cobbled_deepslate"));
+		return MindSense.count(c, n -> n.equals(t) || n.endsWith("_" + t) || n.startsWith(t + "_"));
+	}
 
 	/** A reply to these words, or null (not small talk: the chat model or its plain answers take it). */
 	String answer(ServerPlayer from, String words) {
@@ -96,6 +202,8 @@ final class SmallTalk {
 				default -> c.pick3("Aw, thanks " + who + "!", "Thank you! You too.", "That made my day.");
 			};
 		}
+		String state = aboutItself(from, w);                                  // what it's doing, why, what it has, found, its team...
+		if (state != null) return state;
 		if (JOKE.matcher(w).find()) return JOKES[random.nextInt(JOKES.length)];
 		if (LAUGH.matcher(w).find() && w.split("\\s+").length <= 2) return c.pick3("Haha.", "Right?", "Hehe.");
 		if (WHERE.matcher(w).find()) {

@@ -1,7 +1,77 @@
-XEN COMPANION 1.2.2: TECHNICAL NOTES
+XEN COMPANION 1.3.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.3.0
+===================
+
+Mob pathfinding (MobPath). The walker asks Minecraft's own pathfinder first (PathFinder with a WalkNodeEvaluator,
+the one zombies and villagers use: walk, jump up 1, drop down 3, swim, doors, around fences, cactus, fire and
+lava), for a stand-in zombie (player-sized, never added to the world) at the Xen's feet: up to 1600 nodes in a
+region of the distance plus 16 (96 at most), to the block or next to it when it's solid. Its nodes become the
+walker's moves (walk, diagonal, up, down, swim), driven with the player's keys, sprinting on walk, diagonal and up
+moves (food over 6, 3+ moves left), and running through the middle of a straight stretch without slowing to the
+block centre. Its own A* (digging, towering, bridging, parkour) plans only when this finds no way (or for a goal
+40+ blocks off, one that gets no 12 blocks closer), for a target buried in the ground, and for 5 seconds after a
+mob-way move failed. Unlike its own planner, this one knows the real terrain (like a mob). Setting pathMode: mob
+(default), xen, ab (every second Xen).
+Edge guard: on the ground and not on a planned drop or jump, it looks 0.6 blocks ahead plus 3 ticks of its motion;
+if that's not where it's going and the real drop there is over 4 blocks, it holds sneak (it can't walk off) and stops
+sprinting. Its own planner's drops now also count the real depth (a dark pit is deep to anyone). The solver's
+"bolder way" no longer leads to deadly falls.
+
+Eyes (a yes or no for every block in view). 37 x 31 sight lines (every 3 degrees over 110 x 90 degrees where its head
+points), 24 a tick (a sweep every 1.5 s at 20 tps), each shifted a random part of a step per sweep. Each line
+walks voxel by voxel (Amanatides-Woo) out to 48 blocks through air, plants and water (16 blocks of water at most),
+stopping at the first opaque block; beyond 8 blocks, under the ground, it only sees blocks after lit air. Each block
+it passes or hits is classed once per block state: coal, iron, gold, diamond, copper, lapis, redstone, emerald ore,
+ancient debris, log, grass, chest, crop, sugar cane, melon, pumpkin, berries, sand, gravel, clay, obsidian, spawner,
+water source, lava, built (planks, doors, beds, glass, bricks, tables, furnaces, wool, fences, stairs, slabs,
+torches, lanterns, bookshelves) or nothing. Kept per kind (up to 2000, 10 minutes, 160 blocks). Uses: gathering and
+mining go for the nearest one seen (48 blocks) when none is close; mineFor (seeds from any grass, gravel, obsidian)
+too; 5 dark air blocks in a row under the ground within 32 blocks: a cave (with room around it, not lit); 12 built
+blocks within 8 of each other, not its home: someone's house.
+
+Stuck. The solver never asks for help. When its way fails three times in a row, the target it was going for goes on
+its skip list and it picks another (a chore that runs out of time says so and moves on).
+
+Mobs (Critters). A skeleton, stray, bogged or pillager drawing its bow at it within 16 blocks, in sight: it faces it
+and raises its shield (none: a side step, a new side every 15 ticks). In water with drowned within 12: out to the
+nearest dry land. Poisoned under 14 health: a milk bucket, or a bucket and a cow in sight (it milks it, then drinks).
+When free, in daylight, every 10 s: shears and a woolly sheep in sight (under 16 wool): it shears it; by its home
+(32 blocks), 2+ grown animals of a kind (under 12 there) and their food in its bag (wheat: cows, sheep; seeds:
+chickens; carrots, potatoes, beetroot: pigs): it feeds them; raw cod or salmon and a stray cat: it tames it. It crafts
+shears with 4+ iron and an iron pickaxe. The shield lives in the off hand (checked every 2 s; a totem stays there when
+it's in danger), and comes down when there's no fight.
+
+Progression. A crop farm is only allowed from the iron pickaxe on (or with hunger under 10 and no food). After diamond
+gear (a diamond sword or chestplate) and with adventures on, the plan sends it to the Nether (a portal it knows or
+builds) for ancient debris: a staircase to y 15 and branch tunnels, mining any debris with a face showing within 6
+blocks or seen within 24, gold on the way, home after 4 (or 15 minutes). Debris smelts to netherite scrap; 4 scrap and
+4 gold make a netherite ingot. (Upgrading gear needs a smithing template from a bastion: not yet.)
+
+Teams: auto (-1, the new default; old settings with one team move to it). No color teams are handed out: Xens start
+and join teams on their own (as in 1.2), with the team's color on their names. Rivals: with pvp "own", a player not
+on its team (and not its owner, its tribe, or someone it trusts 0.5+) is a foe when near its home (24 blocks) and it's
+armed, or when it's a fighter (fight skill 0.55+, bravery over 0.45, health 16+, armed) looking for a duel; at most
+one picked fight per 4 minutes. With no danger around and health 14+, the plan takes the fight to a rival. "1v1 me":
+it accepts if it's healthy and armed (or brave), unless it's passive.
+
+Talk. From what's true: what it's doing (its current task), why (the plan's reason), its plan and what it needs (the
+next step of the progression), how many of something it has, what's in its bag (top 6), what it found (caves,
+places, ore and trees seen), its team and teammates, and duels.
+
+/xen summon random N: N Xens (up to 100) with random names and skins, as the limits allow. Any other name with a
+number: Pip, Pip2, Pip3...
+
+RAM and lag. The DMM's replay memory holds 15,000 moments (was 30,000) and 2,500 trauma and joy each (was 5,000):
+about 50 MB less when full. The networks' optimizer state (two more copies of the weights) is only made once it
+learns. The eyes keep their memory in compact long maps. Lag spikes with 5 Xens (a 60-second tick and a crash in a
+test) came from planning: the walker now keeps each block it looked at for the rest of the tick and reads blocks
+straight from chunks, plans at most 2,500 blocks (was 4,000) and 5,000 a tick for all Xens together (was 12,000); the
+eyes read chunks directly and look at light only where it matters. Tick time with 5 Xens at 30 tps: 23 ms average.
 
 
 WHAT'S NEW IN 1.2.2

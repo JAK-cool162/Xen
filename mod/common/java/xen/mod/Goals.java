@@ -600,6 +600,8 @@ final class Goals {
 		if (wood >= (home == null ? 96 : 64)) can[Mind.WOOD] = false;              // plenty: on with something else
 		if (stone >= 64) can[Mind.STONE] = false;
 		if (c.player.isCreative() || c.mode == Companion.Mode.STAY || c.mode == Companion.Mode.FOLLOW) return -1;
+		if (can[Mind.FIGHT] && f[Mind.DANGER] < 0.2f && c.player.getHealth() >= 14 && MindSense.enemy(c) != null
+				&& c.mod.config.teams < 0) return why(Mind.FIGHT, "a rival");             // (teams on auto: it takes the fight to them)
 		if (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // danger, a friend in need: its own call
 		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);
 		int tier = c.crafter.pickTier();
@@ -637,7 +639,30 @@ final class Goals {
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for a house");
 		}
 		if (tier >= 3 && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f ? "iron for armor" : "diamonds");
+		if (tier >= 4 && netheriteNext() && !c.nether.busy() && now() > netherTryAt) {   // diamonds done: netherite, from the Nether
+			netherTryAt = now() + 20 * 60 * 20;
+			String trip = c.nether.go("debris", 0);
+			c.journal("thinks", "the plan: netherite (" + trip + ")");
+			if (trip.startsWith("You will")) {
+				c.chatter(c.pick3("Diamonds done. Next: netherite!", "Time for the Nether. Ancient debris, here I come.", "Netherite next."), true);
+				return why(Mind.REST, "off to the Nether for netherite");
+			}
+		}
 		return -1;
+	}
+
+	private long netherTryAt;
+
+	private long now() {
+		return c.player.level().getGameTime();
+	}
+
+	/** Diamond gear (a diamond pickaxe and sword or chestplate), and not yet netherite enough: the Nether is next. */
+	private boolean netheriteNext() {
+		int debris = MindSense.count(c, n -> n.equals("ancient_debris") || n.equals("netherite_scrap")) + 4 * MindSense.count(c, n -> n.startsWith("netherite_"));
+		boolean diamondGear = MindSense.count(c, n -> n.equals("diamond_sword") || n.equals("diamond_chestplate")) > 0
+				|| c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem().toString().contains("diamond");
+		return diamondGear && debris < 4 && c.mod.config.adventures;
 	}
 
 	private int why(int option, String why) {

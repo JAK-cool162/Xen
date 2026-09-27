@@ -205,10 +205,11 @@ final class Solver {
 			case STAIRS_UP -> above && !water;
 			case DIG_THROUGH -> !water && (pick || !place.startsWith("water"));
 			case SWIM_OUT -> water;
-			case ASK -> c.leader != null;
+			case ASK -> false;                                               // (it gets itself out: no asking anyone)
 			default -> true;
 		});
 		if (way == null) return false;
+		c.stucks++;
 		started = now();
 		startGap = gap(c.player.position(), to);
 		steps = 0;

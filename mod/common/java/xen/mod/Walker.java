@@ -41,7 +41,7 @@ final class Walker {
 
 	// time costs, in ticks (a player walks a block in about 4.6, sprints one in 3.6)
 	private static final double WALK = 4.63, SPRINT = 3.56, JUMP = 3, SWIM = 8, CLIMB = 8.5, SNEAK = 15, PLACE = 6, INF = 1e9;
-	private static final int LIMIT = 4000;                                 // blocks it thinks about, at most, per plan
+	private static final int LIMIT = 2500;                                 // blocks it thinks about, at most, per plan
 
 	private final Companion c;
 	private List<Move> path;
@@ -166,7 +166,7 @@ final class Walker {
 	 * Planning takes time: all the Xens together think about at most this many blocks each server tick (with 50 Xens,
 	 * a few of them plan each tick and the rest walk the way they have), so the server never stutters.
 	 */
-	private static final int NODES_PER_TICK = 12000;
+	private static final int NODES_PER_TICK = 5000;
 	private static int budgetTick = -1, budgetUsed;
 
 	private static boolean budget(int tick) {
@@ -276,7 +276,7 @@ final class Walker {
 		if (path == null) return "no way";
 		Map<Kind, Integer> kinds = new java.util.EnumMap<>(Kind.class);
 		for (Move m : path) kinds.merge(m.kind(), 1, Integer::sum);
-		return kinds.toString().toLowerCase(java.util.Locale.ROOT);
+		return (mobWay ? "mob way " : "") + kinds.toString().toLowerCase(java.util.Locale.ROOT);
 	}
 
 	// ------------------------------------------------------------------------------------ planning
@@ -308,6 +308,14 @@ final class Walker {
 		this.eyes = start;
 		BlockPos target = BlockPos.containing(to);
 		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
+		mobWay = false;
+		if (mobPaths() && now() >= noMobWayUntil && reachable(target)) {         // the mobs' way first: quick, sure, no digging
+			List<Move> m = mobPath.plan(c, level, start, to, 1600);
+			if (m != null) {
+				mobWay = true;
+				return m;
+			}
+		}
 		Map<Long, Node> nodes = new HashMap<>();
 		PriorityQueue<Node> open = new PriorityQueue<>();
 		Node first = new Node(start);
@@ -397,6 +405,7 @@ final class Walker {
 		if (walkedFar > 8 && Math.hypot(prev.x - first.x, prev.z - first.z) < 2) {
 			lockedUntil = now() + 200;                                        // ten seconds on one way, no turning back
 			plannedAt = 0;
+			c.pacings++;
 			XenMod.LOG.info("{} was pacing back and forth ({} blocks walked, {} from where it was): it keeps to one way now",
 					c.name, String.format(java.util.Locale.ROOT, "%.0f", walkedFar), String.format(java.util.Locale.ROOT, "%.1f", Math.hypot(prev.x - first.x, prev.z - first.z)));
 			c.journal("way", "was pacing back and forth: keeps to one way");
@@ -446,7 +455,7 @@ final class Walker {
 					r = r.below();
 					k++;
 				}
-				if (water(r) || k <= maxFall && floor(r) && !farmland(r)) {
+				if (water(r) || k <= maxFall && floor(r) && !farmland(r) && realDrop(q) <= maxFall) {   // (a dark pit looks deep to anyone)
 					double hurt = water(r) ? 0 : Math.max(0, k - 3) * (12 + 30 * fear);
 					add(Kind.FALL, p, r, WALK + 2 * k + hurt + danger(r), List.of());
 				}
@@ -509,15 +518,39 @@ final class Walker {
 	// ------------------------------------------------------------------------------------ the world, as it knows it
 	/** What it can know: close by it feels it; further off only what's out in the light (a dark cave far away: rock). */
 	private boolean known(BlockPos p) {
-		return p.distManhattan(eyes) <= 8 || level.isLoaded(p) && level.getRawBrightness(p, 0) > 0;
+		return p.distManhattan(eyes) <= 8 || level.getRawBrightness(p, 0) > 0;
 	}
 
+	/**
+	 * What it knows is at a block. Planning asks about the same blocks over and over, so each answer is kept for the
+	 * rest of the tick (the world doesn't change within one), and blocks come straight from their chunk.
+	 */
 	private BlockState state(BlockPos p) {
-		if (!level.isLoaded(p)) return Blocks.BEDROCK.defaultBlockState();
-		BlockState s = level.getBlockState(p);
-		if (!known(p) && s.getCollisionShape(level, p).isEmpty() && s.getFluidState().isEmpty()) return Blocks.STONE.defaultBlockState();
+		long now = level.getGameTime(), key = p.asLong();
+		if (now != cacheTick || level != cacheLevel) {
+			cache.clear();
+			chunks.clear();
+			cacheTick = now;
+			cacheLevel = level;
+		}
+		BlockState s = cache.get(key);
+		if (s != null) return s;
+		var chunk = chunks.computeIfAbsent(((long) (p.getX() >> 4) << 32) | ((p.getZ() >> 4) & 0xFFFFFFFFL),
+				k -> level.getChunkSource().getChunkNow(p.getX() >> 4, p.getZ() >> 4));
+		if (chunk == null) {
+			s = Blocks.BEDROCK.defaultBlockState();
+		} else {
+			s = chunk.getBlockState(p);
+			if (!known(p) && s.getCollisionShape(level, p).isEmpty() && s.getFluidState().isEmpty()) s = Blocks.STONE.defaultBlockState();
+		}
+		cache.put(key, s);
 		return s;
 	}
+
+	private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<BlockState> cache = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+	private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<net.minecraft.world.level.chunk.LevelChunk> chunks = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+	private long cacheTick = -1;
+	private ServerLevel cacheLevel;
 
 	/** Room for a body: nothing solid (a carpet or a snow layer is fine, an open door or gate too), no lava, no fire. */
 	private boolean passable(BlockPos p) {
@@ -686,6 +719,8 @@ final class Walker {
 
 	private void problem(Move m, String why) {
 		lastProblem = why;
+		if (mobWay) noMobWayUntil = now() + 100;                              // the mobs' way didn't work here: its own for a bit
+		c.troubles++;
 		bad.merge(key(m), 1, Integer::sum);
 		badSince = now();
 		fails++;
@@ -706,6 +741,7 @@ final class Walker {
 		boolean settled = p.onGround() || p.isInWater() || p.onClimbable();
 		if (m.kind() == Kind.PILLAR || m.kind() == Kind.CLIMB_UP || m.kind() == Kind.CLIMB_DOWN) return feet.equals(m.to()) && settled;
 		if (m.kind() == Kind.SWIM) return flat < 0.6 && Math.abs(p.getY() - m.to().getY()) < 1.0;   // (bobbing in the water)
+		if (mobWay && !last && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL)) return feet.equals(m.to()) && flat < 0.9;   // (running on through)
 		return feet.equals(m.to()) && settled && flat < (last || turning ? 0.35 : 0.7);
 	}
 
@@ -757,8 +793,8 @@ final class Walker {
 		face(to.add(0, 1.2, 0));
 		boolean straight = !last && direction(path.get(index + 1)) == direction(m);
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
-		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR) && (straight || m.kind() == Kind.PARKOUR)
-				&& p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 3;
+		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || mobWay && m.kind() == Kind.ASCEND)
+				&& (straight || mobWay || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > (mobWay ? 2 : 3);
 		p.setSprinting(sprint);
 		switch (m.kind()) {
 			case ASCEND -> {
@@ -796,9 +832,56 @@ final class Walker {
 		}
 		// stuck against a block edge (it happens): a hop, like a player
 		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 10) p.setJumping(true);
+		// an edge it doesn't mean to go over (a cliff, a ravine, a dark one too: a player sees a pit is deep): it
+		// crouches there, like a player, and can't slip off (running on, it could fly past its turn)
+		if (p.onGround() && !p.isInWater() && m.kind() != Kind.FALL && m.kind() != Kind.PARKOUR && m.kind() != Kind.DIG_DOWN) {
+			var v = p.getDeltaMovement();
+			double yaw = Math.toRadians(p.getYRot());
+			Vec3 ahead = p.position().add(-Math.sin(yaw) * 0.6 + v.x * 3, 0, Math.cos(yaw) * 0.6 + v.z * 3);
+			BlockPos under = BlockPos.containing(ahead);
+			if (!under.equals(m.to()) && realDrop(under) > 4) {
+				p.setShiftKeyDown(true);
+				p.setSprinting(false);
+				doing = "careful at the edge";
+			}
+		}
+	}
+
+	/** How far down it would really fall from this block (0: something to stand on, or water to land in). */
+	private int realDrop(BlockPos from) {
+		var lv = (ServerLevel) c.player.level();
+		BlockPos.MutableBlockPos q = from.mutable();
+		int k = 0;
+		while (k < 32) {
+			var st = lv.getBlockState(q);
+			if (!st.getFluidState().isEmpty()) return 0;
+			if (!st.getCollisionShape(lv, q).isEmpty()) return k == 0 ? 0 : k - 1;
+			q.move(Direction.DOWN);
+			k++;
+		}
+		return k;
 	}
 
 	private long lastHop;
+	/** Minecraft's own mob pathfinder, and whether the way it's on came from it. */
+	final MobPath mobPath = new MobPath();
+	boolean mobWay;
+	/** A mob's way that failed on the ground: its own planner for a while. */
+	private long noMobWayUntil;
+
+	/** Somewhere a mob could get to: open, or a block with an open side (not one buried in the ground). */
+	private boolean reachable(BlockPos t) {
+		if (!level.isLoaded(t)) return true;
+		if (level.getBlockState(t).getCollisionShape(level, t).isEmpty()) return true;
+		for (Direction d : Direction.values()) if (level.getBlockState(t.relative(d)).getCollisionShape(level, t.relative(d)).isEmpty()) return true;
+		return false;
+	}
+
+	/** Does it plan the mobs' way first (the setting; "ab" splits the Xens in two, by name)? */
+	boolean mobPaths() {
+		String mode = c.mod.config.pathMode;
+		return "mob".equals(mode) || "ab".equals(mode) && c.mod.companions.indexOf(c) % 2 == 0;
+	}
 	/** The last few goals it walked to (going back to one it just left is dithering, not work). */
 	private final java.util.ArrayDeque<Vec3> recentGoals = new java.util.ArrayDeque<>();
 

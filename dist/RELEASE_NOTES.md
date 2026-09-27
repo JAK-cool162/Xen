@@ -1,7 +1,30 @@
-**Xen Companion 1.2.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.3.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### New in 1.3.0
+
+* **Walking like mobs do, running**: Xens plan their way with Minecraft's own mob pathfinder (the one zombies and
+  villagers use) and sprint along it. Their own planner (digging through, towering up, bridging) is only for where
+  that finds no way. Setting: pathMode (mob, xen, or ab to compare).
+* **Eyes on every block**: a yes or no for every block in view (out to 48 blocks, a full sweep every 1.5 s): ore,
+  trees, grass for seeds, chests, water, crops, what people build. Caves and other people's houses are spotted from
+  what they see, and chores go for what they saw (no more "looking for tall grass" for minutes).
+* **Smarter when stuck**: they never ask you for help; after three failed tries they pick another target.
+* **No more cliff deaths**: they crouch at edges they don't mean to go over, and a dark pit counts as deep.
+* **Mobs**: shield up when a skeleton draws its bow (a side step without one); out of the water when drowned are
+  about; milk a cow when poisoned; breed animals by their home; shear sheep (they make shears); tame cats.
+* **Shield**: always in the off hand, never the sword hand.
+* **Real progression**: no crop farm before the iron pickaxe (unless food runs out); after diamond gear they go to
+  the Nether for ancient debris, smelt it, and make netherite ingots.
+* **Teams: auto** (the new default): like an SMP, Xens start and join their own teams, and their names take the
+  team's color. They fight players too: near their base, fighters looking for a duel, bullies. Say "1v1 me".
+* **Talk**: they answer from what they're really doing: "what are you doing?", "why?", "what's your plan?", "what
+  do you need?", "how many logs do you have?", "what's in your bag?", "found anything?", "what team are you on?".
+* **/xen summon random 5**: five Xens with random names and skins.
+* **Lighter**: less RAM (the brain's replay memory is half the size, learning state only when learning), and the
+  lag spikes with several Xens are gone (planning results are cached, sight lines read chunks directly).
 
 ### 1.2.2: real progress, far fewer deaths
 

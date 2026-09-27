@@ -94,6 +94,12 @@ final class MindSense {
 		Tribe t = c.tribe();
 		long now = c.player.level().getGameTime();
 		boolean bully = c.personality.aggressive() && c.personality.power > 0.55f && now - c.lastPickedFight > 20 * 60 * 5;   // (not every minute)
+		// Teams on auto (an SMP): anyone not on its team is a rival. Near its base it defends its land; a good fighter,
+		// healthy and armed, goes looking for a fight now and then (not the ones it likes).
+		boolean smp = c.mod.config.teams < 0 && c.mod.config.pvp.equals("own") && now - c.lastPickedFight > 20 * 60 * 4 && !c.inArena;
+		boolean armed = smp && count(c, n -> n.endsWith("_sword") || n.endsWith("_axe")) > 0;
+		boolean duelist = smp && armed && c.player.getHealth() >= 16 && c.skills.get(Skills.FIGHT) >= 0.55f && c.personality.bravery > 0.45f;
+		var myTeam = c.server.getScoreboard().getPlayersTeam(c.name);
 		ServerPlayer best = null;
 		double bestD = 24;
 		for (ServerPlayer p : c.server.getPlayerList().getPlayers()) {
@@ -102,6 +108,11 @@ final class MindSense {
 			float trust = c.trust(p.getUUID());
 			boolean weaker = p.getHealth() + 2 * armor(p) < c.player.getHealth() + 2 * armor(c.player) + 4;   // a bully picks on the weaker
 			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker;
+			if (!foe && smp && (myTeam == null || c.server.getScoreboard().getPlayersTeam(p.getScoreboardName()) != myTeam)
+					&& !(p instanceof XenPlayer x && x.companion != null && t != null && t.members.contains(x.companion))) {
+				boolean onItsLand = c.goals.home != null && p.blockPosition().closerThan(c.goals.home, 24) && trust < 0.5f;
+				foe = onItsLand && armed || duelist && trust < 0.5f;
+			}
 			if (!foe) continue;
 			double d = p.distanceTo(c.player);
 			if (d < bestD && c.player.hasLineOfSight(p)) {
@@ -233,7 +244,8 @@ final class MindSense {
 		a[Mind.SHELTER] = night || f[Mind.DUSK] > 0.5f;
 		a[Mind.SLEEP] = night && c.hasBed();
 		a[Mind.HOUSE] = !c.builder.busy() && !creative && (c.goals.home == null && wood >= 60 || c.goals.home != null && wood >= 160);
-		a[Mind.FARM] = c.farmer.middle == null && !c.farmer.on && (f[Mind.HOE] > 0 || wood >= 4);
+		a[Mind.FARM] = c.farmer.middle == null && !c.farmer.on && (f[Mind.HOE] > 0 || wood >= 4)
+				&& (c.crafter.pickTier() >= 3 || food < 10 && c.items().getOrDefault("food", 0) == 0);   // iron first (farms come later, or when food runs out)
 		a[Mind.MINE] = c.crafter.pickTier() >= 1;
 		var items = c.items();
 		a[Mind.SMELT] = (items.getOrDefault("raw_iron", 0) >= 1 || c.chores.rawFood() >= 1) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)

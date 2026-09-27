@@ -53,7 +53,7 @@ public final class Brain {
 		striatum = new Critic(obsDim, nActions, hidden, lr, gamma, tau, seed);
 		amygdala = new Critic(obsDim, nActions, hidden, lr, fearGamma, tau, seed + 1);
 		worldModel = new WorldModel(obsDim, nActions, hidden, lr, seed + 2);
-		memory = new Memory(30_000, 5_000, nStep, gamma, 0.2f, 0.1f);
+		memory = new Memory(15_000, 2_500, nStep, gamma, 0.2f, 0.1f);   // (about 50 MB at most: RAM-friendly, still plenty to learn from)
 	}
 
 	public Emotions newBody() {

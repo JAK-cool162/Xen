@@ -69,6 +69,12 @@ public final class XenConfig {
 	 */
 	public boolean pathAssist = true;
 	/**
+	 * How path assist plans: "mob" (Minecraft's own mob pathfinder first, sprinting along it; its own planner, which
+	 * digs and towers, only where that finds no way), "xen" (only its own planner), "ab" (half the Xens each way, to
+	 * compare them).
+	 */
+	public String pathMode = "mob";
+	/**
 	 * (Experiment) The solver: a second little mind that, when a Xen is stuck, picks a way out (dig up, tower up, a
 	 * staircase, bridge, swim, go round, back off) and learns which ones work where, also from players it trusts.
 	 */
@@ -125,8 +131,11 @@ public final class XenConfig {
 	 */
 	public String nameStyle = "player";
 
-	/** Teams: 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams. */
-	public int teams = 1;
+	/**
+	 * Teams: -1 = auto (like an SMP: no teams handed out; Xens start and join their own, and anyone not on theirs
+	 * is a rival they may fight), 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams.
+	 */
+	public int teams = -1;
 	/**
 	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
 	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",
@@ -148,7 +157,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 6;
+	public int version = 7;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -178,7 +187,8 @@ public final class XenConfig {
 					if (config.maxXens == 0) config.maxXens = 50;
 					if (!j.has("maxMinions") || config.maxMinions == 8) config.maxMinions = 100;
 				}
-				config.version = 6;
+				if ((!j.has("version") || j.get("version").getAsInt() < 7) && config.teams == 1) config.teams = -1;   // 1.3: teams on their own (SMP)
+				config.version = 7;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));
@@ -199,7 +209,7 @@ public final class XenConfig {
 				if (!v.matches("(?i)true|false|on|off")) return key + " is on or off";
 				f.setBoolean(this, v.equalsIgnoreCase("true") || v.equalsIgnoreCase("on"));
 			} else if (t == int.class) {
-				f.setInt(this, Integer.parseInt(v));
+				f.setInt(this, key.equals("teams") && v.equalsIgnoreCase("auto") ? -1 : Integer.parseInt(v));
 			} else if (t == double.class) {
 				f.setDouble(this, Double.parseDouble(v));
 			} else if (t == String.class) {

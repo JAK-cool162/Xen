@@ -53,6 +53,25 @@ final class Caves {
 		c.chatter(c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave."), false);
 	}
 
+	/**
+	 * Its eyes saw dark open space under the ground (see {@link Eyes}): a cave, if there's room around the spot (not a
+	 * hole) and nobody lit it (a lit room is someone's). Kept like the ones it spots itself.
+	 */
+	void saw(BlockPos spot) {
+		if (c.player == null) return;
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7) return;
+		for (BlockPos k : known) if (k.closerThan(spot, 24)) return;           // (one it knows already)
+		known.add(spot);
+		if (known.size() > 12) known.remove(0);
+		c.eyes.caves++;
+		c.places.remember("cave", spot);
+		c.journal("sees", "a cave at " + spot.toShortString());
+		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
+		c.chatter(c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave."), false);
+	}
+
 	/** The nearest cave it knows (within that far), or null. */
 	BlockPos nearest(double far) {
 		if (c.player == null) return null;

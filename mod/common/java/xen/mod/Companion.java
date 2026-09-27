@@ -45,6 +45,12 @@ public final class Companion {
 
 	/** -Dxen.debug=true logs every decision (for troubleshooting). */
 	static final boolean DEBUG = Boolean.getBoolean("xen.debug");
+	/** (Tests) Each game minute, a line in the log with how it's doing (-Dxen.stats=true). */
+	static final boolean STATS = Boolean.getBoolean("xen.stats");
+	/** For the tests: how far it went, how often its way went wrong, it paced, it was stuck. */
+	double moved;
+	int troubles, pacings, stucks;
+	private Vec3 lastPos;
 
 	static final Map<String, Float> ITEM_VALUE = Map.of("dirt", 0.05f, "cobblestone", 0.1f, "log", 1f, "coal", 1.5f,
 			"raw_iron", 3f, "raw_gold", 4f, "diamond", 10f, "food", 0.3f);
@@ -224,6 +230,8 @@ public final class Companion {
 		genTicks++;
 		hands.tick();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
+		eyes.tick();                                                    // a yes or no for every block it can see
+		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
 		if (player.tickCount % 10 == 0) {
 			places.tick();                                               // the way it walked, remembered
@@ -250,7 +258,10 @@ public final class Companion {
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
 		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
-		if (player.tickCount % 40 == 20) wearArmor();
+		if (player.tickCount % 40 == 20) {
+			wearArmor();
+			hands.shieldToOffhand(fighting);                             // a shield lives in the off hand
+		}
 		mimic.watch();                                                  // what are the players it sees doing?
 		solver.watch();                                                 // and how they get out of holes
 		antics.watch();
@@ -627,6 +638,8 @@ public final class Companion {
 			if (goals.instant.isEmpty()) goals.instant = "fighting the " + fightingWhat;
 			return fight;
 		}
+		Action care = critters.danger();                              // arrows coming, drowned about, poison
+		if (care != null) return care;
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
 		Action shocked = rumors.shockStep();                          // someone it killed, alive; the one they say nobody beats
 		if (shocked != null) return shocked;
@@ -717,6 +730,10 @@ public final class Companion {
 		if (drill != null) return drill;
 		Action need = needs();                                         // starving, or night coming with no bed: that first
 		if (need != null) return need;
+		if (mode == Mode.FREE && !minion && !chores.busy() && !builder.busy()) {
+			Action animals = critters.chores();                          // its animals: breeding, shearing, a cat
+			if (animals != null) return animals;
+		}
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.think()) {   // free: what does it want?
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
@@ -1334,6 +1351,7 @@ public final class Companion {
 
 	/** Trouble on the way (a move that didn't work): it tries another way; again and again, and it's stuck. */
 	void stuckOnTheWay(String why, int times) {
+		if (times >= 3) chores.unreachable();                          // can't get there: another one, on its own
 		if (times >= 3 && player.tickCount - stuckSaidAt > 600) {
 			stuckSaidAt = player.tickCount;
 			if (DEBUG) XenMod.LOG.info("[xen debug] {} is stuck on its way ({} times): {}", name, times, why);
@@ -1344,6 +1362,23 @@ public final class Companion {
 
 	/** Truces, giving up, and what it wants for peace (see {@link Diplomacy}). */
 	final Diplomacy diplomacy = new Diplomacy(this);
+
+	private void stats() {
+		Vec3 now = player.position();
+		if (lastPos != null && lastPos.distanceTo(now) < 2) moved += Math.hypot(now.x - lastPos.x, now.z - lastPos.z);   // (not a respawn or a teleport)
+		lastPos = now;
+		if (player.tickCount % 1200 != 0) return;
+		XenMod.LOG.info(String.format(java.util.Locale.ROOT,
+				"[xen stats] %s way=%s moved=%.0f mobplans=%d/%d trouble=%d pacing=%d stuck=%d caves=%d houses=%d ores=%d logs=%d sweeps=%d",
+				name, walker.mobPaths() ? "mob" : "xen", moved, walker.mobPath.found, walker.mobPath.found + walker.mobPath.missed, troubles, pacings, stucks,
+				eyes.caves, eyes.houses, eyes.count("coal") + eyes.count("iron") + eyes.count("gold") + eyes.count("diamond"), eyes.count("log"), eyes.sweeps));
+	}
+
+	/** The mobs and animals around it: arrows, drowned, poison, breeding, shearing, cats (see {@link Critters}). */
+	final Critters critters = new Critters(this);
+
+	/** Its eyes: every block in view, worth knowing or not (see {@link Eyes}). */
+	final Eyes eyes = new Eyes(this);
 
 	/** When it's stuck: a way out it learns (see {@link Solver}). */
 	final Solver solver = new Solver(this);

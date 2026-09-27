@@ -205,7 +205,8 @@ final class Nether {
 		if (nether) {
 			start(why);
 			rodsWanted = rods;
-			return why.equals("blaze") ? "You will look for a Nether fortress and fight blazes for " + rods + " blaze rods." : "You will look around the Nether.";
+			return why.equals("blaze") ? "You will look for a Nether fortress and fight blazes for " + rods + " blaze rods."
+					: why.equals("debris") ? "You will mine for ancient debris down at y 15." : "You will look around the Nether.";
 		}
 		BlockPos portal = c.places.nearest("portal");
 		boolean canBuild = obsidian() >= 10 && has("flint_and_steel");
@@ -216,7 +217,8 @@ final class Nether {
 		start(why);
 		rodsWanted = rods;
 		String how = portal != null ? "through the portal you know" : canBuild ? "through a portal you will build and light" : "through a portal: first you will get obsidian and flint";
-		return "You will go to the Nether " + how + (why.equals("blaze") ? ", then find a fortress and fight blazes for " + rods + " blaze rods." : ".");
+		return "You will go to the Nether " + how + (why.equals("blaze") ? ", then find a fortress and fight blazes for " + rods + " blaze rods."
+				: why.equals("debris") ? ", then mine for ancient debris (netherite) down at y 15." : ".");
 	}
 
 	private void start(String why) {
@@ -491,6 +493,20 @@ final class Nether {
 		if (purpose.equals("blaze") && count("blaze_rod") >= rodsWanted) {
 			c.chatter("Got " + count("blaze_rod") + " blaze rods! Time to go home.", true);
 			purpose = "home";
+		}
+		if (purpose.equals("debris")) {                                          // netherite: ancient debris, deep in the netherrack
+			if (count("ancient_debris") + count("netherite_scrap") + 4 * count("netherite_ingot") >= 4 || now() - tripSince > 20 * 60 * 15) {
+				c.chatter(count("ancient_debris") >= 4 ? "Four ancient debris! Home to smelt it into netherite." : "That's enough of the Nether for now.", true);
+				purpose = "home";
+				return home();
+			}
+			if (!c.chores.busy()) {
+				String plan = c.chores.mine(15, "debris", 4 - count("ancient_debris"));
+				c.chores.own = true;
+				c.journal("does", plan);
+				if (!plan.startsWith("You will")) purpose = "home";
+			}
+			return null;
 		}
 		if (purpose.equals("home")) return home();
 		if (fortress == null) fortress = c.places.get("fortress");

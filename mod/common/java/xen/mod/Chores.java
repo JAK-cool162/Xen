@@ -63,6 +63,16 @@ final class Chores {
 	private String giveItem;
 	private final Set<Long> skip = new HashSet<>();
 	private BlockPos target;
+
+	/** Its legs can't get to what it was going for (three tries): out of reach, it picks another (no waiting for help). */
+	void unreachable() {
+		if (kind == null) return;
+		if (target != null) skip.add(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()));
+		if (glanced != null) skip.add(Perception.Beliefs.key(glanced[0], glanced[1], glanced[2]));
+		target = null;
+		glanced = null;
+		nextGlance = 0;
+	}
 	private double closest;
 	private long lastCloser;
 	private Vec3 wander;
@@ -523,7 +533,7 @@ final class Chores {
 		if (kind == null) return null;
 		if (now() > until && kind != Kind.HIDE) {
 			finish(kind == Kind.GATHER && count(items) > had ? "I only found " + (count(items) - had) + " " + what + "."
-					: "I couldn't do it, sorry.");
+					: c.pick3("No luck here. On to something else.", "That didn't work out. Something else, then.", "Can't get to it. I'll do something else."));
 			return null;
 		}
 		return switch (kind) {
@@ -663,11 +673,13 @@ final class Chores {
 	 */
 	String mine(int y, String what, int amount) {
 		int tier = Math.max(c.crafter.pickTier(), c.crafter.canMake(2) ? 2 : c.crafter.canMake(1) ? 1 : 0);
-		int need = what.equals("diamonds") ? 3 : what.equals("iron") ? 2 : 1;
+		int need = what.equals("debris") ? 4 : what.equals("diamonds") ? 3 : what.equals("iron") ? 2 : 1;
 		if (tier < need) return "You can't go mining for " + what + " yet: you need " + Crafter.tierName(need) + " first.";
 		begin(Kind.MINE);
 		until = now() + 20 * 60 * 6;                                        // six minutes down there at most
-		if (what.equals("diamonds")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.GOLD, Blocks.COAL}, new String[] {"diamond"}, "diamonds", "diamond ore");
+		debrisHunt = what.equals("debris");
+		if (debrisHunt) set(new int[] {Blocks.GOLD}, new String[] {"ancient_debris"}, "ancient debris", "ancient debris");   // (the Nether: and gold on the way)
+		else if (what.equals("diamonds")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.GOLD, Blocks.COAL}, new String[] {"diamond"}, "diamonds", "diamond ore");
 		else if (tier >= 3) set(new int[] {Blocks.IRON, Blocks.GOLD, Blocks.COAL, Blocks.DIAMOND}, new String[] {"raw_iron"}, "iron", "iron ore");
 		else if (tier == 2) set(new int[] {Blocks.IRON, Blocks.COAL}, new String[] {"raw_iron"}, "iron", "iron ore");
 		else set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal ore");
@@ -683,7 +695,7 @@ final class Chores {
 		caveMode = false;
 		caveTarget = null;
 		boolean dark = c.player.level().isDarkOutside();                      // at night: no long walks in the dark to get there
-		BlockPos cave = c.caves.nearest(dark ? 24 : 160);
+		BlockPos cave = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD ? c.caves.nearest(dark ? 24 : 160) : null;
 		if (cave != null) {
 			caveMode = true;
 			toMine = cave;
@@ -765,6 +777,22 @@ final class Chores {
 		return null;
 	}
 
+	/** Looking for ancient debris (the Nether, for netherite) rather than overworld ore. */
+	private boolean debrisHunt;
+
+	/** Ancient debris showing a face within 6 blocks, or what its eyes saw within 24; null if none. */
+	private BlockPos debrisInSight() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-6, -4, -6), feet.offset(6, 5, 6))) {
+			if (!"debris".equals(Eyes.kind(level.getBlockState(q)))) continue;
+			if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || !open(level, q)) continue;
+			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
+		}
+		if (best == null) best = c.eyes.nearest("debris", 24, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+		return best;
+	}
+
 	/** Its mine: the depth it's dug to, the way it goes, the tunnel it's on (kept with the Xen). */
 	int mineRecordY = Integer.MIN_VALUE, mineRecordLeg;
 	net.minecraft.core.Direction mineRecordDir = net.minecraft.core.Direction.NORTH;
@@ -798,6 +826,13 @@ final class Chores {
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
 			return c.walkTo(drop.position());
+		}
+		if (debrisHunt) {                                                    // ancient debris: any it can see (it hides in the netherrack)
+			BlockPos d = debrisInSight();
+			if (d != null) {
+				doing = String.format(java.util.Locale.ROOT, "mining ancient debris (%d of %d)", got, want);
+				return reach(d);
+			}
 		}
 		BlockPos bonus = oreInReach();                                       // any ore right by it, whatever it came for
 		if (bonus != null) {
@@ -888,6 +923,7 @@ final class Chores {
 
 	private static boolean isKind(String path, String id) {
 		return path.equals(id) || id.equals("torch") && path.endsWith("torch") || id.equals("bed") && path.endsWith("_bed")
+				|| id.equals("grass") && (path.equals("short_grass") || path.equals("tall_grass") || path.equals("fern") || path.equals("large_fern"))
 				|| id.equals("door") && path.endsWith("_door") && !path.startsWith("iron") || id.equals("lantern") && path.endsWith("lantern");
 	}
 
@@ -897,9 +933,14 @@ final class Chores {
 		BlockPos feet = c.player.blockPosition(), best = null;
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -6, -16), feet.offset(16, 6, 16))) {
 			if (!isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath(), id)) continue;
+			if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;   // (one it gave up on)
 			boolean open = false;
 			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) open |= level.getBlockState(q.relative(d)).canBeReplaced();
 			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+		}
+		if (best == null) {
+			String kind = id.equals("short_grass") || id.equals("tall_grass") ? "grass" : id;   // not close by: what its eyes saw further off
+			best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
 		}
 		return best;
 	}
@@ -1080,14 +1121,14 @@ final class Chores {
 	}
 
 	private int cooked() {
-		int n = countItem("iron_ingot") + countItem("gold_ingot");
+		int n = countItem("iron_ingot") + countItem("gold_ingot") + countItem("netherite_scrap");
 		for (String f : new String[] {"cooked_beef", "cooked_porkchop", "cooked_chicken", "cooked_mutton", "cooked_rabbit", "cooked_cod",
 				"cooked_salmon", "baked_potato"}) n += countItem(f);
 		return n;
 	}
 
 	String smelt() {
-		int raw = count("raw_iron") + count("raw_gold") + rawFood();
+		int raw = count("raw_iron") + count("raw_gold") + countItem("ancient_debris") + rawFood();
 		if (raw == 0) return "You have nothing to smelt.";
 		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
 		furnace = findFurnace();
@@ -1161,8 +1202,8 @@ final class Chores {
 		if (!(c.player.containerMenu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu menu)) return Action.IDLE;
 		// the ingots out, the ore in, fuel if the fire needs it
 		if (menu.getSlot(2).hasItem()) Compat.click(menu, 2, true, c.player);
-		int raw = count("raw_iron") + count("raw_gold") + rawFood();
-		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold") || isRawFood(st));
+		int raw = count("raw_iron") + count("raw_gold") + countItem("ancient_debris") + rawFood();
+		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold") || isItem(st, "ancient_debris") || isRawFood(st));
 		if (!menu.getSlot(1).hasItem() && (menu.getSlot(0).hasItem() || raw > 0)) {
 			if (!moveInto(menu, 1, st -> isItem(st, "coal") || isItem(st, "charcoal"))) moveInto(menu, 1, st -> {
 				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
@@ -1312,7 +1353,26 @@ final class Chores {
 				}
 			}
 		}
+		if (glanced == null) glanced = fromEyes(level, cats);
 		return glanced;
+	}
+
+	/** Nothing close by: what its eyes saw further off (48 blocks), the nearest one still there. */
+	private int[] fromEyes(ServerLevel level, int[] cats) {
+		BlockPos best = null;
+		int bestCat = -1;
+		for (int cat : cats) {
+			String kind = cat == Blocks.LOG ? "log" : cat == Blocks.COAL ? "coal" : cat == Blocks.IRON ? "iron" : cat == Blocks.GOLD ? "gold"
+					: cat == Blocks.DIAMOND ? "diamond" : null;
+			if (kind == null) continue;
+			BlockPos p = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+			if (p == null || cat == Blocks.LOG && !WorldSenses.treeLog(level, p)) continue;
+			if (best == null || p.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) {
+				best = p;
+				bestCat = cat;
+			}
+		}
+		return best == null ? null : new int[] {best.getX(), best.getY(), best.getZ(), 1, bestCat};
 	}
 
 	/** How far it looks around for what it's gathering. */

@@ -730,7 +730,10 @@ public class XenMod implements ModInitializer {
 	private void commands(CommandDispatcher<CommandSourceStack> d) {
 		d.register(Commands.literal("xen")
 				.then(Commands.literal("summon").executes(ctx -> summon(ctx, null))
-						.then(Commands.argument("name", StringArgumentType.word()).executes(ctx -> summon(ctx, StringArgumentType.getString(ctx, "name")))))
+						.then(Commands.argument("name", StringArgumentType.word()).suggests((ctx, b) -> b.suggest("random").buildFuture())
+								.executes(ctx -> summon(ctx, StringArgumentType.getString(ctx, "name")))
+								.then(Commands.argument("count", IntegerArgumentType.integer(1, 100))
+										.executes(ctx -> summonMany(ctx, StringArgumentType.getString(ctx, "name"), IntegerArgumentType.getInteger(ctx, "count"))))))
 				.then(Commands.literal("spawn").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
 						.then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
 								.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), 300))
@@ -1178,7 +1181,25 @@ public class XenMod implements ModInitializer {
 		return companions.stream().filter(c -> c.minion).count();
 	}
 
+	/**
+	 * /xen summon random 5: five Xens, each with a random name and skin (any other name: Pip, Pip2, Pip3...). As many
+	 * as the limits allow (Xens per player, Xens in the world); it says how many came.
+	 */
+	private int summonMany(CommandContext<CommandSourceStack> ctx, String name, int count) {
+		boolean random = name.equalsIgnoreCase("random");
+		int made = 0;
+		for (int i = 0; i < count; i++) {
+			String n = random ? null : i == 0 ? name : (name.length() > 14 ? name.substring(0, 14) : name) + (i + 1);
+			if (summon(ctx, n) == 0) break;
+			made++;
+		}
+		int m = made;
+		if (count > 1) ctx.getSource().sendSuccess(() -> Component.literal(m + " of " + count + " Xens summoned" + (m < count ? " (the limit: /xen set maxPerPlayer, maxXens)" : "") + "."), false);
+		return made;
+	}
+
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
+		if (wanted != null && wanted.equalsIgnoreCase("random")) wanted = null;   // "random": a random name and skin
 		ServerPlayer owner = ctx.getSource().getPlayer();              // null from the server console
 		long mine = owner == null ? 0 : companions.stream().filter(c -> owner.getUUID().equals(c.owner) && !c.minion).count();
 		if (config.maxPerPlayer > 0 && mine >= config.maxPerPlayer && !op(ctx)) {

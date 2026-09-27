@@ -7,7 +7,8 @@ public final class Mlp {
 	public final int[] sizes;
 	public final float[] flat;
 	final int[] wOff, bOff;
-	private final float[] m, v;
+	/** The optimizer's running averages: only made when it first learns (a brain that just plays needs a third of the memory). */
+	private float[] m, v;
 	private int t;
 	public float lr;
 	public float maxGradNorm = 10f;
@@ -26,8 +27,6 @@ public final class Mlp {
 			total += sizes[i + 1];
 		}
 		flat = new float[total];
-		m = new float[total];
-		v = new float[total];
 		Random rng = new Random(seed);
 		for (int i = 0; i < layers; i++) {
 			double scale = Math.sqrt(2.0 / sizes[i]) * (i == layers - 1 ? 0.1 : 1.0);
@@ -113,6 +112,10 @@ public final class Mlp {
 		norm = Math.sqrt(norm);
 		float scale = norm > maxGradNorm ? (float) (maxGradNorm / norm) : 1f;
 		t++;
+		if (m == null) {
+			m = new float[flat.length];
+			v = new float[flat.length];
+		}
 		double b1 = 0.9, b2 = 0.999, c1 = 1 - Math.pow(b1, t), c2 = 1 - Math.pow(b2, t);
 		for (int i = 0; i < flat.length; i++) {
 			float g = grad[i] * scale;
