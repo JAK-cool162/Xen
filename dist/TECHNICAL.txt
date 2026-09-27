@@ -37,6 +37,10 @@ A new mine's staircase goes the way with no water on or over its first 20 steps;
 swamp) it first walks to dry ground up to 32 blocks away. The walker's price for moving with its head under water is
 30 (was 12), and it won't plan that way at all under 80% air (was 50%).
 
+Result, the same test with 1.2.2 (2.9 days, fresh land): all 3 made iron pickaxes (the first at 0.35 days, the
+others at 1.1), and 7 deaths in all (2.4 a day, was 5.2): 2 falls, 3 mobs at night, 2 drowned (the mob) while
+swimming; none ran out of air.
+
 Pacing. Walking 8+ blocks in 8 seconds and ending up where it started counted as pacing even while it worked around
 one tree or rock (a new goal each log). Now only walking to the same goal, or back to one of its last 4 goals, counts.
 

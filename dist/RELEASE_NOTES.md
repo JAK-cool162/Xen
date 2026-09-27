@@ -16,6 +16,9 @@ controls.
 * Less "pacing back and forth" when it's really just working around a tree or a rock.
 * New mod icon.
 
+Same 3-day test, 3 new Xens: before, stone tools only and 5.2 deaths a day; now all 3 have iron pickaxes (the first
+before noon of day 1) and 2.4 deaths a day, none drowned.
+
 ### 1.2.1
 
 * Fixed for Minecraft 26.3: hunting endermen for pearls (after the dragon) no longer crashes there.
