@@ -304,7 +304,8 @@ final class Voyager {
 			inv.setItem(i, held);
 			return Action.IDLE;
 		}
-		var enderman = level().getEntitiesOfClass(net.minecraft.world.entity.monster.EnderMan.class, c.player.getBoundingBox().inflate(48), e -> e.isAlive());
+		var enderman = level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, c.player.getBoundingBox().inflate(48),
+				e -> e.isAlive() && BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath().equals("enderman"));   // (by its id: the class moved in 26.3)
 		if (enderman.isEmpty()) {
 			c.goals.instant = "looking for endermen (it needs a pearl)";
 			return c.goals.exploreStep();

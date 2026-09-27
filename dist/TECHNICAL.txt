@@ -1,4 +1,4 @@
-XEN COMPANION 1.2.0: TECHNICAL NOTES
+XEN COMPANION 1.2.1: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
