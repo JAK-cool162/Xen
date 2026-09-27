@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.1.1
+# Xen Companion (Fabric mod) 1.2.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.1.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.1.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.1.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.1.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.2.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.2.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.2.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.2.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.1.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.2.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -668,6 +668,20 @@ fish at the furnace, never looks an Enderman in the eyes, and after dying it goe
 treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
 comes along (and gets on with things nearby while you're close); "explore" lets it go again.
 
+## Caves, places, and surviving like a player
+
+Xens spot caves they can see (dark openings under the ground), remember them, and go mining in them: in with
+torches, down the cave, mining the ore showing in the walls; they dig their own tunnels only where there's no cave.
+They take any ore they see on the way. They recognize villages, mineshafts, dungeons, ruined portals, temples,
+strongholds, fortresses, bastions, End cities and other people's houses. Starving, they hunt or fish; before night
+with no bed, they hunt sheep for wool; out in the wild they put their bed down and take it with them in the morning;
+their night shelter is a tunnel dug into a hill and sealed behind them. They sprint-jump on long flat stretches.
+Ask "go fishing" (they make a rod from sticks and string), "make a team called Night Owls (with me)".
+
+On a server with several Xens they live like an SMP: they found their own teams and invite friends (each decides),
+build their bases apart, visit each other's bases, and peek into chests they pass (a greedy one takes a little
+when nobody's looking).
+
 ## The little human things
 
 Xens nod when they agree, shake their heads when they refuse and wave when they say hi. Grudges fade with time (fast
@@ -764,16 +778,6 @@ Both in the settings' **Experimental** tab (with custom instructions and your sc
   tries, with the time. **Copy log** puts it on the clipboard, **Save log** writes a file to `config/xen/logs/` (on a
   server, `/xen log`), to send or to read later: the way to find what to make better.
 
-## Minion Xens
-
-`/xen minions <count>` gives your Xen minions: sidekicks with the same mind, to make a server feel full or to let
-a Xen build its own little civilization. A minion is a real player like any Xen, but **it doesn't load the world
-around it**: it only lives where someone else (its boss, a player) keeps the world loaded, and freezes mid-step
-where nobody does, until someone comes by. Minions take orders only from their boss and you. The boss runs the
-crew: every minute it gives the idle ones work ("NFLR, get 12 wood.", "ivory53, get 3 food for the village."), and
-lays out a **village**: a house for each of them around its home. Without orders they live their own life close
-to their boss. Up to 100 minions per world (`maxMinions`); `/xen dismiss` sends them home with it.
-
 ## Settings: Mod Menu or commands
 
 ![Xen Companion settings in Mod Menu](../docs/screenshots/settings.png)
@@ -798,11 +802,10 @@ away in single player. On a server, operators use:
 | `downloadChatModel` | `true` | download the chat model the first time it's needed |
 | `chatThreads` | half the CPU cores (1-4) | CPU threads for the chat model |
 | `gpu` | `"auto"` | the chat model on the graphics card: `"auto"`, `"on"` or `"off"` ([more](#the-chat-model-on-the-graphics-card)) |
-| `brain` | `"xen2"` | how main Xens decide: `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides)) or `"dmm"` (the classic brain, which minions always use) |
+| `brain` | `"xen2"` | how main Xens decide: `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides)) or `"dmm"` (the classic small brain) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
-| `maxXens` | `50` | Xens the whole world may have (0 = no limit; minions don't count) |
-| `maxMinions` | `100` | [minions](#minion-xens) the whole world may have (0 = no limit) |
+| `maxXens` | `50` | Xens the whole world may have (0 = no limit) |
 | `ownLife` | `true` | a new Xen starts free and plays its own game ([more](#its-own-life)) |
 | `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
 | `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
@@ -826,6 +829,10 @@ away in single player. On a server, operators use:
 | `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
 | `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
 | `friendlyFire` | `true` | teammates can hurt each other |
+| `localChat` | `true` | chat reaches only those within `chatRange` blocks (Xens close by overhear) |
+| `chatRange` | `32` | how far local chat and local death messages carry |
+| `localDeaths` | `true` | death messages only reach those within `chatRange` |
+| `chatModelPick` | `"auto"` | Experimental tab: `"135m"`, `"360m"`, `"off"` or `"auto"` (the Talk tab decides) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
 | `generationDays` | `3` | Minecraft days per generation |
@@ -850,13 +857,12 @@ away in single player. On a server, operators use:
 | `/xen chat on\|off`, `/xen learn on\|off` | quick switches |
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
-| `/xen minions <count>` | [minions](#minion-xens) for your Xen (up to 100 in the world) |
 | `/xen goto <x> <y> <z>` (or `<x> <z>`) | your Xen walks to that exact block and stays (in chat: "Pip, go to 120 64 -40") |
 | `/xen build <what>` | the same as asking it: `house`, `modern house`, `stilt house`, `tower`, `cottage`, `base`, `farm`, `pen`, `mob farm` |
 | `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
 | `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
 | `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
-| `/xen dismiss` | it goes home, with its minions (operators and the console send every Xen home) |
+| `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 
 * **Its bag**: right-click your Xen to open its inventory.
 * **Instincts**: it swims up in water, fights back against hostile monsters

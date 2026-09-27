@@ -109,9 +109,7 @@ public class XenSettingsScreen extends Screen {
 			}
 			case 1 -> {
 				choice("Xens per player", "maxPerPlayer", List.of(1, 2, 3, 5, 10, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens one player may summon.");
-				choice("Xens in the world", "maxXens", List.of(50, 5, 10, 20, 100, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all (minions don't count).");
-				choice("Minions in the world", "maxMinions", List.of(100, 10, 25, 50, 200, 0), n -> n == 0 ? "no limit" : "" + n,
-						"How many minions (/xen minions) the world may have. Minions don't load chunks: they freeze where nobody keeps the world loaded.");
+				choice("Xens in the world", "maxXens", List.of(50, 5, 10, 20, 100, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all.");
 				onOff("Random names", "randomNames", "New Xens get names that fit their nature (off: Xen, Xen2, Xen3...).");
 				choice("Name style", "nameStyle", List.of("player", "mixed", "fun", "gamer", "fantasy", "classic"), s -> s,
 						"player: like real players' names now (luvhi, MeeroSG, cold_lemon, Solen2009), made up, never someone's. mixed: all kinds. fun: SneakyWaffle, GrumpyBadger. gamer: Pickle_42, xXWaffleXx. fantasy: Zorbax, Lumika. classic: Pip, Bramble.");
@@ -188,6 +186,9 @@ public class XenSettingsScreen extends Screen {
 					.setTooltip(tip(Component.literal(toggles[i][2])));
 		}
 		top += 26;
+		choice("Chat model", "chatModelPick", List.of("auto", "135m", "360m", "off"),
+				v -> v.equals("135m") ? "SmolLM2 135M (small, fast)" : v.equals("360m") ? "SmolLM2 360M (better)" : v.equals("off") ? "off" : "auto (Talk tab)",
+				"The AI chat model, on your device. 135M: 145 MB, three times faster, for phones. 360M: 390 MB, better answers. A model picked here loads whatever the memory (it downloads once). auto: the Talk tab's settings. Everyday talk (hellos, jokes, \"do you like me\", where it is...) works without any model.");
 		// the journal: copy it, or save it as a file (bottom left, next to Reset and Done)
 		int by = height - 28, bw = Math.min(80, (panelWidth - 2 * Math.min(90, (panelWidth - 8) / 2) - 24) / 2);
 		StringWidget journalStatus = new StringWidget(left, by - 13, panelWidth, 12, Component.empty(), font);

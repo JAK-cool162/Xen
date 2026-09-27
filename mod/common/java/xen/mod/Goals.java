@@ -225,6 +225,13 @@ final class Goals {
 			case HOUSE -> {
 				Tribe t = c.tribe();
 				BlockPos plot = t != null && t.members.size() > 1 && t.center != null ? t.plot() : home != null ? nextTo(home, 14) : null;   // in its tribe's village
+				Companion neighbor = plot == null ? crowdedBy() : null;
+				if (neighbor != null) {                                            // an SMP: someone's base is right here; its own land first
+					BlockPos n = neighbor.goals.home;
+					heading = Math.atan2(c.player.getZ() - n.getZ(), c.player.getX() - n.getX());
+					exploreTo = null;
+					yield "You can't: " + neighbor.name + "'s base is right here. You'll find land of your own first.";
+				}
 				String h = plot != null ? c.builder.startNear("house", plot) : c.builder.start("house");
 				yield h.startsWith("You will") ? h : "You can't: " + h;
 			}
@@ -366,7 +373,7 @@ final class Goals {
 			c.acted = true;
 			return Action.IDLE;
 		}
-		if (exploreTo != null && (p.position().distanceTo(exploreTo) < 3 || now - exploreSince > 20 * 40)) {
+		if (exploreTo != null && (Math.hypot(p.getX() - exploreTo.x, p.getZ() - exploreTo.z) < 4 || now - exploreSince > 20 * 90)) {
 			exploreTo = null;
 			lookUntil = now + 30 + random.nextInt(50);
 			return Action.IDLE;
@@ -374,11 +381,15 @@ final class Goals {
 		if (exploreTo == null) {
 			if (Double.isNaN(heading)) heading = random.nextDouble() * Math.PI * 2;
 			for (int tries = 0; tries < 8 && exploreTo == null; tries++) {
-				double a = heading + (random.nextDouble() - 0.5) * (tries < 4 ? 1.2 : Math.PI * 2);
-				double r = 24 + random.nextInt(32);
+				double a = heading + (random.nextDouble() - 0.5) * (tries < 4 ? 0.7 : Math.PI * 2);   // (it keeps going one way: far, not round in circles)
+				double r = 40 + random.nextInt(40) + 60 * c.personality.curiosity;
 				BlockPos from = p.blockPosition();
 				int x = (int) Math.round(from.getX() + Math.cos(a) * r), z = (int) Math.round(from.getZ() + Math.sin(a) * r);
-				if (!p.level().hasChunkAt(new BlockPos(x, from.getY(), z))) continue;
+				if (!p.level().hasChunkAt(new BlockPos(x, from.getY(), z))) {          // land nobody has seen yet: it walks that way, and sees
+					exploreTo = new Vec3(x + 0.5, p.getY(), z + 0.5);
+					heading = a;
+					break;
+				}
 				Vec3 top = XenMod.surface((net.minecraft.server.level.ServerLevel) p.level(), x, z);
 				if (top == null || Math.abs(top.y - p.getY()) > 20) continue;          // (water, a cliff: somewhere else)
 				exploreTo = top;
@@ -393,6 +404,23 @@ final class Goals {
 		instant = "exploring";
 		c.run(p.position().distanceTo(exploreTo) > 6);
 		return c.walkTo(exploreTo);
+	}
+
+	/**
+	 * On a server with other Xens, like a real SMP: another Xen's base (not a teammate's, not its village's) within 64
+	 * blocks of here. Null when there's room.
+	 */
+	Companion crowdedBy() {
+		if (home != null || c.mod.companions.size() < 2) return null;
+		Tribe mine = c.tribe();
+		String team = c.mod.teamOf(c);
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.goals.home == null || o.player() == null || o.player().level() != c.player.level()) continue;
+			if (mine != null && mine.members.contains(o)) continue;
+			if (team != null && c.mod.ownTeam(team) && team.equals(c.mod.teamOf(o))) continue;
+			if (o.goals.home.closerThan(c.player.blockPosition(), 64)) return o;
+		}
+		return null;
 	}
 
 	/** A spot about that far from home, to one side (for its farm, its mob farm), in a direction that's the same for it each time. */
@@ -500,6 +528,16 @@ final class Goals {
 		b[Mind.TRADE] += 0.3f * (k.get(Skills.TRADE) - 0.5f);
 		b[Mind.FIGHT] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
 		b[Mind.GUARD] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
+		if (c.caves.nearest(160) != null && c.crafter.pickTier() >= 1) b[Mind.MINE] += 0.35f;   // a cave it knows: ore, easy
+		if (crowdedBy() != null) {                                              // someone else's base here: off to find its own land
+			b[Mind.EXPLORE] += 0.5f;
+			b[Mind.HOUSE] -= 0.5f;
+		}
+		if (!c.player.level().isDarkOutside() && c.goals.home != null && c.crafter.pickTier() >= 1) {   // daytime: get things done
+			b[Mind.WOOD] += 0.1f;
+			b[Mind.STONE] += 0.1f;
+			b[Mind.MINE] += 0.15f;
+		}
 		return b;
 	}
 

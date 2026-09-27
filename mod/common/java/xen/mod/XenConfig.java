@@ -105,6 +105,12 @@ public final class XenConfig {
 	 * Xens that close hear it, so someone nearby can overhear (a spy). Off: chat reaches the whole server.
 	 */
 	public boolean localChat = true;
+	/**
+	 * Which chat model (Experimental): "auto" (the Talk tab's settings decide), "135m" (SmolLM2 135M: small and fast, for
+	 * phones), "360m" (SmolLM2 360M: better answers, needs more memory) or "off". A model picked here is loaded whatever
+	 * the memory.
+	 */
+	public String chatModelPick = "auto";
 	/** How far local chat (and local death messages) carry, in blocks (32 = 2 chunks). */
 	public int chatRange = 32;
 	/** Death messages reach only those within chatRange blocks of where it happened (this turns the show_death_messages game rule off). */

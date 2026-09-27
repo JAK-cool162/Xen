@@ -1,7 +1,59 @@
-XEN COMPANION 1.1.1: TECHNICAL NOTES
+XEN COMPANION 1.2.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.2.0
+===================
+
+Caves. Every 5 seconds a Xen looks for a cave in sight: 600 random spots within 24 blocks (18 down, 6 up), kept when
+the spot is air it could stand in, dim (sky light 7 or less), under the ground (the surface is 4+ blocks above), with
+room around it (10+ air blocks in 3x3x3), not lit by torches, and visible from its eyes (a ray from its eyes reaches
+it). It remembers up to 12 caves (and its places: "cave"). Mining ("go mining", or Xen 5.2's mine choice, which gets
++0.35 when a cave is known) goes to the nearest cave within 160 blocks: in, then each spot a new random look for a
+deeper place it can see (2 points per block lower, -30 for places it was in the last 5 minutes, lava nearby -50),
+kept until it's there (or 15 seconds), torches going up in the dark as always. When there's nothing more to see, it
+digs its own branch tunnels from there.
+Ore on the way: during any gathering or mining it checks the 11x9x11 blocks around it for coal, iron, gold or diamond
+ore that shows a face to the air, that it can see, and its pickaxe can mine (diamond first, then iron); it takes it.
+A block 2 or 3 above it, within reach: it looks up and mines it (before: it stood on a block to reach it). The walker
+charges 24 more ticks for towering up, so a jump up a step wins.
+Places: one signature block looked for every 2 seconds (bell: village; rail: mineshaft; spawner: dungeon; crying
+obsidian: ruined portal; chiseled sandstone: desert temple; end portal frame: stronghold; nether bricks: fortress;
+gilded blackstone: bastion; purpur: End city; ...), 40 rays in front of it up to 64 blocks; an oak door not its own:
+someone's house. Each goes into its places and its notes.
+Survival: hunger 12 or less and no food: it fishes (water and a rod) or hunts (once a minute at most). Afternoon
+(time 8000-12000) with no bed and under 3 wool: it hunts sheep it can see (sheep count 40 blocks closer). At night
+far from home with a bed: it puts it down in front of it, sleeps, and mines it back up in the morning. Shelter: if the
+blocks 1-3 in front (feet and head) are natural ground with a floor and a roof and no water beside, it digs that
+tunnel, goes to the back and seals the entrance with 2 blocks; otherwise the old hut.
+Sprint-jumping: sprinting, on the ground, with the next 4 moves plain walking the same way on the level and room
+above: a jump every 12 ticks at most.
+Fishing: it finds open water it can see within 14 blocks (a source with at least 4 of 6 neighbours water) and a spot
+to stand 2+ blocks from it, casts a little above the spot, watches the bobber, and reels in when it dips (its
+downward speed over 0.15 in the water) or after 40 seconds; four minutes at most. When starving by water, or for fun
+(the new fishing hobby).
+SMP with 2+ Xens: every 5 minutes a Xen with a leader's nature (power over 0.6 or loyalty over 0.65) and a friend
+within 32 blocks may found a team (12%): a made-up name and color; each friend around decides (trust 0.5+, not a
+loner, not already in a team they started, loyal ones stay unless trust 0.8+). Such teams are kept across restarts.
+Asked: "make a team (called X) (with me)". Bases: with no village of its own, it won't build its first house within
+64 blocks of another Xen's (not a teammate's): it heads away and finds its own land. Visits: now and then a free Xen
+walks to a close friend's base (trust 0.6+, 24-300 blocks away), says hi, and goes back to its own life.
+Truces: a truce no longer adds trust (it caps trust at 0), and for 20 minutes they don't chat or team up.
+Chests: a curious Xen (chance 0.25 + 0.5 x curiosity, every 3 seconds) peeks into chests or barrels within 10 blocks
+that it can see (not its own, not its village's, not by its home), following you too while you're close; a Xen
+with kindness under 0.35 and money or power over 0.5 takes up to 3 valuable stacks, only with no player within 16.
+The End: crystals are shot first whenever it has a bow (no need to see one heal the dragon first); it hits her only
+while she sits (not landing or taking off, when her wings throw players far), backs off 10 blocks from her then, and
+waits 15 blocks out, not 7. After the dragon, most Xens (curious, brave or power-driven) go for an elytra: no pearls?
+They hunt endermen; a pearl into the gateway; End city chests and the ship's; back through the gateway they came out
+of, then home.
+Talk: SmallTalk answers 25 everyday things in each Xen's own tone from what it knows. The Experimental tab picks the
+chat model (135M, 360M, off, auto); a model picked there loads whatever the memory, and players are told once it's
+ready.
+Also: no glancing at players while a job waits a moment; after catching up with you it goes back to what it was
+asked to gather; minions (the command and the setting) are removed.
 
 
 WHAT'S NEW IN 1.1.1

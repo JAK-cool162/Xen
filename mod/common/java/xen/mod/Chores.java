@@ -109,6 +109,7 @@ final class Chores {
 
 	private void begin(Kind k) {
 		cancel();
+		dugout = null;
 		gaveAt = -1;
 		kind = k;
 		own = false;
@@ -189,6 +190,9 @@ final class Chores {
 		this.what = what;
 		this.lookFor = lookFor;
 	}
+
+	/** Hunting for wool (a bed): sheep first. */
+	boolean forWool;
 
 	String hunt(int amount) {
 		begin(Kind.HUNT);
@@ -287,6 +291,20 @@ final class Chores {
 		BlockPos feet = c.player.blockPosition();
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (!c.player.onGround()) return "You can't build a shelter because you are not standing on the ground.";
+		if (c.crafter.pickTier() >= 1 || c.crafter.canMake(1)) {               // a hill right here: dig in, like a player's first night
+			List<BlockPos> tunnel = dugoutPlan(level, feet);
+			if (tunnel != null) {
+				begin(Kind.SHELTER);
+				dugout = tunnel;
+				walls = List.of();
+				shape = "dugout";
+				waited = 0;
+				resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+				c.mode = Companion.Mode.STAY;
+				until = now() + 20 * 60;
+				return "You will dig into the hill here for the night (a little tunnel, then seal the way in behind you).";
+			}
+		}
 		List<BlockPos> plan = shelterPlan(feet, build);
 		int blocks = count("dirt", "cobblestone");
 		if (missing(level, plan) > blocks && !build.equals("hut")) {       // not enough for its style: a plain hut will do
@@ -582,6 +600,11 @@ final class Chores {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
 			return c.walkTo(drop.position());
 		}
+		BlockPos bonus = oreInReach();                                  // ore showing right by it: nobody walks past iron for stone
+		if (bonus != null) {
+			doing = "mining the " + Blocks.NAMES[WorldSenses.category((ServerLevel) c.player.level(), bonus, c.player.level().getBlockState(bonus))] + " it spotted";
+			return reach(bonus);
+		}
 		int[] known = glance(cats);                                    // what it can see around it (14 blocks)...
 		for (int tries = 0; known == null && tries < 12; tries++) {       // ...or saw earlier, further away
 			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
@@ -656,6 +679,16 @@ final class Chores {
 		mineY = y;
 		mineLeg = 0;
 		legStarted = now();
+		// A cave it knows: the quickest way to ore (the walls show it). In, with torches, down it goes.
+		caveMode = false;
+		caveTarget = null;
+		BlockPos cave = c.caves.nearest(160);
+		if (cave != null) {
+			caveMode = true;
+			toMine = cave;
+			return "You will go mining in the cave at " + cave.getX() + " " + cave.getY() + " " + cave.getZ()
+					+ " (the walls show the ore; you'll light it with torches as you go).";
+		}
 		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
 		BlockPos entrance = c.places.get("mine");
 		toMine = null;
@@ -681,11 +714,15 @@ final class Chores {
 	int mineRecordY = Integer.MIN_VALUE, mineRecordLeg;
 	net.minecraft.core.Direction mineRecordDir = net.minecraft.core.Direction.NORTH;
 	private BlockPos toMine;
+	/** Mining in a cave (not its own staircase): the spot it's heading for in there, and since when. */
+	private boolean caveMode;
+	private BlockPos caveTarget;
+	private long caveTargetAt;
 
 	private Action mineNext() {
 		if (toMine != null) {                                                  // first to the mine's entrance
 			if (c.player.blockPosition().closerThan(toMine, 2.5)) {
-				if (c.places.get("mine") == null || !c.places.get("mine").closerThan(toMine, 3)) c.places.remember("mine", toMine);
+				if (!caveMode && (c.places.get("mine") == null || !c.places.get("mine").closerThan(toMine, 3))) c.places.remember("mine", toMine);
 				toMine = null;
 				mineStart = c.player.blockPosition();
 				legStarted = now();
@@ -706,6 +743,11 @@ final class Chores {
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
 			return c.walkTo(drop.position());
+		}
+		BlockPos bonus = oreInReach();                                       // any ore right by it, whatever it came for
+		if (bonus != null) {
+			doing = "mining the " + Blocks.NAMES[WorldSenses.category((ServerLevel) c.player.level(), bonus, c.player.level().getBlockState(bonus))] + " it spotted";
+			return reach(bonus);
 		}
 		int[] ore = glance(cats);                                            // ore showing in the walls (the tunnel shows it)
 		if (ore != null && ore[1] <= c.player.getBlockY() + 4) {
@@ -728,6 +770,25 @@ final class Chores {
 			return reach(t);
 		}
 		BlockPos feet = c.player.blockPosition();
+		if (caveMode) {                                                      // in the cave: on and down, to where it hasn't been
+			if (caveTarget == null || feet.closerThan(caveTarget, 1.8) || now() - caveTargetAt > 300) {
+				caveTarget = c.caves.deeper();
+				caveTargetAt = now();
+			}
+			if (caveTarget != null) {
+				doing = String.format(java.util.Locale.ROOT, "exploring the cave for ore (y %d, %d of %d %s so far)", feet.getY(), got, want, what);
+				Action a = c.walkTo(Vec3.atBottomCenterOf(caveTarget));
+				if (a != null) return a;
+				caveTarget = null;
+			}
+			caveMode = false;                                                // (all of it seen: its own tunnels from here)
+			c.chatter("That's all of this cave. I'll dig my own tunnels from here.", false);
+			mineStart = feet;
+			mineDir = c.player.getDirection();
+			if (feet.getY() <= mineY + 6) mineBase = feet;
+			legStarted = now();
+			return null;
+		}
 		net.minecraft.core.Direction right = mineDir.getClockWise();
 		BlockPos goal;
 		if (mineBase == null) {                                              // down the staircase
@@ -1114,6 +1175,37 @@ final class Chores {
 	 * (it can see trunks between trees; ore buried in stone it can't). Stone means natural stone, never something built.
 	 * Beyond 14 blocks it goes by what its eyes saw ({@link Perception.Beliefs}).
 	 */
+	/**
+	 * Ore close by (5 blocks) that shows a face to the air and that it can see, and can mine with the pickaxe it has
+	 * (iron: stone; gold, diamond: iron): like a player, it takes it on the way, whatever it came for. Null if none.
+	 */
+	private BlockPos oreInReach() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		int tier = c.crafter.pickTier();
+		if (tier < 1) return null;
+		BlockPos feet = c.player.blockPosition(), best = null;
+		Vec3 eye = c.player.getEyePosition();
+		double bestD = Double.MAX_VALUE;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-5, -3, -5), feet.offset(5, 5, 5))) {
+			var state = level.getBlockState(q);
+			int cat = WorldSenses.category(level, q, state);
+			if (cat != Blocks.COAL && cat != Blocks.IRON && cat != Blocks.GOLD && cat != Blocks.DIAMOND) continue;
+			if (Crafter.tierFor(cat) > tier || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;
+			boolean open = false;
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) if (level.getBlockState(q.relative(d)).isAir()) open = true;
+			if (!open) continue;
+			var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, Vec3.atCenterOf(q), net.minecraft.world.level.ClipContext.Block.COLLIDER,
+					net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));
+			if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hit.getBlockPos().equals(q)) continue;   // (it has to see it)
+			double d = eye.distanceToSqr(Vec3.atCenterOf(q)) + (cat == Blocks.DIAMOND ? -20 : cat == Blocks.IRON ? -8 : 0);
+			if (d < bestD) {
+				bestD = d;
+				best = q.immutable();
+			}
+		}
+		return best;
+	}
+
 	private int[] glance(int[] cats) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		long now = now();
@@ -1220,10 +1312,10 @@ final class Chores {
 				if (hands.pitch != pitch) return pitch > hands.pitch ? Action.LOOK_UP : Action.LOOK_DOWN;
 				return Action.MINE;
 			}
-			boolean room = c.senses.last != null && !Blocks.SOLID[c.senses.last.near(0, 2, 0)] && !Blocks.SOLID[c.senses.last.near(0, 3, 0)];
-			if (dy >= 2 && dy <= 3 && room && c.player.onGround() && hands.startPillar()) {     // stand on a block to reach it
-				c.pillaring = true;
-				return Action.JUMP;
+			if (dy >= 2 && dy <= 3 && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) <= c.player.blockInteractionRange() - 0.3
+					&& hands.mine(t)) {                                        // up there but in reach: it looks up and mines it (no block to stand on)
+				c.acted = true;
+				return Action.MINE;
 			}
 			if (dy < 0) return digDown(t);
 			if (dy > 1) {                                                // out of reach up there: another one
@@ -1352,7 +1444,7 @@ final class Chores {
 		double bestD = Double.MAX_VALUE;
 		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(48),
 				x -> x.isAlive() && !x.isBaby() && food(x))) {
-			double d = c.player.distanceTo(a);
+			double d = c.player.distanceTo(a) - (forWool && a instanceof net.minecraft.world.entity.animal.sheep.Sheep ? 40 : 0);   // (sheep first, for a bed)
 			if (d < bestD && WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, a)) {
 				bestD = d;
 				best = a;
@@ -1465,7 +1557,77 @@ final class Chores {
 	/** When it tossed what it was asked for (it waits a moment, not walking over its own gift and taking it back). */
 	private long gaveAt = -1;
 
+	/** The dugout: the blocks it digs (feet and head, three deep into the hill), in order; null if it's building walls instead. */
+	private List<BlockPos> dugout;
+
+	/**
+	 * A hillside to dig into from here: three blocks deep, two high, natural ground all round (a floor under it, a roof
+	 * over it, no lava or water next to it). The blocks to dig, in order; null if there's no such hill.
+	 */
+	private List<BlockPos> dugoutPlan(ServerLevel level, BlockPos feet) {
+		net.minecraft.core.Direction facing = c.player.getDirection();
+		for (net.minecraft.core.Direction d : new net.minecraft.core.Direction[] {facing, facing.getClockWise(), facing.getCounterClockWise(), facing.getOpposite()}) {
+			List<BlockPos> dig = new java.util.ArrayList<>();
+			boolean ok = true;
+			for (int k = 1; k <= 3 && ok; k++) {
+				BlockPos f = feet.relative(d, k);
+				for (BlockPos b : new BlockPos[] {f, f.above()}) {
+					var st = level.getBlockState(b);
+					if (!Walker.natural(st) || st.getCollisionShape(level, b).isEmpty()) ok = false;
+					dig.add(b);
+				}
+				for (BlockPos b : new BlockPos[] {f.below(), f.above(2)}) {
+					if (level.getBlockState(b).getCollisionShape(level, b).isEmpty()) ok = false;   // a floor and a roof
+				}
+				for (net.minecraft.core.Direction side : new net.minecraft.core.Direction[] {d.getClockWise(), d.getCounterClockWise()}) {
+					for (BlockPos b : new BlockPos[] {f.relative(side), f.above().relative(side)}) if (!level.getFluidState(b).isEmpty()) ok = false;
+				}
+			}
+			if (ok) return dig;
+		}
+		return null;
+	}
+
+	private Action dugoutNext() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (int i = 0; i < dugout.size(); i++) {                           // dig it out, front to back
+			BlockPos b = dugout.get(i);
+			if (level.getBlockState(b).getCollisionShape(level, b).isEmpty()) continue;
+			doing = "digging into the hill for the night";
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(b)) <= c.player.blockInteractionRange() - 0.5 && c.hands.mine(b)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			BlockPos stand = i < 2 ? c.player.blockPosition() : dugout.get(i - 2 - (i % 2));   // one step further in
+			return c.walkTo(Vec3.atBottomCenterOf(stand));
+		}
+		BlockPos inner = dugout.get(dugout.size() - 2), door = dugout.get(0);
+		if (!c.player.blockPosition().equals(inner)) {                      // in, to the back
+			doing = "going into its dugout";
+			return c.walkTo(Vec3.atBottomCenterOf(inner));
+		}
+		for (BlockPos b : new BlockPos[] {door, door.above()}) {            // and the way in sealed behind it
+			if (!level.getBlockState(b).canBeReplaced()) continue;
+			doing = "sealing the way into its dugout";
+			if (c.hands.placeAt(b, c.personality.material)) {
+				c.acted = true;
+				return Action.PLACE;
+			}
+			if (++waited > 40) break;
+			return Action.IDLE;
+		}
+		dugout = null;
+		cancel();
+		c.chatter(c.pick3("Safe in my little hole in the hill. Good night!", "Dug in for the night.", "Nice and cozy in here."), true);
+		shelterBuilt = true;
+		doing = "hiding in its dugout until morning";
+		kind = Kind.HIDE;
+		until = now() + 1200;
+		return Action.IDLE;
+	}
+
 	private Action shelterNext() {
+		if (dugout != null) return dugoutNext();
 		ServerLevel level = (ServerLevel) c.player.level();
 		boolean done = true;
 		int left = 0;

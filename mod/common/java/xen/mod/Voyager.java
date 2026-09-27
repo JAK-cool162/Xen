@@ -25,6 +25,9 @@ final class Voyager {
 	Quest quest;
 	private long questSince, lastRocket;
 	private BlockPos gateway, city;
+	/** Where it came out on the outer islands (the way back is the gateway there). */
+	private BlockPos arrived;
+	private boolean goingBack;
 	private boolean flying;
 	private Vec3 flyTo;
 
@@ -145,15 +148,16 @@ final class Voyager {
 
 	// ------------------------------------------------------------------------ the elytra quest
 	/** After the dragon, a brave or curious Xen with no elytra goes for one (in the End). */
-	boolean wantsQuest() {
-		return quest == null && c.goals.dragonDown && !hasElytra() && c.mod.config.adventures
-				&& (c.personality.curiosity > 0.5f || c.personality.bravery > 0.6f) && c.items().getOrDefault("ender_pearl", 0) >= 2;
+	boolean wantsQuest() {                                                     // (no pearls? it hunts endermen for them)
+		return (quest == null || quest == Quest.DONE && now() - questSince > 20 * 60 * 60) && c.goals.dragonDown && !hasElytra() && c.mod.config.adventures
+				&& (c.personality.curiosity > 0.3f || c.personality.bravery > 0.4f || c.personality.power > 0.5f);
 	}
 
 	String startQuest() {
-		quest = Quest.TO_END;
+		quest = level().dimension() == net.minecraft.world.level.Level.END ? Quest.GATEWAY : Quest.TO_END;
 		questSince = now();
 		gateway = city = null;
+		arrived = null;
 		return "You will go back to the End for an elytra: through a gateway to the outer islands, to an End city's ship.";
 	}
 
@@ -163,10 +167,29 @@ final class Voyager {
 
 	Action questStep() {
 		if (!onQuest()) return null;
-		if (now() - questSince > 20 * 60 * 30 || hasElytra()) {               // half an hour, or it has one: done
+		if (!goingBack && (now() - questSince > 20 * 60 * 30 || hasElytra())) {   // half an hour, or it has one: back home
 			if (hasElytra()) c.say(c.pick3("An elytra! I can fly!", "Got the elytra. Wings!", "Finally, wings."));
-			quest = Quest.DONE;
-			return null;
+			goingBack = true;
+		}
+		if (goingBack) {
+			boolean outer = level().dimension() == net.minecraft.world.level.Level.END && c.player.blockPosition().distSqr(BlockPos.ZERO) > 400 * 400;
+			if (!outer || arrived == null) {                                   // (back on the main island: the portal home takes over)
+				quest = Quest.DONE;
+				goingBack = false;
+				return null;
+			}
+			c.goals.instant = "going back to the gateway";
+			if (c.player.blockPosition().distSqr(arrived) > 64) return c.walkTo(Vec3.atBottomCenterOf(arrived));
+			BlockPos back = null;
+			for (BlockPos q : BlockPos.betweenClosed(arrived.offset(-8, -6, -8), arrived.offset(8, 6, 8))) {
+				if (level().getBlockState(q).is(Blocks.END_GATEWAY)) back = q.immutable();
+			}
+			if (back == null) {
+				quest = Quest.DONE;
+				goingBack = false;
+				return null;
+			}
+			return throwPearl(Vec3.atCenterOf(back));
 		}
 		boolean inEnd = level().dimension() == net.minecraft.world.level.Level.END;
 		switch (quest) {
@@ -191,6 +214,7 @@ final class Voyager {
 				}
 				if (c.player.blockPosition().distSqr(BlockPos.ZERO) > 400 * 400) {   // through already: the outer islands
 					quest = Quest.CITY;
+					arrived = c.player.blockPosition();
 					return null;
 				}
 				if (gateway == null) gateway = findGateway();
@@ -205,6 +229,7 @@ final class Voyager {
 				return throwPearl(g);                                           // a pearl into the gateway takes it through
 			}
 			case CITY -> {
+				if (c.storage.spotLoot()) return c.storage.next();          // the city's chests (the best loot in the game)
 				if (city == null) city = c.nether.lookFor(level(), "purpur", 128);
 				if (city == null) {
 					c.goals.instant = "looking for an End city";
@@ -218,6 +243,7 @@ final class Voyager {
 				return c.walkTo(Vec3.atBottomCenterOf(city));
 			}
 			case SHIP -> {
+				if (c.storage.spotLoot()) return c.storage.next();          // the ship's chests too
 				ItemFrame frame = null;
 				for (ItemFrame f : level().getEntitiesOfClass(ItemFrame.class, c.player.getBoundingBox().inflate(64), f -> f.getItem().getItem() == Items.ELYTRA)) {
 					frame = f;
@@ -278,8 +304,15 @@ final class Voyager {
 			inv.setItem(i, held);
 			return Action.IDLE;
 		}
-		quest = Quest.DONE;
-		return null;
+		var enderman = level().getEntitiesOfClass(net.minecraft.world.entity.monster.EnderMan.class, c.player.getBoundingBox().inflate(48), e -> e.isAlive());
+		if (enderman.isEmpty()) {
+			c.goals.instant = "looking for endermen (it needs a pearl)";
+			return c.goals.exploreStep();
+		}
+		var e = enderman.get(0);
+		c.goals.instant = "hunting an enderman for a pearl";
+		c.chosenFoe = e;                                                       // (its fighting does the rest; a pearl drops half the time)
+		return c.player.distanceTo(e) > 4 ? c.walkTo(e.position()) : null;
 	}
 
 	/** The worlds it has been to (for its notes). */

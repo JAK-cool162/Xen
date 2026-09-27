@@ -481,7 +481,7 @@ final class Walker {
 		if (inWater && water(p.below())) add(Kind.SWIM, p, p.below(), SWIM + under(p.below()), List.of());
 		if (blocks > 0 && onFloor && !inWater) {                          // tower up (out of a hole): jump, block under its feet
 			double br = breaks(p.above(2));
-			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 6 + br, br > 0 ? List.of(p.above(2)) : List.of());
+			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 24 + br, br > 0 ? List.of(p.above(2)) : List.of());   // (a last resort: a jump up a step is better)
 		}
 		if (dig && floor(p) && !inWater) {                                // straight down (players don't like to: only when there's no other way)
 			BlockPos b = p.below();
@@ -778,10 +778,31 @@ final class Walker {
 				doing = "going down";
 				if (!p.onGround() && flat < 0.5) p.zza = 0;                      // over it: just drop
 			}
-			default -> doing = "walking";
+			default -> {
+				doing = sprint ? "sprinting" : "walking";
+				if (sprint && p.onGround() && flatAhead(4) && now() - lastHop > 12) {   // a long flat stretch: sprint-jumping, like players
+					p.setJumping(true);
+					lastHop = now();
+					doing = "sprint-jumping";
+				}
+			}
 		}
 		// stuck against a block edge (it happens): a hop, like a player
 		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 10) p.setJumping(true);
+	}
+
+	private long lastHop;
+
+	/** The next n moves are plain walking the same way on the level, with room over its head (for a sprint-jump). */
+	private boolean flatAhead(int n) {
+		if (index + n > path.size()) return false;
+		Move first = path.get(index);
+		for (int i = index; i < index + n; i++) {
+			Move m = path.get(i);
+			if (m.kind() != Kind.WALK || !m.dig().isEmpty() || m.to().getY() != first.from().getY() || direction(m) != direction(first)) return false;
+			if (!passable(m.to().above(2))) return false;
+		}
+		return true;
 	}
 
 	/** Bridging: sneak to the edge, look down at the side of the block it stands on, put one against it, walk on. */

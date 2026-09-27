@@ -229,6 +229,8 @@ public final class Companion {
 			places.tick();                                               // the way it walked, remembered
 			totems();
 			rumors.look();                                               // who's that? (a shock, a warning to pass on)
+			caves.scan();                                                // a cave in sight?
+			structures.look();                                           // a village, a mineshaft, a temple?
 		}
 		skills.checkSpar();
 		life.tick();                                                    // a nod, a shake of the head, a wave; a new day
@@ -343,7 +345,12 @@ public final class Companion {
 				+ (pillaring ? "climb up" : instinct.verb) + "." : sensible != null ? "Nothing worth doing there, so: " + sensible.verb + "."
 				: thought.text;
 		hands.glance = null;
-		if (instinct == null && !inArena && !fighting) {                     // nothing to do this moment: what a person does then
+		boolean working = chores.busy() || builder.busy() || storage.busy() || farmer.on || fisher.on || nether.busy() || adventure.on || commandedTo != null
+				|| skills.trainingNow();
+		if (instinct == null && working) {                                   // mid-task, nothing this very moment: eyes stay on the work
+			action = Action.IDLE.ordinal();
+			lastThought = "A moment in what it's doing (" + goals.instant + ").";
+		} else if (instinct == null && !inArena && !fighting) {              // nothing to do this moment: what a person does then
 			Action human = humanIdle(Action.values()[thought.action]);
 			if (human.ordinal() != action || human == Action.IDLE) {
 				action = human.ordinal();
@@ -596,6 +603,7 @@ public final class Companion {
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
 		if (light != null) return light;
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
+			if (asked != null) resumeAsked = true;                           // (it'll get back to what it was asked, once it's caught up)
 			chores.cancel();
 			goals.drop();
 			goals.pause(20 * 20);                                         // (no new errand for a bit: it keeps up first)
@@ -603,6 +611,18 @@ public final class Companion {
 				saidComingAt = player.tickCount;
 				chatter("Coming!", true);
 			}
+		}
+		if (resumeAsked && !chores.busy() && asked != null && askedBy != null && !fighting && (mode != Mode.FOLLOW || leaderWithin(NEARBY))) {
+			resumeAsked = false;                                          // caught up: back to what it was asked to do
+			String again = chores.gather(asked.intent(), asked.amount());
+			if (again.startsWith("You will")) chatter(pick3("Okay, back to it.", "Now, where was I... right, " + asked.intent() + ".", "Back to work."), true);
+		}
+		if (storage.busy() && storage.looting()) {                     // a chest it's going to look in: that first (a moment)
+			Action st = storage.next();
+			if (st != null || storage.busy()) return st;
+		}
+		if ((mode != Mode.FOLLOW || leaderWithin(NEARBY)) && !inArena && !builder.busy() && (!chores.busy() || chores.own) && storage.spotLoot()) {
+			return storage.next();                                    // passing a chest: a look inside (following someone too, while they're close)
 		}
 		if (chores.busy()) {
 			Action chore = chores.next();
@@ -642,9 +662,15 @@ public final class Companion {
 		if (deal != null) return deal;
 		Action drill = skills.step();                                  // training (sparring, practising its swings, parkour)
 		if (drill != null) return drill;
+		Action need = needs();                                         // starving, or night coming with no bed: that first
+		if (need != null) return need;
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.think()) {   // free: what does it want?
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
+		}
+		if (fisher.on) {                                               // fishing: cast, watch the bobber, reel in
+			Action f = fisher.next();
+			if (f != null) return f;
 		}
 		if (farmer.on) {                                               // making its crop farm
 			Action f = farmer.next();
@@ -899,6 +925,50 @@ public final class Companion {
 		return bedAt != null;
 	}
 
+	private long neededAt = -100_000;
+
+	/**
+	 * What a player sees to before anything else: food when it's starving with none on it (it hunts, or fishes), and a
+	 * bed before night when it has none (wool from sheep: it hunts sheep). Null when all's well.
+	 */
+	private Action needs() {
+		if (fighting || chores.busy() || builder.busy() || inArena || player.isCreative() || mode == Mode.FOLLOW && !leaderWithin(NEARBY)) return null;
+		long now = player.level().getGameTime();
+		if (now - neededAt < 1200) return null;
+		var items = items();
+		if (player.getFoodData().getFoodLevel() <= 12 && items.getOrDefault("food", 0) == 0) {
+			neededAt = now;
+			if (fisher.fancies() && fisher.start().startsWith("You will")) {
+				chatter("I'm starving. Fishing for dinner.", true);
+				return Action.IDLE;
+			}
+			chores.forWool = false;
+			String plan = chores.hunt(3);
+			chores.own = true;
+			chatter(plan.startsWith("You don't see") ? "I'm starving... I need to find some animals." : "I'm starving. Time to hunt.", true);
+			return chores.next();
+		}
+		long time = Compat.timeOfDay(player.level()) % 24000;
+		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || goals.home != null && bedAt != null;
+		int wool = 0;
+		for (var e : items.entrySet()) if (e.getKey().endsWith("_wool")) wool += e.getValue();
+		if (!bed && wool < 3 && time > 8000 && time < 12000 && crafter.pickTier() >= 1) {
+			for (var sheep : player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, player.getBoundingBox().inflate(32), x -> x.isAlive())) {
+				if (!WorldSenses.sees(player, hands.yaw, hands.pitch, sheep)) continue;
+				neededAt = now;
+				chores.forWool = true;
+				chores.hunt(3);
+				chores.own = true;
+				chatter(pick3("I need a bed before night. Sheep!", "Wool for a bed. Sorry, sheep.", "Three wool and I can sleep tonight."), true);
+				return chores.next();
+			}
+		}
+		return null;
+	}
+
+	/** A bed it put down out in the wild for the night (it takes it with it in the morning). */
+	private BlockPos campBed;
+
 	private Action bedtime() {
 		var level = (ServerLevel) player.level();
 		if (player.isSleeping()) {
@@ -907,6 +977,47 @@ public final class Companion {
 		}
 		long time = Compat.timeOfDay(level) % 24000;
 		boolean night = time >= 12600 && time <= 23400;
+		if (!night && campBed != null && !fighting) {                          // morning: the bed comes along
+			if (!(level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
+				campBed = null;
+			} else {
+				goals.instant = "packing up its bed";
+				if (player.getEyePosition().distanceTo(Vec3.atCenterOf(campBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(campBed));
+				if (hands.mine(campBed)) {
+					acted = true;
+					return Action.MINE;
+				}
+			}
+		}
+		if (night && !fighting && (goals.home == null || player.distanceToSqr(Vec3.atCenterOf(goals.home)) > 64 * 64) && campBed == null
+				&& mode != Mode.FOLLOW && !chores.busy() && !builder.busy() && player.onGround() && level.getGameTime() - lookedForBedAt > 600) {
+			lookedForBedAt = level.getGameTime();                                 // out in the wild with a bed on it: it puts it down and sleeps
+			int slot = hands.hotbar(st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed"));
+			if (slot >= 0) {
+				net.minecraft.core.Direction f = player.getDirection();
+				BlockPos foot = player.blockPosition().relative(f);
+				if (level.getBlockState(foot).canBeReplaced() && level.getBlockState(foot.relative(f)).canBeReplaced()
+						&& !level.getBlockState(foot.below()).canBeReplaced() && !level.getBlockState(foot.relative(f).below()).canBeReplaced()) {
+					if (hands.placeItem(foot, st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed"), foot.below(),
+							net.minecraft.core.Direction.UP, -1)) {                     // (it faces that way: the bed goes that way)
+						campBed = foot;
+						bedAt = foot;
+						chatter(pick3("Camping out here tonight.", "Bed down, sleep time.", "Good thing I brought my bed."), false);
+						acted = true;
+						return Action.PLACE;
+					}
+				}
+			}
+		}
+		if (campBed != null && night && !fighting && level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+			goals.instant = "going to bed";
+			if (player.getEyePosition().distanceTo(Vec3.atCenterOf(campBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(campBed));
+			hands.stop();
+			hands.use(campBed);
+			acted = true;
+			if (player.isSleeping()) chatter(pick3("Good night!", "Zzz...", "Night night."), false);
+			return Action.IDLE;
+		}
 		if (!night || fighting || goals.home == null || mode == Mode.FOLLOW || chores.busy() || builder.busy()
 				|| player.distanceToSqr(Vec3.atCenterOf(goals.home)) > 64 * 64) return null;
 		if (bedAt == null || !(level.getBlockState(bedAt).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
@@ -1348,12 +1459,22 @@ public final class Companion {
 	final Rumors rumors = new Rumors(this);
 	/** Potions, cobwebs, pearls, golden apples: the fighting gear, when it's good enough to use it. */
 	final PvpKit kit = new PvpKit(this);
+	/** The caves it found (the quickest way to ore), and the places it recognizes (villages, mineshafts, temples...). */
+	final Caves caves = new Caves(this);
+	final Structures structures = new Structures(this);
+	/** Fishing, with a rod, like a player. */
+	final Fisher fisher = new Fisher(this);
+	/** Everyday conversation, in character (no chat model needed). */
+	final SmallTalk smallTalk = new SmallTalk(this);
 	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
 	final Life life = new Life(this);
 	/** Where it was told to go ("go to 120 64 -40", /xen goto), and since when. */
 	BlockPos commandedTo;
 	private long commandedAt;
 	private static final java.util.regex.Pattern COORDS = java.util.regex.Pattern.compile("(-?\\d+)[\\s,]+(-?\\d+)(?:[\\s,]+(-?\\d+))?");
+	private static final java.util.regex.Pattern MAKE_TEAM = java.util.regex.Pattern.compile(
+			"\\b(make|start|create|found)\\s+(a|your own|our own|a new|your)?\\s*team(?:\\s+(?:called|named)\\s+([a-z0-9 ]{2,24}?))?(\\s+with me)?\\s*$");
+	private static final java.util.regex.Pattern FISH = java.util.regex.Pattern.compile("\\b(go|let'?s|can you|time to|want to|wanna) (go )?fish(ing)?\\b|^fish\\b");
 	private static final java.util.regex.Pattern GO_TO = java.util.regex.Pattern.compile("\\b(?:go|walk|move|head|come|run)\\s+(?:to|over to)\\s+(?:x\\s*)?-?\\d+");
 
 	/**
@@ -1380,10 +1501,31 @@ public final class Companion {
 				Math.sqrt(player.blockPosition().distSqr(commandedTo)));
 	}
 
+	/** Visiting a friend's base (it goes back to its own life after). */
+	private Companion visiting;
+
+	/** Off to visit a friend's base, like players on an SMP do. */
+	void visit(Companion friend) {
+		visiting = friend;
+		commandedTo = friend.goals.home;
+		commandedAt = player.level().getGameTime();
+		chatter(pick3("I'm going to visit " + friend.name + ".", "Let's see what " + friend.name + " has built.", "Time to drop by " + friend.name + "'s place."), true);
+		journal("does", "goes to visit " + friend.name);
+	}
+
 	/** On its way to where it was told: the next step, or null when it's there (it stays) or gave up. */
 	private Action goToStep() {
 		if (commandedTo == null) return null;
 		BlockPos at = player.blockPosition();
+		if (visiting != null && at.closerThan(commandedTo, 6)) {               // there: hello, then back to its own life
+			Companion f = visiting;
+			visiting = null;
+			commandedTo = null;
+			walker.stop();
+			say(pick3("Hey " + f.name + "! Nice place.", "Knock knock, " + f.name + "!", "Just passing by, " + f.name + ". Love the base."));
+			trust(f.player() != null ? f.player().getUUID() : null, 0.05f);
+			return Action.IDLE;
+		}
 		if (at.getX() == commandedTo.getX() && at.getZ() == commandedTo.getZ() && Math.abs(at.getY() - commandedTo.getY()) <= 1) {
 			walker.stop();
 			mode = Mode.STAY;
@@ -1391,6 +1533,11 @@ public final class Companion {
 			say(String.format(java.util.Locale.ROOT, "I'm here: %d %d %d.", at.getX(), at.getY(), at.getZ()));
 			commandedTo = null;
 			return Action.IDLE;
+		}
+		if (player.level().getGameTime() - commandedAt > 20 * 60 * 4 && visiting != null) {   // (a visit that didn't work out: never mind)
+			visiting = null;
+			commandedTo = null;
+			return null;
 		}
 		if (player.level().getGameTime() - commandedAt > 20 * 60 * 4) {
 			say("I can't find a way there. I'll stay here.");
@@ -1403,6 +1550,12 @@ public final class Companion {
 		Action a = walkTo(Vec3.atBottomCenterOf(commandedTo));
 		return a != null ? a : Action.IDLE;
 	}
+
+	/** What it was last asked to gather (and by whom), and whether it should get back to it after an interruption. */
+	private xen.mod.talk.Chat.Request asked;
+	private ServerPlayer askedBy;
+	private String askedWords;
+	private boolean resumeAsked;
 
 	/** It lost a fight lately (it may want to train). */
 	boolean lostFight;
@@ -1784,7 +1937,7 @@ public final class Companion {
 				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
 				+ join(places.describe(), storage.describe(), tribe() == null ? "" : tribe().describe(this), nether.describe(), adventure.describe(),
 						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe(),
-						skills.describe(), rumors.describe(), life.describe())
+						skills.describe(), rumors.describe(), life.describe(), caves.describe(), structures.describe())
 				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
@@ -1892,6 +2045,16 @@ public final class Companion {
 		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).find()) {
 			say(goTo(words.substring(GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).results().findFirst().get().start())));
 			return null;                                               // "go to 120 64 -40"
+		}
+		var founding = MAKE_TEAM.matcher(words.toLowerCase(java.util.Locale.ROOT));
+		if (founding.find() && (owner == null || owner.equals(u) || trust(u) >= 0.5f)) {   // "make a team called Night Owls", "make a team with me"
+			String called = founding.group(3) != null ? words.substring(founding.start(3), Math.min(words.length(), founding.end(3))) : null;
+			say(mod.foundTeam(this, called, founding.group(4) != null ? from : null));
+			return null;
+		}
+		if (FISH.matcher(words.toLowerCase(java.util.Locale.ROOT)).find()) {   // "go fishing"
+			say(xen.mod.talk.Chat.firstPerson(fisher.start()));
+			return null;
 		}
 		String train = skills.asked(from, words);                      // "train your fighting", "practice mining"
 		if (train != null) {
@@ -2034,6 +2197,9 @@ public final class Companion {
 					plan = "You will go exploring on your own.";
 				}
 				case "stop" -> {
+					fisher.stop();
+					asked = null;                                          // (stopped on purpose: nothing to come back to)
+					resumeAsked = false;
 					boolean busy = wasBusy;
 					if (!busy) {
 						mode = Mode.STAY;
@@ -2041,7 +2207,13 @@ public final class Companion {
 					}
 					plan = busy ? "You will stop what you are doing." : "You will stop and wait here.";
 				}
-				case "wood", "stone", "coal", "iron", "mine" -> plan = chores.gather(r.intent(), r.amount());
+				case "wood", "stone", "coal", "iron", "mine" -> {
+					plan = (r.intent().equals("mine") || r.intent().equals("iron")) && caves.nearest(160) != null
+							? chores.mine(16, "iron", Math.max(3, r.amount())) : chores.gather(r.intent(), r.amount());   // (a cave it knows: in there)
+					asked = r;                                             // (remembered: if something cuts it short, it comes back to it)
+					askedBy = from;
+					askedWords = said;
+				}
 				case "food" -> plan = chores.hunt(r.amount());
 				case "pickup" -> plan = chores.pickUp(r.thing());
 				case "give" -> plan = chores.give(from, r.thing(), r.amount());
@@ -2077,6 +2249,7 @@ public final class Companion {
 		}
 		if (plan == null) {
 			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
+			if (straight == null && r.intent().equals("chat")) straight = smallTalk.answer(from, words);   // hellos, jokes, "do you like me"...
 			if (straight != null) {
 				say(straight);
 				return null;

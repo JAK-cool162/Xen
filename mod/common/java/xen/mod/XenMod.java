@@ -99,11 +99,19 @@ public class XenMod implements ModInitializer {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
 		Chat.gpuSetting = () -> config.gpu;
-		Chat.sizeSetting = () -> config.chatModelSize;
+		Chat.sizeSetting = () -> switch (config.chatModelPick) {             // (the Experimental tab's pick comes first)
+			case "135m" -> "small";
+			case "360m" -> "normal";
+			default -> config.chatModelSize;
+		};
 		skins.prepare(configDir, config.skins);
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
-		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> config.chatModel, () -> config.downloadChatModel,
+		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> switch (config.chatModelPick) {
+			case "135m", "360m" -> "on";
+			case "off" -> "off";
+			default -> config.chatModel;
+		}, () -> config.downloadChatModel,
 				config.chatThreads, LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
 		ServerLifecycleEvents.SERVER_STARTED.register(this::started);
@@ -259,6 +267,7 @@ public class XenMod implements ModInitializer {
 
 	// --------------------------------------------------------------------------------- world
 	private void tick(MinecraftServer s) {
+		if (s.getTickCount() % 40 == 0) chatModelNews();
 		arena.tick();
 		runLater();
 		List<Companion> order = new ArrayList<>(companions);
@@ -284,6 +293,11 @@ public class XenMod implements ModInitializer {
 			if (config.evolution) evolve();
 		}
 		if (s.getTickCount() % 6000 == 3000) {                                // every five minutes: its team, its rules
+			try {
+				maybeFoundTeams();                                             // (a Xen may start a team of its own)
+			} catch (RuntimeException e) {
+				LOG.warn("Xen team founding stumbled: {}", e.toString());
+			}
 			for (Companion c : companions) {
 				if (c.player == null || c.minion || c.inArena) continue;
 				try {
@@ -537,7 +551,15 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
-	private boolean deathRuleOff;
+	private boolean deathRuleOff, toldModelReady;
+
+	/** Once, when the chat model is loaded: players are told (so they know it works). */
+	private void chatModelNews() {
+		if (toldModelReady || chat == null || !chat.hasModel()) return;
+		toldModelReady = true;
+		Component line = Component.literal("[Xen] The chat model is " + chat.status() + ": Xens can talk freely now.").withStyle(net.minecraft.ChatFormatting.GRAY);
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer)) p.sendSystemMessage(line);
+	}
 	/** A Xen is coming back after dying (its "joined the game" isn't said). */
 	static volatile boolean quietJoin;
 
@@ -714,8 +736,6 @@ public class XenMod implements ModInitializer {
 								.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), 300))
 								.then(Commands.argument("radius", IntegerArgumentType.integer(0, 30000))
 										.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), IntegerArgumentType.getInteger(ctx, "radius"))))))
-				.then(Commands.literal("minions").then(Commands.argument("count", IntegerArgumentType.integer(1, 64))
-						.executes(ctx -> minions(ctx, IntegerArgumentType.getInteger(ctx, "count")))))
 				.then(Commands.literal("dismiss").executes(ctx -> each(ctx, c -> {
 					away.remove(c.name);                                            // (sent home: it doesn't come back by itself)
 					c.leave();
@@ -957,9 +977,92 @@ public class XenMod implements ModInitializer {
 		return team != null && team.getName().startsWith("xen") ? team.getName() : null;
 	}
 
+	private static final String[] TEAM_A = {"Iron", "Crimson", "Shadow", "Golden", "Frost", "Ender", "Emerald", "Stone", "Night", "Storm", "Wild", "Obsidian", "Copper", "Lucky"};
+	private static final String[] TEAM_B = {"Wolves", "Miners", "Knights", "Raiders", "Builders", "Foxes", "Legion", "Clan", "Guild", "Crew", "Dragons", "Squad", "Owls", "Bandits"};
+	private static final net.minecraft.ChatFormatting[] TEAM_PAINT = {net.minecraft.ChatFormatting.GOLD, net.minecraft.ChatFormatting.DARK_PURPLE,
+			net.minecraft.ChatFormatting.DARK_GREEN, net.minecraft.ChatFormatting.DARK_AQUA, net.minecraft.ChatFormatting.LIGHT_PURPLE,
+			net.minecraft.ChatFormatting.DARK_RED, net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.BLUE};
+
+	/** A team a Xen started itself (not one of the settings' color teams). */
+	boolean ownTeam(String team) {
+		if (team == null || !team.startsWith("xen_")) return false;
+		return !java.util.Arrays.asList(TEAM_COLORS).contains(team.substring(4));
+	}
+
+	/**
+	 * A Xen starts a team of its own (a name it makes up, or the one asked for, and a color), like players on an SMP,
+	 * and asks the friends around it to join; each decides (trust, loyalty; loners never). A player who asked is in too.
+	 */
+	String foundTeam(Companion c, String wanted, ServerPlayer with) {
+		if (c.player == null) return null;
+		if (c.personality.loner) return c.pick3("A team? Not for me.", "I work alone.", "No teams for me.");
+		if (ownTeam(teamOf(c))) return "I already have a team: the " + server.getScoreboard().getPlayerTeam(teamOf(c)).getDisplayName().getString() + ".";
+		String name = wanted != null && !wanted.isBlank() ? titled(wanted.trim()) : TEAM_A[random.nextInt(TEAM_A.length)] + " " + TEAM_B[random.nextInt(TEAM_B.length)];
+		if (name.length() > 24) name = name.substring(0, 24);
+		String id = "xen_" + name.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+		if (id.length() > 16) id = id.substring(0, 16);
+		var board = server.getScoreboard();
+		var team = board.getPlayerTeam(id);
+		if (team == null) {
+			team = board.addPlayerTeam(id);
+			team.setDisplayName(Component.literal(name));
+			Compat.teamColor(team, TEAM_PAINT[random.nextInt(TEAM_PAINT.length)]);
+		}
+		team.setAllowFriendlyFire(config.friendlyFire);
+		board.addPlayerToTeam(c.name, team);
+		roster.remember(c, id);
+		c.journal("does", "founded the team " + name);
+		LOG.info("{} founded the team {}", c.name, name);
+		if (with != null) board.addPlayerToTeam(with.getScoreboardName(), team);
+		int joined = 0;
+		for (Companion o : companions) {                                          // who's in? (their call)
+			if (o == c || o.player() == null || o.player().level() != c.player.level() || o.player().distanceTo(c.player) > 32) continue;
+			if (o.personality.loner || ownTeam(teamOf(o)) || o.diplomacy.wary(c.player.getUUID())) continue;
+			float t = o.trust(c.player.getUUID());
+			if (t < 0.5f || o.personality.loyalty > 0.75f && teamOf(o) != null && t < 0.8f) continue;
+			board.addPlayerToTeam(o.name, team);
+			roster.remember(o, id);
+			var n = name;
+			o.mod.later(30 + 20 * joined, () -> o.say(o.pick3("Count me in! The " + n + "!", "I'm in.", "The " + n + "? Sure, I'll join.")));
+			joined++;
+		}
+		return c.pick3("I'm starting a team: the " + name + "!", "New team: the " + name + ". Who's in?", "From now on we're the " + name + "!")
+				+ (joined > 0 ? "" : " Just me for now.");
+	}
+
+	private static String titled(String s) {
+		StringBuilder b = new StringBuilder();
+		for (String w : s.split("\\s+")) if (!w.isEmpty()) b.append(b.length() > 0 ? " " : "").append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+		return b.toString();
+	}
+
+	/** Now and then a Xen with a leader's nature and friends around starts a team of its own (an SMP thing). */
+	private void maybeFoundTeams() {
+		if (config.teams == 0 || companions.size() < 2) return;
+		for (Companion c : companions) {
+			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c))) continue;
+			var p = c.personality;
+			if (!(p.power > 0.6f || p.loyalty > 0.65f) || random.nextFloat() > 0.12f) continue;
+			int friends = 0;
+			for (Companion o : companions) {
+				if (o != c && o.player() != null && o.player().level() == c.player().level() && o.player().distanceTo(c.player()) < 32
+						&& o.trust(c.player().getUUID()) >= 0.5f && !ownTeam(teamOf(o))) friends++;
+			}
+			if (friends == 0) continue;
+			c.say(foundTeam(c, null, null));
+			return;                                                               // (one new team at a time)
+		}
+	}
+
 	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */
 	void joinTeam(Companion c) {
 		var board = server.getScoreboard();
+		var knownTeam = roster.get(c.name);
+		String kept = knownTeam != null && knownTeam.has("team") ? knownTeam.get("team").getAsString() : null;
+		if (c.arenaTeam == null && ownTeam(kept) && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a team it started or joined itself
+			board.addPlayerToTeam(c.name, board.getPlayerTeam(kept));
+			return;
+		}
 		if (c.arenaTeam != null) {                                     // the arena's red and blue teams
 			String name = "xen_" + c.arenaTeam;
 			var team = board.getPlayerTeam(name);
@@ -1043,6 +1146,12 @@ public class XenMod implements ModInitializer {
 
 	/** Put it on that team (a color); false if there's no such team here. */
 	boolean moveToTeam(Companion c, String color) {
+		var own = server.getScoreboard().getPlayerTeam("xen_" + color);
+		if (own != null && ownTeam("xen_" + color)) {                              // a team someone started (not a color team)
+			server.getScoreboard().addPlayerToTeam(c.name, own);
+			roster.remember(c, "xen_" + color);
+			return true;
+		}
 		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
 		int i = java.util.Arrays.asList(TEAM_COLORS).indexOf(color);
 		if (n < 2 || i < 0 || i >= n) return false;

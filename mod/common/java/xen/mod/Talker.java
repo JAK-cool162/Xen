@@ -308,6 +308,7 @@ final class Talker {
 			if (o == c || o.player() == null || o.inArena || o.player().level() != c.player.level()) continue;
 			if (o.player().distanceTo(c.player) > 12 || o.talker.busy() || !c.mod.config.talk) continue;
 			if (now - lastWith.getOrDefault(o.name, -1_000_000L) < 3600) continue;
+			if (c.diplomacy.wary(o.player().getUUID()) || o.diplomacy.wary(c.player.getUUID())) continue;   // (a truce isn't friendship)
 			lastWith.put(o.name, now);
 			o.talker.lastWith.put(c.name, now);
 			o.talker.nextXenTalk = now + 1200;

@@ -255,7 +255,36 @@ final class Storage {
 	private static final Set<String> NOT_WORTH = Set.of("rotten_flesh", "poisonous_potato", "wheat_seeds", "beetroot_seeds", "stick", "bone",
 			"string", "spider_eye", "dead_bush", "cobweb");
 
+	private static final Set<String> VALUABLE = Set.of("diamond", "emerald", "iron_ingot", "gold_ingot", "netherite_ingot", "netherite_scrap",
+			"golden_apple", "enchanted_golden_apple", "ender_pearl", "diamond_sword", "diamond_pickaxe", "totem_of_undying", "enchanted_book");
+
 	private void loot(AbstractContainerMenu menu, int size) {
+		if (peek) {                                                                // someone's chest: a look (and a greedy one helps itself)
+			peek = false;
+			looted.add(chest);
+			StringBuilder saw = new StringBuilder(), stole = new StringBuilder();
+			int seen = 0, taken = 0;
+			for (int i = 0; i < size; i++) {
+				ItemStack s = menu.getSlot(i).getItem();
+				if (s.isEmpty()) continue;
+				String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+				if (seen++ < 3) saw.append(saw.length() > 0 ? ", " : "").append(n.replace('_', ' '));
+				if (sneaky && taken < 3 && VALUABLE.contains(n)) {
+					stole.append(stole.length() > 0 ? ", " : "").append(s.getCount()).append(' ').append(n.replace('_', ' '));
+					Compat.click(menu, i, true, c.player);
+					taken++;
+				}
+			}
+			if (taken > 0) {
+				c.journal("does", "helped itself from someone's chest at " + chest.toShortString() + ": " + stole);
+				XenMod.LOG.info("{} took {} from a chest at {} (nobody was looking)", c.name, stole, chest.toShortString());
+			} else if (seen > 0) {
+				c.chatter(c.pick3("Just looking... " + saw + ".", "Someone keeps " + saw + " in here.", "Nice chest. " + saw + "."), false);
+			} else {
+				c.chatter(c.pick3("Empty.", "Nothing in here.", "An empty chest. Oh well."), false);
+			}
+			return;
+		}
 		int took = 0;
 		StringBuilder what = new StringBuilder();
 		for (int i = 0; i < size; i++) {
@@ -375,7 +404,52 @@ final class Storage {
 				}
 			}
 		}
+		// Someone's chest (placed, already opened): a curious Xen has a look inside, like players on a server do. A greedy,
+		// unkind one takes a few valuables, but only when nobody's around to see.
+		if (c.player.getRandom().nextFloat() > 0.25f + 0.5f * c.personality.curiosity) return false;
+		if (Companion.DEBUG || Boolean.getBoolean("xen.debugLoot")) XenMod.LOG.info("[xen loot] {} looks for chests around {}", c.name, feet.toShortString());
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				var chunk = level.getChunkSource().getChunkNow((feet.getX() >> 4) + dx, (feet.getZ() >> 4) + dz);
+				if (chunk == null) continue;
+				for (var e : chunk.getBlockEntities().entrySet()) {
+					var be = e.getValue();
+					if (!(be instanceof net.minecraft.world.level.block.entity.ChestBlockEntity || be instanceof net.minecraft.world.level.block.entity.BarrelBlockEntity)) continue;
+					BlockPos at = e.getKey();
+					if (looted.contains(at) || chests.containsKey(at) || at.distSqr(feet) > 10 * 10 || mine(at)) continue;
+					var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, Vec3.atCenterOf(at), net.minecraft.world.level.ClipContext.Block.COLLIDER,
+							net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));
+					if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hit.getBlockPos().equals(at)) continue;
+					var p = c.personality;
+					boolean watched = false;
+					for (var other : level.players()) if (other != c.player && other.distanceTo(c.player) < 16) watched = true;
+					sneaky = p.kindness < 0.35f && (p.money > 0.5f || p.power > 0.5f) && !watched;
+					peek = true;
+					begin(Job.LOOT);
+					chest = at.immutable();
+					until = now() + 20 * 30;
+					c.journal("does", "goes to have a look in a chest at " + at.toShortString());
+					XenMod.LOG.info("{} goes to look in a chest at {}{}", c.name, at.toShortString(), sneaky ? " (nobody's watching)" : "");
+					return true;
+				}
+			}
+		}
 		return false;
+	}
+
+	/** A chest of its own, or its tribe's (not someone else's to peek in). */
+	private boolean mine(BlockPos at) {
+		Tribe t = c.tribe();
+		if (t != null) for (Companion m : t.members) if (m.storage.chests.containsKey(at)) return true;
+		BlockPos home = c.goals.home;
+		return home != null && home.distSqr(at) < 12 * 12;
+	}
+
+	private boolean peek, sneaky;
+
+	/** Off to (or at) a chest to loot or look in. */
+	boolean looting() {
+		return job == Job.LOOT;
 	}
 
 	com.google.gson.JsonObject toJson() {

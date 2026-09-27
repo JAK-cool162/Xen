@@ -27,7 +27,7 @@ import java.util.UUID;
  * </ul>
  */
 final class Life {
-	static final String[] HOBBIES = {"flowers", "stars", "sunsets", "dogs"};
+	static final String[] HOBBIES = {"flowers", "stars", "sunsets", "dogs", "fishing"};
 	private static final String[] DOG_NAMES = {"Biscuit", "Rex", "Luna", "Pepper", "Max", "Coco", "Buddy", "Mochi", "Shadow", "Nugget", "Bean", "Scout"};
 
 	private final Companion c;
@@ -48,6 +48,10 @@ final class Life {
 
 	private long now() {
 		return c.player.level().getGameTime();
+	}
+
+	private net.minecraft.world.level.Level level0() {
+		return c.player.level();
 	}
 
 	/** A new Xen: its hobby (from its nature) and its first day. */
@@ -138,6 +142,23 @@ final class Life {
 		}
 		Action dog = tameDog();
 		if (dog != null) return dog;
+		if (!level0().isDarkOutside() && random.nextFloat() < 0.004f && c.mode == Companion.Mode.FREE) {   // an SMP: dropping by a friend's base
+			for (Companion o : c.mod.companions) {
+				if (o == c || o.goals.home == null || o.player() == null || c.trust(o.player().getUUID()) < 0.6f || c.diplomacy.wary(o.player().getUUID())) continue;
+				double d = Math.sqrt(o.goals.home.distSqr(p.blockPosition()));
+				if (d < 24 || d > 300) continue;
+				c.visit(o);
+				return Action.IDLE;
+			}
+		}
+		boolean hungry = p.getFoodData().getFoodLevel() < 14 && c.items().getOrDefault("food", 0) == 0;
+		if ((hungry || "fishing".equals(hobby) && random.nextFloat() < 0.02f) && c.fisher.fancies()) {   // a quiet moment by the water
+			String went = c.fisher.start();
+			if (went.startsWith("You will")) {
+				c.chatter(hungry ? "I'm hungry. Time to catch some fish." : c.pick3("Perfect day for fishing.", "Let's see what's biting.", "Fishing time."), false);
+				return Action.IDLE;
+			}
+		}
 		var level = p.level();
 		long time = Compat.timeOfDay(level), day = level.getGameTime() / 24000;
 		boolean sky = level.canSeeSky(p.blockPosition().above());
@@ -235,6 +256,7 @@ final class Life {
 			case "flowers" -> "picking flowers";
 			case "stars" -> "watching the stars";
 			case "sunsets" -> "watching sunsets";
+			case "fishing" -> "fishing";
 			default -> "dogs";
 		}).append(". ");
 		if (!dogs.isEmpty()) sb.append("Your dog").append(dogs.size() > 1 ? "s: " : ": ").append(String.join(", ", dogs)).append(". ");

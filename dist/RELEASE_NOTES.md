@@ -1,7 +1,30 @@
-**Xen Companion 1.1.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.2.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### New in 1.2.0
+
+* **Caves**: Xens spot caves they can see, remember them, and go mining in them (torches as they go, following the
+  cave down, mining the ore in the walls). They take any ore they see on the way (no more walking past iron for stone).
+* **Real survival sense**: starving with no food, they hunt (or fish); before night with no bed they hunt sheep for
+  wool; out in the wild they put their bed down, sleep, and take it with them in the morning. Their night shelter is
+  a little tunnel dug into a hill, sealed behind them. They sprint-jump on long flat stretches, and look up to mine a
+  block above instead of stacking blocks to reach it.
+* **Fishing**: "go fishing", or on their own when hungry by water (they make the rod from sticks and string).
+* **SMP life with 2+ Xens**: they found their own teams (with names like the "Iron Wolves") and invite friends, who
+  decide for themselves; they build their bases apart, not on top of each other, and visit friends' bases. Ask one:
+  "make a team called Night Owls with me". A truce ends a fight but doesn't make them friends.
+* **Chests**: they peek into chests they pass; a greedy one helps itself when nobody's watching.
+* **Places**: they recognize villages, mineshafts, dungeons, ruined portals, temples, strongholds, fortresses,
+  bastions, End cities and other people's houses from what they see.
+* **The End**: they shoot the crystals first, keep clear of the dragon's wings (no more flying across the island),
+  and after the dragon they go for an elytra: pearls from endermen, through the gateway, End city chests, the ship.
+* **Talk**: many more everyday replies without any chat model (hellos, jokes, "where are you", "do you like me",
+  favorites, skills, "are you a bot", comfort when you're sad). Pick the chat model in the Experimental tab: 135M
+  (fast, phones), 360M (better) or off; you're told when it's ready.
+* **Fixes**: they no longer glance at you in the middle of a job, and get back to a job after catching up with you.
+  Minions are gone.
 
 ### Fixed in 1.1.1
 
@@ -53,10 +76,10 @@ controls.
 
 | file | what |
 |---|---|
-| `xen-companion-1.1.1+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
-| `xen-companion-1.1.1+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
-| `xen-companion-1.1.1+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
-| `xen-companion-1.1.1+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-1.2.0+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
+| `xen-companion-1.2.0+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
+| `xen-companion-1.2.0+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
+| `xen-companion-1.2.0+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `SmolLM2-135M-Instruct-Q8_0.gguf`, `smollm2-360m-instruct-q8_0.gguf` | the chat models on their own (small for phones, normal for PCs) |
 | `TECHNICAL.txt` | **how it all works**: Xen 5.2, the settings, the commands, every change |
 | `xen-brain*.bin`, `SHA256SUMS.txt` | the classic brain (already inside the jars), checksums |

@@ -54,10 +54,18 @@ final class Diplomacy {
 		return true;
 	}
 
+	/** Who it made peace with after a fight, and until when it still holds a grudge (a truce isn't friendship). */
+	private final Map<java.util.UUID, Long> grudge = new java.util.HashMap<>();
+
+	/** Still sore at them (a truce lately): no friendly chats, no teaming up, it keeps an eye on them. */
+	boolean wary(java.util.UUID who) {
+		Long until = grudge.get(who);
+		return until != null && now() < until;
+	}
+
 	void makePeace(Entity other, String why) {
-		if (other instanceof XenPlayer x && x.companion != null && c.owner == null && x.companion.owner == null) {
-			c.trust(other.getUUID(), 0.2f);                                   // two free Xens that made peace may team up after
-		}
+		grudge.put(other.getUUID(), now() + 20 * 60 * 20);                     // twenty minutes: they stop fighting, they aren't friends
+		c.trust.merge(other.getUUID(), 0f, (a, b) -> Math.min(a, 0f));         // (no warmth from a truce: trust stays where the fight left it)
 		peace.put(other.getUUID(), now() + 2400);
 		madeAt.put(other.getUUID(), c.player.tickCount);
 		askedTruce = null;

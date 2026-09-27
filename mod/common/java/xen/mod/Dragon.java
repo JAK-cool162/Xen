@@ -109,10 +109,18 @@ final class Dragon {
 		}
 		dragonHealth = dragon.getHealth();
 		EnderDragonPhase<?> phase = dragon.getPhaseManager().getCurrentPhase().getPhase();
+		// Only once she sits: landing and taking off, her wings throw anyone close far away (that's what flung them).
 		boolean perched = phase == EnderDragonPhase.SITTING_SCANNING || phase == EnderDragonPhase.SITTING_ATTACKING
-				|| phase == EnderDragonPhase.SITTING_FLAMING || phase == EnderDragonPhase.LANDING;
+				|| phase == EnderDragonPhase.SITTING_FLAMING;
 		if (perched) return headHit(dragon);
-		if (c.hands.hasBow() && c.knowledge.knows("crystals_heal")) {
+		if ((phase == EnderDragonPhase.LANDING || phase == EnderDragonPhase.TAKEOFF || phase == EnderDragonPhase.LANDING_APPROACH)
+				&& c.player.distanceTo(dragon) < 16) {
+			c.goals.instant = "keeping clear of the dragon's wings";
+			Vec3 clear = c.player.position().subtract(dragon.position()).multiply(1, 0, 1);
+			if (clear.lengthSqr() < 1e-4) clear = new Vec3(1, 0, 0);
+			return c.walkTo(c.player.position().add(clear.normalize().scale(10)));
+		}
+		if (c.hands.hasBow()) {                                                // (every player knows: the crystals heal her, they go first)
 			List<EndCrystal> left = crystals(level);
 			left.sort(Comparator.comparingDouble(e -> e.distanceTo(c.player)));
 			for (EndCrystal e : left) {
@@ -146,7 +154,7 @@ final class Dragon {
 		}
 		// wait by the portal in the middle (not on it: she breathes there), watching her
 		c.goals.instant = "waiting for the dragon to land";
-		Vec3 spot = middle.add(c.player.getX() > 0 ? 7 : -7, 0, 0);
+		Vec3 spot = middle.add(c.player.getX() > 0 ? 15 : -15, 0, 0);            // (out of reach of her wings when she lands)
 		if (c.player.position().distanceTo(spot) > 3) return c.walkTo(spot);
 		c.hands.watching = dragon;
 		return Action.IDLE;
@@ -344,6 +352,13 @@ final class Dragon {
 			c.antics.celebrate();
 			c.journal("fight", "the Ender Dragon is dead");
 			c.goals.dragonDown = true;
+		}
+		if (c.voyager.onQuest()) return null;                                 // (after an elytra first: its own steps)
+		if (c.voyager.wantsQuest()) {
+			c.say(c.pick3("Before I go: an elytra. To the End cities!", "Not leaving yet. There are End cities out there.",
+					"Time to find an End city and get some wings."));
+			c.voyager.startQuest();
+			return null;
 		}
 		if (portal == null) {
 			c.goals.instant = "waiting for the way home";
