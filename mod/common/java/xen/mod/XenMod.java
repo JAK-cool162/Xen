@@ -74,6 +74,18 @@ public class XenMod implements ModInitializer {
 	/** How many of its choices Xen 2.0 has seen turn out (in this world), and learned from. */
 	long mindExperiences;
 	private long mindTrained;
+	/** Some ordinary moments, and how big the shipped mind's values are on them (a mind far beyond that has drifted). */
+	private float[][] probe;
+	private float mindScale;
+
+	/** The mind that ships with the mod (trained in SimLife), fresh; null if it can't be read. */
+	private static xen.mod.core.Mind shippedMind() {
+		try (InputStream in = XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
+			return in == null ? null : xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
+		} catch (IOException | RuntimeException e) {
+			return null;
+		}
+	}
 	private final Random mindRandom = new Random();
 	Chat chat;
 	MinecraftServer server;
@@ -189,6 +201,7 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		Path mindFile = brainFile().resolveSibling("mind.bin");
+		probe = xen.mod.core.SimLife.probe(64, 17);
 		xen.mod.core.Mind shipped = null, own = null;
 		try (InputStream in = XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
 			if (in != null) shipped = xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
@@ -201,15 +214,26 @@ public class XenMod implements ModInitializer {
 			} catch (IOException | RuntimeException e) {
 				own = null;
 			}
-			if (own == null || shipped != null && own.updates < shipped.updates) {    // unreadable, or an older mind than the one that ships
+			if (own == null || own.carried || shipped != null && own.updates < shipped.updates) {   // unreadable, an older version, or less trained than the one that ships
 				LOG.info("Upgrading this world's Xen mind to the one that ships (the old one is kept as mind.bin.old)");
 				keepOld(mindFile);
 				own = null;
 			}
 		}
+		if (own != null && shipped != null && own.scale(probe) > 3 * shipped.scale(probe) + 20) {   // its values ran away while it played: broken
+			LOG.info("This world's Xen mind had drifted (its values {} against {}): back to the one that ships (the old one is kept as mind.bin.old)",
+					(int) own.scale(probe), (int) shipped.scale(probe));
+			keepOld(mindFile);
+			own = null;
+		}
 		mind = own != null ? own : shipped;
-		if (mind != null) LOG.info("Xen 5.2's mind loaded ({} learning steps){}", mind.updates, own != null ? "" : " - trained in SimLife");
+		if (mind != null) {
+			mind.minMemory = 400;                                                // (learns from a fair few choices, not the last handful)
+			mindScale = shipped != null ? shipped.scale(probe) : mind.scale(probe);
+		}
+		if (mind != null) LOG.info("{}'s mind loaded ({} learning steps){}", xen.mod.core.Mind.VERSION, mind.updates, own != null ? "" : " - trained in SimLife");
 		else LOG.warn("No Xen 2.0 mind: Xens choose the old way");
+		loadStrategies();
 		loadAway();
 		deathMessages();
 		later(60, () -> comeBack(o -> !o.has("owner")));                          // the free ones: back when the world is up
@@ -228,9 +252,17 @@ public class XenMod implements ModInitializer {
 				if (pendingTraining.get() > 0) {
 					pendingTraining.decrementAndGet();
 					brain.trainStep();
-				} else if (mind != null && config.learn && mindTrained < mindExperiences * 8) {   // Xen 2.0: 8 lessons per choice it saw through
+				} else if (mind != null && config.learn && mindTrained < mindExperiences * 2) {   // Xen 2.0: 2 lessons per choice it saw through
 					mindTrained++;
 					mind.learn(32, mindRandom);
+					if (mindTrained % 200 == 0 && mind.scale(probe) > 3 * mindScale + 20) {   // its values running away: back to what it knew
+						LOG.warn("Xen's mind drifted while learning (its values {} against {}): back to the one that ships", (int) mind.scale(probe), (int) mindScale);
+						xen.mod.core.Mind fresh = shippedMind();
+						if (fresh != null) {
+							fresh.minMemory = 400;
+							mind = fresh;
+						}
+					}
 				} else {
 					Thread.sleep(50);
 				}
@@ -267,8 +299,27 @@ public class XenMod implements ModInitializer {
 	/** What Xens see, think, say and hear (for the Experimental tab's log). */
 	public Journal journal;
 
+	/** What every Xen's plans led to (see {@link xen.mod.core.Strategy.Book}): which plan works for which nature. */
+	final xen.mod.core.Strategy.Book strategies = new xen.mod.core.Strategy.Book();
+
+	private void loadStrategies() {
+		Path f = brainFile().resolveSibling("strategies.txt");
+		try {
+			if (Files.exists(f)) strategies.load(Files.readString(f));
+		} catch (IOException | RuntimeException e) {
+			LOG.warn("Xen's plan book couldn't be read: {}", e.toString());
+		}
+	}
+
 	private void save() {
 		solverMind.save();
+		try {
+			Path f = brainFile().resolveSibling("strategies.txt");
+			Files.createDirectories(f.getParent());
+			Files.writeString(f, strategies.save());
+		} catch (IOException e) {
+			LOG.warn("Could not save Xen's plan book: {}", e.toString());
+		}
 		Path file = brainFile();
 		try {
 			Files.createDirectories(file.getParent());
@@ -840,6 +891,7 @@ public class XenMod implements ModInitializer {
 														case "material" -> Personality.MATERIALS;
 														case "tone" -> Personality.TONES;
 														case "temper" -> Personality.TEMPERS;
+														case "plan" -> xen.mod.core.Strategy.NAMES;
 														default -> new String[] {"0", "0.5", "1"};
 													};
 													for (String v : values) b.suggest(v);
@@ -895,7 +947,7 @@ public class XenMod implements ModInitializer {
 		return arena.running() ? 1 : 0;
 	}
 
-	private static final String[] TRAITS = {"fight", "build", "material", "tone", "temper", "bravery", "curiosity", "chattiness", "diligence", "kindness",
+	private static final String[] TRAITS = {"plan", "fight", "build", "material", "tone", "temper", "bravery", "curiosity", "chattiness", "diligence", "kindness",
 			"loyalty", "power", "money", "crit", "charge",
 			"spacing", "wtap", "jumpreset", "strafe", "counter", "select", "retreat", "shield"};
 
@@ -958,6 +1010,7 @@ public class XenMod implements ModInitializer {
 		com.google.gson.JsonObject known = roster.get(name);
 		Personality p = nature != null ? nature
 				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality")) : born;
+		p.bornWith(new Random(name.toLowerCase(Locale.ROOT).hashCode() * 31L + 7));   // (a Xen from before 1.5: its sins and beliefs from its name, always the same)
 		if (nature == null && known == null && config.personalities) {           // born with an arena champion's fighting
 			float[] champion = Arena.championGenes(brainFile().getParent(), random);
 			if (champion != null) {

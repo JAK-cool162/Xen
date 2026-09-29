@@ -1,7 +1,13 @@
 package xen.mod;
 
 import com.google.gson.JsonObject;
+import xen.mod.core.Beliefs;
+import xen.mod.core.Mind;
+import xen.mod.core.Sins;
+import xen.mod.core.Strategy;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
@@ -94,6 +100,59 @@ public final class Personality {
 	static final String[] TEMPERS = {"friendly", "passive", "aggressive"};
 	/** Hidden too: a lone wolf never joins a team (it may still have friends). */
 	public boolean loner;
+	/** Xen 6.0: its seven sins (see {@link Sins}), given at birth and never changed. Null until given (an older Xen gets them from its name). */
+	public float[] sins;
+	/** Its beliefs (see {@link Beliefs}), given at birth with its sins, never changed. */
+	public List<String> beliefs = new ArrayList<>();
+	/** Its own plan (see {@link Strategy}; -1: not worked out yet). It changes its plan when it isn't working. */
+	public int plan = -1;
+	private transient Beliefs.Knobs knobs;
+
+	/** Its sins and beliefs, if it has none yet (a newborn; an older Xen: from its name, so it's always the same one). */
+	void bornWith(Random r) {
+		if (sins != null) return;
+		sins = Sins.random(r);
+		beliefs = Beliefs.pick(sins, r, 4 + r.nextInt(3));
+		knobs = null;
+	}
+
+	float sin(int i) {
+		return sins == null ? 0f : sins[i];
+	}
+
+	boolean believes(String id) {
+		return beliefs.contains(id);
+	}
+
+	/** Its beliefs added up (fear, patience, talk, risk, sharing, hunger, nights, curiosity, trust, leanings). */
+	Beliefs.Knobs knobs() {
+		if (knobs == null) knobs = Beliefs.knobs(beliefs);
+		return knobs;
+	}
+
+	/** What its sins, beliefs and plan lean it toward (added to what its mind thinks each choice is worth). */
+	float[] bias() {
+		float[] b = sins == null ? new float[Mind.N] : Sins.bias(sins), p = Strategy.bias(plan);
+		Beliefs.Knobs k = knobs();
+		for (int i = 0; i < Mind.N; i++) b[i] += k.bias[i] + p[i];
+		return b;
+	}
+
+	/** "proud, and a little greedy" (its sins), for its notes and its status. */
+	String sinsInWords() {
+		return sins == null ? "" : Sins.describe(sins);
+	}
+
+	/** What it believes, in its own words. */
+	String beliefsInWords() {
+		StringBuilder sb = new StringBuilder();
+		for (String id : beliefs) sb.append(sb.length() == 0 ? "" : " ").append(Beliefs.words(id));
+		return sb.toString();
+	}
+
+	String planInWords() {
+		return plan < 0 ? "no plan yet" : Strategy.NAMES[plan] + ": " + Strategy.WORDS[plan];
+	}
 
 	boolean aggressive() {
 		return temper.equals("aggressive");
@@ -129,6 +188,7 @@ public final class Personality {
 		float t = r.nextFloat();
 		p.temper = t < 0.5f ? "friendly" : t < 0.75f ? "passive" : "aggressive";
 		p.loner = r.nextFloat() < 0.06f + 0.25f * (1 - p.loyalty) * (1 - p.kindness);   // (about one in eight)
+		p.bornWith(r);
 		return p;
 	}
 
@@ -161,6 +221,12 @@ public final class Personality {
 		c.money = mutate(r.nextBoolean() ? money : other.money, r);
 		c.temper = pick(temper, other.temper, TEMPERS, r);
 		c.loner = r.nextFloat() < 0.1f ? !(r.nextBoolean() ? loner : other.loner) : r.nextBoolean() ? loner : other.loner;
+		if (sins != null && other.sins != null) {                               // born with a mix of its parents' sins and beliefs
+			c.sins = Sins.mix(sins, other.sins, r);
+			c.beliefs = Beliefs.mix(beliefs, other.beliefs, c.sins, r);
+		} else {
+			c.bornWith(r);
+		}
 		return c;
 	}
 
@@ -173,24 +239,56 @@ public final class Personality {
 		return Math.max(0f, Math.min(1f, gene + (float) r.nextGaussian() * 0.1f));
 	}
 
-	/** Fear weighs 1.6x for the most timid, 0.4x for the bravest. */
+	/**
+	 * Fear weighs 1.6x for the most timid, 0.4x for the bravest; pride and wrath make it less, beliefs either way
+	 * ("creepers are everywhere" more, "fortune favors the bold" less), and a plan of playing it safe a little more.
+	 */
 	float cautionScale() {
-		return 1.6f - 1.2f * bravery;
+		return (1.6f - 1.2f * bravery) * Math.max(0.3f, 1 + knobs().fear - 0.3f * sin(Sins.PRIDE) - 0.2f * sin(Sins.WRATH))
+				* (plan == Strategy.SURVIVOR ? 1.2f : 1f);
 	}
 
-	/** Tries new things half as often (not curious) to 1.5x as often (very curious). */
+	/** Tries new things half as often (not curious) to 1.5x as often (very curious); some beliefs more or less. */
 	float curiosityScale() {
-		return 0.5f + curiosity;
+		return Math.max(0.2f, 0.5f + curiosity + knobs().curious);
+	}
+
+	/** How much it talks: its chattiness, pride and lust up, sloth down, and its beliefs ("silence is awkward"). */
+	float talkative() {
+		return Math.max(0f, Math.min(1f, chattiness + knobs().chat + 0.2f * sin(Sins.PRIDE) + 0.2f * sin(Sins.LUST) - 0.2f * sin(Sins.SLOTH)));
 	}
 
 	/** Seconds between things it says on its own: 60 for the quiet, 10 for the chattiest. */
 	long chatterGapMillis() {
-		return (long) ((60 - 50 * chattiness) * 1000);
+		return (long) ((60 - 50 * talkative()) * 1000);
 	}
 
-	/** Gives up on a chore after half (impatient) to 1.5x (patient) the usual time. */
+	/** Gives up on a chore after half (impatient) to 1.5x (patient) the usual time; sloth sooner, hard workers later. */
 	float patience() {
-		return 0.5f + diligence;
+		return Math.max(0.3f, 0.5f + diligence + knobs().work - 0.4f * sin(Sins.SLOTH) + 0.1f * sin(Sins.PRIDE));
+	}
+
+	/** Its risk-taking (jumps, drops): its beliefs and pride and wrath. Around 0; up to about +0.6 or down to -0.4. */
+	float risk() {
+		return knobs().risk + 0.15f * sin(Sins.PRIDE) + 0.1f * sin(Sins.WRATH) - 0.1f * sin(Sins.SLOTH);
+	}
+
+	/** When it eats: at this food level or below (10 for most; a glutton or "food is life" sooner, "hunger keeps you sharp" later). */
+	int eatAt() {
+		return Math.max(6, Math.min(17, Math.round(10 + 6 * sin(Sins.GLUTTONY) + 8 * knobs().hunger)));
+	}
+
+	/**
+	 * How far it trusts a stranger at first: its beliefs, envy down, lust up. Never below -0.2: distrust makes it wary
+	 * of someone new, not an enemy (that takes what they do: a hit, a theft).
+	 */
+	float strangerTrust() {
+		return Math.max(-0.2f, Math.min(0.6f, 0.2f + knobs().trust - 0.15f * sin(Sins.ENVY) + 0.1f * sin(Sins.LUST)));
+	}
+
+	/** How ready it is to give things away: kindness, its beliefs, greed down. 0 to 1. */
+	float generosity() {
+		return Math.max(0f, Math.min(1f, kindness + knobs().share - 0.5f * sin(Sins.GREED)));
 	}
 
 	/** In words, for its notes: "cheerful, brave and curious". */
@@ -233,12 +331,19 @@ public final class Personality {
 				bravery, curiosity, chattiness, diligence, tone, fight, material, build, generation);
 	}
 
-	static final String TRAITS_HELP = "Traits: tone, fight, build, material, temper (words); loner (true/false); bravery, curiosity, chattiness, diligence, kindness, loyalty, power, money, and the fight "
+	static final String TRAITS_HELP = "Traits: tone, fight, build, material, temper, plan (words); loner (true/false); bravery, curiosity, chattiness, diligence, kindness, loyalty, power, money, and the fight "
 			+ "genes " + String.join(", ", GENES) + " (0 to 1).";
 
-	/** Change one trait by hand (/xen style). Null if it worked, else what's wrong. */
+	/** Change one trait by hand (/xen style). Null if it worked, else what's wrong. Its sins and beliefs can't be changed: they're who it is. */
 	String set(String trait, String value) {
 		String v = value.toLowerCase(Locale.ROOT);
+		if (trait.equals("plan")) {
+			int s = Strategy.index(v);
+			if (s < 0) return "plan is one of: " + String.join(", ", Strategy.NAMES);
+			plan = s;
+			return null;
+		}
+		if (Sins.index(trait) >= 0 || trait.equals("beliefs")) return "Its sins and beliefs are who it is: they don't change.";
 		if (trait.equals("loner")) {
 			if (!v.equals("true") && !v.equals("false")) return "loner is true or false";
 			loner = v.equals("true");
@@ -316,6 +421,15 @@ public final class Personality {
 		o.addProperty("money", money);
 		o.addProperty("temper", temper);
 		o.addProperty("loner", loner);
+		if (sins != null) {
+			com.google.gson.JsonObject sn = new com.google.gson.JsonObject();
+			for (int i = 0; i < Sins.N; i++) sn.addProperty(Sins.NAMES[i], sins[i]);
+			o.add("sins", sn);
+			com.google.gson.JsonArray bl = new com.google.gson.JsonArray();
+			for (String b : beliefs) bl.add(b);
+			o.add("beliefs", bl);
+		}
+		if (plan >= 0) o.addProperty("plan", Strategy.NAMES[plan]);
 		return o;
 	}
 
@@ -341,6 +455,15 @@ public final class Personality {
 		if (o.has("money")) p.money = o.get("money").getAsFloat();
 		if (o.has("temper")) p.temper = o.get("temper").getAsString();
 		if (o.has("loner")) p.loner = o.get("loner").getAsBoolean();
+		if (o.has("sins") && o.get("sins").isJsonObject()) {
+			p.sins = new float[Sins.N];
+			var sn = o.getAsJsonObject("sins");
+			for (int i = 0; i < Sins.N; i++) if (sn.has(Sins.NAMES[i])) p.sins[i] = Math.max(0f, Math.min(1f, sn.get(Sins.NAMES[i]).getAsFloat()));
+			if (o.has("beliefs") && o.get("beliefs").isJsonArray()) {
+				for (var b : o.getAsJsonArray("beliefs")) if (Beliefs.ALL.containsKey(b.getAsString())) p.beliefs.add(b.getAsString());
+			}
+		}
+		if (o.has("plan")) p.plan = Strategy.index(o.get("plan").getAsString());
 		return p;
 	}
 

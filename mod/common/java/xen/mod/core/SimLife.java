@@ -20,6 +20,11 @@ public final class SimLife {
 	// who it is
 	float kind, loyal, power, money, brave, curious, diligent;
 	boolean aggressive, passive;
+	/** Xen 6.0: its sins, beliefs (as knobs) and its plan. */
+	float[] sins = new float[Sins.N];
+	java.util.List<String> beliefs = java.util.List.of();
+	Beliefs.Knobs knobs = new Beliefs.Knobs();
+	int plan;
 	// its body and its things
 	long t;
 	float hp, food;
@@ -60,6 +65,12 @@ public final class SimLife {
 		float tm = r.nextFloat();
 		aggressive = tm > 0.75f;
 		passive = tm > 0.5f && tm <= 0.75f;
+		sins = Sins.random(r);
+		beliefs = Beliefs.pick(sins, r, 4 + r.nextInt(3));
+		knobs = Beliefs.knobs(beliefs);
+		diligent = Math.max(0, Math.min(1, diligent + knobs.work - 0.3f * sins[Sins.SLOTH]));
+		curious = Math.max(0, Math.min(1, curious + knobs.curious));
+		plan = r.nextFloat() < 0.7f ? Strategy.choose(sins, null, -1, r) : r.nextInt(Strategy.N);   // (mostly its own pick; every plan gets lived)
 		t = r.nextInt(6000);
 		hp = 20;
 		food = 20;
@@ -198,7 +209,22 @@ public final class SimLife {
 		f[Mind.DRAGON] = dragon ? 1 : 0;
 		f[Mind.SHELTERED] = sheltered || home && night() ? 1 : 0;
 		f[Mind.HASFRIEND] = hasFriend ? 1 : 0;
+		for (int i = 0; i < Sins.N; i++) f[Mind.SIN0 + i] = sins[i];
+		f[Mind.PLAN0 + plan] = 1;
 		return f;
+	}
+
+	/** How much fear weighs for it (the same sum as in the game: bravery, pride, its beliefs, a careful plan). */
+	float caution() {
+		return (1.6f - 1.2f * brave) * Math.max(0.3f, 1 + knobs.fear - 0.3f * sins[Sins.PRIDE] - 0.2f * sins[Sins.WRATH])
+				* (plan == Strategy.SURVIVOR ? 1.2f : 1f);
+	}
+
+	/** What it leans toward: its sins, its beliefs, its plan (the same as in the game). */
+	float[] bias() {
+		float[] b = Sins.bias(sins), p = Strategy.bias(plan);
+		for (int i = 0; i < Mind.N; i++) b[i] += knobs.bias[i] + p[i];
+		return b;
 	}
 
 	// ---------------------------------------------------------------------- what it can do now
@@ -624,8 +650,11 @@ public final class SimLife {
 		trust = Math.max(-1, Math.min(1, trust + (float) r.nextGaussian() * 0.03f));
 	}
 
+	/** How long a life lasts here: ten days (long enough to go all the way, the dragon too). */
+	static final int DAYS = 10;
+
 	boolean over() {
-		return dead || t > 5 * 24000L;
+		return dead || t > DAYS * 24000L;
 	}
 
 	// ------------------------------------------------------------------------------- training
@@ -664,7 +693,7 @@ public final class SimLife {
 			float eps = (float) Math.max(0.05, eps0 - eps0 * s / (0.5 * steps));
 			float[] f = life.features();
 			boolean[] can = life.allowed();
-			Mind.Choice c = mind.choose(f, can, 1.6f - 1.2f * life.brave, eps, r);
+			Mind.Choice c = mind.choose(f, can, life.caution(), eps, r, life.bias());
 			float minutes = life.step(c.option);
 			float[] g = life.features();
 			float rew = Mind.reward(f, g, c.option, minutes), harm = Mind.harm(f, g, life.dead);
@@ -701,13 +730,15 @@ public final class SimLife {
 	static void evaluate(Mind mind, Random r, int n) {
 		SimLife life = new SimLife(r);
 		int deaths = 0, pickN = 0, stoneN = 0, ironN = 0, homeN = 0, diamondN = 0, farmN = 0, dragonN = 0;
+		int[] planLives = new int[Strategy.N], planDragon = new int[Strategy.N], planHome = new int[Strategy.N], planFarm = new int[Strategy.N],
+				planDead = new int[Strategy.N];
 		double tPick = 0, tStone = 0, tIron = 0, tHome = 0;
 		int[] picks = new int[Mind.N];
 		for (int i = 0; i < n; i++) {
 			life.reset();
 			while (!life.midLifeFree()) life.reset();
 			while (!life.over()) {
-				Mind.Choice c = mind.choose(life.features(), life.allowed(), 1.6f - 1.2f * life.brave, 0f, r);
+				Mind.Choice c = mind.choose(life.features(), life.allowed(), life.caution(), 0f, r, life.bias());
 				picks[c.option]++;
 				life.step(c.option);
 			}
@@ -731,16 +762,43 @@ public final class SimLife {
 			if (life.diamond > 0 || life.pick >= 4) diamondN++;
 			if (life.farm) farmN++;
 			if (life.dragon) dragonN++;
+			planLives[life.plan]++;
+			if (life.dragon) planDragon[life.plan]++;
+			if (life.home) planHome[life.plan]++;
+			if (life.farm) planFarm[life.plan]++;
+			if (life.dead) planDead[life.plan]++;
 		}
-		System.out.printf(Locale.ROOT, "evaluation, %d fresh lives of 5 days: died %d%%, wooden pickaxe %d%% (day %.2f), stone %d%% (day %.2f), iron %d%% (day %.2f), "
+		System.out.printf(Locale.ROOT, "evaluation, %d fresh lives of " + DAYS + " days: died %d%%, wooden pickaxe %d%% (day %.2f), stone %d%% (day %.2f), iron %d%% (day %.2f), "
 						+ "home %d%% (day %.2f), farm %d%%, diamonds %d%%, dragon %d%%%n", n, pct(deaths, n), pct(pickN, n), tPick / Math.max(1, pickN),
 				pct(stoneN, n), tStone / Math.max(1, stoneN), pct(ironN, n), tIron / Math.max(1, ironN), pct(homeN, n), tHome / Math.max(1, homeN),
 				pct(farmN, n), pct(diamondN, n), pct(dragonN, n));
+		StringBuilder pl = new StringBuilder("  by plan (lives: dragon/home/farm/died %):");
+		for (int i = 0; i < Strategy.N; i++) if (planLives[i] > 0) pl.append(String.format(Locale.ROOT, " %s %d: %d/%d/%d/%d", Strategy.NAMES[i], planLives[i],
+				pct(planDragon[i], planLives[i]), pct(planHome[i], planLives[i]), pct(planFarm[i], planLives[i]), pct(planDead[i], planLives[i])));
+		System.out.println(pl);
 		StringBuilder h = new StringBuilder("  choices:");
 		int total = 0;
 		for (int p : picks) total += p;
 		for (int i = 0; i < Mind.N; i++) if (picks[i] > 0) h.append(' ').append(Mind.OPTIONS[i]).append(' ').append(Math.round(picks[i] * 1000.0 / total) / 10.0).append('%');
 		System.out.println(h);
+	}
+
+	/** Some ordinary moments of lives (their inputs), always the same ones for a seed: to see if a mind's values drifted. */
+	public static float[][] probe(int n, long seed) {
+		Random r = new Random(seed);
+		SimLife life = new SimLife(r);
+		float[][] out = new float[n][];
+		for (int i = 0; i < n; i++) {
+			if (life.over()) life.reset();
+			for (int k = r.nextInt(6); k > 0 && !life.over(); k--) {
+				boolean[] can = life.allowed();
+				int o;
+				do o = r.nextInt(Mind.N); while (!can[o]);
+				life.step(o);
+			}
+			out[i] = life.features();
+		}
+		return out;
 	}
 
 	/** (For the evaluation: a fresh start, not one of the lives already under way.) */

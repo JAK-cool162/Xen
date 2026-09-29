@@ -107,7 +107,7 @@ final class Talker {
 		}
 		if (c.mod.config.talkToXens && now >= nextXenTalk && lines.isEmpty()) chatWithXen(now);
 		if (now >= nextRemark && (now - anyoneSpoke > 200 || FAST) && lines.isEmpty() && !listeners(48).isEmpty()) {
-			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.chattiness) * (0.7f + 0.6f * random.nextFloat())));
+			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.talkative()) * (0.7f + 0.6f * random.nextFloat())));
 			String r = random.nextFloat() < (FAST ? 0.7f : 0.35f) ? question() : null;
 			boolean asking = r != null;
 			if (r == null) r = remark();

@@ -8,6 +8,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import xen.mod.core.Action;
 import xen.mod.core.Mind;
+import xen.mod.core.Sins;
+import xen.mod.core.Strategy;
 
 import java.util.EnumMap;
 import java.util.Locale;
@@ -185,6 +187,7 @@ final class Goals {
 	 */
 	boolean think(boolean nearby) {
 		long now = c.player.level().getGameTime();
+		reviewPlan(now);
 		if (current != null) {
 			boolean over = current == Short.EXPLORE ? now > until || progressWaiting() && now > until - EXPLORE_TICKS / 2
 					: current == Short.FARM ? !c.farmer.on && !c.chores.busy()
@@ -216,7 +219,7 @@ final class Goals {
 	private boolean begin(Short best, boolean nearby, long now) {
 		buildingHome = best == Short.SHELTER && dream == Long.HOME && home == null && !c.player.level().isDarkOutside();
 		String plan = switch (best) {
-			case FOOD -> c.chores.hunt(2);
+			case FOOD -> food();
 			case SHELTER -> buildingHome ? c.chores.shelter("fort") : c.chores.shelter();
 			case WOOD -> c.chores.gather("wood", c.crafter.pickTier() == 0 ? 5 : 10);
 			case STONE -> needBlocksForTheNight() || c.crafter.pickTier() == 0 ? c.chores.gather("dirt", Math.max(4, 12 - blocks()))
@@ -239,8 +242,8 @@ final class Goals {
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
-					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(-58, "diamonds", 3)   // (iron armor first, then diamonds)
-					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", 6) : c.chores.mine(40, "coal", 8);
+					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(-58, "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", more(6)) : c.chores.mine(40, "coal", more(8));   // (iron armor first, then diamonds; greed: more)
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
 			case MOBFARM -> {
@@ -437,6 +440,32 @@ final class Goals {
 		return s == Short.HOUSE || s == Short.MOBFARM;
 	}
 
+	/**
+	 * Food, its way: "fish are free food" (or "animals deserve kindness") fishes when it can; "animals deserve kindness"
+	 * only hunts when it's really hungry; everyone else hunts.
+	 */
+	private String food() {
+		Personality p = c.personality;
+		boolean kind = p.believes("animals_kindness");
+		if ((kind || p.believes("fish_free_food")) && c.fisher.fancies()) {
+			String f = c.fisher.start();
+			if (f.startsWith("You will")) return f;
+		}
+		if (kind && c.player.getFoodData().getFoodLevel() > 6) {
+			String f = c.farmer.start();                                     // (a farm, not a hunt)
+			if (f.startsWith("You will")) {
+				c.journal("thinks", "won't hurt the animals (\"animals deserve kindness\"): farms instead");
+				return f;
+			}
+		}
+		return c.chores.hunt(2);
+	}
+
+	/** How much ore it goes down for: a greedy Xen wants more (up to twice as much). */
+	private int more(int n) {
+		return Math.round(n * (1 + c.personality.sin(Sins.GREED)));
+	}
+
 	private int diamonds() {
 		return c.items().getOrDefault("diamond", 0);
 	}
@@ -522,6 +551,8 @@ final class Goals {
 	/** Leanings on top of what Xen 2.0 values: its village's rules and job, and what it's good at (people do what they're good at). */
 	private float[] bias(Tribe t) {
 		float[] b = t == null ? new float[Mind.N] : t.laws.bias(c);
+		float[] nature = c.personality.bias();                                // its sins, beliefs and its own plan (Xen 6.0)
+		for (int i = 0; i < Mind.N; i++) b[i] += nature[i];
 		Skills k = c.skills;
 		b[Mind.MINE] += 0.3f * (k.get(Skills.MINE) - 0.5f);
 		b[Mind.HOUSE] += 0.3f * (k.get(Skills.BUILD) - 0.5f);
@@ -623,13 +654,16 @@ final class Goals {
 		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
 		boolean dark = f[Mind.NIGHT] > 0.5f || f[Mind.DUSK] > 0.5f;
 		boolean below = f[Mind.UNDERGROUND] > 0.5f;
-		if (can[Mind.EAT] && hunger < 14) return why(Mind.EAT, "hungry");
+		Personality who = c.personality;
+		int plan = who.plan;
+		if (can[Mind.EAT] && hunger < Math.min(18, who.eatAt() + 4)) return why(Mind.EAT, "hungry");   // (a glutton sooner)
 		if (dark) {
 			if (can[Mind.SLEEP]) return why(Mind.SLEEP, "night: bed");
 			boolean bedWithIt = items.keySet().stream().anyMatch(k -> k.endsWith("_bed"));
 			if (bedWithIt && (home == null || !c.player.blockPosition().closerThan(home, 64))) return why(Mind.REST, "night: it camps with its bed");
 			BlockPos mine = c.places.get("mine");
-			if (tier >= 2 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), 32)) && wantsOre(tier, iron))
+			int mineRange = who.believes("night_mining") ? 96 : who.believes("night_belongs_to_monsters") ? 0 : 32;   // (its beliefs about the night)
+			if (tier >= 2 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), mineRange)) && wantsOre(tier, iron))
 				return why(Mind.MINE, "night: mining (safe under the ground)");
 			if (f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below) return why(Mind.REST, "night: staying in");
 			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
@@ -648,12 +682,27 @@ final class Goals {
 		}
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
-		// The main goal, in two steps: iron (tools, then armor), and then diamonds. A house comes after.
+		// The main goal: iron (tools, then armor), then diamonds, a home, and in the end the dragon. Its own plan (Xen 6.0)
+		// changes the order: a builder or a settler makes its home first, a speedrunner skips it, a settler farms.
+		boolean holeOnly = who.believes("hole_is_enough");
+		boolean homeFirst = (plan == Strategy.BUILDER || plan == Strategy.SETTLER) && !holeOnly;
+		if (homeFirst && tier >= 2 && home == null) {
+			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home first (its plan)");
+			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for its home (its plan)");
+		}
+		boolean farmed = c.places.get("farm") != null;
+		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
 		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");
-		if (tier >= 3 && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f && iron < 24 ? "iron for armor" : "diamonds");
-		if (tier >= 3 && home == null) {
+		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
+		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f && iron < 24 ? "iron for armor" : "diamonds");
+		if (tier >= 3 && home == null && plan != Strategy.SPEEDRUN && !holeOnly) {
 			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home");
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for a house");
+		}
+		boolean greedy = who.believes("nether_opportunity") || who.sin(Sins.GREED) >= 0.7f;   // (netherite before the dragon)
+		if (!greedy) {
+			int end = endgame(f, can, tier, items, homeFirst || holeOnly);
+			if (end >= 0) return end;
 		}
 		if (tier >= 4 && netheriteNext() && !c.nether.busy() && now() > netherTryAt) {   // diamonds done: netherite, from the Nether
 			netherTryAt = now() + 20 * 60 * 20;
@@ -664,10 +713,112 @@ final class Goals {
 				return why(Mind.REST, "off to the Nether for netherite");
 			}
 		}
+		if (greedy) return endgame(f, can, tier, items, holeOnly);
 		return -1;
 	}
 
+	/**
+	 * The end of the game: the Ender Dragon, when it's geared (an iron pickaxe and sword, armor) and it's time by its
+	 * plan and beliefs: a speedrunner (or "the dragon must fall") at once; "the End can wait" and a settler once life is
+	 * good (a home, a farm, diamond tools); everyone else once it has a home and diamonds. Beliefs hold it back, never
+	 * for ever: after four days on its plan it goes anyway. Food for the journey first.
+	 */
+	private int endgame(float[] f, boolean[] can, int tier, Map<String, Integer> items, boolean homeDone) {
+		if (dragonDown || !c.mod.config.adventures || c.adventure.on) return -1;
+		boolean geared = tier >= 3 && f[Mind.SWORD] >= 0.75f && f[Mind.ARMOR] >= 0.6f;
+		if (!geared) return -1;
+		Personality who = c.personality;
+		int plan = who.plan;
+		boolean farmed = c.places.get("farm") != null, homed = home != null || homeDone;
+		boolean long_ = planSince >= 0 && now() - planSince > 4 * 24000L;
+		boolean time;
+		if (plan == Strategy.SPEEDRUN || who.believes("dragon_must_fall")) time = true;
+		else if (who.believes("end_can_wait") || plan == Strategy.SETTLER) time = homed && farmed && tier >= 4 || long_;
+		else time = homed && (tier >= 4 || diamonds() >= 3) || long_;
+		if (time && who.believes("nether_is_hell") && !long_) {                 // not into the Nether without diamond armor
+			String chest = c.itemKey(c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST));
+			time = chest.startsWith("diamond") || chest.startsWith("netherite");
+		}
+		if (!time) return -1;
+		if (items.getOrDefault("food", 0) < 8 && can[Mind.FOOD]) return why(Mind.FOOD, "food for the journey to the End");
+		return can[Mind.ADVENTURE] ? why(Mind.ADVENTURE, "the dragon: the end of the game (" + (plan >= 0 ? Strategy.NAMES[plan] : "its plan") + ")") : -1;
+	}
+
 	private long netherTryAt;
+
+	// -------------------------------------------------------------------- its own plan (Xen 6.0)
+	private long planSince = -1, planChecked;
+	private float planScoreAt;
+	private int planDeathsAt, planBadDays;
+
+	/**
+	 * Its plan, worked out and looked at again once a day: how far did it get today (tools, armor, a home, a farm, ore,
+	 * the Nether, the End; a death sets it back)? Every Xen's days go into the plan book, so the next Xen of its nature
+	 * knows what works. Two days of getting nowhere and it thinks again: a new plan, not the one that failed.
+	 */
+	private void reviewPlan(long now) {
+		Personality p = c.personality;
+		if (p.sins == null || c.minion || c.player.isCreative()) return;
+		if (p.plan < 0) {
+			p.plan = Strategy.choose(p.sins, c.mod.strategies, -1, random);
+			startPlan(now);
+			c.journal("thinks", "works out its plan: " + p.planInWords());
+			c.chatter(c.pick3("My plan: " + Strategy.WORDS[p.plan], "Here's the plan: " + Strategy.WORDS[p.plan],
+					"I know what I'll do: " + Strategy.WORDS[p.plan]), true);
+			return;
+		}
+		if (planSince < 0) {
+			startPlan(now);
+			return;
+		}
+		if (now - planChecked < 24000) return;
+		float score = gameProgress(), day = score - planScoreAt - 3f * (c.genDeaths - planDeathsAt);
+		c.mod.strategies.add(Sins.top(p.sins), p.plan, day);
+		planChecked = now;
+		planScoreAt = score;
+		planDeathsAt = c.genDeaths;
+		planBadDays = day <= 0.5f ? planBadDays + 1 : 0;
+		c.journal("thinks", String.format(Locale.ROOT, "its plan (%s): %+.1f progress today", Strategy.NAMES[p.plan], day));
+		if (planBadDays >= 2 && now - planSince >= 2 * 24000L) {
+			int was = p.plan;
+			p.plan = Strategy.choose(p.sins, c.mod.strategies, was, random);
+			startPlan(now);
+			c.journal("thinks", "its plan wasn't working (" + Strategy.NAMES[was] + "): new plan " + p.planInWords());
+			c.chatter(c.pick3("This isn't working. New plan: " + Strategy.WORDS[p.plan], "Time for a different plan: " + Strategy.WORDS[p.plan],
+					"Okay, change of plan: " + Strategy.WORDS[p.plan]), true);
+		}
+	}
+
+	private void startPlan(long now) {
+		planSince = planChecked = now;
+		planScoreAt = gameProgress();
+		planDeathsAt = c.genDeaths;
+		planBadDays = 0;
+	}
+
+	/** How far it has got, one yardstick for every plan. */
+	float gameProgress() {
+		var items = c.items();
+		float s = 2f * c.crafter.pickTier();
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+			var it = c.player.getItemBySlot(slot);
+			if (it.isEmpty()) continue;
+			String id = c.itemKey(it);
+			s += id.startsWith("diamond") || id.startsWith("netherite") ? 1.5f : id.startsWith("leather") ? 0.3f : 1f;
+		}
+		if (home != null) s += 3;
+		if (c.places.get("farm") != null) s += 2;
+		if (c.bedAt != null) s += 1;
+		s += 0.5f * Math.min(5, diamonds()) + 0.2f * Math.min(10, items.getOrDefault("emerald", 0));
+		if (c.player.getMainHandItem().isEnchanted() || c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEnchanted()) s += 2;
+		if (c.places.get("portal") != null || c.places.get("fortress") != null) s += 3;
+		s += 0.3f * Math.min(7, items.getOrDefault("blaze_rod", 0) + items.getOrDefault("blaze_powder", 0) / 2);
+		s += 0.3f * Math.min(12, items.getOrDefault("ender_eye", 0) + items.getOrDefault("ender_pearl", 0) / 2);
+		if (c.places.get("stronghold", "overworld") != null) s += 3;
+		if (dragonDown) s += 15;
+		return s;
+	}
 
 	private long now() {
 		return c.player.level().getGameTime();
@@ -917,7 +1068,7 @@ final class Goals {
 		followWho = null;
 		if (o < 0 || before == null || c.mod.mind == null || c.player == null) return;
 		long now = c.player.level().getGameTime();
-		float minutes = Math.max(0.05f, (now - optionAt) / 1200f);
+		float minutes = Math.max(0.5f, (now - optionAt) / 1200f);           // (a choice counts as half a minute at least: many quick ones in a row mustn't look like no time at all)
 		float[] after = MindSense.features(c);
 		if (died) after[Mind.HEALTH] = 0;
 		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);

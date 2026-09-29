@@ -133,6 +133,7 @@ final class Crafter {
 		String w = wanted();
 		if (w != null) return w;
 		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
+		if (c.personality.believes("always_bucket") && !has("bucket") && iron >= 3 && pickTier() >= 2) return "bucket";   // ("always carry a water bucket": first thing)
 		String[] pieces = {"chestplate", "leggings", "helmet", "boots"};
 		int[] cost = {8, 7, 5, 4};
 		for (int i = 0; i < pieces.length; i++) {
@@ -151,7 +152,8 @@ final class Crafter {
 		if (c.skills.get(Skills.FIGHT) >= 0.45f && count(n -> n.equals("golden_apple")) < 2 && count(n -> n.equals("apple")) >= 1
 				&& count(n -> n.equals("gold_ingot")) >= 8) return "golden_apple";   // a fighter's gear: golden apples
 		int coal = count(n -> n.equals("coal") || n.equals("charcoal"));
-		if (count(n -> n.equals("torch")) < 16 && coal >= 1 && (count(n -> n.equals("stick")) > 0 || wood() >= 2)) return "torch";
+		int torches = c.personality.believes("torches_safe") ? 48 : 16;       // ("light makes a place safe": plenty)
+		if (count(n -> n.equals("torch")) < torches && coal >= 1 && (count(n -> n.equals("stick")) > 0 || wood() >= 2)) return "torch";
 		if (!has("_bed") && wood() >= 3) {
 			var inv = c.player.getInventory();
 			java.util.Map<String, Integer> wool = new java.util.HashMap<>();

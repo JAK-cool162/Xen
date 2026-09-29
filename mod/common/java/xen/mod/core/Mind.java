@@ -43,15 +43,22 @@ public final class Mind {
 			"pickaxe", "axe", "sword", "armor", "hoe", "bucket", "bed", "home", "farm", "chest", "mine", "enchanted",
 			"trees known", "villager near", "bag full", "friend near", "asked to follow", "friend needs", "tribe in danger", "tribe",
 			"trust", "kindness", "loyalty", "power", "money", "aggressive", "passive", "bravery", "curiosity", "diligence",
-			"xp", "obsidian", "lapis", "raw food", "furnace", "dragon beaten", "sheltered", "has friend"};
+			"xp", "obsidian", "lapis", "raw food", "furnace", "dragon beaten", "sheltered", "has friend",
+			// Xen 6.0: its sins (fixed at birth) and its own plan (one of Strategy.N)
+			"pride", "greed", "lust", "envy", "gluttony", "wrath", "sloth",
+			"plan speedrun", "plan builder", "plan settler", "plan miner", "plan explorer", "plan trader", "plan warrior", "plan survivor"};
 	public static final int HEALTH = 0, FOODLVL = 1, NIGHT = 2, DUSK = 3, DANGER = 4, HOSTILES = 5, ENEMY = 6, UNDERGROUND = 7, INWATER = 8,
 			LOGS = 9, PLANKS = 10, COBBLE = 11, COAL = 12, RAWIRON = 13, IRON = 14, DIAMOND = 15, FOODITEMS = 16, TORCHES = 17, EMERALD = 18,
 			GOLD = 19, PICK = 20, AXE = 21, SWORD = 22, ARMOR = 23, HOE = 24, BUCKET = 25, BED = 26, HOME = 27, FARMED = 28, CHEST = 29,
 			MINED = 30, ENCHANTED = 31, TREES = 32, VILLAGER = 33, BAGFULL = 34, FRIENDNEAR = 35, ASKEDFOLLOW = 36, FRIENDNEEDS = 37,
 			TRIBEDANGER = 38, TRIBE = 39, TRUST = 40, KINDNESS = 41, LOYALTY = 42, POWER = 43, MONEY = 44, AGGRESSIVE = 45, PASSIVE = 46,
 			BRAVERY = 47, CURIOSITY = 48, DILIGENCE = 49, XP = 50, OBSIDIAN = 51, LAPIS = 52, RAWFOOD = 53, FURNACE = 54, DRAGON = 55,
-			SHELTERED = 56, HASFRIEND = 57;
+			SHELTERED = 56, HASFRIEND = 57, SIN0 = 58, PLAN0 = SIN0 + Sins.N;
 	public static final int F = FEATURES.length;
+	/** The inputs Xen 5.2 had (a 5.2 mind is carried over: the new inputs start with no say, then it learns them). */
+	static final int F52 = 58;
+	/** Its version, for the log and "who are you". */
+	public static final String VERSION = "Xen 6.0";
 	/** How a count becomes a feature: count / scale, at most 1. */
 	public static float count(int n, float scale) {
 		return Math.min(1f, n / scale);
@@ -90,7 +97,55 @@ public final class Mind {
 		if (option == EXPLORE) r += 0.3f * b[CURIOSITY] * minutes / 1.5f;
 		if (option == REST && b[NIGHT] < 0.5f) r -= 0.05f * minutes * (0.5f + b[DILIGENCE]);   // idle in daylight: a waste
 		r -= 0.02f * minutes;
+		r += sins(b, a, option, minutes) + plan(b, a, option, minutes);
 		return r;
+	}
+
+	/** Xen 6.0: what its sins make of it (the same things feel different to a greedy Xen and a lazy one). */
+	private static float sins(float[] b, float[] a, int option, float minutes) {
+		float pride = b[SIN0 + Sins.PRIDE], greed = b[SIN0 + Sins.GREED], lust = b[SIN0 + Sins.LUST], envy = b[SIN0 + Sins.ENVY];
+		float glut = b[SIN0 + Sins.GLUTTONY], wrath = b[SIN0 + Sins.WRATH], sloth = b[SIN0 + Sins.SLOTH];
+		float r = 0;
+		r += 0.8f * greed * (2f * (v(a[DIAMOND]) - v(b[DIAMOND])) + v(a[EMERALD]) - v(b[EMERALD]) + v(a[GOLD]) - v(b[GOLD]) + v(a[IRON]) - v(b[IRON])
+				+ 0.3f * (v(a[COAL]) - v(b[COAL])));
+		if (option == HELP) r -= 1.5f * greed;                                  // (giving hurts a greedy one)
+		r += pride * (4f * (a[ARMOR] - b[ARMOR]) + 3f * (a[SWORD] - b[SWORD]) + 3f * (a[HOME] - b[HOME]) + 2f * (a[ENCHANTED] - b[ENCHANTED])
+				+ 10f * (a[DRAGON] - b[DRAGON]));
+		if (option == FLEE) r -= pride + 0.5f * wrath;                          // (running hurts its pride)
+		boolean won = (b[ENEMY] > 0.5f || b[DANGER] > 0.3f) && a[ENEMY] < 0.5f && a[DANGER] < 0.3f;
+		if (option == FIGHT && won) r += 1.5f * wrath;
+		float seen = b[FRIENDNEAR] > 0.5f || b[TRIBE] > 0 ? 1.5f : 1f;            // (envy: gear counts more with others around)
+		r += envy * seen * (3f * (a[ARMOR] - b[ARMOR]) + 3f * (a[PICK] - b[PICK]) + 2f * (a[SWORD] - b[SWORD]));
+		r += glut * (1.2f * (v(a[FOODITEMS]) - v(b[FOODITEMS])) + 0.5f * (v(a[RAWFOOD]) - v(b[RAWFOOD])) + 2f * (a[FARMED] - b[FARMED]));
+		if (a[FOODLVL] < 0.6f) r -= 0.3f * glut * minutes;                      // (a glutton feels hunger early)
+		if (a[FRIENDNEAR] > 0.5f) r += 0.15f * lust * minutes;                  // (company)
+		r += lust * (v(a[GOLD]) - v(b[GOLD]) + v(a[EMERALD]) - v(b[EMERALD]));
+		if (option == REST || option == SLEEP) r += 0.04f * sloth * minutes;    // (rest is sweet)
+		else r -= 0.02f * sloth * Math.min(minutes, 5f);                         // (and effort costs)
+		return r;
+	}
+
+	/** Its plan: what counts as getting on (a speedrunner and a settler want different things from the same day). */
+	public static int planOf(float[] f) {
+		for (int i = 0; i < Strategy.N; i++) if (f[PLAN0 + i] > 0.5f) return i;
+		return -1;
+	}
+
+	private static float plan(float[] b, float[] a, int option, float minutes) {
+		boolean won = (b[ENEMY] > 0.5f || b[DANGER] > 0.3f) && a[ENEMY] < 0.5f && a[DANGER] < 0.3f;
+		return switch (planOf(b)) {
+			case Strategy.SPEEDRUN -> 6f * (a[PICK] - b[PICK]) + 4f * (a[SWORD] - b[SWORD]) + 3f * (a[ARMOR] - b[ARMOR]) + 15f * (a[DRAGON] - b[DRAGON])
+					- 0.03f * minutes;                                                 // (the clock is ticking)
+			case Strategy.BUILDER -> 5f * (a[HOME] - b[HOME]) + 0.4f * (v(a[PLANKS]) - v(b[PLANKS]) + v(a[COBBLE]) - v(b[COBBLE]));
+			case Strategy.SETTLER -> 4f * (a[FARMED] - b[FARMED]) + 2f * (a[HOME] - b[HOME]) + v(a[FOODITEMS]) - v(b[FOODITEMS]) + 1f * (a[BED] - b[BED]);
+			case Strategy.MINER -> 0.8f * (v(a[RAWIRON]) - v(b[RAWIRON]) + v(a[COAL]) - v(b[COAL]) + 2f * (v(a[DIAMOND]) - v(b[DIAMOND]))) + 1f * (a[MINED] - b[MINED]);
+			case Strategy.EXPLORER -> (option == EXPLORE ? 0.2f * minutes : 0) + 1f * (a[VILLAGER] - b[VILLAGER]);
+			case Strategy.TRADER -> 1.5f * (v(a[EMERALD]) - v(b[EMERALD])) + (option == TRADE ? 0.5f : 0);
+			case Strategy.WARRIOR -> 3f * (a[SWORD] - b[SWORD]) + 3f * (a[ARMOR] - b[ARMOR]) + (option == FIGHT && won ? 1f : 0);
+			case Strategy.SURVIVOR -> (b[NIGHT] > 0.5f ? 0.1f * minutes * (a[SHELTERED] - 0.5f) : 0) + 2f * (a[ARMOR] - b[ARMOR]) + 1f * (a[BED] - b[BED])
+					- 2f * Math.max(0, b[HEALTH] - a[HEALTH]);
+			default -> 0f;
+		};
 	}
 
 	/** What it cost: health lost (a full bar is 5), dying on top. */
@@ -104,6 +159,8 @@ public final class Mind {
 	public final WorldModel world;
 	public final float gamma = 0.97f, fearGamma = 0.8f;
 	public long updates, choices;
+	/** Carried over from an older version (Xen 5.2): the one that ships is newer. */
+	public boolean carried;
 	/** Think ahead with the world model when unsure (off while it trains, for speed). */
 	public boolean think = true;
 
@@ -258,13 +315,30 @@ public final class Mind {
 		return size;
 	}
 
+	/** It starts learning once it remembers this many choices (in the game: enough to learn from, not the last few). */
+	public int minMemory;
+
+	/**
+	 * How big its values are on some ordinary moments (see {@link SimLife#probe}): the mean size of what it thinks each
+	 * choice is worth. A mind whose values run away (they grow and grow as it learns) is broken; this finds it.
+	 */
+	public float scale(float[][] probe) {
+		double sum = 0;
+		int n = 0;
+		for (float[] q : striatum.values(probe)) for (float x : q) {
+			sum += Math.abs(x);
+			n++;
+		}
+		return n == 0 ? 0 : (float) (sum / n);
+	}
+
 	/** Learn from a batch of what it remembers (double Q: the net picks the next choice, its target rates it). */
 	public void learn(int batch, Random r) {
 		float[][] o, nx;
 		int[] a, na;
 		float[] rw, hm, dn, st;
 		synchronized (this) {
-			if (size < batch * 4) return;
+			if (size < Math.max(batch * 4, minMemory)) return;
 			o = new float[batch][];
 			nx = new float[batch][];
 			a = new int[batch];
@@ -325,19 +399,61 @@ public final class Mind {
 		}
 	}
 
-	/** A saved mind, or null if the file is from another version (different features or choices). */
+	/**
+	 * A saved mind, or null if the file is from another version (different choices, or inputs it can't carry over).
+	 * A Xen 5.2 mind (the same choices, the first 58 inputs) becomes a Xen 6.0 one: every weight it learned is kept, the
+	 * new inputs (sins, plan) start with no say at all, so it chooses just as it did until it learns what they mean.
+	 */
 	public static Mind load(DataInputStream in) throws IOException {
-		if (in.readInt() != MAGIC || in.readInt() != F || in.readInt() != N) return null;
+		if (in.readInt() != MAGIC) return null;
+		int oldF = in.readInt();
+		if (in.readInt() != N || oldF > F || oldF != F && oldF != F52) return null;
 		int[] hidden = new int[in.readInt()];
 		for (int i = 0; i < hidden.length; i++) hidden[i] = in.readInt();
 		Mind m = new Mind(hidden, 3e-4f, 1);
+		m.carried = oldF != F;
 		m.updates = in.readLong();
 		m.world.updates = in.readLong();
-		for (Mlp net : new Mlp[] {m.striatum.net, m.striatum.target, m.amygdala.net, m.amygdala.target, m.world.net}) {
-			int n = in.readInt();
-			if (n != net.flat.length) return null;
-			for (int i = 0; i < n; i++) net.flat[i] = in.readFloat();
+		Mlp[] nets = {m.striatum.net, m.striatum.target, m.amygdala.net, m.amygdala.target, m.world.net};
+		for (int k = 0; k < nets.length; k++) {
+			Mlp net = nets[k];
+			float[] old = new float[in.readInt()];
+			for (int i = 0; i < old.length; i++) old[i] = in.readFloat();
+			float[] flat = oldF == F ? old : k < 4 ? widenCritic(old, oldF, hidden[0]) : widenWorld(old, oldF, hidden);
+			if (flat == null || flat.length != net.flat.length) return null;
+			System.arraycopy(flat, 0, net.flat, 0, flat.length);
 		}
 		return m;
+	}
+
+	/** A critic from fewer inputs: the first layer gets rows for the new inputs (zeros); the rest is the same. */
+	static float[] widenCritic(float[] old, int oldF, int h0) {
+		float[] out = new float[old.length + (F - oldF) * h0];
+		System.arraycopy(old, 0, out, 0, oldF * h0);
+		System.arraycopy(old, oldF * h0, out, F * h0, old.length - oldF * h0);
+		return out;
+	}
+
+	/**
+	 * The world model from fewer inputs: its input is [inputs, choice], its output [change in each input, reward, harm,
+	 * end]; the new inputs get zero rows in, zero columns out (it predicts they don't change, which is right: they're
+	 * its nature and its plan).
+	 */
+	static float[] widenWorld(float[] old, int oldF, int[] hidden) {
+		int h0 = hidden[0], hl = hidden[hidden.length - 1], oldIn = oldF + N, oldOut = oldF + 3, newOut = F + 3;
+		int layer0 = oldIn * h0 + h0, middle = 0;
+		for (int i = 0; i + 1 < hidden.length; i++) middle += hidden[i] * hidden[i + 1] + hidden[i + 1];
+		if (old.length != layer0 + middle + hl * oldOut + oldOut) return null;
+		float[] out = new float[(F + N) * h0 + h0 + middle + hl * newOut + newOut];
+		System.arraycopy(old, 0, out, 0, oldF * h0);                                  // input rows: its old inputs
+		System.arraycopy(old, oldF * h0, out, F * h0, N * h0);                        // the choice rows, after the new inputs
+		System.arraycopy(old, oldIn * h0, out, (F + N) * h0, h0 + middle);            // first bias and the middle layers
+		int oldW = layer0 + middle, newW = (F + N) * h0 + h0 + middle;
+		for (int i = 0; i < hl; i++) {
+			for (int o = 0; o < oldOut; o++) out[newW + i * newOut + (o < oldF ? o : F + o - oldF)] = old[oldW + i * oldOut + o];
+		}
+		int oldB = oldW + hl * oldOut, newB = newW + hl * newOut;
+		for (int o = 0; o < oldOut; o++) out[newB + (o < oldF ? o : F + o - oldF)] = old[oldB + o];
+		return out;
 	}
 }

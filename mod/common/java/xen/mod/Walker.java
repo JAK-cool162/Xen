@@ -276,6 +276,14 @@ final class Walker {
 		float h = p.getHealth();
 		maxFall = (h >= 16 ? 5 : h >= 12 ? 4 : 3) + (brave > 0.7f && h >= 18 && fear < 0.4f ? 1 : 0);
 		maxGap = h < 10 || fear > 0.6f ? 0 : brave > 0.7f ? 3 : brave > 0.35f ? 2 : 1;
+		float risk = c.personality.risk();                                 // its beliefs: "fortune favors the bold", "look before you leap"
+		if (risk > 0.25f && h >= 14) {
+			maxGap = Math.min(3, maxGap + 1);
+			maxFall += 1;
+		} else if (risk < -0.25f) {
+			maxGap = Math.min(maxGap, 1);
+			maxFall = Math.min(maxFall, 3);
+		}
 		blocks = throwaway();
 		dig = true;
 		if (now() < daringUntil) {                                           // (the solver said: be bolder)

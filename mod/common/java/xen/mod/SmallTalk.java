@@ -49,6 +49,9 @@ final class SmallTalk {
 	private static final Pattern DOING = p("\\b(what (are|r) (you|u) (doing|up to)|wyd|whatcha doing|what you doing|what'?s up with you)\\b");
 	private static final Pattern WHY = p("^(why|why\\?|how come|but why|why tho|why though)\\??$");
 	private static final Pattern PLAN = p("\\b(what'?s (your|the) plan|what (will|are) you (do|going to do)|what next|what'?s next|your goal)\\b");
+	private static final Pattern BELIEVE = p("\\b(what do (you|u) believe|your beliefs?|believe in|what are your (rules|values|principles)|what'?s your (mindset|philosophy|motto))\\b");
+	private static final Pattern SINS = p("\\b(your sins?|what'?s your sin|deadly sins?|what are you like|what kind of (person|player|xen) are you|describe yourself|your personality)\\b");
+	private static final Pattern STRATEGY = p("\\b(your strategy|what'?s your strategy|how do (you|u) play|your game ?plan|your play ?style)\\b");
 	private static final Pattern NEED = p("\\b(what do you need|need anything|what are you missing|need help with)\\b");
 	private static final Pattern HOW_MANY = p("\\b(how (many|much) ([a-z_ ]+?)( do you have| have you got| you got)?\\??$|do you have (any |some |a |an )?([a-z_]+))");
 	private static final Pattern BAG = p("\\b(what'?s in your (bag|inventory|pockets)|what do you have|show (me )?your (stuff|inventory|items))\\b");
@@ -73,6 +76,35 @@ final class SmallTalk {
 	/** Questions about itself, answered from what it's really doing, has and knows (not made up). Null if not one. */
 	private String aboutItself(ServerPlayer from, String w) {
 		var g = c.goals;
+		Personality me = c.personality;
+		if (BELIEVE.matcher(w).find() && !me.beliefs.isEmpty()) {             // its mindset, in its own words
+			java.util.List<String> said = new java.util.ArrayList<>(me.beliefs);
+			java.util.Collections.shuffle(said, c.random());
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < Math.min(3, said.size()); i++) sb.append(' ').append(xen.mod.core.Beliefs.words(said.get(i)));
+			return c.pick3("I believe a few things." + sb, "Here's what I live by:" + sb, "My rules?" + sb);
+		}
+		if (SINS.matcher(w).find() && me.sins != null) {
+			int top = xen.mod.core.Sins.top(me.sins);
+			String why = switch (top) {
+				case xen.mod.core.Sins.PRIDE -> "Nobody does it better than me.";
+				case xen.mod.core.Sins.GREED -> "What can I say, I like having things. Lots of things.";
+				case xen.mod.core.Sins.LUST -> "I love company, and anything shiny.";
+				case xen.mod.core.Sins.ENVY -> "Everyone always seems to have better stuff than me.";
+				case xen.mod.core.Sins.GLUTTONY -> "Is it dinner time yet?";
+				case xen.mod.core.Sins.WRATH -> "Don't make me angry.";
+				default -> "Why do today what you can do tomorrow?";
+			};
+			return c.pick3("I'm " + me.sinsInWords() + ". " + why, "Honestly? " + cap(me.sinsInWords()) + ". " + why, why + " I'm " + me.sinsInWords() + ".");
+		}
+		if (STRATEGY.matcher(w).find()) {
+			if (me.plan < 0) return "I'm still working that out.";
+			String plan = xen.mod.core.Strategy.WORDS[me.plan];
+			int kind = me.sins == null ? 0 : xen.mod.core.Sins.top(me.sins);
+			int tried = c.mod.strategies.count(kind, me.plan);
+			return c.pick3("My plan: " + plan, "I play it like this: " + plan, cap(plan))
+					+ (tried >= 3 ? String.format(java.util.Locale.ROOT, " Xens like me got %.1f further a day with it.", c.mod.strategies.value(kind, me.plan)) : "");
+		}
 		if (DOING.matcher(w).find()) {
 			String now = Talker.mine(!g.instant.isEmpty() ? g.instant : g.current != null ? g.current.what : "");
 			because = g.optionHow == null ? "" : g.optionHow.replace("the plan: ", "");

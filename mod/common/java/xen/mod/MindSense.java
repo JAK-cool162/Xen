@@ -228,6 +228,8 @@ final class MindSense {
 		f[Mind.DRAGON] = c.goals.dragonDown ? 1 : 0;
 		BlockPos home = c.goals.home;
 		f[Mind.SHELTERED] = !sky || home != null && home.closerThan(p.blockPosition(), 8) ? 1 : 0;
+		for (int i = 0; i < xen.mod.core.Sins.N; i++) f[Mind.SIN0 + i] = who.sin(i);   // Xen 6.0: its nature and its plan
+		if (who.plan >= 0) f[Mind.PLAN0 + who.plan] = 1;
 		return f;
 	}
 

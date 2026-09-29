@@ -64,7 +64,8 @@ final class Diplomacy {
 	}
 
 	void makePeace(Entity other, String why) {
-		grudge.put(other.getUUID(), now() + 20 * 60 * 20);                     // twenty minutes: they stop fighting, they aren't friends
+		float hold = (1 + c.personality.sin(xen.mod.core.Sins.WRATH)) * (c.personality.believes("revenge_sweet") ? 3f : c.personality.believes("forgive_forget") ? 0.25f : 1f);
+		grudge.put(other.getUUID(), now() + (long) (20 * 60 * 20 * hold));     // twenty minutes (wrath and its beliefs: longer or shorter): they stop fighting, they aren't friends
 		c.trust.merge(other.getUUID(), 0f, (a, b) -> Math.min(a, 0f));         // (no warmth from a truce: trust stays where the fight left it)
 		peace.put(other.getUUID(), now() + 2400);
 		madeAt.put(other.getUUID(), c.player.tickCount);

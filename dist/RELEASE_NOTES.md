@@ -1,7 +1,38 @@
-**Xen Companion 1.4.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.5.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.5.0: born with a nature, their own plans, Xen 6.0
+
+* **The seven deadly sins**: every Xen is born with pride, greed, lust, envy, gluttony, wrath and sloth (0 to 1),
+  one strong and one behind it, fixed for life (a child gets a mix of its parents'). They change what it does: a
+  proud Xen fears less, won't run, builds big and boasts; a greedy one mines twice as much, hoards and shares little;
+  a lustful one seeks company and pretty things; an envious one gears up and resents better gear; a glutton eats
+  early and farms; a wrathful one fights, stands its ground and holds grudges; a lazy one rests, gives up sooner and
+  stays near home.
+* **60 beliefs**: each Xen is born believing four to six things ("A true warrior never runs", "The night belongs to
+  the monsters", "Trust no one", "Animals deserve kindness", "Gold is for fools", "The dragon must fall"...), the
+  ones its sins make likely, never two that contradict. Each changes how it plays (fear, patience, risk, when it
+  eats, trust, sharing, nights, what it goes for), and many have rules of their own. Ask a Xen "what do you
+  believe?" or "what's your sin?".
+* **Its own game plan**: a Xen works out how it will play (rush the dragon, build a home first, settle down and
+  farm, get rich underground, see the world, trade, fight, play it safe) from its nature and from what worked for
+  Xens like it (every Xen's days are scored and shared). It keeps to it, and after two days of getting nowhere it
+  says so and changes plans. Ask "what's your strategy?".
+* **Xen 6.0**: the new mind, trained on from Xen 5.2 (everything 5.2 learned is kept) with its sins and its plan as
+  inputs: the same day feels different to a greedy Xen and a lazy one, and a speedrunner feels the clock.
+* **From the start to the end**: every plan now ends with the Ender Dragon (eyes of ender, the stronghold, the End):
+  a speedrunner as soon as it has iron gear, the others once they have a home and diamonds, and beliefs can hold it
+  back, never for ever.
+* **Reacting to people**: someone comes into view and it reacts, in its own way: a crouch hello, a wary step back,
+  a stare with its sword out, a boast, an envious look, an offer to trade, or a lazy nod.
+* **No standing about**: a minute in the same spot with nothing to show (not asleep, building, farming or fishing)
+  and it moves on.
+* **Fixed: odd choices after a while**: what Xens learned while playing made their mind's values run away over
+  time (then they chose strangely). Learning in the game is steady now, and a mind that drifts goes back to the
+  trained one.
+* Diamond hunts last longer before it gives up (diamonds are rare); how long depends on its patience.
 
 ### 1.4.0: walking with a goal (Baritone style, our own code)
 

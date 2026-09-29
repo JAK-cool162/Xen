@@ -159,13 +159,14 @@ final class Chores {
 			lastGain = now();
 			return false;
 		}
-		if (now() - lastGain < 20 * 60 * 3) return false;
+		int minutes = "diamonds".equals(what) ? 8 : 3;                          // (diamonds are rare: a player strip-mines a while for them)
+		if (now() - lastGain < (long) (20 * 60 * minutes * c.personality.patience())) return false;   // (a lazy one gives up sooner, a hard worker later)
 		if (kind == Kind.MINE) {
 			if (!caveMode) c.places.forget("mine");
 			mineRecordY = Integer.MIN_VALUE;
 			if (caveMode && !c.caves.known.isEmpty()) c.caves.known.remove(c.caves.nearest(200));   // (that cave's done)
 		}
-		c.journal("does", "gives up: nothing for three minutes (" + what + ")");
+		c.journal("does", String.format(java.util.Locale.ROOT, "gives up: nothing for %.1f minutes (%s)", minutes * c.personality.patience(), what));
 		finish(c.pick3("Nothing here. I'll try somewhere else.", "This isn't working. Time for something else.", "Giving up on this spot."));
 		return true;
 	}
@@ -1345,6 +1346,8 @@ final class Chores {
 		int tier = c.crafter.pickTier();
 		boolean[] want = new boolean[Blocks.COUNT];
 		for (int k : cats) if (k == Blocks.COAL || k == Blocks.IRON || k == Blocks.GOLD || k == Blocks.DIAMOND) want[k] = Crafter.tierFor(k) <= tier;
+		if (c.personality.believes("gold_for_fools")) want[Blocks.GOLD] = false;          // ("gold is for fools")
+		if (c.personality.believes("beauty_matters") && Crafter.tierFor(Blocks.GOLD) <= tier) want[Blocks.GOLD] = true;   // (gold is pretty)
 		java.util.Set<BlockPos> found = new java.util.LinkedHashSet<>();
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-GLANCE, -6, -GLANCE), feet.offset(GLANCE, 8, GLANCE))) {
 			int cat = WorldSenses.category(level, q, level.getBlockState(q));
@@ -1389,6 +1392,7 @@ final class Chores {
 			var state = level.getBlockState(q);
 			int cat = WorldSenses.category(level, q, state);
 			if (cat != Blocks.COAL && cat != Blocks.IRON && cat != Blocks.GOLD && cat != Blocks.DIAMOND) continue;
+			if (cat == Blocks.GOLD && c.personality.believes("gold_for_fools")) continue;
 			if (Crafter.tierFor(cat) > tier || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;
 			boolean open = false;
 			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) if (level.getBlockState(q.relative(d)).isAir()) open = true;

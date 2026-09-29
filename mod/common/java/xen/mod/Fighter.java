@@ -75,7 +75,9 @@ final class Fighter {
 			return runFrom(foe, sprintable);
 		}
 
-		float retreat = 0.4f * gene(8);
+		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
+		if (c.personality.believes("warrior_never_runs")) retreat = Math.min(retreat, 0.12f);   // (it stands its ground till the very end)
+		if (c.personality.believes("live_to_fight")) retreat = Math.max(retreat, 0.45f);        // (it backs off early and lives)
 		float health = p.getHealth() / p.getMaxHealth();
 		Action gear = c.kit.use(foe, d, fleeing || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
 		if (gear != null) return gear;

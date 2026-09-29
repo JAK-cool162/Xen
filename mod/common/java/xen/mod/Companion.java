@@ -266,6 +266,7 @@ public final class Companion {
 		mimic.watch();                                                  // what are the players it sees doing?
 		solver.watch();                                                 // and how they get out of holes
 		antics.watch();
+		reactions.look();                                               // someone new in view? (it reacts, in its own way)
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
@@ -675,7 +676,7 @@ public final class Companion {
 			player.setShiftKeyDown(false);
 			return Action.JUMP;                                       // hold space to swim up, like a player
 		}
-		if (player.getFoodData().getFoodLevel() <= 10 && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
+		if (player.getFoodData().getFoodLevel() <= personality.eatAt() && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
 			goals.instant = "eating";
 			return Action.EAT;
 		}
@@ -701,6 +702,10 @@ public final class Companion {
 		if (rally != null) return rally;
 		Action through = nether.followThrough();                       // its friend went through a portal: after them
 		if (through != null) return through;
+		Action met = reactions.next();                                // someone came into view: hello, a wary step back, a stare...
+		if (met != null) return met;
+		Action about = standingAbout();                                // a minute standing about with nothing to show: it moves on
+		if (about != null) return about;
 		Action fun = antics.next(false);                              // dancing, showing off
 		if (fun != null) return fun;
 		if (crafter.ready() && !farBehind()) {                        // tools first, like any new player
@@ -1013,7 +1018,7 @@ public final class Companion {
 			int size = d == null ? 25 : d.w() * d.d(), living = 0;
 			for (Companion o : t.members) if (m.goals.home.equals(o.goals.home)) living++;
 			if (size < 30 * (living + 1)) continue;                            // (about 30 blocks of floor each)
-			float yes = m.personality.kindness + m.trust(player.getUUID()) + (m.personality.money > 0.6f ? -0.3f : 0);
+			float yes = m.personality.generosity() + m.trust(player.getUUID()) + (m.personality.money > 0.6f ? -0.3f : 0);
 			if (yes < 0.8f) continue;
 			goals.home = m.goals.home;
 			say(pick3("Can I move in with you, " + m.name + "? No point building two houses.", m.name + ", room for one more at yours?",
@@ -1769,7 +1774,8 @@ public final class Companion {
 	float trust(UUID who) {
 		if (who == null) return 0;
 		if (who.equals(owner)) return 1f;
-		return trust.getOrDefault(who, known.contains(who) ? 0.3f : 0.2f);
+		float stranger = personality.strangerTrust();                  // (its beliefs and sins: "trust no one", "everyone's a friend")
+		return trust.getOrDefault(who, known.contains(who) ? stranger + 0.1f : stranger);
 	}
 
 	void trust(UUID who, float change) {
@@ -2131,7 +2137,9 @@ public final class Companion {
 	public String status() {
 		if (player == null) return name + " is not here.";
 		return String.format("%s (%s; %s; %s): health %.0f/20, food %d/20, mood %s (fear %.0f%%), mode %s. Goals: %s. %s Last thought: %s",
-				name, personality.describe(), personality.style(), goals.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
+				name, personality.describe() + (personality.sins == null ? "" : "; " + personality.sinsInWords() + "; plan: "
+						+ (personality.plan < 0 ? "none yet" : xen.mod.core.Strategy.NAMES[personality.plan]) + "; believes: " + personality.beliefsInWords()),
+				personality.style(), goals.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
 				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), goals.status(),
 				senses.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe()) + " " + skills.describe()
 						+ (personality.loner ? " (a loner)" : ""), lastThought);
@@ -2155,7 +2163,9 @@ public final class Companion {
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
 				+ (trader.market().isEmpty() ? "" : " " + trader.market())
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
-						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote() : "");
+						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote()
+						+ (personality.sins == null ? "" : " You are " + personality.sinsInWords() + ". You believe: " + personality.beliefsInWords()
+								+ " Your plan: " + (personality.plan < 0 ? "not worked out yet." : xen.mod.core.Strategy.WORDS[personality.plan])) : "");
 	}
 
 	private static final java.util.regex.Pattern PORTAL_MATH = java.util.regex.Pattern.compile(
@@ -2292,7 +2302,7 @@ public final class Companion {
 		Needs.Need need = needs.pending();
 		if (need != null && need.who().equals(u) && (r.intent().equals("chat") || r.intent().equals("food")) && need.item().equals("food")
 				&& words.matches("(?s).*\\b(i'?m|im|i am|so|very)\\s+(hungry|starving|starved).*")) {   // "I'm hungry": share or not, its call
-			boolean share = personality.kindness + 0.5f * trust(u) > 0.6f && needs.canHelp();
+			boolean share = personality.generosity() + 0.5f * trust(u) > 0.6f && needs.canHelp();   // (greed and "what's mine is mine" say no)
 			if (share) {
 				String plan = needs.help();
 				say(plan != null && plan.startsWith("You will") ? pick3("Here, have some of mine.", "Take some food!", "I've got you. Here.")
@@ -2479,6 +2489,51 @@ public final class Companion {
 	final Mimic mimic = new Mimic(this);
 	/** The unpredictable side: dancing, showing off, surprises. */
 	final Antics antics = new Antics(this);
+	final Reactions reactions = new Reactions(this);
+
+	// ------------------------------------------------------------------------ standing about
+	/** Where it has been standing, since when; and where it's off to when it had enough of it. */
+	private Vec3 idleFrom;
+	private long idleSince, movingOnUntil;
+	private Vec3 movingOnTo;
+	/** How often it caught itself standing about (for the journal and the tests). */
+	int standings;
+
+	/**
+	 * A player doesn't stand in one spot for a minute doing nothing. If it has been within three blocks of the same
+	 * place for a minute (not asleep, not staying in at night, not building, farming, fishing, crafting or told to
+	 * stay), it drops what it was stuck on and walks off somewhere new for a bit, then its mind picks again.
+	 */
+	private Action standingAbout() {
+		if (player == null || mode != Mode.FREE || inArena) return null;
+		long now = player.level().getGameTime();
+		if (movingOnTo != null) {
+			if (now < movingOnUntil && movingOnTo.distanceTo(player.position()) > 2) return walkTo(movingOnTo);
+			movingOnTo = null;
+		}
+		boolean legit = player.isSleeping() || player.level().isDarkOutside() && (goals.option == xen.mod.core.Mind.REST || goals.option == xen.mod.core.Mind.SLEEP)
+				|| builder.busy() || farmer.on || fisher.on || crafter.hasOrder() || storage.busy() || player.isInWater() || adventure.on && dragon.next() != null;
+		Vec3 here = player.position();
+		if (legit || idleFrom == null || idleFrom.distanceTo(here) > 3) {
+			idleFrom = here;
+			idleSince = now;
+			return null;
+		}
+		if (now - idleSince < 1200) return null;
+		standings++;
+		String was = goals.instant.isEmpty() ? chores.busy() ? "a chore" : "nothing" : goals.instant;
+		journal("does", "stood about for a minute (" + was + "): moves on");
+		chores.cancel();
+		goals.drop();
+		walker.stop();
+		double a = random().nextDouble() * Math.PI * 2;
+		movingOnTo = here.add(Math.cos(a) * 16, 0, Math.sin(a) * 16);
+		movingOnUntil = now + 300;
+		idleFrom = null;
+		chatter(personality.sin(xen.mod.core.Sins.SLOTH) > 0.6f ? pick3("Fine, fine. I'll do something.", "Ugh, okay, moving.", "Alright, alright.")
+				: pick3("Enough standing around.", "Right, let's do something.", "Okay, what next?"), false);
+		return walkTo(movingOnTo);
+	}
 	/** Its owner's own rules (the script setting). */
 	final Script script = new Script(this);
 

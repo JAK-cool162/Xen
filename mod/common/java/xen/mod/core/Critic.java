@@ -3,6 +3,8 @@ package xen.mod.core;
 /** TD critic with a dueling head: striatum (reward) or amygdala (harm). Port of xen/brain/critic.py. */
 public final class Critic {
 	public Mlp net, target;
+	/** No value target beyond this (a life in SimLife earns about 30 to 60). */
+	static final float LIMIT = 200f;
 	public final float gamma, tau;
 	final int actions;
 
@@ -49,6 +51,7 @@ public final class Critic {
 			float qNext = q(tOut[s])[nextA[s]];
 			double discount = Math.pow(gamma, steps == null ? 1 : steps[s]);
 			float y = (float) (signal[s] + discount * (1 - done[s]) * qNext);
+			y = Math.max(-LIMIT, Math.min(LIMIT, y));                        // (a target never runs away: values stay in the range a life can earn)
 			float g = Mlp.huber(q(out[s])[a[s]] - y) / n;
 			grad[s][0] = g;
 			for (int j = 0; j < actions; j++) grad[s][j + 1] = -g / actions;

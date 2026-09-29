@@ -1,7 +1,93 @@
-XEN COMPANION 1.4.0: TECHNICAL NOTES
+XEN COMPANION 1.5.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.5.0
+===================
+
+Sins (core/Sins). Seven numbers 0 to 1 (pride, greed, lust, envy, gluttony, wrath, sloth), given at birth: one 0.7 to
+1, one 0.4 to 0.7, the rest up to 0.35. Fixed for life (a child: each from one parent plus a little noise). Saved with
+its personality; a Xen from before 1.5 gets them from its name (always the same ones). /xen style can't change them.
+What they do (on top of the mind's own lean, see Xen 6.0):
+  pride    fear x(1 - 0.3), backs off in a fight later (retreat x(1 - 0.5)), builds big, boasts, more risk, patience +0.1
+  greed    ore it mines x(1 + greed), shares less (generosity - 0.5), a harder bargain, asks people to trade
+  lust     trusts strangers more (+0.1), talks more, greets, seeks company, likes gold and gems
+  envy     trusts strangers less (-0.15), gears up (craft), resents better gear (trust -0.05 when it sees it)
+  gluttony eats at food 10 + 6 x gluttony (instead of 10), keeps more food, farms
+  wrath    fear x(1 - 0.2), fights on longer (retreat x(1 - 0.3)), grudges x(1 + wrath), stares people down
+  sloth    patience - 0.4, talks less, rests more, less risk
+
+Beliefs (core/Beliefs): 60 of them, in groups (a Xen never has two from the same group: "trust no one" and
+"everyone's a friend" can't go together). Four to six at birth, picked with weights 0.25 + (affinity x sins), fixed
+for life (a child: most from its parents, sometimes one of its own). Each has knobs (added up): fear, patience, talk,
+risk, sharing, hunger, nights in, curiosity, trust in strangers; a lean on each of its mind's choices; and many have
+rules of their own:
+  warrior_never_runs / live_to_fight     retreat at 12% health at most / at 45% at least
+  fortune_bold / look_before_leap        jumps one gap more and one more block of drop / at most one gap, three blocks
+  strangers_dangerous / everyone_friend / trust_no_one    trust in strangers -0.2 / +0.25 / -0.4 (never below -0.2:
+                                         wary, not hostile; an enemy takes a real hit or a theft)
+  food_is_life / hunger_sharp           eats 2 levels sooner / 1.6 later
+  night_mining / night_belongs_to_monsters   mines at night up to 96 blocks from its mine / never goes mining at night
+  gold_for_fools / beauty_matters       never mines gold / always takes gold it can
+  animals_kindness / fish_free_food     fishes or farms instead of hunting (hunts only when starving) / fishes first
+  revenge_sweet / forgive_forget        grudges x3 / x0.25
+  hole_is_enough / big_house            no house (a hole for the night) / builds its home before iron
+  dragon_must_fall / end_can_wait       the dragon as soon as it's geared / only with a home, a farm, diamond tools
+  nether_is_hell                        not into the Nether without a diamond chestplate (for four days at most)
+  diamonds_forever                      2 more diamonds each trip
+  farming_way                           a farm as soon as it has a home
+  ...and the rest through their knobs and leanings (always_bucket, torches_safe, tidy_inventory, chest_is_home,
+  emeralds_rule, enchant_magic, better_gear, xp_matters, world_is_big, stay_close_home, climb_mountains...).
+
+Its own plan (core/Strategy). Eight: speedrun, builder, settler, miner, explorer, trader, warrior, survivor. It picks:
+1.5 x (its sins' pull toward each) + 0.25 x (the plan book's average progress a day for Xens of its top sin with that
+plan) + 0.3 if that plan was tried fewer than 3 times + a little chance. Progress (Goals.gameProgress): 2 per pickaxe
+tier, 1 per armor piece (1.5 diamond), 3 a home, 2 a farm, 1 a bed, diamonds and emeralds, 2 enchanted gear, 3 the
+Nether, blaze rods, eyes, 3 the stronghold, 15 the dragon. Once a game day it adds the day's progress (minus 3 per
+death) to the book (strategies.txt next to mind.bin); two days in a row under 0.5, and at least two days on the plan:
+a new plan, never the one that failed. The plan leans its mind's choices and orders its steps:
+  builder, settler: a home right after stone tools (before iron); settler (and "farming_way"): then a farm
+  speedrun: no house; once it has iron armor and an iron sword, straight on to the dragon
+  everyone: after the home, iron armor and diamonds (or four days on the plan), the dragon (Adventure: blaze rods,
+  pearls, eyes of ender, the stronghold, the portal, the End); greedy ones (greed 0.7+, "nether_opportunity") go for
+  netherite first. Food for the journey (8 meals) before it sets off.
+/xen style <xen> plan <plan> changes it by hand.
+
+Xen 6.0 (core/Mind). 73 inputs: the 58 of Xen 5.2, its seven sins, and its plan (one of eight). A Xen 5.2 mind file
+is carried over: every weight kept (the critics' first layer gets zero rows for the new inputs; the world model gets
+zero rows in and zero columns out for them), so it chooses exactly as 5.2 did (checked: no difference at all over
+200 random states) until it learns what they mean. A world's own 5.2 mind is set aside (mind.bin.old) for the one
+that ships. The reward adds what its sins make of things (greed: ore, emeralds, gold worth more, helping hurts;
+pride: gear, a home, enchanting, the dragon, running away hurts; wrath: fights won; envy: gear, more with others
+around; gluttony: food, a farm, hunger felt early; lust: company, gold and emeralds; sloth: rest sweet, effort
+costs) and what counts for its plan (a speedrunner: tools, gear and the dragon, and the clock; a builder: a home;
+a settler: a farm, food, a bed; a miner: ore; an explorer: exploring, villages; a trader: emeralds; a warrior: gear
+and fights won; a survivor: safe nights, armor, no harm). Choices lean by its sins, beliefs and plan (the same in
+training and in the game). Trained on in SimLife from Xen 5.2: every simulated life is born with sins, beliefs and a
+plan (70% its own pick, 30% any, so every plan gets lived), lives last ten days (long enough for the dragon).
+
+Reactions (Reactions). Twice a second it looks for players in view (20 blocks, line of sight) it hasn't had in view
+for five minutes, and reacts to the first: hello (crouches twice, says hi; always for its owner or a friend),
+wary (watches, steps back 4 blocks), stare (sword out, stands still), boast (a hop or two), envy (trust -0.05, never
+below -0.15), trade (walks up and asks), nod. Each is scored from its sins, beliefs, trust, their weapon and armor
+against its own, plus a little chance. Not in a fight, in water, or under 8 health. Journal: "notices".
+
+Learning in the game, fixed (it was broken since Xen 2.0). The mind kept learning from its own choices while it
+played, 8 lessons per choice from a memory of the last few hundred, and a choice that lasted a few seconds counted as
+almost no time, so its values fed on themselves and ran away (a world's mind after a few thousand lessons: values
+around 8500 where SimLife's are about 30), and its choices got strange ("explore looks best (+552)"). Now: a choice
+counts as half a minute at least, 2 lessons per choice, none before it has 400 choices to learn from, targets are
+capped at 200, and its values are checked on 64 ordinary moments (the same ones every time): more than three times
+the shipped mind's and it goes back to the shipped one, when the world loads and every 200 lessons while it plays.
+
+Giving up on a mine: after 3 minutes with nothing (8 for diamonds: they're rare), times its patience (a lazy Xen
+sooner, a hard worker later).
+
+Standing about. Free, not asleep or staying in at night, not building, farming, fishing, crafting or storing, not in
+water: a minute within 3 blocks of the same spot and it drops what it's on and walks 16 blocks somewhere new
+(journal: "stood about for a minute"), then its mind picks again.
 
 
 WHAT'S NEW IN 1.4.0
