@@ -31,13 +31,6 @@ jobs:
         with:
           ref: ${{ inputs.commit || github.sha }}
 
-      # An older commit may not have the bundling script yet: take it from this one.
-      - uses: actions/checkout@v4
-        if: ${{ inputs.commit != '' }}
-        with:
-          path: .current
-          sparse-checkout: scripts
-
       - name: Chat model (SmolLM2-360M-Instruct by Hugging Face, Apache-2.0)
         run: |
           curl -fL --retry 5 -o smollm2-360m-instruct-q8_0.gguf \
@@ -52,9 +45,9 @@ jobs:
 
       - name: All-in-one jars (the mod with its chat model inside)
         run: |
-          script=scripts/bundle_chat_model.py
-          [ -f "$script" ] || script=.current/scripts/bundle_chat_model.py
-          for jar in dist/*.jar; do python3 "$script" "$jar" smollm2-360m-instruct-q8_0.gguf; done
+          # (versions before 0.4.1 can't load a model from inside their jar: no all-in-one jars for them)
+          [ -f scripts/bundle_chat_model.py ] || { echo "no all-in-one jars for this version"; exit 0; }
+          for jar in dist/*.jar; do python3 scripts/bundle_chat_model.py "$jar" smollm2-360m-instruct-q8_0.gguf; done
 
       - name: Xen's brain and checksums
         run: |
