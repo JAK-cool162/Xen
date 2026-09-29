@@ -803,7 +803,9 @@ final class Chores {
 				double a = k * Math.PI / 4;
 				int x = from.getX() + (int) Math.round(r * Math.cos(a)), z = from.getZ() + (int) Math.round(r * Math.sin(a));
 				if (!level.isLoaded(new BlockPos(x, from.getY(), z))) continue;
-				BlockPos q = BlockPos.containing(XenMod.surface(level, x, z));
+				Vec3 ground = XenMod.surface(level, x, z);
+				if (ground == null) continue;                                  // (no ground there it can find: not that spot)
+				BlockPos q = BlockPos.containing(ground);
 				boolean wet = false;
 				for (BlockPos n : BlockPos.betweenClosed(q.offset(-4, -3, -4), q.offset(4, 1, 4))) {
 					if (!level.getFluidState(n).isEmpty()) {
