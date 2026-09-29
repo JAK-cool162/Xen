@@ -40,6 +40,24 @@ way".
 The plan. Iron first (tier 2 with under 3 iron: mine at y 16); then with an iron pickaxe, more ore before the house:
 iron for armor, and diamonds (at y -58) once it wears a chestplate or carries 24+ iron; then a house; then netherite.
 
+Mining walks to nextTo(block) (before: into the block itself, which needed a way into the rock). Right by a block
+(eyes within 4.5) for 15 seconds and it's still there: it's skipped (journal: "gives up on the block"); before, a
+block it couldn't hit from where it stood (round a corner) could keep it hitting and "towering up" for minutes.
+No way planned and the target within 2 blocks (an item at its feet, still in its pickup delay): a straight step to it
+instead of the solver (these were most of the "stuck"s in the 5-Xen test).
+Going back for its things: killed again within 16 blocks of where it died (a monster, or a fall), before the items
+would despawn, it gives them up ("Not going back down there again.").
+
+Swimming to air (toAir), fixed. The search for air now goes through water its body fits in (two blocks high; one
+block high only if there's no other way, swimming flat) and acts on the first step: down (holds sneak and looks down,
+no jump: it dives under the edge of the roof), along (forward, no jump; sprinting flat through a one-block gap,
+sneaking with a roof just above) or up (jump). Before, it held jump whatever the first step was, and under a roof
+where the way out starts down it pushed up into the roof until it drowned (four drownings in one spot in the test;
+dropped into that spot now, it's out in 3 seconds). Half its air gone, busy hands are let go at once (mining under
+water is 5 to 25 times slower, and busy hands kept the instinct from running until it was hurt). Short of air, the
+walker plans no way with its head under water for 30 seconds (it went back down again and again). Drops that have
+sunk, ore seen under water, and ore within reach while it's under water are left alone.
+
 pathMode: xen (its own planner) is the default again; settings from 1.3 with "mob" move to "xen" (settings version 8).
 With a goal the mob pathfinder is never used (it only knows points).
 

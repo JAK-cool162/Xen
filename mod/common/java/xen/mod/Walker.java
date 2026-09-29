@@ -647,8 +647,12 @@ final class Walker {
 	private double under(BlockPos p) {
 		if (!water(p.above())) return 0;
 		var body = c.player;
-		return body.getAirSupply() < body.getMaxAirSupply() * 0.8 ? INF : 30;
+		if (body.getAirSupply() < body.getMaxAirSupply() / 2) noDiveUntil = now() + 600;   // (nearly out of air just now: no more ways under for 30 s)
+		return body.getAirSupply() < body.getMaxAirSupply() * 0.8 || now() < noDiveUntil ? INF : 30;
 	}
+
+	/** Till when it plans no way with its head under water (it ran short of air there). */
+	long noDiveUntil;
 
 	/** Lava next to the way, a drop into the void: it keeps well clear. */
 	private double danger(BlockPos p) {

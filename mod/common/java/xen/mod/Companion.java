@@ -272,6 +272,9 @@ public final class Companion {
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
 			hitBy(by);
 		}
+		if (hands.busy() && hands.interruptible() && player.isUnderWater() && player.getAirSupply() < player.getMaxAirSupply() / 2) {
+			hands.stop();                                                // half its air gone: whatever it's doing, air first
+		}
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
 		if (player.tickCount % 40 == 0) watched = watchedByAPlayer();
 		int every = Math.max(1, mod.config.decisionTicks / 5) * (watched || inArena || hurtNow ? 1 : 3);   // far from any player: it thinks less often
@@ -581,9 +584,43 @@ public final class Companion {
 			if (s.getFluidState().isEmpty() && s.getCollisionShape(level, head.above(k)).isEmpty()) return null;
 			if (s.getFluidState().isEmpty()) break;
 		}
+		BlockPos start = player.blockPosition();
+		boolean tall = true;
+		BlockPos step = stepToAir(level, start, true);                 // a way its whole body fits (two blocks high)...
+		if (step == null) {
+			step = stepToAir(level, start, false);                     // ...or through gaps one block high, swimming flat
+			tall = false;
+		}
+		if (step == null) return null;
+		goals.instant = "swimming to air";
+		hands.steer = Vec3.atBottomCenterOf(step);
+		if (step.getY() < start.getY()) {                              // the way out starts down (under the edge of the roof): it dives
+			player.setSprinting(false);
+			player.setShiftKeyDown(true);
+			diving = true;
+			hands.face(Vec3.atCenterOf(step).add(0, -1, 0));
+			return Action.IDLE;
+		}
+		player.setShiftKeyDown(false);
+		if (step.getY() == start.getY()) {                             // along: no jumping into the roof
+			boolean low = !tall || !swimmable(level, step.above());
+			player.setSprinting(low);                                  // (a gap one block high: only swimming flat fits through)
+			if (!low && !swimmable(level, step.above(2))) {             // a roof right over it there: keep low
+				player.setShiftKeyDown(true);
+				diving = true;
+			}
+			hands.face(Vec3.atCenterOf(step).add(0, low ? -0.4 : 0, 0));
+			return Action.FORWARD;
+		}
+		player.setSprinting(false);                                    // up: hold space
+		hands.face(Vec3.atCenterOf(step));
+		return Action.JUMP;
+	}
+
+	/** The first block of the shortest swim to air (breathing room over it), through water its body fits in; null if none near. */
+	private static BlockPos stepToAir(ServerLevel level, BlockPos start, boolean tall) {
 		java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
 		Map<BlockPos, BlockPos> from = new HashMap<>();
-		BlockPos start = player.blockPosition();
 		open.add(start);
 		from.put(start, start);
 		BlockPos air = null;
@@ -595,18 +632,15 @@ public final class Companion {
 			}
 			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
 				BlockPos n = q.relative(d);
-				if (from.containsKey(n) || n.distManhattan(start) > 16 || !swimmable(level, n)) continue;
+				if (from.containsKey(n) || n.distManhattan(start) > 16 || !swimmable(level, n) || tall && !swimmable(level, n.above())) continue;
 				from.put(n, q);
 				open.add(n);
 			}
 		}
 		if (air == null) return null;
 		BlockPos step = air;
-		while (!from.get(step).equals(start)) step = from.get(step);  // the first step of the way there
-		goals.instant = "swimming to air";
-		hands.steer = Vec3.atBottomCenterOf(step);
-		hands.face(Vec3.atCenterOf(step));
-		return Action.JUMP;
+		while (!from.get(step).equals(start)) step = from.get(step);
+		return step;
 	}
 
 	private static boolean swimmable(ServerLevel level, BlockPos p) {
@@ -619,14 +653,26 @@ public final class Companion {
 		return s.getFluidState().isEmpty() && s.getCollisionShape(level, p).isEmpty();
 	}
 
+	/** Holding sneak to swim down (out from under a roof): let go once its head is out. */
+	private boolean diving;
+
 	/** Companion instincts that come before the brain's own choice. */
 	private Action instinct() {
 		hands.watching = null;
+		if (diving && !player.isUnderWater()) {
+			player.setShiftKeyDown(false);
+			diving = false;
+		}
 		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
-			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) walker.stop();   // (its way led under: air first)
+			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) {
+				walker.stop();                                        // (its way led under: air first)
+				walker.noDiveUntil = player.level().getGameTime() + 600;   // and no ways under water for a while
+			}
 			Action out = toAir();
 			if (out != null) return out;
 			goals.instant = "swimming up for air";
+			player.setSprinting(false);                               // (upright: swimming flat and looking down, it would sink)
+			player.setShiftKeyDown(false);
 			return Action.JUMP;                                       // hold space to swim up, like a player
 		}
 		if (player.getFoodData().getFoodLevel() <= 10 && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
@@ -1450,6 +1496,7 @@ public final class Companion {
 				if (a != null) return a;
 			}
 			Action w = g != null ? walker.go(g) : walker.go(goal);
+			if (w == null && player.position().distanceTo(goal) < 2) return digToward(goal);   // right there (a drop at its feet): a step, not being stuck
 			if (w != null && !walker.stuck()) return w;
 			String why = w == null ? "no way it knows of" : walker.lastProblem.isEmpty() ? "getting no closer" : walker.lastProblem;
 			if (solver.start(goal, why)) {
@@ -2042,7 +2089,15 @@ public final class Companion {
 		String how = source.type().msgId();
 		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
 				|| how.contains("drown") || player.isUnderWater();                   // (under water: not worth drowning again for)
-		lostAt = gone || inArena ? null : player.blockPosition().immutable();   // its things are lying there: back for them after
+		BlockPos here = player.blockPosition().immutable();
+		boolean again = lostAt != null && lostDimension == player.level().dimension() && lostAt.closerThan(here, 16)
+				&& player.level().getGameTime() < lostUntil && (source.getEntity() instanceof Enemy || how.contains("fall"));
+		if (again && !inArena) {                                      // killed going back to where it died: what's there wins (a player lets it go too)
+			chatter(pick3("Not going back down there again.", "Too many monsters there. My stuff can stay.", "Twice is enough. I'll start over."), true);
+			journal("does", "gives up on its things (died there again)");
+		}
+		lostAt = gone || inArena || again ? null : here;              // its things are lying there: back for them after
+		saidGoingBack = false;
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 5200;              // (items last five minutes)
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());

@@ -17,6 +17,14 @@ controls.
   outside or when scared).
 * **A short, real plan**: iron first; with iron, diamonds (down at y -58 once it has an iron chestplate or plenty of
   iron); then a house; then netherite.
+* **Walks next to what it mines**: to mine a block it walks to where it can reach it, not into it.
+* **Fewer false "stuck"s**: something right at its feet (a drop from the block it just mined) is a step, not a reason
+  to tower up; a block it can't get at from where it stands is let go after 15 seconds (before: minutes of hitting at it).
+* **No death loops**: killed a second time going back for its things (monsters, a fall), it lets them go.
+* **Out from under water, for real**: under a roof with the way out going down first (under a ledge, then up), it
+  now dives, swims along (flat through a one-block gap) and then up, instead of pushing up into the roof until it
+  drowned. Half its air gone, it drops whatever it's doing (mining under water is very slow); after a close call it
+  plans no way under water for 30 seconds; and it doesn't dive for sunken drops or ore under water.
 * Its own planner is the default again (setting pathMode: xen). The mob pathfinder is still there (pathMode: mob).
 
 ### 1.3.1

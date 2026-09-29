@@ -66,6 +66,9 @@ final class Chores {
 	/** The ores it's walking to (the quickest of them), and since when: kept a while so it's one goal, not a new one each step. */
 	private List<BlockPos> oreWay;
 	private long oreWayAt;
+	/** The block right by it that it's trying to get, and since when (hitting at it for ever is no good: another one). */
+	private BlockPos working;
+	private long workingSince;
 	private BlockPos target;
 
 	/** Its legs can't get to what it was going for (three tries): out of reach, it picks another (no waiting for help). */
@@ -1300,7 +1303,7 @@ final class Chores {
 		double feet = c.player.getY();
 		ItemEntity best = null;
 		for (ItemEntity drop : c.player.level().getEntitiesOfClass(ItemEntity.class, c.player.getBoundingBox().inflate(Perception.NEAR),
-				x -> x.isAlive() && Math.abs(x.getY() - feet) <= 2.5 && !ignoredDrops.contains(x.getUUID()))) {
+				x -> x.isAlive() && Math.abs(x.getY() - feet) <= 2.5 && !ignoredDrops.contains(x.getUUID()) && !x.isUnderWater())) {   // (sunk: not worth a dive)
 			String k = c.itemKey(drop.getItem());
 			boolean wanted = false;
 			for (String i : items) wanted |= i.equals(k);
@@ -1356,7 +1359,7 @@ final class Chores {
 			for (var it = seen.keySet().iterator(); it.hasNext(); ) {
 				BlockPos q = BlockPos.of(it.nextLong());
 				if (q.closerThan(feet, Eyes.RANGE) && !skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))
-						&& WorldSenses.category(level, q, level.getBlockState(q)) == k) found.add(q);
+						&& WorldSenses.category(level, q, level.getBlockState(q)) == k && !underwater(q)) found.add(q);
 			}
 		}
 		List<BlockPos> out = new ArrayList<>(found);
@@ -1378,7 +1381,7 @@ final class Chores {
 	private BlockPos oreInReach() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		int tier = c.crafter.pickTier();
-		if (tier < 1) return null;
+		if (tier < 1 || c.player.isUnderWater()) return null;              // (under water: air first, mining there is slow)
 		BlockPos feet = c.player.blockPosition(), best = null;
 		Vec3 eye = c.player.getEyePosition();
 		double bestD = Double.MAX_VALUE;
@@ -1521,6 +1524,16 @@ final class Chores {
 	private Action reach(BlockPos t) {
 		Hands hands = c.hands;
 		BlockPos feet = c.player.blockPosition();
+		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) < 4.5) {   // right by it: 15 seconds and still there, it can't get at it
+			if (!t.equals(working)) {
+				working = t.immutable();
+				workingSince = now();
+			} else if (now() - workingSince > 300) {
+				working = null;
+				c.journal("does", "gives up on the block at " + t.toShortString() + " (can't get at it)");
+				return giveUp(t);
+			}
+		}
 		BlockPos hit = t.getY() >= feet.getY() ? hitFromHere(t) : null;   // (below its feet: the staircase way, never straight down)
 		if (hit != null) {
 			if (floods((ServerLevel) c.player.level(), hit)) return giveUp(t);   // (water behind it: not worth a flooded tunnel)
@@ -1557,7 +1570,7 @@ final class Chores {
 			c.acted = true;
 			return Action.MINE;
 		}
-		return c.walkTo(Vec3.atCenterOf(t));
+		return c.walkTo(Goal.nextTo(t));                                 // (to where it can mine it, not into it)
 	}
 
 	/** Dig the block under its feet, unless it knows there is lava or water right below. */
