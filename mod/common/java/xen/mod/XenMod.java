@@ -1066,6 +1066,7 @@ public class XenMod implements ModInitializer {
 			part.accept("portal math", () -> { if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT); });
 			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });
 			part.accept("taste", () -> { if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste")); });
+			part.accept("habits", () -> { if (known.has("habits")) c.habits.load(known.getAsJsonObject("habits")); });
 			part.accept("mine", () -> {
 				if (!known.has("mine")) return;
 				com.google.gson.JsonObject mine = known.getAsJsonObject("mine");

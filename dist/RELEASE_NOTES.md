@@ -1,7 +1,43 @@
-**Xen Companion 1.5.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.6.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.6.0: plays like a person on a server
+
+* **Hits read right**: only one light tap with an empty hand while you're talking to it is a poke. A critical hit, a
+  crouching hit, a weapon, a hard hit, a second hit, or a hit out of nowhere is an attack. It reads how you hit it at
+  that very moment (a crit before you land), and tells its owner off, worse each time. A wrathful Xen hits back, a
+  gentle one keeps away.
+* **Boats and horses**: "get in my boat", "hop on", "ride with me", "get on the horse", "get out". Following you, it
+  hops into your boat when there's room and gets out when you do. With no seat, it puts its own boat on the water,
+  paddles after you and takes the boat back at the shore. A wild horse bucks it off until it's tamed; with a saddle
+  it rides after you.
+* **Follows when told**: "follow me" means now. It drops its own errands to keep up, and doesn't go back to an old
+  task while you're walking.
+* **Crouching back and arm swings players can see**: a crouch hello is answered with two to four real crouches, and
+  arm swings and block cracks show while it mines and fights.
+* **Hunting when hungry**: starving with nothing to eat, its errands wait and it hunts, then eats (before, it could
+  starve over a wood errand with cows right there). With no food on it and an animal close by, it takes it.
+* **Real night shelters**: no more 1x1 tower. At nightfall out in the open it drops what it's doing and goes home, digs
+  into a hillside, builds a little hut with room inside (on a flat spot close by, with a real roof), or digs a hole
+  and covers it. Standing under a tree isn't a roof. It stays in until morning.
+* **Sharing with other Xens**: spare armor (it already wears its best), a second sword or pickaxe, blocks and food it
+  has plenty of go to a Xen close by who needs them. It walks over and tosses it to them (only they can pick it up);
+  they put it on or use it and say thanks. Its team, its village and Xens with the same owner get what they lack;
+  others only what anyone can see they need (a missing or weaker piece of armor, fighting bare-handed), and only
+  from a kind Xen that trusts them. Greedy ones give less, and never to an enemy.
+* **Using items**: "light the tnt" (and it runs), "burn that", "use the flint and steel", "bone meal that", "put that
+  out": on the block you're looking at.
+* **Griefing (setting `grief`)**: `revenge` (default): a Xen that holds grudges, badly hurt by someone whose house
+  it knows, may set it on fire while they're away. `off`, or `chaos` (a mean one may burn a stranger's house too).
+  Never its owner's, its village's or a friend's.
+* **Habits**: it looks around when it arrives, gets bored of doing the same thing too long, grumbles and plays safer
+  after dying (and takes a breather after two quick deaths), takes a short detour to look at a village or temple it
+  spots, tosses junk when its bag is full, and builds up its own routine for each time of day ("what do you usually
+  do?").
+* Its head stuck in a block (it woke up in a wall, sand fell on it): it digs out instead of suffocating.
+* Older versions that never had a release now have one: 1.4.0 and 0.2.0-alpha.
 
 ### 1.5.0: born with a nature, their own plans, Xen 6.0
 

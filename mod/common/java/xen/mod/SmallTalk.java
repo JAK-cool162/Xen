@@ -51,6 +51,7 @@ final class SmallTalk {
 	private static final Pattern PLAN = p("\\b(what'?s (your|the) plan|what (will|are) you (do|going to do)|what next|what'?s next|your goal)\\b");
 	private static final Pattern BELIEVE = p("\\b(what do (you|u) believe|your beliefs?|believe in|what are your (rules|values|principles)|what'?s your (mindset|philosophy|motto))\\b");
 	private static final Pattern SINS = p("\\b(your sins?|what'?s your sin|deadly sins?|what are you like|what kind of (person|player|xen) are you|describe yourself|your personality)\\b");
+	private static final Pattern ROUTINE = p("\\bwhat do (you|u) (usually|normally|always) do\\b|\\byour (routine|habits?|day like)\\b|\\bwhat'?s your (routine|day like)\\b");
 	private static final Pattern STRATEGY = p("\\b(your strategy|what'?s your strategy|how do (you|u) play|your game ?plan|your play ?style)\\b");
 	private static final Pattern NEED = p("\\b(what do you need|need anything|what are you missing|need help with)\\b");
 	private static final Pattern HOW_MANY = p("\\b(how (many|much) ([a-z_ ]+?)( do you have| have you got| you got)?\\??$|do you have (any |some |a |an )?([a-z_]+))");
@@ -96,6 +97,11 @@ final class SmallTalk {
 				default -> "Why do today what you can do tomorrow?";
 			};
 			return c.pick3("I'm " + me.sinsInWords() + ". " + why, "Honestly? " + cap(me.sinsInWords()) + ". " + why, why + " I'm " + me.sinsInWords() + ".");
+		}
+		if (ROUTINE.matcher(w).find()) {
+			String r = c.habits.routine();
+			if (r.isEmpty()) return c.pick3("I don't really have a routine yet.", "Whatever comes up, so far.", "Still figuring out my days.");
+			return r.replace("Your routine: ", "My routine: ").replace("take a breather", "rest");
 		}
 		if (STRATEGY.matcher(w).find()) {
 			if (me.plan < 0) return "I'm still working that out.";

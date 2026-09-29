@@ -135,6 +135,25 @@ final class Compat {
 		}
 	}
 
+	/** Tosses a stack to someone: only they can pick it up (like the /give overflow, marked for them). */
+	static boolean tossTo(ServerPlayer p, ItemStack stack, java.util.UUID target) {
+		try {
+			Object e;
+			try {
+				e = ServerPlayer.class.getMethod("drop", ItemStack.class, boolean.class, boolean.class).invoke(p, stack, false, true);
+			} catch (NoSuchMethodException x) {
+				Class<?> prediction = Class.forName("net.minecraft.util.Prediction");
+				e = ServerPlayer.class.getMethod("drop", ItemStack.class, boolean.class, prediction)
+						.invoke(p, stack, true, prediction.getField("PREDICTED").get(null));
+			}
+			if (e instanceof net.minecraft.world.entity.item.ItemEntity item) item.setTarget(target);
+			return e != null;
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			XenMod.LOG.warn("Could not toss {}: {}", stack, e.toString());
+			return false;
+		}
+	}
+
 	/**
 	 * Writes 4 lines on the front of a sign. 26.1: SignText(Component[], ...) and setText(text, true);
 	 * 26.3: SignText(List, ...) and setText(text, SignTextSlot.FRONT).

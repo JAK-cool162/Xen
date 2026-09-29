@@ -115,6 +115,7 @@ public final class Companion {
 	// ------------------------------------------------------------------------------- joining
 	/** Join the server as a real player at a position. */
 	void join(ServerLevel level, Vec3 at, float yaw) {
+		habits.arrived();                                               // (new here: a look around first)
 		GameProfile profile = Looks.profile(name, skin);
 		// What the server kept of it (its bag, health, where it was), like any player coming back: read before it joins.
 		java.util.Optional<net.minecraft.nbt.CompoundTag> saved = server.getPlayerList().loadPlayerData(new net.minecraft.server.players.NameAndId(profile));
@@ -272,6 +273,7 @@ public final class Companion {
 		hands.tick();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
 		rider.tick();                                                   // in a boat or on a horse: steering
+		habits.tick();                                                  // getting its bearings, frustration fading
 		eyes.tick();                                                    // a yes or no for every block it can see
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
@@ -728,6 +730,10 @@ public final class Companion {
 		}
 		Action ride = rider.next();                                   // getting in a boat, on a horse, riding
 		if (ride != null) return ride;
+		Action use = uses.next();                                     // an item used on a block (asked, or a grudge)
+		if (use != null) return use;
+		Action share = sharing.next();                                // spare armor, a second sword, blocks: to a Xen who needs it
+		if (share != null) return share;
 		Action fight = fightBack();
 		if (fight != null) {
 			if (antics.busy()) antics.next(true);                     // a fight ends the fun
@@ -758,6 +764,8 @@ public final class Companion {
 		if (about != null) return about;
 		Action fun = antics.next(false);                              // dancing, showing off
 		if (fun != null) return fun;
+		Action grudge = mode == Mode.FREE ? uses.grudge() : null;      // someone hurt it badly: their house (the grief setting)
+		if (grudge != null) return grudge;
 		if (crafter.ready() && !farBehind()) {                        // tools first, like any new player
 			Action craft = crafter.next();
 			if (craft != null) return craft;
@@ -799,6 +807,8 @@ public final class Companion {
 			Action roof = chores.busy() ? chores.next() : null;
 			if (roof != null) return roof;
 		}
+		Action habit = habits.next();                                 // a look around, a detour, a breather, boredom, a full bag
+		if (habit != null) return habit;
 		if (chores.busy()) {
 			Action chore = chores.next();
 			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;
@@ -1471,7 +1481,8 @@ public final class Companion {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
 		net.minecraft.world.entity.item.ItemEntity best = null;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
-				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath()))) {
+				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
+						|| sharing.expected(x.getItem())))) {                   // (or what a friend just tossed to it)
 			if (!player.hasLineOfSight(e)) continue;
 			if (best == null || e.distanceTo(player) < best.distanceTo(player)) best = e;
 		}
@@ -2263,6 +2274,7 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
+		habits.died();
 		if (goals.option >= 0) goals.finishOption(true);                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
 		if (skills.partner != null) skills.endSpar(false);
@@ -2319,6 +2331,7 @@ public final class Companion {
 		} finally {
 			XenMod.quietJoin = false;
 		}
+		habits.respawned();
 	}
 
 	public String status() {
@@ -2344,7 +2357,7 @@ public final class Companion {
 				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
 				+ join(places.describe(), storage.describe(), tribe() == null ? "" : tribe().describe(this), nether.describe(), adventure.describe(),
 						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe(),
-						skills.describe(), rumors.describe(), life.describe(), caves.describe(), structures.describe())
+						skills.describe(), rumors.describe(), life.describe(), caves.describe(), structures.describe(), habits.routine())
 				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
@@ -2587,6 +2600,8 @@ public final class Companion {
 				farmer.cancel();
 				hands.stop();
 				if (!r.intent().equals("ride")) rider.cancel();
+				if (!r.intent().equals("use")) uses.cancel();
+				sharing.cancel();
 			}
 			switch (r.intent()) {
 				case "follow" -> {
@@ -2604,6 +2619,7 @@ public final class Companion {
 					plan = rider.ask(from, words);
 				}
 				case "dismount" -> plan = rider.getOut();
+				case "use" -> plan = uses.ask(from, words);
 				case "stay" -> {
 					chores.cancel();
 					asked = null;
@@ -2689,6 +2705,9 @@ public final class Companion {
 	/** The unpredictable side: dancing, showing off, surprises. */
 	final Antics antics = new Antics(this);
 	final Rider rider = new Rider(this);
+	final Uses uses = new Uses(this);
+	final Habits habits = new Habits(this);
+	final Sharing sharing = new Sharing(this);
 	final Reactions reactions = new Reactions(this);
 
 	// ------------------------------------------------------------------------ standing about

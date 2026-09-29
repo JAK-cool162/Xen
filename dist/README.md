@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.5.0
+# Xen Companion (Fabric mod) 1.6.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.5.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.5.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.5.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.5.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.6.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.6.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.6.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.6.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.5.0+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.6.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -187,7 +187,10 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "Pip, kill a pig" / "get us food" | hunts an animal it sees and picks up the meat |
 | "Pip, give me your wood" / "hand over 12 cobblestone" | walks over and tosses it to you (keeps its tools) |
 | "Pip, craft a boat" / "make me 4 torches" / "craft a chest" / "make me a stone pickaxe" | crafts it with the recipe book (planks and sticks first, a crafting table if needed), or says what's missing |
-| "Pip, build a shelter" / "hide!" | builds a little hut around itself (10 blocks) and stays in it until morning |
+| "Pip, build a shelter" / "hide!" | digs into a hill, builds a little hut with room inside (about 28 blocks, on a flat spot close by) or digs a hole and covers it, and stays in until morning |
+| "Pip, get in my boat" / "hop on" / "ride with me" / "get on the horse" / "tame that horse" | gets in your boat (or one it sees), gets on a horse (a wild one bucks until it's tamed; with a saddle it rides after you) |
+| "Pip, get out" / "get off" | gets out of the boat, off the horse |
+| "Pip, light the tnt" / "burn that" / "use the flint and steel" / "bone meal that" / "put that out" | uses the item on the block you're looking at (or TNT it can see), and runs from lit TNT |
 | "Pip, build a NOT gate" / "an OR gate" / "an AND gate" / "a long wire" | builds that redstone circuit from parts it carries |
 | "Pip, eat something" | eats, if it has food and is hungry |
 | "Pip, stop" / "cancel that" | stops what it's doing |
@@ -245,15 +248,25 @@ It does it fairly:
   things); "forget what I told you" clears yours.
 * **Signs**: it reads the signs it can see, says what a new one says when
   someone's there, and knows it afterwards.
-* **Greetings**: crouch at it quickly a few times and it crouches back and trusts
-  you a little more (never fully: anyone can crouch).
-* **Pokes and attacks**: a hit with an empty hand (or a flower, a block) gets its
-  attention ("Hey! What's up?"); a hit with a weapon, or poking on and on, is an
-  attack. With PvP `own` (the default) it decides what to do about an attack
-  itself: it fights back against armed attacks on it or its owner, lets a
-  friend's mistake go, and gets away when it's losing.
+* **Greetings**: crouch at it quickly a few times and it crouches back two to four
+  times (you see it crouch, like a player) and trusts you a little more (never
+  fully: anyone can crouch).
+* **Pokes and attacks**: only one light tap with an empty hand while you're
+  talking with it is a poke ("Hey! What's up?"). Anything else is an attack: a
+  weapon, a critical hit (hitting while falling), a crouching hit, a hard hit,
+  a second hit within three seconds, or a hit out of nowhere. It reads how you
+  hit it at that very moment. Its owner gets told off, worse each time ("Ow!
+  What was that for?", "Stop it!", "I'm not fighting you. Stop!"); a wrathful
+  one hits back for a few seconds, a gentle one keeps away. With PvP `own` (the
+  default) it decides what to do about anyone else's attack itself: it fights
+  back against armed attacks on it or its owner, lets a friend's mistake go,
+  and gets away when it's losing.
+* **Boats and horses**: following you, it hops into your boat when there's room
+  and gets out when you do; with no seat, it puts its own boat on the water,
+  paddles after you and takes the boat back at the shore. A wild horse throws it
+  off a few times before it's tamed; with a saddle it rides after you.
 * **Giving**: it thinks for a moment, keeps what it needs (wood for its
-  pickaxe, stone for its tools, 10 blocks for a shelter in the evening, a little
+  pickaxe, stone for its tools, 24 blocks for a hut in the evening, a little
   food when it's hungry) and says so, then tosses the rest at your feet and waits
   while you pick it up.
 * **In the dark** (caves, tunnels, under a roof) it puts torches on the floor or
@@ -694,6 +707,31 @@ of. With a bone and a wild wolf around it tames a dog and names it. Each Xen has
 flowers, watching the stars at night, watching the sunset, or dogs. And every 10 days it notices how long it has
 lived in your world.
 
+### Playing like a person on a server
+
+* **Getting its bearings**: new in the world, or back from dying, it looks around for a few seconds first.
+* **Routines**: it notices what it tends to do at each time of day (mining in the morning, building in the afternoon)
+  and leans that way again. Its habits are its own and slowly change; ask "what do you usually do?".
+* **Boredom**: 5 to 15 minutes of the same work (a patient Xen lasts longer, a lazy one less) and it's sick of it
+  ("Enough chopping for now."). It won't pick that again for a few minutes.
+* **Frustration**: dying stings. It grumbles, plays it safer for about ten minutes (fewer fights, less exploring),
+  and after two deaths in a short time it takes a breather first.
+* **Curiosity**: on its way somewhere, it spots a village, a temple, a portal... and a curious Xen takes a short look,
+  then gets back to what it was doing.
+* **A full bag**: it tosses the junk (rotten flesh, gravel, too much dirt, seeds...), keeping a little. A greedy
+  one keeps it all.
+* **Sharing**: spare armor, a second sword or pickaxe, blocks and food it has plenty of go to a Xen close by who needs
+  them: its team, its village or Xens with the same owner get what they lack; others only what shows (missing or
+  weaker armor, bare hands in a fight), from a kind Xen that trusts them. It tosses it to them (only they can pick it
+  up); they put it on and say thanks.
+* **Hungry**: starving with nothing to eat, its errands wait (one you asked for waits once it's down to nothing) and
+  it hunts. With no food on it and an animal right there, it takes it.
+* **Nights**: when night falls out in the open, it drops what it's doing for a roof: home if it has one, a hole in a
+  hillside, a little hut with room inside, or a hole in the ground covered over. Standing under a tree isn't a roof.
+* **Items**: it uses what it carries the way you would: flint and steel (on request, or to light its portal), bone
+  meal, a water bucket, boats. **Griefing** (setting `grief`): a Xen that holds grudges (wrathful, envious or
+  aggressive), badly hurt by someone whose house it knows, may come back and set it on fire while they're away.
+
 ## Villages: rules, jobs and punishments
 
 Xens that live together form a village with a **leader** (the one the others trust most). Anyone can propose a rule
@@ -838,6 +876,7 @@ away in single player. On a server, operators use:
 | `localDeaths` | `true` | death messages only reach those within `chatRange` |
 | `chatModelPick` | `"auto"` | Experimental tab: `"135m"`, `"360m"`, `"off"` or `"auto"` (the Talk tab decides) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
+| `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
 | `generationDays` | `3` | Minecraft days per generation |
 | `redstone` | `true` | Xen may build small circuits |

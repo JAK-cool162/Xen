@@ -143,6 +143,12 @@ public final class XenConfig {
 	 */
 	public String pvp = "own";
 
+	/**
+	 * Griefing: "off"; "revenge" (someone who hurt it badly may find their house on fire, if it's the kind to hold a
+	 * grudge); "chaos" (a mean one may burn a stranger's house too). Never its owner's, its village's or a friend's.
+	 */
+	public String grief = "revenge";
+
 	/** Evolution: every few days, the Xens that did worst (only ones without an owner) are replaced by children of the best. */
 	public boolean evolution = false;
 	/** Days (Minecraft days) per generation. */

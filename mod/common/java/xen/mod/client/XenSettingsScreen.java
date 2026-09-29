@@ -137,6 +137,8 @@ public class XenSettingsScreen extends Screen {
 				onOff("Team members can fight", "friendlyFire", "Being on a team doesn't stop a fight: each Xen decides who to fight, by its temper, its motives and who it trusts."); 
 				choice("PvP", "pvp", List.of("own", "off", "defend", "teams"), s -> s,
 						"own: its own call: it fights back when someone attacks it or its owner with a weapon, lets a friend's mistake go, and gets away when it's losing. A poke with an empty hand only gets its attention. defend: always fights back against armed attacks. teams: Xens of different teams fight too.");
+				choice("Griefing", "grief", List.of("revenge", "off", "chaos"), s -> s,
+						"revenge: someone who hurt a Xen badly may find their house on fire, if it's the kind to hold a grudge (wrathful, envious or aggressive). off: never. chaos: a mean one may also burn a stranger's house. Never its owner's, its village's or a friend's.");
 			}
 			case 4 -> {
 				onOff("Redstone", "redstone", "Xen may build small circuits it learned (NOT, OR, AND gates) from parts it carries.");

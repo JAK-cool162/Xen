@@ -51,6 +51,13 @@ final class Compat {
 		return true;
 	}
 
+	/** Tosses a stack to someone: only they can pick it up (like the /give overflow, marked for them). */
+	static boolean tossTo(ServerPlayer p, ItemStack stack, java.util.UUID target) {
+		net.minecraft.world.entity.item.ItemEntity e = p.drop(stack, false, true);
+		if (e != null) e.setTarget(target);
+		return e != null;
+	}
+
 	/** Writes 4 lines on the front of a sign. */
 	static boolean signText(SignBlockEntity sign, List<Component> lines) {
 		SignText text = new SignText();

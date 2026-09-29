@@ -59,6 +59,7 @@ final class Structures {
 		BlockPos had = found.get(sign[1]);
 		if (had != null && had.closerThan(at, 96)) return;
 		found.put(sign[1], at);
+		c.habits.spotted(at, sign[1]);                                        // (a curious one may go and look)
 		c.places.remember(sign[1], at);
 		c.journal("sees", "a " + sign[1] + " at " + at.toShortString());
 		c.chatter(sign[2], false);

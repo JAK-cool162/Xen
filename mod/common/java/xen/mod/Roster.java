@@ -67,6 +67,7 @@ final class Roster {
 		o.add("chests", c.storage.toJson());
 		o.add("knows", c.knowledge.toJson());
 		o.add("taste", c.taste.toJson());
+		o.add("habits", c.habits.toJson());
 		if (c.chores.mineRecordY != Integer.MIN_VALUE) {
 			JsonObject mine = new JsonObject();
 			mine.addProperty("y", c.chores.mineRecordY);

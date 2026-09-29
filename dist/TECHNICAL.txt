@@ -1,7 +1,84 @@
-XEN COMPANION 1.5.0: TECHNICAL NOTES
+XEN COMPANION 1.6.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.6.0
+===================
+
+Hits (Companion.hitBy, XenPlayer.hurtServer). XenPlayer.hurtServer records, at the moment of the hit, how the player
+hit it: a crit (fallDistance > 0, not on the ground, not climbing, not in water, not riding: vanilla's own test),
+crouching. hitBy (at most a few ticks later) uses that record when it's under 10 ticks old. An attack is: a weapon, a
+crit, a hard hit (over 3 health), crouching, a second hit within 3 s (60 ticks), or no conversation with it (talking =
+it answered them in the last 30 s). Anything else is a poke. Its owner: n = hits in 10 s; it says a line when 60 ticks
+passed since the last one, or when it's worse than the last (1: "Ow!", 2: "stop it", 3+: "I'm not fighting you") and
+8 ticks passed. A hitter (aggressive, wrath >= 0.5 or pride >= 0.7, pvp not off) hits back for 6 s after 3 hits; a
+gentle one keeps 6 blocks away for 5 s. Others: trust -0.3 (weapon, crit, hard) or -0.15, the tribe is alarmed.
+
+Crouching back (Companion.crouchWave). A gesture counter applied once per tick, last in the tick (after the walker and
+everything else set the keys): 4 ticks down, 4 up, 2 to 4 times. Entity data is sent every 2 ticks, so a crouch set
+and cleared in one tick never showed (before: one crouch at most). Not while riding (shift gets you out).
+
+Riding (Rider). "ride" and "dismount" intents. Its friend's vehicle with room (boat: 2 seats, chest boat 1, camel 2,
+horse 1), else the nearest with room within 24 blocks (seen, or within 8). It walks within 2.8 blocks and right-clicks
+it (Compat.interact); for a horse with an empty hand (food feeds it, a tool makes a wild one angry). XenPlayer
+.isClientAuthoritative() is false while it's a passenger, so a boat or horse it steers is simulated by the server
+(isLocalInstanceAuthoritative); on foot nothing changes. Boat: each tick the yaw turns up to 5 degrees towards its friend
+and, 3+ blocks away and within 70 degrees, 0.04 is added to the boat's velocity along its yaw (the W key); paddle
+animation on. Horse (saddled): its yaw turns up to 10 degrees a tick, zza = 1 beyond 4 blocks, a jump (onPlayerJump 60) when
+blocked on the ground, once a second. Taming: it gets back on up to 16 times as the horse bucks (vanilla temper). A
+saddle it carries goes on first. Getting out: its friend left the shared ride (10 ticks later), a fight on land, or at
+the shore by its friend for its own boat, which it then breaks and picks up. Following someone into a boat with no
+seat: its own boat onto water within 3 blocks (BoatItem use while looking at the water).
+
+Food (Companion.starving). Food <= 6 and none on it: its own errand is cancelled (an asked one too at food 0, and it
+comes back to that afterwards); it hunts 2 (or fishes), every 20 s at most. needs(): food 13 to 17, none on it, and an
+animal within 10 blocks it can see: it hunts 1.
+
+Shelters (Chores.shelter). In order: a dugout in a hill (as before); a room (roomyPlan: 2x2 inside, walls 2 high all
+round, 3 for a lookout, one support block on a wall, then a 2x2 roof: 29 blocks), at its feet or at a flat spot up to 4
+blocks away (floor solid, inside clear, walls grounded); a pit (two blocks straight down, solid all round, a floor under
+it, no falling blocks, each under 10 s to mine; the block over its head from what it dug); last, the old box around it.
+Evening block target: 24 (Goals.NIGHT_BLOCKS). The Mind's agenda at dusk gets dirt first ("dusk: dirt for a hut") when
+it has fewer than 24 blocks and no home within 96. Night takes priority over "danger: its own call" unless the danger
+feature is 0.3+ or a friend needs help. Goals.nightfall() (checked every 5 s before errands run): dark, out in the open
+(no real roof, and nothing but leaves above: MOTION_BLOCKING_NO_LEAVES heightmap), and it's chopping, exploring,
+building, farming, digging, or resting: that's dropped for a shelter. MindSense.SHELTERED is now enclosed(): a solid
+roof that isn't leaves within 4 above its head, and something solid within 3 on all four sides at feet and head height
+(or its home within 8). Hiding and building a shelter count as a reason to stand still (the stand-still watchdog).
+
+Items (Uses). The "use" intent: light/ignite/burn/set fire/blow up (flint and steel, else a fire charge), bone meal/grow,
+put out/extinguish (a water bucket), or "use the <item it carries>". The target: TNT within 16 blocks for "light the
+tnt", else the block the asker is looking at (their crosshair, 20 blocks). No flint and steel but iron and flint: it
+crafts one first. After lighting TNT it runs 10 blocks away. Griefing (setting grief: revenge | off | chaos): every 2 s
+it notes whose a house is (a player within 16 blocks of a house it knows). Once a day at most, a mean Xen (aggressive,
+wrath >= 0.6 or envy >= 0.6), free (not following), with trust <= -0.5 in a house's owner (chaos: also a stranger, 5%
+of checks) sets fire to a wooden or wool block with air on top, within 6 blocks of the house, while the owner is more
+than 24 blocks away and its own owner more than 48. Never near its home or village, never its owner's house.
+
+Sharing (Sharing). Every 15 to 30 s, when free (no errand, build, ride, fight), it looks at the Xens within 24 blocks it
+can see, trust >= 0. Friends: allied on the scoreboard team, the same village, or the same owner. Others: only if its
+greed <= 0.6, trust >= 0.4 and kindness >= 0.5 (or lust >= 0.6). What it gives (the first that fits): armor in its bag
+(it wears its best already) for a slot where they wear nothing or less (seen by anyone); a second, worse sword (to a
+friend with a worse best sword, to anyone else seen fighting bare-handed); for friends also a second pickaxe (if theirs
+is worse), 32 blocks (they have under 16, it has over 88 + 64 x greed) or 3 food (they have none and food under 16, it
+has over 10 + 10 x greed). It walks within 2.5 blocks and tosses it, marked for them (ItemEntity.setTarget: only they
+can pick it up); they pick it up even if it isn't usually worth a detour; 3 s later, if they have it: thanks, trust
++0.08 (the giver +0.02). The same Xen again after 15 s at most.
+
+Habits (Habits). Its bearings: 60 ticks (50 after dying) looking around, turning 6 degrees a tick. Routine: each option
+its mind starts is counted for the part of the day (4 parts of 6000 ticks), older counts fading x0.97; once there are
+4+, the mind's lean gets + 0.3 x share x patience (saved with the Xen). Boredom: the same option for 5 + 10 x patience
+x (1 - 0.5 x sloth) minutes (not rest, sleep, shelter, fights, eating, helping) and it drops it; that option gets -0.8
+for 4 minutes. Frustration: +0.5 per death (fades to 0 in 10 minutes); while over 0.2, fight -0.4f, explore -0.3f,
+mine -0.15f (f = frustration); two deaths within 10 minutes: a 45 s breather. Curiosity: a new place its eyes find
+(village, temple, portal...) within 48 blocks, by day, free, every 3 minutes at most, with chance 0.3 + 0.6 x curiosity:
+it walks there (25 s at most). A full bag (checked every 5 s): a stack of junk goes (rotten flesh, poisonous potatoes,
+spider eyes, seeds, gravel, dirt/andesite/diorite/granite/tuff/deepslate/netherrack, flint, sticks, bones, string,
+feathers), keeping a little of some; greed over 0.7 keeps everything.
+
+In a wall: its eyes in a block with collision, every 5 ticks it mines that block, and nothing else runs until it's out.
 
 
 WHAT'S NEW IN 1.5.0

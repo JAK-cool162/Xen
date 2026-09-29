@@ -573,6 +573,7 @@ final class Goals {
 			b[Mind.STONE] += 0.1f;
 			b[Mind.MINE] += 0.15f;
 		}
+		c.habits.bias(b);                                                       // its routine, what it's sick of, how stung it is
 		return b;
 	}
 
@@ -594,6 +595,7 @@ final class Goals {
 		if (planned >= 0) {
 			if (startOption(planned, nearby, now)) {
 				option = planned;
+				c.habits.started(option);
 				optionFeatures = f;
 				optionAt = now;
 				optionHow = "the plan: " + agendaWhy;
@@ -610,6 +612,7 @@ final class Goals {
 				continue;
 			}
 			option = ch.option;
+			c.habits.started(option);
 			optionFeatures = f;
 			optionAt = now;
 			optionHow = ch.how;

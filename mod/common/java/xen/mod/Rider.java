@@ -86,6 +86,7 @@ final class Rider {
 
 	void cancel() {
 		want = null;
+		taming = null;
 	}
 
 	// ------------------------------------------------------------------------------ asked
@@ -106,7 +107,7 @@ final class Rider {
 			double best = 24;
 			for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(24), x -> x.isAlive() && rideable(x) && room(x))) {
 				if (horse && !(e instanceof AbstractHorse) || boat && !(e instanceof AbstractBoat)) continue;
-				if (!p.hasLineOfSight(e)) continue;                          // only what it can see
+				if (e.distanceTo(p) > 8 && !p.hasLineOfSight(e)) continue;   // only what it can see (close by: it knows it's there)
 				double d = e.distanceTo(p) + (e.getPassengers().contains(from) ? -20 : 0);
 				if (d < best) {
 					best = d;
@@ -127,6 +128,7 @@ final class Rider {
 		wantUntil = now() + 20 * 30;
 		with = pick.getPassengers().contains(from) || pick == theirs ? from.getUUID() : null;
 		tries = 0;
+		taming = pick instanceof AbstractHorse h && !h.isTamed() ? h : null;
 		c.goals.instant = "getting in the " + what(pick);
 		return pick == theirs ? "You will get in " + from.getName().getString() + "'s " + what(pick) + "."
 				: "You will get " + (pick instanceof AbstractBoat ? "in" : "on") + " the " + what(pick) + ".";
@@ -159,10 +161,17 @@ final class Rider {
 		if (ownBoat != null && ownBoat.isAlive() && ownBoat.getPassengers().isEmpty() && ownBoat.distanceTo(p) < 16 && !c.fightingNow()) {
 			return takeBoatBack();                                            // its boat, left at the shore: it takes it along
 		}
+		if (want == null && taming != null && taming.isAlive() && !taming.isTamed() && !taming.isVehicle() && tries < 16
+				&& taming.distanceTo(p) < 16 && !c.fightingNow()) {
+			want = taming;                                                   // thrown off: back on (that's how taming goes)
+			wantUntil = now() + 20 * 20;
+		} else if (want == null && taming != null && (tries >= 16 || !taming.isAlive())) {
+			taming = null;
+			c.chatter("This one won't let me ride it.", false);
+		}
 		if (want == null) want = friendsRide();
 		if (want == null) return null;
 		if (!want.isAlive() || now() > wantUntil || !room(want) || want.level() != p.level() || c.fightingNow()) {
-			if (want instanceof AbstractHorse && tries > 0 && now() > wantUntil) c.chatter("This one won't let me ride it.", false);
 			want = null;
 			return null;
 		}
@@ -195,7 +204,7 @@ final class Rider {
 			Entity v = want;
 			want = null;
 			aloneSince = -1;
-			if (v instanceof AbstractHorse h && !h.isTamed()) c.chatter(pick("Whoa, easy... easy!", "Hold still, you!", "Yeehaw!"), false);
+			if (v instanceof AbstractHorse h && !h.isTamed() && tries <= 1) c.chatter(pick("Whoa, easy... easy!", "Hold still, you!", "Yeehaw!"), false);
 			else if (with != null) c.chatter(pick("In!", "Room for one more.", "Let's go!", "Alright, I'm in."), false);
 			c.journal("does", "got " + (v instanceof AbstractBoat ? "in a " : "on a ") + what(v));
 		}
@@ -242,6 +251,7 @@ final class Rider {
 			leave();
 			return null;
 		}
+		if (v instanceof AbstractHorse h && v.getPassengers().get(0) == p) return onHorse(h, friend);   // its own mount
 		if (theyreIn || !driving && with == null && !v.getPassengers().isEmpty() && v.getPassengers().get(0) instanceof ServerPlayer) {
 			aloneSince = -1;                                                 // someone else's ride, with them in it: it stays
 			return Action.IDLE;
@@ -264,6 +274,39 @@ final class Rider {
 			c.chatter("No saddle, I can't steer.", false);
 			leave();
 		}
+		return Action.IDLE;
+	}
+
+	/** A wild horse it's taming (it gets back on each time it's thrown), and whether it said it's tamed. */
+	private AbstractHorse taming;
+
+	/** On a horse of its own: taming it (it bucks), a saddle on, then it rides after its friend (steered per tick). */
+	private Action onHorse(AbstractHorse h, ServerPlayer friend) {
+		if (!h.isTamed()) {
+			taming = h;
+			c.goals.instant = "taming a " + what(h);
+			return Action.IDLE;                                              // (it throws it off in a while, or it's tamed)
+		}
+		if (taming == h) {
+			taming = null;
+			c.chatter(pick("It likes me now!", "Tamed! Good horse.", "Finally. We're friends now."), false);
+			c.journal("does", "tamed a " + what(h));
+		}
+		if (!h.isSaddled()) {
+			if (slot("saddle") >= 0) {                                      // off, saddle on, back on
+				leave();
+				want = h;
+				wantUntil = now() + 20 * 15;
+				tries = 0;
+				return Action.IDLE;
+			}
+			if (friend != null && friend.distanceTo(c.player) > 8) {
+				c.chatter("No saddle, I can't steer.", false);
+				leave();
+			}
+			return Action.IDLE;
+		}
+		c.goals.instant = "riding" + (friend != null ? " after " + friend.getName().getString() : "");
 		return Action.IDLE;
 	}
 
@@ -340,11 +383,13 @@ final class Rider {
 		p.setXRot(0);
 		p.zza = flat > 4 ? 1f : 0f;
 		p.xxa = 0;
-		if (h.horizontalCollision && h.onGround() && p.zza > 0) {             // something in the way: a jump
-			h.onPlayerJump(70);
-			h.handleStartJump(70);
+		if (h.horizontalCollision && h.onGround() && p.zza > 0 && p.tickCount - jumpedAt > 20) {   // something in the way: a jump (space, let go)
+			jumpedAt = p.tickCount;
+			h.onPlayerJump(60);
 		}
 	}
+
+	private int jumpedAt = -100;
 
 	private static float wrap(float deg) {
 		deg %= 360f;
