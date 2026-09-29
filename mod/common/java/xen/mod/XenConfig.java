@@ -69,11 +69,11 @@ public final class XenConfig {
 	 */
 	public boolean pathAssist = true;
 	/**
-	 * How path assist plans: "mob" (Minecraft's own mob pathfinder first, sprinting along it; its own planner, which
-	 * digs and towers, only where that finds no way), "xen" (only its own planner), "ab" (half the Xens each way, to
-	 * compare them).
+	 * How path assist plans: "xen" (its own Baritone-style planner: goals, parkour, digging through, towering, bridging,
+	 * a long way a piece at a time), "mob" (Minecraft's own mob pathfinder first, its own where that finds no way),
+	 * "ab" (half the Xens each way, to compare them).
 	 */
-	public String pathMode = "mob";
+	public String pathMode = "xen";
 	/**
 	 * (Experiment) The solver: a second little mind that, when a Xen is stuck, picks a way out (dig up, tower up, a
 	 * staircase, bridge, swim, go round, back off) and learns which ones work where, also from players it trusts.
@@ -157,7 +157,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 7;
+	public int version = 8;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -191,7 +191,8 @@ public final class XenConfig {
 					if (!j.has("maxMinions") || config.maxMinions == 8) config.maxMinions = 100;
 				}
 				if ((!j.has("version") || j.get("version").getAsInt() < 7) && config.teams == 1) config.teams = -1;   // 1.3: teams on their own (SMP)
-				config.version = 7;
+				if ((!j.has("version") || j.get("version").getAsInt() < 8) && "mob".equals(config.pathMode)) config.pathMode = "xen";   // 1.4: its own planner again
+				config.version = 8;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

@@ -1426,7 +1426,21 @@ public final class Companion {
 	 * closer, the solver picks a way out; and if all that's switched off, the old way: straight at it, digging.
 	 */
 	Action walkTo(Vec3 goal) {
-		if (voyager.flying() || voyager.shouldFly(goal)) {                 // far, under the sky, with an elytra: it flies there
+		return walkTo(null, goal);
+	}
+
+	/** Walk toward a goal (next to an ore, down to a height, the nearest of several...): see {@link Goal}. */
+	Action walkTo(Goal g) {
+		return walkTo(g, g.center());
+	}
+
+	/** When it last looked for ore to take on its way. */
+	private int lookedOnTheWay;
+
+	private Action walkTo(Goal g, Vec3 goal) {
+		Action ore = oreOnTheWay();                                     // on its way: ore right there, it takes it (like a player would)
+		if (ore != null) return ore;
+		if (g == null && (voyager.flying() || voyager.shouldFly(goal))) {   // far, under the sky, with an elytra: it flies there
 			Action f = voyager.flyTo(goal);
 			if (f != null) return f;
 		}
@@ -1435,7 +1449,7 @@ public final class Companion {
 				Action a = solver.next(goal);
 				if (a != null) return a;
 			}
-			Action w = walker.go(goal);
+			Action w = g != null ? walker.go(g) : walker.go(goal);
 			if (w != null && !walker.stuck()) return w;
 			String why = w == null ? "no way it knows of" : walker.lastProblem.isEmpty() ? "getting no closer" : walker.lastProblem;
 			if (solver.start(goal, why)) {
@@ -1446,6 +1460,23 @@ public final class Companion {
 			if (w != null) return w;
 		}
 		return digToward(goal);
+	}
+
+	/**
+	 * Ore it passes on its way (showing, in sight, within reach, and its pickaxe can take it): it stops a moment and mines
+	 * it, then walks on. Not in a fight, running away, scared, in water or with its hands full of something else.
+	 */
+	private Action oreOnTheWay() {
+		if (player.tickCount - lookedOnTheWay < 10 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
+				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy()
+				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return null;   // (out at night: keep going)
+		lookedOnTheWay = player.tickCount;
+		BlockPos ore = chores.oreWithinReach();
+		if (ore == null || !hands.mine(ore)) return null;
+		goals.instant = "taking the ore on its way";
+		journal("does", "takes ore on its way at " + ore.toShortString());
+		acted = true;
+		return Action.MINE;
 	}
 
 	/** The old way on foot: straight at it through what it knows, digging through, pillaring up. Null if lava is in the way. */

@@ -1,7 +1,23 @@
-**Xen Companion 1.3.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.4.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.4.0: walking with a goal (Baritone style, our own code)
+
+* **Goals, not points**: a Xen walks to a goal the way Baritone does ("next to that ore", "any of these ores"). The
+  search ends where the goal says "you're there", so it stops where it can mine the ore, not on top of it.
+* **The ore that's quickest to get to**: with several ores in view, it plans one way to all of them at once and goes
+  for the one its legs get to first (not just the nearest as the crow flies).
+* **Long ways in pieces**: a far goal is planned a piece at a time, and the next piece is ready before the last one
+  runs out, so it never stops to think.
+* **Smarter parkour**: it sprint-jumps up onto a ledge one block higher across a gap (only where a miss is a fall it
+  survives), and runs through bends without slowing down (it only slows for sharp turns).
+* **Things on the way**: walking somewhere, it mines ore it passes within reach (not in a fight, in water, at night
+  outside or when scared).
+* **A short, real plan**: iron first; with iron, diamonds (down at y -58 once it has an iron chestplate or plenty of
+  iron); then a house; then netherite.
+* Its own planner is the default again (setting pathMode: xen). The mob pathfinder is still there (pathMode: mob).
 
 ### 1.3.1
 

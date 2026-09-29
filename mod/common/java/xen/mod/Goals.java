@@ -238,7 +238,8 @@ final class Goals {
 			case STORE -> c.storage.store();
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
-			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(-54, "diamonds", 3)
+			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
+					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(-58, "diamonds", 3)   // (iron armor first, then diamonds)
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", 6) : c.chores.mine(40, "coal", 8);
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
@@ -647,12 +648,13 @@ final class Goals {
 		}
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
+		// The main goal, in two steps: iron (tools, then armor), and then diamonds. A house comes after.
 		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");
+		if (tier >= 3 && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f && iron < 24 ? "iron for armor" : "diamonds");
 		if (tier >= 3 && home == null) {
 			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home");
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for a house");
 		}
-		if (tier >= 3 && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f ? "iron for armor" : "diamonds");
 		if (tier >= 4 && netheriteNext() && !c.nether.busy() && now() > netherTryAt) {   // diamonds done: netherite, from the Nether
 			netherTryAt = now() + 20 * 60 * 20;
 			String trip = c.nether.go("debris", 0);

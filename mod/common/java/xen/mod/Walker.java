@@ -108,10 +108,29 @@ final class Walker {
 	 * it knows of (then it's up to the old ways: dig towards it).
 	 */
 	Action go(Vec3 to) {
+		return go(null, to);
+	}
+
+	/**
+	 * Walk toward a goal (see {@link Goal}): next to an ore, down to a height, toward a far column, the nearest of
+	 * several. Like Baritone's goals (our own code): the search ends where the goal says "you're there", and a long
+	 * way is planned a piece at a time, the next piece before the last one runs out, so it never stops to think.
+	 */
+	Action go(Goal g) {
+		return go(g, g.center());
+	}
+
+	/** The goal it's walking to (null: a point, the old way), and whether the way it has only gets part of the way there. */
+	private Goal want;
+	private String wantKey = "";
+	private boolean partial;
+
+	private Action go(Goal g, Vec3 to) {
 		touched = true;
 		var p = c.player;
-		double gap = Math.hypot(p.getX() - to.x, p.getZ() - to.z) + 0.7 * Math.abs(p.getY() - to.y);
-		if (goal == null || goal.distanceTo(to) > 1.5 || gap < bestGap - 1) {
+		double gap = g != null ? g.heuristic(p.blockPosition()) / Goal.PER_BLOCK                  // (how far, by the goal's own measure)
+				: Math.hypot(p.getX() - to.x, p.getZ() - to.z) + 0.7 * Math.abs(p.getY() - to.y);
+		if (goal == null || (g == null ? goal.distanceTo(to) > 1.5 : !g.toString().equals(wantKey)) || gap < bestGap - 1) {
 			bestGap = gap;
 			bestAt = now();
 		}
@@ -120,10 +139,12 @@ final class Walker {
 		// A goal that moved a little isn't a new goal (far away, a few blocks either way are the same way), and while it
 		// was pacing back and forth it keeps to the way it chose for a while.
 		double tolerance = now() < lockedUntil ? 12 : Math.max(1.5, Math.min(6, 0.15 * gap));
-		boolean moved = goal == null || goal.distanceTo(to) > tolerance;
+		boolean moved = goal == null || (g == null ? goal.distanceTo(to) > tolerance || want != null : !g.toString().equals(wantKey));
+		boolean nearEnd = partial && path != null && path.size() - index <= 2;   // (a piece of a long way: the next piece now)
 		// It keeps to its way (like a player who knows where they're going): a new plan only when the way is done, the goal
 		// moved, a move failed, or what it sees now blocks the next steps.
-		boolean replan = path == null || moved || index >= path.size() || now() - plannedAt > 20 && settled && !stillGood();
+		boolean replan = path == null || moved || index >= path.size() || now() - plannedAt > 20 && settled && !stillGood()
+				|| nearEnd && settled && now() - plannedAt > 10;
 		if (replan && !settled && path != null) replan = false;             // not in the middle of a jump or a fall
 		if (replan && !budget(p.level().getServer().getTickCount())) {     // many Xens thinking at once: its turn next tick
 			if (path == null) {
@@ -135,15 +156,17 @@ final class Walker {
 		if (replan) {
 			if (moved || goal == null) {
 				boolean flip = false;                                         // back to a goal it just left: that's dithering
-				for (Vec3 g : recentGoals) flip |= g.distanceTo(to) < 2;
+				for (Vec3 r : recentGoals) flip |= r.distanceTo(to) < 2;
 				if (!flip) trail.clear();                                     // a new goal (the next log, the next ore): not pacing
 				recentGoals.addLast(to);
 				if (recentGoals.size() > 4) recentGoals.removeFirst();
 				goal = to;
+				want = g;
+				wantKey = g == null ? "" : g.toString();
 			}
 			bold();
 			Move was = path != null && index < path.size() ? path.get(index) : null;
-			path = plan((ServerLevel) p.level(), p.blockPosition(), to);
+			path = plan((ServerLevel) p.level(), p.blockPosition(), to, want);
 			index = 0;
 			stage = 0;
 			boolean same = was != null && path != null && !path.isEmpty() && path.get(0).from().equals(was.from()) && path.get(0).to().equals(was.to());
@@ -303,13 +326,15 @@ final class Walker {
 	private ServerLevel level;
 	private BlockPos eyes;
 
-	private List<Move> plan(ServerLevel level, BlockPos start, Vec3 to) {
+	private List<Move> plan(ServerLevel level, BlockPos start, Vec3 to, Goal want) {
 		this.level = level;
 		this.eyes = start;
 		BlockPos target = BlockPos.containing(to);
+		Goal aim = want != null ? want : Goal.block(target);
+		partial = false;
 		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
 		mobWay = false;
-		if (mobPaths() && now() >= noMobWayUntil && reachable(target)) {         // the mobs' way first: quick, sure, no digging
+		if (want == null && mobPaths() && now() >= noMobWayUntil && reachable(target)) {   // the mobs' way first (the setting): quick, sure, no digging
 			List<Move> m = mobPath.plan(c, level, start, to, 1600);
 			if (m != null) {
 				mobWay = true;
@@ -320,7 +345,7 @@ final class Walker {
 		PriorityQueue<Node> open = new PriorityQueue<>();
 		Node first = new Node(start);
 		first.placedFloor = c.player.onGround();                            // it's standing (maybe on the very edge of a block)
-		first.f = h(start, to);
+		first.f = h(aim, start);
 		nodes.put(start.asLong(), first);
 		open.add(first);
 		Node best = first;
@@ -331,8 +356,8 @@ final class Walker {
 			if (n.closed) continue;
 			n.closed = true;
 			expanded++;
-			double hn = h(n.pos, to);
-			if (n.pos.equals(target) || hn < 0.01) {
+			double hn = h(aim, n.pos);
+			if (aim.isIn(n.pos) || want == null && hn < 0.01) {
 				best = n;
 				break;
 			}
@@ -346,7 +371,7 @@ final class Walker {
 				Node next = nodes.computeIfAbsent(m.to().asLong(), k -> new Node(m.to()));
 				if (next.closed || n.g + cost >= next.g && next.parent != null) continue;
 				next.g = n.g + cost;
-				next.f = next.g + h(m.to(), to);
+				next.f = next.g + h(aim, m.to());
 				next.parent = n;
 				next.via = m;
 				next.placedFloor = m.kind() == Kind.PILLAR || m.kind() == Kind.BRIDGE;
@@ -355,6 +380,7 @@ final class Walker {
 			}
 		}
 		if (best == first) return null;
+		partial = !aim.isIn(best.pos) && !(want == null && h(aim, best.pos) < 0.01);   // (only part of the way: more later)
 		List<Move> out = new ArrayList<>();
 		for (Node n = best; n.via != null; n = n.parent) out.add(0, n.via);
 		return out;
@@ -414,10 +440,9 @@ final class Walker {
 	}
 
 	/** At best a sprint the whole way (a little more: it would rather find a good way than the shortest one). */
-	private static double h(BlockPos p, Vec3 to) {
-		double dx = p.getX() + 0.5 - to.x, dy = p.getY() - to.y, dz = p.getZ() + 0.5 - to.z;
-		double d = Math.sqrt(dx * dx + dz * dz + dy * dy * 1.5);
-		return d < 0.75 && Math.abs(dy) < 1 ? 0 : d * SPRINT * 1.15;
+	/** How far from the goal, a little more than a sprint the whole way (it would rather find a good way than the shortest). */
+	private static double h(Goal aim, BlockPos p) {
+		return aim.isIn(p) ? 0 : aim.heuristic(p) * 1.15;
 	}
 
 	private static long key(Move m) {
@@ -469,6 +494,14 @@ final class Walker {
 					}
 					if (clear && !farmland(land)) add(Kind.PARKOUR, p, land, (g + 1) * SPRINT + 4 + g * 6 * fear + danger(land), List.of());
 					if (!clear) break;
+				}
+				// up across a gap (a sprint-jump lands a block higher two blocks on), where it's brave enough and a miss won't hurt
+				if (maxGap >= 1 && realDrop(q) <= maxFall) {
+					BlockPos up2 = p.relative(d, 2).above(), mid = p.relative(d, 1);
+					if (passable(p.above(2)) && passable(mid.above()) && passable(mid.above(2)) && passable(up2) && passable(up2.above())
+							&& floor(up2) && !farmland(up2)) {
+						add(Kind.PARKOUR, p, up2, 2 * SPRINT + JUMP + 6 + 8 * fear + danger(up2), List.of());
+					}
 				}
 				// or a block down to walk on (sneaking at the edge, placed against the side of the one it stands on)
 				if (blocks > 0 && passable(q.below()) && !water(q.below()) && (fullBlock(p.below()) || placedFloor) && !lava(q.below().below())) {
@@ -741,7 +774,7 @@ final class Walker {
 		boolean settled = p.onGround() || p.isInWater() || p.onClimbable();
 		if (m.kind() == Kind.PILLAR || m.kind() == Kind.CLIMB_UP || m.kind() == Kind.CLIMB_DOWN) return feet.equals(m.to()) && settled;
 		if (m.kind() == Kind.SWIM) return flat < 0.6 && Math.abs(p.getY() - m.to().getY()) < 1.0;   // (bobbing in the water)
-		if (mobWay && !last && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL)) return feet.equals(m.to()) && flat < 0.9;   // (running on through)
+		if (!last && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL) && smooth()) return feet.equals(m.to()) && flat < 0.9;   // (running on through)
 		return feet.equals(m.to()) && settled && flat < (last || turning ? 0.35 : 0.7);
 	}
 
@@ -793,8 +826,8 @@ final class Walker {
 		face(to.add(0, 1.2, 0));
 		boolean straight = !last && direction(path.get(index + 1)) == direction(m);
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
-		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || mobWay && m.kind() == Kind.ASCEND)
-				&& (straight || mobWay || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > (mobWay ? 2 : 3);
+		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || m.kind() == Kind.ASCEND)
+				&& (straight || smooth() || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 2;
 		p.setSprinting(sprint);
 		switch (m.kind()) {
 			case ASCEND -> {
@@ -866,6 +899,17 @@ final class Walker {
 	}
 
 	private long lastHop;
+
+	/** The next move keeps about the same heading (45 degrees at most): it runs on through, sprinting, like a player. */
+	private boolean smooth() {
+		if (path == null || index + 1 >= path.size()) return false;
+		Move a = path.get(index), b = path.get(index + 1);
+		double ax = a.to().getX() - a.from().getX(), az = a.to().getZ() - a.from().getZ();
+		double bx = b.to().getX() - b.from().getX(), bz = b.to().getZ() - b.from().getZ();
+		double la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+		if (la < 0.1 || lb < 0.1) return false;
+		return (ax * bx + az * bz) / (la * lb) >= 0.7;
+	}
 	/** Minecraft's own mob pathfinder, and whether the way it's on came from it. */
 	final MobPath mobPath = new MobPath();
 	boolean mobWay;

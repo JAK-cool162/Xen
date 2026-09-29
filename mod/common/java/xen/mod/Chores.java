@@ -12,6 +12,7 @@ import xen.mod.core.Action;
 import xen.mod.core.Blocks;
 import xen.mod.core.Perception;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -62,6 +63,9 @@ final class Chores {
 	private UUID forWhom;
 	private String giveItem;
 	private final Set<Long> skip = new HashSet<>();
+	/** The ores it's walking to (the quickest of them), and since when: kept a while so it's one goal, not a new one each step. */
+	private List<BlockPos> oreWay;
+	private long oreWayAt;
 	private BlockPos target;
 
 	/** Its legs can't get to what it was going for (three tries): out of reach, it picks another (no waiting for help). */
@@ -229,6 +233,7 @@ final class Chores {
 		this.items = items;
 		this.what = what;
 		this.lookFor = lookFor;
+		this.oreWay = null;
 	}
 
 	/** Hunting for wool (a bed): sheep first. */
@@ -870,6 +875,31 @@ final class Chores {
 			doing = "mining the " + Blocks.NAMES[WorldSenses.category((ServerLevel) c.player.level(), bonus, c.player.level().getBlockState(bonus))] + " it spotted";
 			return reach(bonus);
 		}
+		List<BlockPos> ores = oreCandidates(cats, 12);                       // every ore it knows (showing, or seen): the cheapest to get to
+		if (ores.size() > 1 && c.mod.config.pathAssist) {
+			for (BlockPos o : ores) {
+				if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(o)) <= c.player.blockInteractionRange() - 0.5 && open((ServerLevel) c.player.level(), o)) {
+					target = o;
+					return reach(o);                                           // (one right here: that one)
+				}
+			}
+			// The same set for a while (a new set is a new goal: the walker would plan afresh every step), less the ones gone.
+			ServerLevel level = (ServerLevel) c.player.level();
+			if (oreWay != null) oreWay.removeIf(o -> !java.util.Arrays.stream(cats).anyMatch(k -> k == WorldSenses.category(level, o, level.getBlockState(o)))
+					|| skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ())));   // (mined, or given up on)
+			if (oreWay == null || oreWay.isEmpty() || now() - oreWayAt > 200) {
+				oreWay = ores;
+				oreWayAt = now();
+			}
+			doing = String.format(java.util.Locale.ROOT, "going for the ore that's quickest to get to (%d it knows; %d of %d %s so far)", oreWay.size(), got, want, what);
+			List<Goal> goals = new ArrayList<>();
+			for (BlockPos o : oreWay) goals.add(Goal.nextTo(o));
+			Action a = c.walkTo(Goal.anyOf(goals));
+			if (a != null) return a;
+			for (BlockPos o : oreWay) skip.add(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ()));   // no way to any of them: others then
+			oreWay = null;
+			return null;
+		}
 		int[] ore = glance(cats);                                            // ore showing in the walls (the tunnel shows it)
 		if (ore != null && ore[1] <= c.player.getBlockY() + 4) {
 			doing = String.format(java.util.Locale.ROOT, "mining %s, %d of %d %s so far", Blocks.NAMES[ore[4]].replace(" ore", "") + " ore", got, want, what);
@@ -1302,6 +1332,45 @@ final class Chores {
 	 * (it can see trunks between trees; ore buried in stone it can't). Stone means natural stone, never something built.
 	 * Beyond 14 blocks it goes by what its eyes saw ({@link Perception.Beliefs}).
 	 */
+	/**
+	 * The ore of these kinds it knows of: showing a face (not under water) within 14 blocks, and what its eyes saw within
+	 * 48; not the ones it gave up on, not ones its pickaxe can't take. The nearest few, nearest first.
+	 */
+	private List<BlockPos> oreCandidates(int[] cats, int max) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		int tier = c.crafter.pickTier();
+		boolean[] want = new boolean[Blocks.COUNT];
+		for (int k : cats) if (k == Blocks.COAL || k == Blocks.IRON || k == Blocks.GOLD || k == Blocks.DIAMOND) want[k] = Crafter.tierFor(k) <= tier;
+		java.util.Set<BlockPos> found = new java.util.LinkedHashSet<>();
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-GLANCE, -6, -GLANCE), feet.offset(GLANCE, 8, GLANCE))) {
+			int cat = WorldSenses.category(level, q, level.getBlockState(q));
+			if (!want[cat] || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || !open(level, q) || underwater(q)) continue;
+			found.add(q.immutable());
+		}
+		for (int k = 0; k < Blocks.COUNT; k++) {
+			if (!want[k]) continue;
+			String kind = k == Blocks.COAL ? "coal" : k == Blocks.IRON ? "iron" : k == Blocks.GOLD ? "gold" : "diamond";
+			var seen = c.eyes.seen.get(kind);
+			if (seen == null) continue;
+			for (var it = seen.keySet().iterator(); it.hasNext(); ) {
+				BlockPos q = BlockPos.of(it.nextLong());
+				if (q.closerThan(feet, Eyes.RANGE) && !skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))
+						&& WorldSenses.category(level, q, level.getBlockState(q)) == k) found.add(q);
+			}
+		}
+		List<BlockPos> out = new ArrayList<>(found);
+		out.sort(java.util.Comparator.comparingDouble(q -> q.distSqr(feet)));
+		return out.size() > max ? new ArrayList<>(out.subList(0, max)) : out;
+	}
+
+	/** Ore it can mine right from where it stands (showing, in sight, within reach): for mining on its way. */
+	BlockPos oreWithinReach() {
+		BlockPos o = oreInReach();
+		if (o == null || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ()))) return null;
+		return c.player.getEyePosition().distanceTo(Vec3.atCenterOf(o)) <= c.player.blockInteractionRange() - 0.3 ? o : null;
+	}
+
 	/**
 	 * Ore close by (5 blocks) that shows a face to the air and that it can see, and can mine with the pickaxe it has
 	 * (iron: stone; gold, diamond: iron): like a player, it takes it on the way, whatever it came for. Null if none.

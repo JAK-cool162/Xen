@@ -1,7 +1,47 @@
-XEN COMPANION 1.3.1: TECHNICAL NOTES
+XEN COMPANION 1.4.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.4.0
+===================
+
+Goals (Goal). The walker's A* can now search to a goal instead of a point, like Baritone's goals (our own code). A goal
+answers two things for any block: "is it there?" and "about how many ticks away?" (a sprint per block, 3.56 ticks, a
+little under so the search stays honest; up and down count 1.5 times). Kinds: block (standing on it), near (within r),
+nextTo (beside it at feet or head level, or on it, or under it: where a player breaks or uses it), column (anywhere
+above or below x, z), level (at a height, two blocks a level) and anyOf (any of several: the smallest estimate). The
+search stops at the first node the goal takes; the old point targets are a block goal.
+
+Ore by path cost. When a Xen mining sees more than one ore (exposed, in reach of a glance, plus ores its Eyes saw
+within 48 blocks: up to 12, nearest first), it walks to anyOf(nextTo each). One search, and the ore its legs reach
+first wins, not the nearest in a straight line (one behind a wall or up a cliff loses to one around the corner). If
+there's no way to any of them, they're all skipped.
+
+A long way in pieces. When the search runs out of nodes (2500) before the goal, it keeps the best piece (closest by the
+goal's estimate) and marks the way partial. With two moves left on a partial way, standing, and 10+ ticks since the
+last plan, it plans the next piece from where it is, so the handover is seamless.
+
+Parkour up. A sprint-jump across a one-block gap onto a block one higher, two blocks on (head room over the gap and at
+the landing), where it dares to jump gaps (maxGap 1+) and a miss is a drop it survives (the real depth, maxFall).
+Cost: two sprints, a jump, 6, plus 8 x fear.
+
+Running through. On walk and diagonal moves it runs on through the block (no stop at the centre) when the next move
+keeps about the same heading (45 degrees or less), and sprints on walk, diagonal, up and parkour moves when the way
+keeps straight or smooth and more than 2 moves are left (food over 6, not in water). It only slows for sharp turns
+and the last move.
+
+Ore on the way. Every half second while walking somewhere (walkTo), it looks for ore within reach that it can see and
+its pickaxe can take (Chores.oreWithinReach); if there is one, it mines it, then walks on. Not while fighting, in the
+arena, in water, fear over 0.6, running away, hands busy, or out under the sky at night. Journal: "takes ore on its
+way".
+
+The plan. Iron first (tier 2 with under 3 iron: mine at y 16); then with an iron pickaxe, more ore before the house:
+iron for armor, and diamonds (at y -58) once it wears a chestplate or carries 24+ iron; then a house; then netherite.
+
+pathMode: xen (its own planner) is the default again; settings from 1.3 with "mob" move to "xen" (settings version 8).
+With a goal the mob pathfinder is never used (it only knows points).
 
 
 WHAT'S NEW IN 1.3.1
