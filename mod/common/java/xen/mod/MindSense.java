@@ -227,7 +227,7 @@ final class MindSense {
 		f[Mind.FURNACE] = items.getOrDefault("furnace", 0) > 0 || c.places.get("furnace") != null ? 1 : 0;
 		f[Mind.DRAGON] = c.goals.dragonDown ? 1 : 0;
 		BlockPos home = c.goals.home;
-		f[Mind.SHELTERED] = !sky || home != null && home.closerThan(p.blockPosition(), 8) ? 1 : 0;
+		f[Mind.SHELTERED] = enclosed(p) || home != null && home.closerThan(p.blockPosition(), 8) ? 1 : 0;   // (under a tree isn't a shelter)
 		for (int i = 0; i < xen.mod.core.Sins.N; i++) f[Mind.SIN0 + i] = who.sin(i);   // Xen 6.0: its nature and its plan
 		if (who.plan >= 0) f[Mind.PLAN0 + who.plan] = 1;
 		return f;
@@ -271,5 +271,33 @@ final class MindSense {
 			for (int o = 0; o < Mind.N; o++) if (Mind.far(o)) a[o] = false;
 		}
 		return a;
+	}
+
+	/**
+	 * A real roof over its head (not leaves, not open sky) and something on every side close by: a hut, a hole in the
+	 * ground, a dugout, a cave, a house. Standing under a tree is not a shelter.
+	 */
+	static boolean enclosed(net.minecraft.server.level.ServerPlayer p) {
+		var level = p.level();
+		BlockPos feet = p.blockPosition(), head = feet.above();
+		boolean roof = false;
+		for (int y = 1; y <= 4; y++) {
+			BlockPos b = head.above(y);
+			var st = level.getBlockState(b);
+			if (st.isAir()) continue;
+			roof = !st.getCollisionShape(level, b).isEmpty() && !(st.getBlock() instanceof net.minecraft.world.level.block.LeavesBlock);
+			break;
+		}
+		if (!roof) return false;
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			boolean low = false, high = false;
+			for (int k = 1; k <= 3; k++) {
+				BlockPos a = feet.relative(d, k), b = head.relative(d, k);
+				if (!low && !level.getBlockState(a).getCollisionShape(level, a).isEmpty()) low = true;
+				if (!high && !level.getBlockState(b).getCollisionShape(level, b).isEmpty()) high = true;
+			}
+			if (!low || !high) return false;
+		}
+		return true;
 	}
 }

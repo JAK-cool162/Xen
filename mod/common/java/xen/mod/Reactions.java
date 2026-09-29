@@ -163,7 +163,7 @@ final class Reactions {
 		c.acted = true;
 		switch (how) {
 			case "hello" -> {
-				p.setShiftKeyDown(step % 8 < 4 && step < 17);                 // crouch, crouch: a player's hello
+				if (step == 1) c.crouchWave(2);                               // crouch, crouch: a player's hello
 				return Action.IDLE;
 			}
 			case "wary" -> {

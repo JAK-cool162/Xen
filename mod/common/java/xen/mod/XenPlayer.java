@@ -50,6 +50,24 @@ public class XenPlayer extends ServerPlayer {
 		doCheckFallDamage(getX() - x, getY() - y, getZ() - z, onGround());   // and what the server does with a client's moves:
 	}                                                      // falling counts (fall damage, and critical hits need it)
 
+	/**
+	 * Riding: no game client moves its boat or horse (a player's client would), so the server does, and it steers by the
+	 * keys ({@link Rider}). On its own feet nothing changes.
+	 */
+	@Override
+	public boolean isClientAuthoritative() {
+		return !isPassenger() && super.isClientAuthoritative();
+	}
+
+	/** Hit: how the one who hit it did it, at that very moment (a crit is decided right then, before they land). */
+	@Override
+	public boolean hurtServer(net.minecraft.server.level.ServerLevel level, DamageSource source, float amount) {
+		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && source.getDirectEntity() == by) {
+			companion.struckBy(by, amount);
+		}
+		return super.hurtServer(level, source, amount);
+	}
+
 	@Override
 	public void die(DamageSource source) {
 		super.die(source);

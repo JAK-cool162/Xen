@@ -376,6 +376,18 @@ public final class Hands {
 	/** The last block it gave up on: it would take too long with what it has (or can't be broken). */
 	BlockPos cantMine;
 
+	/** Would it take more than 10 seconds to break with the best it has? */
+	boolean tooSlowToMine(BlockPos pos) {
+		ServerLevel level = (ServerLevel) p.level();
+		BlockState state = level.getBlockState(pos);
+		return state.getDestroySpeed(level, pos) < 0 || tooSlow(bestSpeed(state, level, pos));
+	}
+
+	/** Is it mining that very block right now? */
+	boolean digging(BlockPos pos) {
+		return digging != null && digging.equals(pos) || aim != null && aim.equals(pos) && current == Action.MINE;
+	}
+
 	/** Mine a block it can reach by looking at it (not just ahead or under its feet): for staircases. */
 	boolean mine(BlockPos pos) {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;

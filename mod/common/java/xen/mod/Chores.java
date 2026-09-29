@@ -127,6 +127,9 @@ final class Chores {
 	private void begin(Kind k) {
 		cancel();
 		dugout = null;
+		pit = null;
+		inside = null;
+		walked = 0;
 		gaveAt = -1;
 		kind = k;
 		own = false;
@@ -258,8 +261,8 @@ final class Chores {
 		int tier = c.crafter.pickTier();
 		return switch (key) {
 			case "log" -> tier == 0 ? 3 : 0;
-			case "cobblestone" -> Math.max(tier < 2 ? 3 : 0, c.goals.evening() ? 10 - count("dirt") : 0);   // (a shelter tonight: 10 blocks)
-			case "dirt" -> c.goals.evening() ? 10 - count("cobblestone") : 0;
+			case "cobblestone" -> Math.max(tier < 2 ? 3 : 0, c.goals.evening() ? Goals.NIGHT_BLOCKS - count("dirt") : 0);   // (a shelter tonight)
+			case "dirt" -> c.goals.evening() ? Goals.NIGHT_BLOCKS - count("cobblestone") : 0;
 			case "food" -> c.player.getFoodData().getFoodLevel() < 14 ? 2 : 0;
 			case "torch" -> 2;
 			default -> 0;
@@ -269,7 +272,7 @@ final class Chores {
 	private String why(String key) {
 		return switch (key) {
 			case "log" -> "for your pickaxe";
-			case "cobblestone" -> c.goals.evening() && 10 - count("dirt") > 3 ? "for a shelter tonight" : "for your stone tools";
+			case "cobblestone" -> c.goals.evening() && Goals.NIGHT_BLOCKS - count("dirt") > 3 ? "for a shelter tonight" : "for your stone tools";
 			case "dirt" -> "for a shelter tonight";
 			case "food" -> "to eat";
 			default -> "for yourself";
@@ -354,8 +357,48 @@ final class Chores {
 				return "You will dig into the hill here for the night (a little tunnel, then seal the way in behind you).";
 			}
 		}
-		List<BlockPos> plan = shelterPlan(feet, build);
 		int blocks = count("dirt", "cobblestone");
+		List<BlockPos> room = roomyPlan(level, feet, build);                // a little room it can stand up and turn around in
+		for (int r = 1; r <= 4 && room == null; r++) {                       // not here: a flat spot close by, like anyone looks for
+			for (int dx = -r; dx <= r && room == null; dx++) {
+				for (int dz = -r; dz <= r && room == null; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+					for (int dy = -1; dy <= 1 && room == null; dy++) {
+						BlockPos spot = feet.offset(dx, dy, dz);
+						if (level.getBlockState(spot.below()).getCollisionShape(level, spot.below()).isEmpty()) continue;
+						room = roomyPlan(level, spot, build);
+					}
+				}
+			}
+		}
+		if (room != null && missing(level, room) <= blocks) {
+			begin(Kind.SHELTER);
+			walls = room;
+			inside = new java.util.ArrayList<>();
+			BlockPos corner = room.get(room.size() - 4).below(build.equals("tower") ? 3 : 2);   // (the roof's first block, straight down)
+			for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) inside.add(corner.offset(dx, 0, dz));
+			shape = build.equals("tower") ? "hut with a lookout" : build;
+			waited = 0;
+			resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+			c.mode = Companion.Mode.STAY;
+			c.anchor = inside.get(0);
+			return "You will build a little " + shape + " (room for two inside) with " + missing(level, room) + " blocks.";
+		}
+		if (c.crafter.pickTier() >= 1 || diggableByHand(level, feet)) {   // not enough blocks for a hut: a hole in the ground (what it digs covers it)
+			List<BlockPos> hole = pitPlan(level, feet);
+			if (hole != null) {
+				begin(Kind.SHELTER);
+				pit = hole;
+				walls = List.of();
+				shape = "hole";
+				waited = 0;
+				resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+				c.mode = Companion.Mode.STAY;
+				until = now() + 20 * 60;
+				return "You will dig a hole two deep right here and put a block over your head for the night.";
+			}
+		}
+		List<BlockPos> plan = shelterPlan(feet, build);                   // the last resort: blocks all around where it stands
 		if (missing(level, plan) > blocks && !build.equals("hut")) {       // not enough for its style: a plain hut will do
 			build = "hut";
 			plan = shelterPlan(feet, build);
@@ -398,6 +441,116 @@ final class Chores {
 		c.mode = Companion.Mode.STAY;
 		c.anchor = feet;
 		return "You will build a small " + of + build + " around yourself with " + missing + " blocks.";
+	}
+
+	/**
+	 * A little room: 2 by 2 inside (it stands in one corner), walls 2 high all round (3 for a lookout), a roof on top.
+	 * The floor must be solid and the inside clear (a flat spot, like anyone picks); null if it isn't. Walls first,
+	 * bottom up, then the roof, which rests on them.
+	 */
+	private static List<BlockPos> roomyPlan(ServerLevel level, BlockPos feet, String build) {
+		int height = build.equals("tower") ? 3 : 2;
+		for (int[] o : new int[][] {{0, 0}, {-1, 0}, {0, -1}, {-1, -1}}) {    // which corner of the room it stands in
+			BlockPos a = feet.offset(o[0], 0, o[1]);                        // the room's north-west inside corner
+			boolean ok = true;
+			for (int dx = 0; dx < 2 && ok; dx++) {
+				for (int dz = 0; dz < 2 && ok; dz++) {
+					BlockPos in = a.offset(dx, 0, dz);
+					if (level.getBlockState(in.below()).getCollisionShape(level, in.below()).isEmpty()) ok = false;   // a floor
+					for (int y = 0; y < height && ok; y++) {
+						BlockPos b = in.above(y);
+						if (!level.getBlockState(b).canBeReplaced() || !level.getFluidState(b).isEmpty()) ok = false;   // room to stand
+					}
+				}
+			}
+			if (!ok) continue;
+			List<BlockPos> plan = new java.util.ArrayList<>();
+			for (int y = 0; y < height; y++) {
+				for (int dx = -1; dx <= 2; dx++) {
+					for (int dz = -1; dz <= 2; dz++) {
+						if (dx >= 0 && dx < 2 && dz >= 0 && dz < 2) continue;   // (inside)
+						plan.add(a.offset(dx, y, dz));
+					}
+				}
+			}
+			plan.add(a.offset(-1, height, 0));                              // one on top of a wall: the roof goes against it
+			for (int dx = 0; dx < 2; dx++) for (int dz = 0; dz < 2; dz++) plan.add(a.offset(dx, height, dz));   // the roof
+			boolean grounded = true;                                        // walls need ground under them (no digging holes to fill)
+			for (BlockPos b : plan) {
+				if (b.getY() == feet.getY() && level.getBlockState(b.below()).canBeReplaced()) grounded = false;
+			}
+			if (grounded) return plan;
+		}
+		return null;
+	}
+
+	/** A hole two deep under its feet (dug straight down, rock or dirt all round, a floor under it); null if not here. */
+	private List<BlockPos> pitPlan(ServerLevel level, BlockPos feet) {
+		BlockPos one = feet.below(), two = feet.below(2);
+		for (BlockPos b : new BlockPos[] {one, two}) {
+			var st = level.getBlockState(b);
+			if (!Walker.natural(st) || st.getCollisionShape(level, b).isEmpty() || st.getBlock() instanceof net.minecraft.world.level.block.FallingBlock) return null;
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				BlockPos side = b.relative(d);
+				if (level.getBlockState(side).getCollisionShape(level, side).isEmpty() || !level.getFluidState(side).isEmpty()) return null;
+			}
+		}
+		BlockPos floor = feet.below(3);
+		if (level.getBlockState(floor).getCollisionShape(level, floor).isEmpty() || !level.getFluidState(floor).isEmpty()) return null;
+		if (c.hands.tooSlowToMine(one) || c.hands.tooSlowToMine(two)) return null;
+		return List.of(one, two);
+	}
+
+	private static boolean diggableByHand(ServerLevel level, BlockPos feet) {
+		String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(feet.below()).getBlock()).getPath();
+		return id.contains("dirt") || id.equals("grass_block") || id.contains("sand") || id.equals("gravel") || id.equals("podzol") || id.contains("mud");
+	}
+
+	/** The inside of the little room it's building (it stays in there while it builds), or null. */
+	private List<BlockPos> inside;
+	private int walked;
+
+	/** The hole it's digging for the night (the two blocks under it), or null. */
+	private List<BlockPos> pit;
+
+	private Action pitNext() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (BlockPos b : pit) {                                                // straight down, like a player digging in
+			if (level.getBlockState(b).getCollisionShape(level, b).isEmpty()) continue;
+			doing = "digging a hole for the night";
+			if (c.hands.busy()) return Action.IDLE;
+			if (c.hands.mine(b)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			if (++waited > 60) break;
+			return Action.IDLE;
+		}
+		BlockPos bottom = pit.get(1), cover = bottom.above(2);
+		if (!c.player.blockPosition().equals(bottom)) {                         // (falls in by itself; a step if it's beside it)
+			if (++waited > 80) {
+				pit = null;
+				finish("I couldn't get down into my hole.");
+				return null;
+			}
+			return c.walkTo(Vec3.atBottomCenterOf(bottom));
+		}
+		if (level.getBlockState(cover).canBeReplaced()) {                     // and a block over its head
+			doing = "covering its hole";
+			if (c.hands.placeAt(cover, c.personality.material)) {
+				c.acted = true;
+				return Action.PLACE;
+			}
+			if (++waited < 100) return Action.IDLE;
+		}
+		pit = null;
+		cancel();
+		c.chatter(c.pick3("Dug in. See you in the morning!", "A hole in the ground: not pretty, but safe.", "Nice and snug down here."), true);
+		shelterBuilt = true;
+		doing = "hiding in its hole until morning";
+		kind = Kind.HIDE;
+		until = now() + 1200;
+		return Action.IDLE;
 	}
 
 	private static int missing(ServerLevel level, List<BlockPos> plan) {
@@ -1713,7 +1866,7 @@ final class Chores {
 		return eaten && !a.hasCustomName() && !(a instanceof net.minecraft.world.entity.Mob m && m.isLeashed());
 	}
 
-	private LivingEntity nearestAnimal() {
+	LivingEntity nearestAnimal() {
 		LivingEntity best = null;
 		double bestD = Double.MAX_VALUE;
 		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(48),
@@ -1902,7 +2055,14 @@ final class Chores {
 
 	private Action shelterNext() {
 		if (dugout != null) return dugoutNext();
+		if (pit != null) return pitNext();
 		ServerLevel level = (ServerLevel) c.player.level();
+		if (inside != null && !inside.contains(c.player.blockPosition()) && ++walked < 200) {   // the spot it picked: over there first
+			BlockPos in = inside.get(0);
+			for (BlockPos b : inside) if (b.distSqr(c.player.blockPosition()) < in.distSqr(c.player.blockPosition())) in = b;
+			doing = "going to the spot for its " + shape;
+			return c.walkTo(Vec3.atBottomCenterOf(in));
+		}
 		boolean done = true;
 		int left = 0;
 		for (BlockPos p : walls) if (level.getBlockState(p).canBeReplaced()) left++;
@@ -1925,6 +2085,7 @@ final class Chores {
 			return Action.IDLE;
 		}
 		doing = "building a " + shape + ", " + left + " blocks to go, stuck: " + c.hands.cantPlace;
+
 		if (++waited < 30) return Action.IDLE;                          // someone in the way? wait a little
 		finish("I couldn't finish the " + shape + ": " + c.hands.cantPlace + ".");
 		return null;

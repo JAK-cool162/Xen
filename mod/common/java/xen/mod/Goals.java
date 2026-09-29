@@ -222,7 +222,7 @@ final class Goals {
 			case FOOD -> food();
 			case SHELTER -> buildingHome ? c.chores.shelter("fort") : c.chores.shelter();
 			case WOOD -> c.chores.gather("wood", c.crafter.pickTier() == 0 ? 5 : 10);
-			case STONE -> needBlocksForTheNight() || c.crafter.pickTier() == 0 ? c.chores.gather("dirt", Math.max(4, 12 - blocks()))
+			case STONE -> needBlocksForTheNight() || c.crafter.pickTier() == 0 ? c.chores.gather("dirt", Math.max(4, NIGHT_BLOCKS + 2 - blocks()))
 					: c.chores.gather("stone", 16);
 			case ORE -> c.chores.gather("ore", 2);
 			case HOUSE -> {
@@ -476,8 +476,11 @@ final class Goals {
 	}
 
 	/** Evening (or night already) and too few blocks for a shelter: a player gets some dirt before dark. */
+	/** Blocks for a night's shelter: a little hut with room inside takes about this many. */
+	static final int NIGHT_BLOCKS = 24;
+
 	boolean needBlocksForTheNight() {
-		return evening() && blocks() < 10;
+		return evening() && blocks() < NIGHT_BLOCKS;
 	}
 
 	/** Evening or night: time to think about a shelter. */
@@ -630,6 +633,34 @@ final class Goals {
 		c.lastPickedFight = now;
 	}
 
+	private long nightCheckedAt;
+
+	/**
+	 * Night fell while it was out chopping, exploring, farming: a player drops that and sees to a roof (it checks every
+	 * 5 seconds, before its errands go on). True when it dropped something.
+	 */
+	boolean nightfall() {
+		long now = c.player.level().getGameTime();
+		if (option < 0 || now - nightCheckedAt < 100 || !useMind() || c.mode != Companion.Mode.FREE) return false;
+		nightCheckedAt = now;
+		boolean outdoorWork = option == Mind.WOOD || option == Mind.EXPLORE || option == Mind.HOUSE || option == Mind.FARM
+				|| option == Mind.STONE && !needBlocksForTheNight() || option == Mind.REST;
+		if (!outdoorWork || !outAtNight()) return false;
+		c.journal("does", "night fell: drops " + Mind.SAYS[option] + " for a shelter");
+		finishOption(false);
+		c.chores.cancel();
+		next = now;
+		return true;
+	}
+
+	/** Night, and it's out under the open sky (leaves don't count): no roof, no walls. */
+	boolean outAtNight() {
+		var p = c.player;
+		if (!p.level().isDarkOutside() || MindSense.enclosed(p)) return false;
+		int top = p.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getBlockX(), p.getBlockZ());
+		return top <= p.getBlockY() + 1;
+	}
+
 	/** Why the plan picked what it picked (for its thoughts). */
 	private String agendaWhy = "";
 
@@ -648,7 +679,8 @@ final class Goals {
 		if (c.player.isCreative() || c.mode == Companion.Mode.STAY || c.mode == Companion.Mode.FOLLOW) return -1;
 		if (can[Mind.FIGHT] && f[Mind.DANGER] < 0.2f && c.player.getHealth() >= 14 && MindSense.enemy(c) != null
 				&& c.mod.config.teams < 0) return why(Mind.FIGHT, "a rival");             // (teams on auto: it takes the fight to them)
-		if (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // danger, a friend in need: its own call
+		boolean calm = f[Mind.DANGER] < 0.3f && !can[Mind.HELP];
+		if (!calm && (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD])) return -1;   // danger, a friend in need: its own call
 		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);
 		int tier = c.crafter.pickTier();
 		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
@@ -666,9 +698,12 @@ final class Goals {
 			if (tier >= 2 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), mineRange)) && wantsOre(tier, iron))
 				return why(Mind.MINE, "night: mining (safe under the ground)");
 			if (f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below) return why(Mind.REST, "night: staying in");
+			if (f[Mind.NIGHT] < 0.5f && blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below
+					&& (home == null || !c.player.blockPosition().closerThan(home, 96))) return why(Mind.STONE, "dusk: dirt for a hut");   // (before dark, like a player)
 			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
 			return -1;
 		}
+		if (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // (monsters about in the day: its own call)
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
 		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
 		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {

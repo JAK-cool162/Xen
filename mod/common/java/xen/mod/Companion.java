@@ -213,6 +213,47 @@ public final class Companion {
 	}
 
 	void tick() {
+		tickInner();
+		gesture();                                                      // last: nothing this tick undoes it
+	}
+
+	/** Its head is in a block (sand fell on it, it was pushed in, it woke up in a wall): it breaks it, like a player. */
+	private void digOut() {
+		BlockPos head = BlockPos.containing(player.getEyePosition());
+		var level = player.level();
+		if (level.getBlockState(head).getCollisionShape(level, head).isEmpty()) return;
+		if (hands.digging(head)) return;                                // (already at it)
+		walker.stop();
+		hands.stop();
+		if (hands.mine(head)) {
+			goals.instant = "digging out of a wall";
+			if (DEBUG) XenMod.LOG.info("[xen debug] {} digs out of {} at {}", name, level.getBlockState(head), head);
+		}
+	}
+
+	/** A crouch wave going on (a player's hello: down, up, down, up): ticks left. */
+	private int crouchWave;
+
+	/** Crouch at someone this many times, a player's way (down 4 ticks, up 4 ticks), whatever else it's doing. */
+	void crouchWave(int times) {
+		crouchWave = Math.max(crouchWave, times * 8 + 1);
+	}
+
+	boolean waving() {
+		return crouchWave > 0;
+	}
+
+	private void gesture() {
+		if (crouchWave <= 0 || player == null) return;
+		if (player.isPassenger()) {                                     // (crouching gets you out of a boat: not now)
+			crouchWave = 0;
+			return;
+		}
+		crouchWave--;
+		player.setShiftKeyDown(crouchWave > 0 && crouchWave % 8 >= 4);
+	}
+
+	private void tickInner() {
 		if (player == null) return;
 		if (respawnIn >= 0) {
 			if (--respawnIn < 0) respawn();
@@ -230,6 +271,7 @@ public final class Companion {
 		genTicks++;
 		hands.tick();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
+		rider.tick();                                                   // in a boat or on a horse: steering
 		eyes.tick();                                                    // a yes or no for every block it can see
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
@@ -272,6 +314,10 @@ public final class Companion {
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
 			hitBy(by);
+		}
+		if (player.isInWall()) {                                        // its head in a block: out first, whatever it was doing
+			if (player.tickCount % 5 == 0) digOut();
+			if (hands.busy()) return;
 		}
 		if (hands.busy() && hands.interruptible() && player.isUnderWater() && player.getAirSupply() < player.getMaxAirSupply() / 2) {
 			hands.stop();                                                // half its air gone: whatever it's doing, air first
@@ -357,7 +403,7 @@ public final class Companion {
 		Action sensible = instinct == null ? sensible(Action.values()[thought.action]) : null;
 		if (sensible != null && sensible.ordinal() == thought.action) sensible = null;
 		int action = instinct != null ? instinct.ordinal() : sensible != null ? sensible.ordinal() : thought.action;
-		lastThought = instinct != null ? (chores.busy() ? "Doing what I was asked (" + chores.doing + "): " : "Instinct: ")
+		lastThought = instinct != null ? (chores.busy() ? (chores.own ? "Doing my own errand (" : "Doing what I was asked (") + chores.doing + "): " : "Instinct: ")
 				+ (pillaring ? "climb up" : instinct.verb) + "." : sensible != null ? "Nothing worth doing there, so: " + sensible.verb + "."
 				: thought.text;
 		hands.glance = null;
@@ -680,6 +726,8 @@ public final class Companion {
 			goals.instant = "eating";
 			return Action.EAT;
 		}
+		Action ride = rider.next();                                   // getting in a boat, on a horse, riding
+		if (ride != null) return ride;
 		Action fight = fightBack();
 		if (fight != null) {
 			if (antics.busy()) antics.next(true);                     // a fight ends the fun
@@ -702,6 +750,8 @@ public final class Companion {
 		if (rally != null) return rally;
 		Action through = nether.followThrough();                       // its friend went through a portal: after them
 		if (through != null) return through;
+		Action off = backOffFromOwner();                              // its owner kept hitting it: it keeps away for a bit
+		if (off != null) return off;
 		Action met = reactions.next();                                // someone came into view: hello, a wary step back, a stare...
 		if (met != null) return met;
 		Action about = standingAbout();                                // a minute standing about with nothing to show: it moves on
@@ -720,7 +770,8 @@ public final class Companion {
 		if (bed != null) return bed;
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
 		if (light != null) return light;
-		if (chores.busy() && chores.own && mode == Mode.FOLLOW && !leaderWithin(LEASH)) {   // its friend is leaving: that comes first
+		if (mode == Mode.FOLLOW) watchLeaderMoving();
+		if (chores.busy() && chores.own && mode == Mode.FOLLOW && (!leaderWithin(LEASH) || leaderMoving())) {   // its friend is leaving: that comes first
 			if (asked != null) resumeAsked = true;                           // (it'll get back to what it was asked, once it's caught up)
 			chores.cancel();
 			goals.drop();
@@ -730,7 +781,7 @@ public final class Companion {
 				chatter("Coming!", true);
 			}
 		}
-		if (resumeAsked && !chores.busy() && asked != null && askedBy != null && !fighting && (mode != Mode.FOLLOW || leaderWithin(NEARBY))) {
+		if (resumeAsked && !chores.busy() && asked != null && askedBy != null && !fighting && mode != Mode.FOLLOW) {
 			resumeAsked = false;                                          // caught up: back to what it was asked to do
 			String again = chores.gather(asked.intent(), asked.amount());
 			if (again.startsWith("You will")) chatter(pick3("Okay, back to it.", "Now, where was I... right, " + asked.intent() + ".", "Back to work."), true);
@@ -741,6 +792,12 @@ public final class Companion {
 		}
 		if ((mode != Mode.FOLLOW || leaderWithin(NEARBY)) && !inArena && !builder.busy() && (!chores.busy() || chores.own) && storage.spotLoot()) {
 			return storage.next();                                    // passing a chest: a look inside (following someone too, while they're close)
+		}
+		Action hungry = starving();                                   // starving with nothing to eat: food before errands
+		if (hungry != null) return hungry;
+		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.nightfall() && goals.think()) {   // dark, out in the open: a roof before errands
+			Action roof = chores.busy() ? chores.next() : null;
+			if (roof != null) return roof;
 		}
 		if (chores.busy()) {
 			Action chore = chores.next();
@@ -818,11 +875,11 @@ public final class Companion {
 		}
 		// Following a friend who's close: it doesn't just stand there. Like a friend playing along, it gets on with what
 		// it needs nearby (wood, stone, food, ore, a shelter at night) and drops it to keep up when they leave.
-		if (mode == Mode.FOLLOW && mod.config.wants && !inArena && !catchingUp && leaderWithin(NEARBY) && goals.think(true)) {
+		if (mode == Mode.FOLLOW && mod.config.wants && !inArena && !catchingUp && leaderWithin(NEARBY) && leaderStill() && goals.think(true)) {
 			Action chore = chores.next();
 			if (chore != null || chores.busy()) return chore;
 		}
-		if (mode == Mode.FOLLOW && goals.useMind() && !catchingUp && leaderWithin(NEARBY)) {
+		if (mode == Mode.FOLLOW && goals.useMind() && !catchingUp && leaderWithin(NEARBY) && leaderStill()) {
 			Action m = goals.mindStep();
 			if (m != null) return m;
 		}
@@ -849,6 +906,30 @@ public final class Companion {
 	}
 
 	private boolean catchingUp;
+	/** Where its friend was standing, and since when they've stayed about there (following: moving means keep up). */
+	private Vec3 leaderSpot;
+	private long leaderStillSince;
+
+	private void watchLeaderMoving() {
+		ServerPlayer o = leader == null ? null : server.getPlayerList().getPlayer(leader);
+		if (o == null) return;
+		long now = player.level().getGameTime();
+		if (leaderSpot == null || o.position().distanceTo(leaderSpot) > 3) {
+			leaderSpot = o.position();
+			leaderStillSince = now;
+		}
+	}
+
+	/** Following: its friend has stayed put for a while (then it may do a little something of its own nearby). */
+	private boolean leaderStill() {
+		return leaderSpot != null && player.level().getGameTime() - leaderStillSince > 160;
+	}
+
+	/** Following: its friend just set off (and is getting away): it drops what it's doing and keeps up. */
+	private boolean leaderMoving() {
+		return player.level().getGameTime() - leaderStillSince < 40 && !leaderWithin(mod.config.followDistance + 4);
+	}
+
 	/** While following: it does things of its own when its friend is this close, and drops them past the leash. */
 	static final double NEARBY = 12, LEASH = 24;
 
@@ -1048,6 +1129,35 @@ public final class Companion {
 	}
 
 	private long neededAt = -100_000;
+	private long starvingAt = -100_000;
+
+	/**
+	 * Starving (food 6 or less) with nothing to eat: an errand of its own waits, and one it was asked waits too once it's
+	 * down to nothing. Food first: it hunts (or fishes), like any player who looks at their hunger bar.
+	 */
+	private Action starving() {
+		if (fighting || inArena || player.isCreative() || fisher.on) return null;
+		int food = player.getFoodData().getFoodLevel();
+		if (food > 6 || items().getOrDefault("food", 0) > 0) return null;
+		if (chores.busy() && (chores.kind == Chores.Kind.HUNT || chores.kind == Chores.Kind.EAT)) return null;
+		if (chores.busy() && !chores.own && food > 0) return null;          // asked: it finishes first, unless it's down to nothing
+		long now = player.level().getGameTime();
+		if (now - starvingAt < 400) return null;
+		starvingAt = now;
+		if (chores.busy()) {
+			if (!chores.own && asked != null) resumeAsked = true;         // (it gets back to it after eating)
+			chores.cancel();
+		}
+		if (builder.busy()) builder.cancel();
+		neededAt = now;
+		chores.forWool = false;
+		String plan = chores.hunt(2);
+		chores.own = true;
+		chatter(plan.startsWith("You don't see") ? pick3("I'm starving... I need to find some animals.", "So hungry. Where are the animals?", "I need food, now.")
+				: pick3("I'm starving. Food first.", "Can't work on an empty stomach. Hunting.", "Dinner first, sorry."), true);
+		return chores.next();
+	}
+
 
 	/**
 	 * What a player sees to before anything else: food when it's starving with none on it (it hunts, or fishes), and a
@@ -1058,6 +1168,16 @@ public final class Companion {
 		long now = player.level().getGameTime();
 		if (now - neededAt < 1200) return null;
 		var items = items();
+		if (player.getFoodData().getFoodLevel() <= 17 && items.getOrDefault("food", 0) == 0 && player.getFoodData().getFoodLevel() > 12) {
+			var prey = chores.nearestAnimal();                             // nothing to eat on it, and an animal right there: a player takes it
+			if (prey != null && prey.distanceTo(player) < 10) {
+				neededAt = now;
+				chores.forWool = false;
+				chores.hunt(1);
+				chores.own = true;
+				return chores.next();
+			}
+		}
 		if (player.getFoodData().getFoodLevel() <= 12 && items.getOrDefault("food", 0) == 0) {
 			neededAt = now;
 			if (fisher.fancies() && fisher.start().startsWith("You will")) {
@@ -1797,9 +1917,12 @@ public final class Companion {
 	}
 
 	/**
-	 * A player hit it. With a weapon, it's an attack: it trusts them a lot less and may fight back. With an empty hand
-	 * (or a flower, a block) it's a poke, the way players get someone's attention: it turns to them and asks what's up,
-	 * and barely minds. Poking on and on is an attack too.
+	 * A player hit it. A poke (the way players get someone's attention: one light tap with an empty hand) only counts
+	 * while they're talking with it; then it turns to them and asks what's up. Anything else is an attack: a weapon, a
+	 * critical hit (hitting while falling), a hard hit, hitting while crouching, a second hit within three seconds, or a
+	 * hit out of nowhere (not talking to it). Its owner gets told off first ("Ow! What was that for?"); keep it up and a
+	 * wrathful or aggressive Xen hits back for a bit, a gentler one backs off. Anyone else: it trusts them a lot less and
+	 * it may fight back (its own call).
 	 */
 	private void hitBy(ServerPlayer by) {
 		long now = player.level().getGameTime();
@@ -1807,28 +1930,61 @@ public final class Companion {
 		if (skills.sparringWith(u)) return;                            // a sparring partner: that's the game
 		Tribe home = tribe();
 		if (home != null && by instanceof XenPlayer xp && xp.companion != null && isWeapon(by.getMainHandItem())) home.laws.hit(xp.companion, this);
-		if (isWeapon(by.getMainHandItem()) || by.getAttackStrengthScale(0) > 0 && player.getHealth() < tickHealthBefore - 3) {
-			armedHitAt.put(u, now);
-			trust(u, -0.3f);                                           // it remembers who hit it
-			Tribe t = tribe();
-			if (t != null) t.alarm(this, by);                          // and its tribe does too
-			return;
-		}
 		var q = pokes.computeIfAbsent(u, k -> new java.util.ArrayDeque<>());
 		q.addLast(now);
 		while (!q.isEmpty() && now - q.peekFirst() > 200) q.removeFirst();
-		if (q.size() >= 6) {                                           // on and on: that's not asking for attention any more
-			armedHitAt.put(u, now);
-			trust(u, -0.3f);
-			q.clear();
-			say(pick3("Stop that!", "Okay, that's enough!", "Quit it!"));
-			return;
-		}
-		trust(u, -0.01f);
-		known.add(u);
+		int recent = 0;
+		for (long t : q) if (now - t <= 60) recent++;
+		boolean armed = isWeapon(by.getMainHandItem());
+		boolean fresh = u.equals(struckBy) && player.tickCount - struckAt < 10;   // (how they hit it, seen at that very moment)
+		boolean crit = fresh ? struckCrit : !by.onGround() && !by.isInWater() && !by.onClimbable() && by.fallDistance > 0;
+		boolean sneaking = fresh ? struckSneaking : by.isShiftKeyDown();
+		boolean hard = player.getHealth() < tickHealthBefore - 3;
+		boolean talking = u.equals(talkingWith) && now < talkingUntil;
+		boolean attack = armed || crit || hard || sneaking || recent >= 2 || !talking;
+		hitsTaken.merge(u, 1, Integer::sum);
 		hands.watching = by;
 		watchFor = u;
 		watchUntil = player.tickCount + 100;                           // it looks at them
+		if (attack) {
+			armedHitAt.put(u, now);
+			String how = crit ? "a critical hit" : armed ? "a weapon" : recent >= 2 ? "hit after hit" : sneaking ? "a sneaky hit" : "a hit out of nowhere";
+			if (u.equals(owner)) {                                      // its owner: told off first, then (its nature) it hits back or backs off
+				int n = 0;
+				for (long t : q) if (now - t <= 200) n++;
+				journal("does", "hit by its owner (" + how + ", " + n + " in 10 s)");
+				boolean hitsBack = personality.aggressive() || personality.sin(xen.mod.core.Sins.WRATH) >= 0.5f || personality.sin(xen.mod.core.Sins.PRIDE) >= 0.7f;
+				int level = Math.min(n, 3);                                 // how bad it's getting: it says so when it gets worse (even right after a "what's up?")
+				boolean speak = now - scoldedAt > 60 || level > scoldLevel && now - scoldedAt > 8;
+				if (n >= 3 && hitsBack && !mod.config.pvp.equals("off")) {
+					ownerFoeUntil = now + 120;                              // six seconds of hitting back
+					if (speak) say(pick3("That's it!", "You asked for it!", "Okay, now I'm mad."));
+				} else {
+					if (speak) say(n <= 1 ? (now - answeredPokeAt < 80 ? pick3("Ow! Okay, I'm listening!", "Hey, no need to hit!", "Ow, I heard you!")
+									: pick3("Ow! What was that for?", "Hey! Why'd you hit me?", "Ouch! What did I do?"))
+							: n == 2 ? pick3("Hey, stop hitting me!", "Stop it!", "Quit it, that hurts!")
+							: pick3("I'm not fighting you. Stop!", "Seriously, stop!", "Fine, I'm leaving."));
+					if (n >= 3) fleeFromOwnerUntil = now + 100;                // (a gentle one backs off)
+				}
+				if (speak) {
+					scoldedAt = now;
+					scoldLevel = level;
+				}
+				answeredPokeAt = now;
+				return;
+			}
+			trust(u, armed || crit || hard ? -0.3f : -0.15f);            // it remembers who hit it
+			Tribe t = tribe();
+			if (t != null) t.alarm(this, by);                          // and its tribe does too
+			journal("does", "attacked by " + by.getName().getString() + " (" + how + ")");
+			if (now - answeredPokeAt > 100 && random().nextFloat() < 0.5f) {
+				answeredPokeAt = now;
+				say(personality.say("ouch"));
+			}
+			return;
+		}
+		trust(u, -0.01f);                                               // a poke while they talk: it wants its attention
+		known.add(u);
 		if (now - answeredPokeAt > 200) {
 			answeredPokeAt = now;
 			talkingWith = u;
@@ -1844,6 +2000,37 @@ public final class Companion {
 			});
 		}
 	}
+
+	private Action backOffFromOwner() {
+		if (owner == null || player.level().getGameTime() >= fleeFromOwnerUntil) return null;
+		ServerPlayer o = server.getPlayerList().getPlayer(owner);
+		if (o == null || o.level() != player.level() || o.distanceTo(player) > 8) return null;
+		Vec3 away = player.position().subtract(o.position()).multiply(1, 0, 1);
+		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
+		goals.instant = "keeping away from " + o.getName().getString();
+		return walkTo(player.position().add(away.normalize().scale(6)));
+	}
+
+	/** The last hit by a player, as it happened: who, when, a crit (falling), crouching, how hard. */
+	private UUID struckBy;
+	private int struckAt = -100;
+	private boolean struckCrit, struckSneaking;
+
+	void struckBy(ServerPlayer by, float amount) {
+		struckBy = by.getUUID();
+		struckAt = player.tickCount;
+		struckCrit = by.fallDistance > 0 && !by.onGround() && !by.onClimbable() && !by.isInWater() && !by.isPassenger();
+		struckSneaking = by.isShiftKeyDown();
+	}
+
+	/** When it last told its owner off for hitting it, and how bad it was then (1 to 3). */
+	private long scoldedAt = -1_000;
+	private int scoldLevel;
+
+	/** Hits taken from each player, all told (for its memory of them). */
+	final Map<UUID, Integer> hitsTaken = new HashMap<>();
+	/** Its owner hit it again and again: until when it hits back (a wrathful one), or keeps away (a gentle one). */
+	long ownerFoeUntil, fleeFromOwnerUntil;
 
 	/** Is this player really attacking it (a weapon, or poking on and on) lately? */
 	private boolean attackedBy(LivingEntity a, long now) {
@@ -1952,7 +2139,7 @@ public final class Companion {
 		for (LivingEntity victim : new LivingEntity[] {player, o}) {               // who hurt it, or its owner, just now
 			if (victim == null || victim.level() != player.level()) continue;
 			LivingEntity a = victim.getLastHurtByMob();
-			if (a == null || !a.isAlive() || a == player || a == o) continue;             // (a teammate who hits it with a weapon too: its call)
+			if (a == null || !a.isAlive() || a == player || a == o && now >= ownerFoeUntil) continue;   // (its owner: only when it's had enough)
 			if (diplomacy.atPeace(a)) continue;                                   // a truce (unless they broke it)
 			if (a instanceof ServerPlayer sp0 && skills.sparringWith(sp0.getUUID())) continue;   // (sparring: that's the game)
 			if (a instanceof AbstractVillager || a instanceof AbstractGolem || a instanceof TamableAnimal t && t.isTame()) continue;
@@ -2399,16 +2586,28 @@ public final class Companion {
 				trials.on = false;
 				farmer.cancel();
 				hands.stop();
+				if (!r.intent().equals("ride")) rider.cancel();
 			}
 			switch (r.intent()) {
 				case "follow" -> {
 					chores.cancel();
+					asked = null;                                              // (a new request: what it was asked before is over)
+					resumeAsked = false;
+					leaderSpot = null;
 					mode = Mode.FOLLOW;
 					leader = from.getUUID();
 					plan = "You will follow " + who + ".";
 				}
+				case "ride" -> {
+					if (mode == Mode.STAY) mode = Mode.FOLLOW;
+					if (leader == null || mode == Mode.FOLLOW) leader = from.getUUID();
+					plan = rider.ask(from, words);
+				}
+				case "dismount" -> plan = rider.getOut();
 				case "stay" -> {
 					chores.cancel();
+					asked = null;
+					resumeAsked = false;
 					mode = Mode.STAY;
 					anchor = player.blockPosition();
 					plan = "You will stay here.";
@@ -2489,6 +2688,7 @@ public final class Companion {
 	final Mimic mimic = new Mimic(this);
 	/** The unpredictable side: dancing, showing off, surprises. */
 	final Antics antics = new Antics(this);
+	final Rider rider = new Rider(this);
 	final Reactions reactions = new Reactions(this);
 
 	// ------------------------------------------------------------------------ standing about
@@ -2512,7 +2712,8 @@ public final class Companion {
 			movingOnTo = null;
 		}
 		boolean legit = player.isSleeping() || player.level().isDarkOutside() && (goals.option == xen.mod.core.Mind.REST || goals.option == xen.mod.core.Mind.SLEEP)
-				|| builder.busy() || farmer.on || fisher.on || crafter.hasOrder() || storage.busy() || player.isInWater() || adventure.on && dragon.next() != null;
+				|| builder.busy() || farmer.on || fisher.on || crafter.hasOrder() || storage.busy() || player.isInWater() || adventure.on && dragon.next() != null
+				|| chores.busy() && (chores.kind == Chores.Kind.HIDE || chores.kind == Chores.Kind.SHELTER) || rider.busy();   // (in its shelter for the night, riding)
 		Vec3 here = player.position();
 		if (legit || idleFrom == null || idleFrom.distanceTo(here) > 3) {
 			idleFrom = here;
@@ -2576,6 +2777,12 @@ public final class Companion {
 	/** Someone said "watch me": it keeps its eyes on them for a while. */
 	private UUID watchFor;
 	private int watchUntil;
+
+	/** Eyes on them for a while (ticks). */
+	void lookAt(ServerPlayer p, int ticks) {
+		watchFor = p.getUUID();
+		watchUntil = player.tickCount + ticks;
+	}
 
 	boolean watchingYou(ServerPlayer p) {
 		return p.getUUID().equals(watchFor) && watchUntil > player.tickCount;

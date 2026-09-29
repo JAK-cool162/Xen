@@ -81,10 +81,9 @@ final class Antics {
 
 	/** Hello to a friend, the way players do it: crouching twice. */
 	void wave(ServerPlayer to) {
-		if (!c.mod.config.antics || busy()) return;
-		partner = to;
+		if (c.player == null) return;
 		c.hands.watching = to;
-		start("wave", 8);
+		c.crouchWave(2);
 	}
 
 	private void start(String what, int ticks) {
@@ -112,11 +111,9 @@ final class Antics {
 		greetedAt.put(p.getUUID(), now);
 		float t = c.trust(p.getUUID());
 		if (t < 0.5f) c.trust(p.getUUID(), Math.min(0.1f, 0.5f - t));
-		if (!busy()) {
-			partner = p;
-			c.hands.watching = p;
-			start("wave", 8);
-		}
+		c.hands.watching = p;
+		c.lookAt(p, 60);
+		c.crouchWave(2 + random.nextInt(3));                                  // crouch, crouch (a few): right away, like a player
 		if (!(p instanceof XenPlayer)) c.talker.sayNear(pick("Hi hi! *crouches back*", "Hey. *crouches back*", "Hm. Hi.", "O-oh, hi! *crouches*",
 				"Yo! *crouch crouch*", "*crouch crouch crouch* Hiii!"));
 		if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} greeted {} back (trust now {})", c.name, p.getName().getString(), c.trust(p.getUUID()));
@@ -155,7 +152,7 @@ final class Antics {
 	 */
 	Action next(boolean fighting) {
 		if (c.inArena || c.player == null) return null;
-		if (!c.mod.config.antics && !doing.equals("wave")) return null;   // (crouching back to a greeting isn't an antic)
+		if (!c.mod.config.antics) return null;
 		if (fighting || c.player.isInWater() || c.player.getHealth() < 10) {
 			if (busy() && !doing.equals("fight")) stop();
 			return null;
@@ -179,10 +176,6 @@ final class Antics {
 				return Action.TURN_LEFT;
 			}
 			case "stumble" -> {
-				return Action.IDLE;
-			}
-			case "wave" -> {                                                    // crouching twice: a player's hello
-				c.player.setShiftKeyDown(++step % 4 < 2);
 				return Action.IDLE;
 			}
 			default -> {}
