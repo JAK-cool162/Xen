@@ -216,14 +216,14 @@ public final class SimLife {
 
 	/** How much fear weighs for it (the same sum as in the game: bravery, pride, its beliefs, a careful plan). */
 	float caution() {
-		return (1.6f - 1.2f * brave) * Math.max(0.3f, 1 + knobs.fear - 0.3f * sins[Sins.PRIDE] - 0.2f * sins[Sins.WRATH])
+		return (1.6f - 1.2f * brave) * Math.max(0.4f, 1 + knobs.fear - 0.15f * sins[Sins.PRIDE] - 0.1f * sins[Sins.WRATH])
 				* (plan == Strategy.SURVIVOR ? 1.2f : 1f);
 	}
 
 	/** What it leans toward: its sins, its beliefs, its plan (the same as in the game). */
 	float[] bias() {
 		float[] b = Sins.bias(sins), p = Strategy.bias(plan);
-		for (int i = 0; i < Mind.N; i++) b[i] += knobs.bias[i] + p[i];
+		for (int i = 0; i < Mind.N; i++) b[i] = Sins.LEAN * (b[i] + knobs.bias[i] + p[i]);
 		return b;
 	}
 

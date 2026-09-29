@@ -11,12 +11,12 @@ Sins (core/Sins). Seven numbers 0 to 1 (pride, greed, lust, envy, gluttony, wrat
 1, one 0.4 to 0.7, the rest up to 0.35. Fixed for life (a child: each from one parent plus a little noise). Saved with
 its personality; a Xen from before 1.5 gets them from its name (always the same ones). /xen style can't change them.
 What they do (on top of the mind's own lean, see Xen 6.0):
-  pride    fear x(1 - 0.3), backs off in a fight later (retreat x(1 - 0.5)), builds big, boasts, more risk, patience +0.1
+  pride    fear x(1 - 0.15), backs off in a fight later (retreat x(1 - 0.5)), builds big, boasts, more risk, patience +0.1
   greed    ore it mines x(1 + greed), shares less (generosity - 0.5), a harder bargain, asks people to trade
   lust     trusts strangers more (+0.1), talks more, greets, seeks company, likes gold and gems
   envy     trusts strangers less (-0.15), gears up (craft), resents better gear (trust -0.05 when it sees it)
   gluttony eats at food 10 + 6 x gluttony (instead of 10), keeps more food, farms
-  wrath    fear x(1 - 0.2), fights on longer (retreat x(1 - 0.3)), grudges x(1 + wrath), stares people down
+  wrath    fear x(1 - 0.1), fights on longer (retreat x(1 - 0.3)), grudges x(1 + wrath), stares people down
   sloth    patience - 0.4, talks less, rests more, less risk
 
 Beliefs (core/Beliefs): 60 of them, in groups (a Xen never has two from the same group: "trust no one" and
@@ -65,7 +65,9 @@ around; gluttony: food, a farm, hunger felt early; lust: company, gold and emera
 costs) and what counts for its plan (a speedrunner: tools, gear and the dragon, and the clock; a builder: a home;
 a settler: a farm, food, a bed; a miner: ore; an explorer: exploring, villages; a trader: emeralds; a warrior: gear
 and fights won; a survivor: safe nights, armor, no harm). Choices lean by its sins, beliefs and plan (the same in
-training and in the game). Trained on in SimLife from Xen 5.2: every simulated life is born with sins, beliefs and a
+training and in the game), at 0.12 of their full size: a nudge. At full size they overruled what the mind knows (in
+SimLife, Xen 5.2 with them: 57% of lives died instead of 38%, a home in 56% instead of 81%); at 0.1 it did as well as
+without them. Running away only hurts its pride while it's healthy (half its health or more). Trained on in SimLife from Xen 5.2: every simulated life is born with sins, beliefs and a
 plan (70% its own pick, 30% any, so every plan gets lived), lives last ten days (long enough for the dragon).
 
 Reactions (Reactions). Twice a second it looks for players in view (20 blocks, line of sight) it hasn't had in view

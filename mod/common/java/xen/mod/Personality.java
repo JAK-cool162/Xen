@@ -134,7 +134,7 @@ public final class Personality {
 	float[] bias() {
 		float[] b = sins == null ? new float[Mind.N] : Sins.bias(sins), p = Strategy.bias(plan);
 		Beliefs.Knobs k = knobs();
-		for (int i = 0; i < Mind.N; i++) b[i] += k.bias[i] + p[i];
+		for (int i = 0; i < Mind.N; i++) b[i] = Sins.LEAN * (b[i] + k.bias[i] + p[i]);   // (a nudge: its mind knows best what works)
 		return b;
 	}
 
@@ -244,7 +244,7 @@ public final class Personality {
 	 * ("creepers are everywhere" more, "fortune favors the bold" less), and a plan of playing it safe a little more.
 	 */
 	float cautionScale() {
-		return (1.6f - 1.2f * bravery) * Math.max(0.3f, 1 + knobs().fear - 0.3f * sin(Sins.PRIDE) - 0.2f * sin(Sins.WRATH))
+		return (1.6f - 1.2f * bravery) * Math.max(0.4f, 1 + knobs().fear - 0.15f * sin(Sins.PRIDE) - 0.1f * sin(Sins.WRATH))
 				* (plan == Strategy.SURVIVOR ? 1.2f : 1f);
 	}
 

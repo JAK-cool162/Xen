@@ -41,6 +41,12 @@ public final class Sins {
 		return s;
 	}
 
+	/**
+	 * How hard its nature (sins, beliefs, plan) leans on its mind's choices: a nudge, not a shove. Stronger and it
+	 * overrules what its mind knows (in SimLife, at full strength: 57% of lives died instead of 38%; at 0.1: 35%).
+	 */
+	public static final float LEAN = 0.12f;
+
 	public static int top(float[] s) {
 		int best = 0;
 		for (int i = 1; i < N; i++) if (s[i] > s[best]) best = i;

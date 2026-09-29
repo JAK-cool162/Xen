@@ -111,7 +111,7 @@ public final class Mind {
 		if (option == HELP) r -= 1.5f * greed;                                  // (giving hurts a greedy one)
 		r += pride * (4f * (a[ARMOR] - b[ARMOR]) + 3f * (a[SWORD] - b[SWORD]) + 3f * (a[HOME] - b[HOME]) + 2f * (a[ENCHANTED] - b[ENCHANTED])
 				+ 10f * (a[DRAGON] - b[DRAGON]));
-		if (option == FLEE) r -= pride + 0.5f * wrath;                          // (running hurts its pride)
+		if (option == FLEE && b[HEALTH] > 0.5f) r -= pride + 0.5f * wrath;     // (running while it could still fight hurts its pride; nearly dead, it's just sense)
 		boolean won = (b[ENEMY] > 0.5f || b[DANGER] > 0.3f) && a[ENEMY] < 0.5f && a[DANGER] < 0.3f;
 		if (option == FIGHT && won) r += 1.5f * wrath;
 		float seen = b[FRIENDNEAR] > 0.5f || b[TRIBE] > 0 ? 1.5f : 1f;            // (envy: gear counts more with others around)
