@@ -59,6 +59,8 @@ loom {
 			if (project.hasProperty('uiTest')) vmArg '-Dxen.uiTest=true'
 			if (project.hasProperty('gpuTest')) vmArg "-Dxen.gpuTest=${project.property('gpuTest')}"   // -PgpuTest=<model file>
 			if (project.hasProperty('joinServer')) programArgs '--quickPlayMultiplayer', project.property('joinServer')   // -PjoinServer=localhost:25569
+			if (project.hasProperty('clientName')) programArgs '--username', project.property('clientName')   // -PclientName=XenCam
+			if (project.hasProperty('playWorld')) programArgs '--quickPlaySingleplayer', project.property('playWorld')   // -PplayWorld=xentest (a world in run/saves)
 		}
 	}
 }

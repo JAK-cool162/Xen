@@ -23,8 +23,8 @@ import java.util.PriorityQueue;
  * mountain you've never seen. Kept with the Xen.
  */
 final class Places {
-	/** A remembered place: what it is, in which world, where. */
-	record Place(String name, String dim, BlockPos pos, long day) {}
+	/** A remembered place: what it is, in which world, where, the day it was seen, the biome it's in. */
+	record Place(String name, String dim, BlockPos pos, long day, String biome) {}
 
 	private static final int GAP = 12, JOIN = 6, MAX_CRUMBS = 800;
 
@@ -60,15 +60,16 @@ final class Places {
 		if (c.player == null || pos == null) return;
 		String dim = here();
 		Place old = places.get(key(name, dim));
-		places.put(key(name, dim), new Place(name, dim, pos.immutable(), c.player.level().getGameTime() / 24000));
-		if (old == null || old.pos().distSqr(pos) > 64) c.journal("remembers", name + " at " + pos.toShortString() + " (" + dim + ")");
+		String biome = biomeAt(pos);
+		places.put(key(name, dim), new Place(name, dim, pos.immutable(), c.player.level().getGameTime() / 24000, biome));
+		if (old == null || old.pos().distSqr(pos) > 64) c.journal("remembers", name + " at " + pos.toShortString() + " (" + dim + (biome.isEmpty() ? "" : ", " + biome) + ")");
 	}
 
 	/** Remember a place in a given world (the other end of a portal it just came through). */
 	void remember(String name, String dim, BlockPos pos) {
 		if (c.player == null || pos == null) return;
 		Place old = places.get(key(name, dim));
-		places.put(key(name, dim), new Place(name, dim, pos.immutable(), c.player.level().getGameTime() / 24000));
+		places.put(key(name, dim), new Place(name, dim, pos.immutable(), c.player.level().getGameTime() / 24000, dim.equals(here()) ? biomeAt(pos) : ""));
 		if (old == null || old.pos().distSqr(pos) > 64) c.journal("remembers", name + " at " + pos.toShortString() + " (" + dim + ")");
 	}
 
@@ -100,6 +101,47 @@ final class Places {
 			if (best == null || p.pos().distSqr(feet) < best.distSqr(feet)) best = p.pos();
 		}
 		return best;
+	}
+
+	/** The biome at a spot of the world it's in ("birch forest"), as a player sees it on the debug screen. */
+	String biomeAt(BlockPos pos) {
+		if (c.player == null) return "";
+		return c.player.level().getBiome(pos).unwrapKey().map(k -> k.identifier().getPath().replace('_', ' ')).orElse("");
+	}
+
+	/** The biome it's in now. */
+	String biome() {
+		return c.player == null ? "" : biomeAt(c.player.blockPosition());
+	}
+
+	/**
+	 * A place there can be many of (villages, strongholds, temples, caves): remembered as another one unless it's one
+	 * it knows already (within apart blocks); the first is "village", the next "village 2"...
+	 */
+	void rememberAnother(String kind, BlockPos pos, int apart) {
+		String dim = here();
+		int n = 0;
+		for (Place p : places.values()) {
+			if (!p.dim().equals(dim) || !(p.name().equals(kind) || p.name().startsWith(kind + " "))) continue;
+			if (p.pos().distSqr(pos) < (long) apart * apart) return;                // (knows it)
+			n++;
+		}
+		remember(n == 0 ? kind : kind + " " + (n + 1), pos);
+	}
+
+	/** Every place it knows, nearest first (in the world it's in, then the others). */
+	List<Place> all() {
+		List<Place> out = new ArrayList<>(places.values());
+		BlockPos feet = c.player == null ? BlockPos.ZERO : c.player.blockPosition();
+		String dim = here();
+		out.sort(java.util.Comparator.comparing((Place p) -> !p.dim().equals(dim)).thenComparingDouble(p -> p.pos().distSqr(feet)));
+		return out;
+	}
+
+	/** What it knows of a kind of place ("village"): the nearest one, or null. */
+	Place find(String kind) {
+		for (Place p : all()) if (p.name().equals(kind) || p.name().startsWith(kind + " ") || p.name().replace(' ', '_').equals(kind.replace(' ', '_'))) return p;
+		return null;
 	}
 
 	// ----------------------------------------------------------------------------------- the ways it walked
@@ -242,6 +284,7 @@ final class Places {
 			j.addProperty("y", p.pos().getY());
 			j.addProperty("z", p.pos().getZ());
 			j.addProperty("day", p.day());
+			if (!p.biome().isEmpty()) j.addProperty("biome", p.biome());
 			ps.add(j);
 		}
 		o.add("places", ps);
@@ -271,7 +314,8 @@ final class Places {
 				for (var e : o.getAsJsonArray("places")) {
 					JsonObject j = e.getAsJsonObject();
 					Place p = new Place(j.get("name").getAsString(), j.get("dim").getAsString(),
-							new BlockPos(j.get("x").getAsInt(), j.get("y").getAsInt(), j.get("z").getAsInt()), j.has("day") ? j.get("day").getAsLong() : 0);
+							new BlockPos(j.get("x").getAsInt(), j.get("y").getAsInt(), j.get("z").getAsInt()), j.has("day") ? j.get("day").getAsLong() : 0,
+							j.has("biome") ? j.get("biome").getAsString() : "");
 					places.put(key(p.name(), p.dim()), p);
 				}
 			}

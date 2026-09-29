@@ -211,7 +211,17 @@ final class Goals {
 				best = s;
 			}
 		}
-		if (best == null) return false;
+		if (best == null) {                                                    // nothing pressing: a friend building near? it lends a hand
+			Companion friend = nearby || evening() ? null : c.builder.friendBuilding();
+			if (friend != null && random.nextFloat() < 0.15f + 0.5f * c.personality.kindness && c.builder.help(friend).startsWith("You will")) {
+				current = Short.HOUSE;
+				rewardAtStart = c.genReward;
+				until = now + EXPLORE_TICKS;
+				c.chores.own = true;
+				c.chatter(c.pick3("I'll help you, " + friend.name + "!", "Need a hand, " + friend.name + "?", "Let's build it together, " + friend.name + "."), false);
+			}
+			return false;
+		}
 		return begin(best, nearby, now) && c.chores.busy();
 	}
 
@@ -226,6 +236,18 @@ final class Goals {
 					: c.chores.gather("stone", 16);
 			case ORE -> c.chores.gather("ore", 2);
 			case HOUSE -> {
+				Companion friend = c.builder.friendBuilding();                   // a friend building close by: it helps first (shared progress)
+				if (friend != null && (home != null || random.nextFloat() < c.personality.kindness)) {
+					String h = c.builder.help(friend);
+					if (h.startsWith("You will")) {
+						c.chatter(c.pick3("I'll help you, " + friend.name + "!", "Need a hand, " + friend.name + "?", "Let's build it together, " + friend.name + "."), false);
+						yield h;
+					}
+				}
+				if (home != null && c.builder.canUpgrade()) {                       // its own house first: the next stage (depth, details, polish)
+					String up = c.builder.upgrade();
+					if (up.startsWith("You will")) yield up;
+				}
 				Tribe t = c.tribe();
 				BlockPos plot = t != null && t.members.size() > 1 && t.center != null ? t.plot() : home != null ? nextTo(home, 14) : null;   // in its tribe's village
 				Companion neighbor = plot == null ? crowdedBy() : null;
@@ -235,7 +257,7 @@ final class Goals {
 					exploreTo = null;
 					yield "You can't: " + neighbor.name + "'s base is right here. You'll find land of your own first.";
 				}
-				String h = plot != null ? c.builder.startNear("house", plot) : c.builder.start("house");
+				String h = plot != null ? c.builder.startNear("house", plot, t != null && t.members.size() > 1 ? t.plotFront : null) : c.builder.start("house");
 				yield h.startsWith("You will") ? h : "You can't: " + h;
 			}
 			case STORE -> c.storage.store();
@@ -305,6 +327,8 @@ final class Goals {
 			// the way a player gets on in the world: a real house once it has tools, then down for iron, then diamonds
 			case HOUSE -> home == null && !busyBuilding && c.crafter.pickTier() >= 2 && !evening() && !c.player.isCreative()
 					? 0.7f * (0.6f + p.diligence)
+					: home != null && !busyBuilding && !evening() && c.builder.canUpgrade() && items.getOrDefault("log", 0) >= 16
+					? 0.45f * (0.5f + p.diligence)                                        // its house, a stage better (like players do)
 					: home != null && !busyBuilding && !evening() && !c.player.isCreative() && c.taste.wantsBigger(items.getOrDefault("log", 0))
 					? 0.35f * (0.5f + p.diligence) : 0;                                // a better house once it has the wood
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)

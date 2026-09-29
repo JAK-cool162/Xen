@@ -1,6 +1,7 @@
 package xen.mod.client;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.MultiLineEditBox;
@@ -18,7 +19,8 @@ import java.util.List;
  * Experimental); the open one's settings are on the right (hover one to read what it does). Experimental has two
  * text boxes: custom instructions (what Xens know about themselves) and a custom script (rules like "when night: do
  * build a shelter"). "Reset" puts the open category back to how it comes, and Done saves to config/xen.json. Changes
- * apply right away in single player (on a server, operators use /xen set).
+ * apply right away in single player (on a server, operators use /xen set). The settings scroll (the mouse wheel; on a
+ * phone the launcher's scroll gesture) when they don't all fit, with arrows on the right showing there's more.
  */
 public class XenSettingsScreen extends Screen {
 	private static final String[] TABS = {"Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Experimental"};
@@ -45,6 +47,10 @@ public class XenSettingsScreen extends Screen {
 	private final List<String> keys = new ArrayList<>();
 	private int row, columns, buttonWidth, left, panelWidth, top;
 	private StringWidget scriptStatus;
+	/** How far the open category's settings are scrolled (kept while the screen is open), and how far they can go. */
+	private static int scroll;
+	private int maxScroll, viewTop, viewBottom;
+	private final List<AbstractWidget> panel = new ArrayList<>();
 
 	public XenSettingsScreen(Screen parent) {
 		super(Component.literal("Xen Companion"));
@@ -66,17 +72,20 @@ public class XenSettingsScreen extends Screen {
 	protected void init() {
 		row = 0;
 		keys.clear();
+		panel.clear();
 		scriptStatus = null;
 		// the categories, down the left side
 		int side = Math.max(80, Math.min(110, width / 5));
 		Component title = Component.literal("Xen").withStyle(ChatFormatting.BOLD, ChatFormatting.AQUA);
 		addRenderableWidget(new StringWidget(8, 10, side - 8, 12, title, font));
+		int step = Math.max(14, Math.min(22, (height - 62) / TABS.length)), tall = Math.min(20, step - 2);   // (a short screen: smaller tabs)
 		for (int i = 0; i < TABS.length; i++) {
 			int which = i;
 			Button b = Button.builder(Component.literal(TABS[i]), x -> {
 				tab = which;
+				scroll = 0;
 				rebuildWidgets();
-			}).bounds(8, 28 + i * 22, side - 8, 20).tooltip(tip(Component.literal(ABOUT[i]))).build();
+			}).bounds(8, 28 + i * step, side - 8, tall).tooltip(tip(Component.literal(ABOUT[i]))).build();
 			b.active = i != tab;                                         // the open one is the pressed-in one
 			addRenderableWidget(b);
 		}
@@ -89,6 +98,8 @@ public class XenSettingsScreen extends Screen {
 		Component about = Component.literal(ABOUT[tab]).withStyle(ChatFormatting.GRAY);
 		addRenderableWidget(new StringWidget(left, 24, panelWidth, 12, about, font).setMaxWidth(panelWidth));
 		top = 42;
+		viewTop = top;
+		viewBottom = height - (tab == TABS.length - 1 ? 50 : 34);
 		columns = panelWidth >= 330 ? 2 : 1;
 		buttonWidth = columns == 2 ? Math.min(180, (panelWidth - 8) / 2) : Math.min(240, panelWidth);
 
@@ -156,6 +167,7 @@ public class XenSettingsScreen extends Screen {
 			}
 			default -> experimental();
 		}
+		scrollPanel();
 
 		int half = Math.min(90, (panelWidth - 8) / 2);
 		int y = height - 28;
@@ -180,18 +192,20 @@ public class XenSettingsScreen extends Screen {
 		keys.add("pathAssist");
 		keys.add("solver");
 		keys.add("journal");
-		int third = (panelWidth - 8) / 3;
+		keys.add("spawnAsXen");
+		int half = (panelWidth - 4) / 2;
 		String[][] toggles = {
 				{"Path assist", "pathAssist", "Its legs find the way: walk, sprint, jump up, drop down, jump gaps, swim, climb ladders, open doors, dig through the ground, bridge and tower up out of holes. Its own mind still decides where to go, and how bold to be (brave Xens jump gaps, hurt or scared ones take the safe way)."},
 				{"Solver", "solver", "A second little mind for being stuck: it picks a way out (tower up, a staircase, dig through, a bolder way, go round, back off, swim out, ask for help) and learns which work where, also from watching players it trusts get out of holes. Its notes: config/xen/solver.json, every try in solver-tries.jsonl."},
-				{"Journal", "journal", "Keep a journal of what Xens see, think, say and hear, how they find their way and what the solver tries. Copy it or save it below."}};
+				{"Journal", "journal", "Keep a journal of what Xens see, think, say and hear, how they find their way and what the solver tries. Copy it or save it below."},
+				{"Spawn as Xen", "spawnAsXen", "A Xen named after you plays your character, with your things, and you watch through its eyes (a spectator on its camera). It lives its own life: its own goals, its own mind, and it listens to you. Turn it off to take over again, where it is, with what it has. Single player and LAN host only: it never works on a public (dedicated) server."}};
 		for (int i = 0; i < toggles.length; i++) {
 			String key = toggles[i][1];
-			addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
-					.create(left + i * (third + 4), top, third, 20, Component.literal(toggles[i][0]), (b, v) -> settings.set(key, "" + v)))
+			inPanel(addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
+					.create(left + (i % 2) * (half + 4), top + (i / 2) * 24, half, 20, Component.literal(toggles[i][0]), (b, v) -> settings.set(key, "" + v))))
 					.setTooltip(tip(Component.literal(toggles[i][2])));
 		}
-		top += 26;
+		top += 50;
 		choice("Chat model", "chatModelPick", List.of("auto", "135m", "360m", "off"),
 				v -> v.equals("135m") ? "SmolLM2 135M (small, fast)" : v.equals("360m") ? "SmolLM2 360M (better)" : v.equals("off") ? "off" : "auto (Talk tab)",
 				"The AI chat model, on your device. 135M: 145 MB, three times faster, for phones. 360M: 390 MB, better answers. A model picked here loads whatever the memory (it downloads once). auto: the Talk tab's settings. Everyday talk (hellos, jokes, \"do you like me\", where it is...) works without any model.");
@@ -211,11 +225,11 @@ public class XenSettingsScreen extends Screen {
 			addRenderableWidget(journalStatus);
 		}
 		int bottom = height - 50, label = 12;
-		int free = Math.max(80, bottom - top - 3 * label - 8);
+		int free = Math.max(110, bottom - top - 3 * label - 8);                      // (a short screen: they scroll)
 		int instructionsHeight = Math.max(36, free / 3), scriptHeight = Math.max(44, free - instructionsHeight);
 		int y = top;
 
-		addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal("Custom instructions"), font));
+		inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal("Custom instructions"), font)));
 		y += label;
 		MultiLineEditBox instructions = MultiLineEditBox.builder().setX(left).setY(y)
 				.setPlaceholder(Component.literal("What Xens know about themselves, for example:\nYou love cats and hate the rain. You're scared of the dark.\nPip: you're a pirate and talk like one.")
@@ -226,10 +240,10 @@ public class XenSettingsScreen extends Screen {
 		instructions.setValueListener(v -> settings.set("instructions", v));
 		instructions.setTooltip(tip(Component.literal("Every Xen's personality and what it should know. A line that starts with a Xen's name and a colon "
 				+ "(\"Pip: ...\") is only for that Xen. The chat model reads it when it answers and talks.")));
-		addRenderableWidget(instructions);
+		inPanel(addRenderableWidget(instructions));
 		y += instructionsHeight + 6;
 
-		addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal("Custom script"), font));
+		inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal("Custom script"), font)));
 		y += label;
 		MultiLineEditBox script = MultiLineEditBox.builder().setX(left).setY(y)
 				.setPlaceholder(Component.literal("when night: do build a shelter\nwhen morning: say Good morning, {player}!\nwhen someone comes: wave\n"
@@ -238,11 +252,11 @@ public class XenSettingsScreen extends Screen {
 		script.setCharacterLimit(2000);
 		script.setValue(settings.value("script"));
 		script.setTooltip(tip(Component.literal(SCRIPT_HELP)));
-		addRenderableWidget(script);
+		inPanel(addRenderableWidget(script));
 		y += scriptHeight + 2;
 
 		scriptStatus = new StringWidget(left, y, panelWidth, label, Component.empty(), font);
-		addRenderableWidget(scriptStatus);
+		inPanel(addRenderableWidget(scriptStatus));
 		showScriptStatus(script.getValue());
 		script.setValueListener(v -> {
 			settings.set("script", v);
@@ -291,8 +305,8 @@ public class XenSettingsScreen extends Screen {
 	private void onOff(String label, String key, String help) {
 		keys.add(key);
 		int[] at = next();
-		addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
-				.create(at[0], at[1], buttonWidth, 20, Component.literal(label), (b, v) -> settings.set(key, "" + v)))
+		inPanel(addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
+				.create(at[0], at[1], buttonWidth, 20, Component.literal(label), (b, v) -> settings.set(key, "" + v))))
 				.setTooltip(tip(Component.literal(help)));
 	}
 
@@ -313,9 +327,42 @@ public class XenSettingsScreen extends Screen {
 				current = options.get(0);
 			}
 		}
-		addRenderableWidget(CycleButton.builder((T v) -> Component.literal(show.apply(v)), current).withValues(options)
-				.create(at[0], at[1], buttonWidth, 20, Component.literal(label), (b, v) -> settings.set(key, v.toString())))
+		inPanel(addRenderableWidget(CycleButton.builder((T v) -> Component.literal(show.apply(v)), current).withValues(options)
+				.create(at[0], at[1], buttonWidth, 20, Component.literal(label), (b, v) -> settings.set(key, v.toString()))))
 				.setTooltip(tip(Component.literal(help)));
+	}
+
+	/** A widget of the open category's settings (the part that scrolls). */
+	private <W extends AbstractWidget> W inPanel(W w) {
+		panel.add(w);
+		return w;
+	}
+
+	/** The settings moved up by how far they're scrolled; the ones out of the view hidden (not clickable either). */
+	private void scrollPanel() {
+		int bottom = viewTop;
+		for (AbstractWidget w : panel) bottom = Math.max(bottom, w.getY() + w.getHeight());
+		maxScroll = Math.max(0, bottom - viewBottom + 4);
+		scroll = Math.max(0, Math.min(scroll, maxScroll));
+		for (AbstractWidget w : panel) {
+			w.setY(w.getY() - scroll);
+			w.visible = w.getY() >= viewTop - 2 && w.getY() + w.getHeight() <= viewBottom + 2;
+		}
+		if (maxScroll > 0) {                                                 // arrows: more above, more below
+			if (scroll > 0) addRenderableWidget(new StringWidget(width - 12, viewTop, 10, 10, Component.literal("\u25B2").withStyle(ChatFormatting.GRAY), font));
+			if (scroll < maxScroll) addRenderableWidget(new StringWidget(width - 12, viewBottom - 10, 10, 10, Component.literal("\u25BC").withStyle(ChatFormatting.GRAY), font));
+		}
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		if (maxScroll > 0 && mouseX >= left - 4) {
+			int before = scroll;
+			scroll = Math.max(0, Math.min(maxScroll, scroll - (int) Math.round(scrollY * 24)));
+			if (scroll != before) rebuildWidgets();
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
 	@Override

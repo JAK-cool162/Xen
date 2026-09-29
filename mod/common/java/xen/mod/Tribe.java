@@ -138,11 +138,45 @@ final class Tribe {
 		return best > 3 ? c.walkTo(target.position()) : null;
 	}
 
-	/** A house spot in the village for the next one who needs a home. */
+	private String layout;
+	/** The way the last plot's house should face (its front, where its door and path go). */
+	net.minecraft.core.Direction plotFront;
+
+	/**
+	 * How the village is laid out, the leader's call (and it sticks): "modern", a planned grid the way towns are laid
+	 * out now (straight streets, lots in rows on both sides, every house facing the street), by an orderly,
+	 * commanding leader; or "freeform", like a Minecraft village (houses scattered round the middle along winding
+	 * paths, facing it), by a curious, easy-going one.
+	 */
+	String layout() {
+		if (layout != null) return layout;
+		Companion lead = laws.leader();
+		if (lead == null) return "freeform";
+		var p = lead.personality;
+		layout = p.diligence + 0.5f * p.power > p.curiosity + 0.45f ? "modern" : "freeform";
+		lead.journal("village", "lays the village out " + (layout.equals("modern") ? "in streets" : "freely, like a village grows"));
+		if (center != null) lead.lore(lead.name + " founded " + name + "'s village at " + center.getX() + " " + center.getZ()
+				+ (layout.equals("modern") ? ", laid out in streets" : ", growing freely round its middle"));
+		lead.chatter(layout.equals("modern") ? "Let's lay the village out properly: streets, houses in rows." : "Build wherever feels right, round the middle.", false);
+		return layout;
+	}
+
+	/** A house spot in the village for the next one who needs a home (and plotFront: the way it faces). */
 	BlockPos plot() {
 		if (center == null) return null;
-		double angle = houses++ * 2.4, r = 16 + 5 * (houses / 5);
-		return center.offset((int) Math.round(Math.cos(angle) * r), 0, (int) Math.round(Math.sin(angle) * r));
+		int i = houses++;
+		if (layout().equals("modern")) {                                  // lots on both sides of straight streets, 16 apart
+			int perStreet = 8, street = i / perStreet, k = i % perStreet, slot = k / 2, side = k % 2 == 0 ? 1 : -1;
+			int streetZ = (street + 1) / 2 * 44 * (street % 2 == 1 ? 1 : -1);
+			int x = (slot % 2 == 0 ? 1 : -1) * (8 + 16 * (slot / 2));
+			plotFront = side > 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.SOUTH;   // (facing the street)
+			return center.offset(x, 0, streetZ + side * 11);
+		}
+		double angle = i * 2.4 + (random.nextDouble() - 0.5) * 0.6, r = 16 + 5 * (i / 5) + random.nextInt(5);   // round the middle, a bit off
+		int dx = (int) Math.round(Math.cos(angle) * r), dz = (int) Math.round(Math.sin(angle) * r);
+		plotFront = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? net.minecraft.core.Direction.WEST : net.minecraft.core.Direction.EAST)
+				: dz > 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.SOUTH;   // (facing the middle)
+		return center.offset(dx, 0, dz);
 	}
 
 	// ------------------------------------------------------------------------------ all the tribes

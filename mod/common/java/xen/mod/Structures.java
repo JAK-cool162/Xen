@@ -30,6 +30,12 @@ final class Structures {
 			{"gilded_blackstone", "bastion", "A bastion. Lots of piglins, and gold."},
 			{"purpur", "end city", "An End city!"},
 			{"stripped_dark_oak_log", "shipwreck", "A shipwreck, maybe. Treasure maps are in those."},
+			{"prismarine_bricks", "ocean monument", "An ocean monument! Guardians. Sponges inside."},
+			{"reinforced_deepslate", "ancient city", "An ancient city... quiet. The warden lives here."},
+			{"trial_spawner", "trial chamber", "A trial chamber! Keys and vaults."},
+			{"tripwire_hook", "jungle temple", "A jungle temple. Mind the tripwires."},
+			{"suspicious_gravel", "trail ruins", "Suspicious gravel. Old ruins: I could brush for pottery sherds."},
+			{"cauldron", "witch hut", "A cauldron out here... a witch hut?"},
 	};
 
 	private final Companion c;
@@ -60,8 +66,11 @@ final class Structures {
 		if (had != null && had.closerThan(at, 96)) return;
 		found.put(sign[1], at);
 		c.habits.spotted(at, sign[1]);                                        // (a curious one may go and look)
-		c.places.remember(sign[1], at);
-		c.journal("sees", "a " + sign[1] + " at " + at.toShortString());
+		boolean many = !sign[1].equals("stronghold");                         // (there's one stronghold near; villages, temples: many)
+		if (many) c.places.rememberAnother(sign[1], at, sign[1].equals("village") ? 160 : 96);
+		else c.places.remember(sign[1], at);
+		c.journal("sees", "a " + sign[1] + " at " + at.toShortString() + " (" + c.places.biomeAt(at) + ")");
+		if (!sign[1].equals("old ruins")) c.lore(c.name + " found a " + sign[1] + " at " + at.getX() + " " + at.getZ() + " (" + c.places.biomeAt(at) + ")");
 		c.chatter(sign[2], false);
 	}
 
@@ -70,6 +79,7 @@ final class Structures {
 		BlockPos door = c.nether.lookFor(level, "oak_door", 24);
 		if (door == null) return;
 		if (c.goals.home != null && c.goals.home.closerThan(door, 16)) return;
+		if (c.builder.plan != null && c.builder.plan.middle().closerThan(door, 16)) return;   // (the one it's building)
 		BlockPos had = found.get("house");
 		if (had != null && had.closerThan(door, 24)) return;
 		found.put("house", door);
@@ -84,6 +94,7 @@ final class Structures {
 	 */
 	void builtSeen(BlockPos at, it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap built) {
 		if (c.goals.home != null && c.goals.home.closerThan(at, 20)) return;
+		if (c.builder.plan != null && c.builder.plan.middle().closerThan(at, 20)) return;   // (the one it's building)
 		BlockPos had = found.get("house");
 		if (had != null && had.closerThan(at, 24)) return;
 		int near = 0;

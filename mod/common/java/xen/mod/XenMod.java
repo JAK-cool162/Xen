@@ -59,6 +59,10 @@ public class XenMod implements ModInitializer {
 	/** The running mod (for the settings screen). */
 	static XenMod INSTANCE;
 	final Roster roster = new Roster();
+	/** The world's lore: what happened on it (see {@link Lore}). */
+	final Lore lore = new Lore();
+	/** (Experiment) Spawn as Xen: a Xen plays your character (see {@link Avatar}). */
+	final Avatar avatar = new Avatar(this);
 	final Arena arena = new Arena(this);
 	/** Where skins come from: the pack, your folder, mineskin.org, players. */
 	final Skins skins = new Skins();
@@ -175,6 +179,7 @@ public class XenMod implements ModInitializer {
 	private void started(MinecraftServer s) {
 		server = s;
 		roster.load(brainFile().resolveSibling("companions.json"));
+		lore.load(brainFile().resolveSibling("lore.json"));
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
 		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
 		Path file = brainFile();
@@ -340,14 +345,17 @@ public class XenMod implements ModInitializer {
 		}
 		for (Companion c : companions) roster.remember(c, teamOf(c));
 		roster.save();
+		lore.save();
 	}
 
 	private void stopping(MinecraftServer s) {
 		arena.stop("the server is stopping.");
+		avatar.stopping();
 		for (Companion c : companions) if (c.player() != null && !c.inArena) rememberAway(c);   // they come back next time
 		saveAway();
 		for (Companion c : companions) roster.remember(c, teamOf(c));                          // (before they leave: all they know)
 		roster.save();
+		lore.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
 		running = false;
 		if (trainer != null) trainer.interrupt();
@@ -357,7 +365,9 @@ public class XenMod implements ModInitializer {
 
 	// --------------------------------------------------------------------------------- world
 	private void tick(MinecraftServer s) {
+		DesignTest.maybeRun(s);                                          // (developing designs: only with -Dxen.designTest)
 		if (s.getTickCount() % 40 == 0) chatModelNews();
+		if (s.getTickCount() % 20 == 0) avatar.tick();
 		arena.tick();
 		runLater();
 		List<Companion> order = new ArrayList<>(companions);
@@ -479,6 +489,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private void ownerLeft(ServerPlayer p) {
+		avatar.leaving(p);
 		if (p == null || p instanceof XenPlayer || !config.leaveWithOwner) return;
 		for (Companion c : companions) {
 			if (!p.getUUID().equals(c.owner)) continue;
@@ -676,10 +687,18 @@ public class XenMod implements ModInitializer {
 			sender.sendSystemMessage(Component.literal("[Xen] The chat model is " + chat.status()
 					+ ". Until it's ready, Xens understand requests and answer simply.").withStyle(net.minecraft.ChatFormatting.GRAY));
 		}
+		Companion named = null;                                               // the one named first ("Bex, help Aria build": Bex)
+		int namedAt = Integer.MAX_VALUE;
 		for (Companion c : companions) {
 			if (!hears(c, sender)) continue;
-			if (!java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
-					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) continue;
+			var m = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
+			if (m.find() && m.start() < namedAt) {
+				named = c;
+				namedAt = m.start();
+			}
+		}
+		if (named != null) {
+			Companion c = named;
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> c.say(reply)));
 			return;
@@ -1067,6 +1086,12 @@ public class XenMod implements ModInitializer {
 			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });
 			part.accept("taste", () -> { if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste")); });
 			part.accept("habits", () -> { if (known.has("habits")) c.habits.load(known.getAsJsonObject("habits")); });
+			part.accept("chronicle", () -> {
+				if (!known.has("chronicle")) return;
+				c.loreWritten = known.getAsJsonObject("chronicle").get("written").getAsInt();
+				c.loreVolume = known.getAsJsonObject("chronicle").get("volume").getAsInt();
+			});
+			part.accept("home", () -> { if (known.has("homeBuild")) c.builder.loadHome(known.getAsJsonObject("homeBuild")); });
 			part.accept("mine", () -> {
 				if (!known.has("mine")) return;
 				com.google.gson.JsonObject mine = known.getAsJsonObject("mine");
@@ -1286,7 +1311,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	/** The world has all the Xens it may have (minions apart). */
-	private boolean full() {
+	boolean full() {
 		return config.maxXens > 0 && companions.stream().filter(c -> !c.minion).count() >= config.maxXens;
 	}
 

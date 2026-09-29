@@ -104,6 +104,7 @@ final class Life {
 		for (var e : new ArrayList<>(c.trust.entrySet())) {
 			if (e.getValue() < 0) c.trust.put(e.getKey(), Math.min(0f, e.getValue() + fade));
 		}
+		c.writeChronicle();                                                    // a chronicler writes down what happened
 		long lived = day - bornDay;
 		if (lived > 0 && lived % 10 == 0) {
 			c.chatter(c.pick3("It's been " + lived + " days since I came to this world. Time flies!", lived + " days here already. What a life.",

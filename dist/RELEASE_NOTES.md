@@ -1,7 +1,34 @@
-**Xen Companion 1.6.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.7.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.7.0: houses that look built by a builder, villages with a plan, a world with a story
+
+* **Houses in stages**, the way building guides teach it: basic (the shape), simple (depth: a log frame, a stone ground
+  floor), good (details: a light infill between the timbers, darker roof edges, trims under the eaves, sills, lamps, a
+  real chimney) and perfect (polish: flower boxes, bushes, a tree, barrels and hay, moss in clusters, a textured roof,
+  a winding path). A less skilled Xen stops earlier and upgrades later ("decorate your house").
+* **Real shapes, not boxes**: a front gable with the upper floor jutting out over the door, a long house with a cross
+  gable and dormers, or an L with a lower wing. Roofs meet like real ones. No more lightning rods on the gables; the
+  chimney is a stone stack with its fire in a pot at the top (the smoke rises, no bare campfire on the roof).
+* **The house fits the place**: palettes by biome (teal roofs, autumn orange, cherry, swamp mud brick, desert
+  sandstone, snowy spruce) with a dark frame and a light infill for contrast; on a slope a narrow gable-front house,
+  on flat ground a long one or an L, on water stilts.
+* **Paths**: winding, two or three wide, never broken, worn-looking patches of dirt path, coarse dirt and gravel, with
+  bushes and flowers, rocks, lamp posts, bits of fence and benches along them.
+* **Building together**: Xens help a friend build (their village, team, or someone they trust), or when you ask ("Pip,
+  help Aria build"). One plan, shared progress: a block either one puts down counts for both.
+* **Village layout by its leader**: modern (straight streets, houses in rows facing them) or freeform (like a Minecraft
+  village, round the middle).
+* **Places and biomes**: it remembers villages, strongholds, temples, mineshafts, ancient cities, trial chambers,
+  monuments and more, each with coordinates and biome ("where's the nearest village?", "what places do you know?",
+  "what biome is this?").
+* **Server lore**: the world keeps its history (builds, villages founded, discoveries, deaths, the dragon). A
+  chronicler Xen writes it into written books, a volume at a time; ask "what happened on the server?".
+* **Spawn as Xen** (Experimental): a Xen plays your character and you watch through its eyes. Single player and LAN
+  host only.
+* **Scrollable settings**: the settings screen scrolls when it doesn't fit (small screens, phones).
 
 ### 1.6.0: plays like a person on a server
 

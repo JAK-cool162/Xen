@@ -249,7 +249,8 @@ final class MindSense {
 		a[Mind.EAT] = (food < 16 || food < 19 && c.player.getHealth() < 14) && c.items().getOrDefault("food", 0) > 0;
 		a[Mind.SHELTER] = night || f[Mind.DUSK] > 0.5f;
 		a[Mind.SLEEP] = night && c.hasBed();
-		a[Mind.HOUSE] = !c.builder.busy() && !creative && (c.goals.home == null && wood >= 60 || c.goals.home != null && wood >= 160);
+		a[Mind.HOUSE] = (!c.builder.busy() && !creative && (c.goals.home == null && wood >= 60 || c.goals.home != null && wood >= 160
+				|| c.goals.home != null && c.builder.canUpgrade() && wood >= 40)) || !nearby && !c.builder.busy() && c.builder.friendBuilding() != null;   // (or a friend's build to help with)
 		a[Mind.FARM] = c.farmer.middle == null && !c.farmer.on && (f[Mind.HOE] > 0 || wood >= 4)
 				&& (c.crafter.pickTier() >= 3 || food < 10 && c.items().getOrDefault("food", 0) == 0);   // iron first (farms come later, or when food runs out)
 		a[Mind.MINE] = c.crafter.pickTier() >= 1;

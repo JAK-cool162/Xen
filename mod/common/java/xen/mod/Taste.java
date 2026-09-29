@@ -121,6 +121,14 @@ final class Taste {
 
 	/** The same, in a style someone asked for ("build a modern house"), or its own choice if null. */
 	Design design(boolean starter, boolean creative, Style asked) {
+		return design(starter, creative, asked, "");
+	}
+
+	/**
+	 * The same for a kind of place (Builder.area): on water it builds on stilts, on a slope narrow with the gable to the
+	 * front, on flat open ground long and spread out (a cross gable, an L); what it likes still decides the rest.
+	 */
+	Design design(boolean starter, boolean creative, Style asked, String area) {
 		float t = 0.25f + 0.35f * c.personality.curiosity;
 		String[] sizes = starter ? new String[] {"small"} : creative ? new String[] {"medium", "large"} : new String[] {"small", "medium", "large"};
 		String size = sizes[0];
@@ -173,6 +181,19 @@ final class Taste {
 				}
 			}
 		}
+		boolean alongW = random.nextBoolean();
+		if (asked == null && !starter) {                                     // the place has its say
+			if (area.equals("wet") && random.nextFloat() < 0.7f) style = Style.STILT;
+			if (area.equals("steep")) {
+				w = Math.min(w, 9);
+				alongW = false;
+				if (style == Style.STILT) style = Style.COTTAGE;
+			}
+			if (area.equals("flat") && style == Style.COTTAGE) {
+				alongW = w >= 9 || random.nextBoolean();
+				if (creative && w < 11) w = 11 + 2 * random.nextInt(2);
+			}
+		}
 		if (style == Style.TOWER) {                                          // a tower: a small footprint, floors on floors
 			w = 7;
 			d = 7;
@@ -183,7 +204,7 @@ final class Taste {
 		boolean tallAnyway = w >= 11;                                        // (a big house gets taller walls)
 		if (style == Style.TOWER || style == Style.MODERN) loft = false;
 		boolean framed = !starter && style != Style.MODERN && pick("frame");
-		return new Design(w, d, loft ? 5 : tall || tallAnyway || style == Style.TOWER ? 4 : 3, roof, random.nextBoolean(), rich && style != Style.STILT && pick("base"),
+		return new Design(w, d, loft ? 5 : tall || tallAnyway || style == Style.TOWER ? 4 : 3, roof, alongW, rich && style != Style.STILT && pick("base"),
 				framed, rich && style == Style.COTTAGE && pick("lower"), pick("shutters"), rich && style != Style.STILT && pick("porch"),
 				rich && style != Style.MODERN && pick("chimney"), pick("bushes"), loft, rich && pick("yard"), pick("garden"), style, rich && pick("pond"),
 				rich && pick("workshop"));
@@ -304,14 +325,32 @@ final class Taste {
 		return "Your last house: " + last.describe() + ".";
 	}
 
+	/** A design as "w,d,wallH,roof,..." (how it's kept with the world), and back (null if it can't be read). */
+	static String designString(Design last) {
+		return last.w() + "," + last.d() + "," + last.wallH() + "," + last.roof() + "," + last.ridgeAlongWidth() + "," + last.base() + ","
+				+ last.frame() + "," + last.lowerStone() + "," + last.shutters() + "," + last.porch() + "," + last.chimney() + "," + last.bushes() + ","
+				+ last.loft() + "," + last.yard() + "," + last.garden() + "," + last.style() + "," + last.pond() + "," + last.workshop();
+	}
+
+	static Design designOf(String s) {
+		try {
+			String[] f = s.split(",");
+			return new Design(Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]), Roof.valueOf(f[3]), Boolean.parseBoolean(f[4]),
+					Boolean.parseBoolean(f[5]), Boolean.parseBoolean(f[6]), Boolean.parseBoolean(f[7]), Boolean.parseBoolean(f[8]),
+					Boolean.parseBoolean(f[9]), Boolean.parseBoolean(f[10]), Boolean.parseBoolean(f[11]), Boolean.parseBoolean(f[12]),
+					f.length > 13 && Boolean.parseBoolean(f[13]), f.length > 14 && Boolean.parseBoolean(f[14]),
+					f.length > 15 ? Style.valueOf(f[15]) : Style.COTTAGE, f.length > 16 && Boolean.parseBoolean(f[16]), f.length > 17 && Boolean.parseBoolean(f[17]));
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
 	JsonObject toJson() {
 		JsonObject o = new JsonObject();
 		liking.forEach(o::addProperty);
 		o.addProperty("#houses", houses);
 		if (last != null) {
-			o.addProperty("#last", last.w() + "," + last.d() + "," + last.wallH() + "," + last.roof() + "," + last.ridgeAlongWidth() + "," + last.base() + ","
-					+ last.frame() + "," + last.lowerStone() + "," + last.shutters() + "," + last.porch() + "," + last.chimney() + "," + last.bushes() + ","
-					+ last.loft() + "," + last.yard() + "," + last.garden() + "," + last.style() + "," + last.pond() + "," + last.workshop());
+			o.addProperty("#last", designString(last));
 			if (lastAt != null) o.addProperty("#at", lastAt.getX() + "," + lastAt.getY() + "," + lastAt.getZ());
 		}
 		return o;
@@ -324,13 +363,8 @@ final class Taste {
 				switch (e.getKey()) {
 					case "#houses" -> houses = e.getValue().getAsInt();
 					case "#last" -> {
-						String[] f = e.getValue().getAsString().split(",");
-						last = new Design(Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]), Roof.valueOf(f[3]), Boolean.parseBoolean(f[4]),
-								Boolean.parseBoolean(f[5]), Boolean.parseBoolean(f[6]), Boolean.parseBoolean(f[7]), Boolean.parseBoolean(f[8]),
-								Boolean.parseBoolean(f[9]), Boolean.parseBoolean(f[10]), Boolean.parseBoolean(f[11]), Boolean.parseBoolean(f[12]),
-								f.length > 13 && Boolean.parseBoolean(f[13]), f.length > 14 && Boolean.parseBoolean(f[14]),
-								f.length > 15 ? Style.valueOf(f[15]) : Style.COTTAGE, f.length > 16 && Boolean.parseBoolean(f[16]), f.length > 17 && Boolean.parseBoolean(f[17]));
-						shown = true;
+						last = designOf(e.getValue().getAsString());
+						shown = last != null;
 						lastDone = -24000;                                         // (as if a while ago)
 					}
 					case "#at" -> {

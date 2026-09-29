@@ -2264,6 +2264,61 @@ public final class Companion {
 		journal("says", text);
 	}
 
+	/** How much of the world's lore it has written down (entries), and its volumes so far (a chronicler: see {@link Lore}). */
+	int loreWritten, loreVolume;
+
+	/** Something that belongs in the world's lore (it happened today). */
+	void lore(String text) {
+		if (player == null || inArena) return;
+		mod.lore.add(server.overworld().getGameTime() / 24000 + 1, text);
+	}
+
+	/**
+	 * A chronicler, once a day: writes what happened since its last volume into a book (when there's enough to tell
+	 * and it has a book and quill, or can make one from a book, a feather and an ink sac; in creative, always) and
+	 * keeps it.
+	 */
+	void writeChronicle() {
+		if (player == null || !Lore.chronicler(this)) return;
+		var fresh = mod.lore.since(loreWritten);
+		if (fresh.size() < 4) return;
+		var inv = player.getInventory();
+		boolean can = player.isCreative();
+		if (!can) {
+			for (int i = 0; i < inv.getContainerSize() && !can; i++) {
+				if (inv.getItem(i).is(net.minecraft.world.item.Items.WRITABLE_BOOK)) {
+					inv.getItem(i).shrink(1);
+					can = true;
+				}
+			}
+		}
+		if (!can && inv.countItem(net.minecraft.world.item.Items.BOOK) > 0 && inv.countItem(net.minecraft.world.item.Items.FEATHER) > 0
+				&& inv.countItem(net.minecraft.world.item.Items.INK_SAC) > 0) {                   // (a book and quill from a book, a feather, ink)
+			for (var item : new net.minecraft.world.item.Item[] {net.minecraft.world.item.Items.BOOK, net.minecraft.world.item.Items.FEATHER,
+					net.minecraft.world.item.Items.INK_SAC}) {
+				for (int i = 0; i < inv.getContainerSize(); i++) {
+					if (inv.getItem(i).is(item)) {
+						inv.getItem(i).shrink(1);
+						break;
+					}
+				}
+			}
+			can = true;
+		}
+		if (!can) {
+			if (random.nextFloat() < 0.3f) chatter(pick3("I should write down what's been happening. I need a book and quill.",
+					"So much has happened. If only I had a book to write it in.", "Someone should keep a record of all this. Anyone got a book and quill?"), false);
+			return;
+		}
+		loreVolume++;
+		net.minecraft.world.item.ItemStack book = Lore.book(name, loreVolume, fresh);
+		loreWritten = mod.lore.entries.size();
+		if (!inv.add(book)) Compat.drop(player, book);
+		journal("does", "writes volume " + loreVolume + " of the chronicle (" + fresh.size() + " entries)");
+		chatter(pick3("I wrote down what's happened lately. Volume " + loreVolume + " of my chronicle!", "Another volume of the chronicle, done.",
+				"History, written down. Ask me if you want to read it."), false);
+	}
+
 	/** A line in the journal (the Experimental tab's log): what it sees, thinks, says, how it goes. */
 	void journal(String kind, String text) {
 		if (mod.config.journal && mod.journal != null) mod.journal.add(name, kind, text);
@@ -2288,6 +2343,12 @@ public final class Companion {
 		String cause = source.type().msgId() + (source.getEntity() != null
 				? ":" + BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath() : "");
 		if (!inArena) mod.logLife(name, player.level().getGameTime() / 24000, lifeTicks, lifeReward, cause);
+		if (!inArena) {
+			var k = source.getEntity();
+			lore(name + (k instanceof ServerPlayer sp ? " was killed by " + sp.getGameProfile().name()
+					: k != null ? " was killed by a " + BuiltInRegistries.ENTITY_TYPE.getKey(k.getType()).getPath().replace('_', ' ')
+					: " died (" + source.type().msgId() + ")") + " near " + player.blockPosition().getX() + " " + player.blockPosition().getZ());
+		}
 		lifeTicks = 0;
 		lifeReward = 0;
 		emotions.reset();
@@ -2658,7 +2719,14 @@ public final class Companion {
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
 				case "craft" -> plan = crafter.request(r.thing(), r.amount());
-				case "build" -> plan = r.thing().startsWith("statue") ? builder.statue(r.thing().substring(Math.min(r.thing().length(), 7)), from)
+				case "helpbuild" -> {                                              // a friend's build: help with it (shared progress)
+					Companion mate = null;
+					for (Companion o : mod.companions) if (o != this && o.name.equalsIgnoreCase(r.thing())) mate = o;
+					if (mate == null && r.thing().isEmpty()) mate = builder.friendBuilding();
+					plan = mate == null ? "You can't: you don't see who that is building." : builder.help(mate);
+				}
+				case "build" -> plan = r.thing().equals("upgrade") ? builder.upgrade()
+						: r.thing().startsWith("statue") ? builder.statue(r.thing().substring(Math.min(r.thing().length(), 7)), from)
 						: r.thing().equals("farm") ? farmer.start() : builder.start(r.thing());
 				case "quest" -> plan = switch (r.thing()) {
 					case "nether" -> nether.go(nether.inNether() ? "home" : "visit", 0);

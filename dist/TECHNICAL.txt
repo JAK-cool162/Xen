@@ -1,7 +1,103 @@
-XEN COMPANION 1.6.0: TECHNICAL NOTES
+XEN COMPANION 1.7.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.7.0
+===================
+
+Houses (TimberHouse, Architect.designed(..., stage)). A cottage (any roof asked of the COTTAGE style) is built by
+TimberHouse from Parts: a footprint (u0..u1, v0..v1), a roof whose ridge runs along v or u, whether its front row is a
+jetty (only from the upper floor up, on log pillars), and the top of its walls (8 for two floors, 4 for one and a loft).
+Shapes: front gable (ridgeAlongWidth false: one part, jetty at v -1), cross gable (w >= 11: a main part with the ridge
+along u and a bay 5 or 7 wide at v -3..mid, ridge along v, door in the bay), L (w 9..10: a main part and a lower wing
+0..4 x -4..mid with top 4). Roofs: for each column every part's roof height is top + 1 + min(distance to its eaves
+on both sides); a part's roof is left out where the column is inside another part whose roof is higher there (or
+equal and listed first), so roofs meet in valleys and a lower wing's roof stops at the taller wall. The edge rows over
+the gables are a darker wood (edgeOf: dark oak under spruce/oak/warped/cherry/deepslate roofs, spruce under dark oak
+or acacia) with an upside-down stair under each; upside-down trim stairs of the frame's wood under the eaves. Walls
+(walls()): the outline of the ground floor and of the upper floor, cell by cell: corners are posts; each straight run
+gets posts every 3-4 (Architect.posts) and a window in the middle of each bay, or on a run with the door posts either
+side of it (a door frame, the door set a block back), or on an upper floor's gable end a post up the middle with
+windows either side. Materials by stage: SHAPE all the wall block; DEPTH log frame, cobblestone course and the
+palette's base on the ground floor, a stone foundation 2 deep under the walls; DETAIL the infill (accentOf: calcite by
+default, stripped birch, spruce planks under stone, cut sandstone) between the timbers above, darker edges, eave trim,
+sills, lanterns, the chimney; POLISH flower boxes (leaves or moss and a flower in a box of open trapdoors), bushes
+along the walls, a tree behind a back corner, barrels and hay, wear() and texture(). wear(): clustered noise (a hash of
+the block's position halved, plus a quarter of per-block noise), moss thicker at y <= 1 and y <= 3: cobblestone ->
+mossy/andesite, stone bricks -> mossy/cracked, their stairs too. texture(): about 18% of the plain roof stairs and
+slabs, in 2-wide patches, of a close block (dark oak <-> spruce, warped -> oxidized cut copper, acacia -> smooth red
+sandstone, deepslate tiles -> deepslate bricks). Chimney (TimberHouse.chimney, also the old designer's): a cobblestone
+foot 3 wide with sloping shoulders, a 1x1 stack (bricks on creative palettes) past the roof, the lit campfire at the
+top ringed by open trapdoors (the flames hidden, the smoke rising). No lightning rods.
+
+Palettes (Architect.PALETTES, Builder.paletteFor). New: teal (calcite, dark oak log, stone bricks, warped roof), autumn
+(smooth sandstone, spruce log, cobblestone, acacia roof), cherry (calcite, dark oak log, cherry roof), swamp (mud
+bricks, mangrove). medieval's wall is calcite; oak's frame is spruce log with a dark oak roof (any-block palettes).
+Creative by biome: desert/badlands desert; cherry cherry; swamp/mangrove swamp; snow/frozen/ice/grove/peaks spruce or
+stone; taiga/dark forest autumn, spruce or medieval; jungle teal or autumn; savanna autumn or desert; birch birch or
+teal; forest autumn, medieval or oak; else oak, medieval, teal, stone or autumn.
+
+Choice by area (Builder.area, Taste.design(..., area)). A 25x25 grid every 3 blocks around its feet: water share
+>= 1/3 (or a swamp) "wet", height range (land only) >= 7 "steep", <= 2 "flat". Wet: 70% stilts. Steep: width <= 9,
+front gable. Flat: a cottage gets the ridge along its width (cross gable or L) when 9+ wide, 11-13 wide in creative.
+
+Paths (Paths.lay). From the door out len blocks: 3 wide for the first 2, then 2 (3 half the time when polished); after
+3 blocks it may shift a block sideways every 3+ blocks (45%), within 2 of the middle; where it shifts both widths are
+laid (no gaps). Blocks: plain dirt path below POLISH; polished: a patch map (2x2 cells) of the place's mix (meadow
+dirt path 60, coarse dirt 30, gravel 10; desert smooth sandstone/sandstone/coarse dirt; cold gravel/cobblestone/coarse
+dirt; wet packed mud/coarse dirt/mud bricks), 25% single blocks of the mix, 22% stray coarse dirt or gravel beside the
+edges. Every 4-6 blocks, alternating sides, 2 out from the edge: a bush and a flower (30%), flowers (20%), a mossy or
+plain cobblestone boulder with a slab stone and maybe a pebble button (15%), a lamp post (15%), fence 1-3 long (12%),
+a two-stair bench with trapdoor arms (8%). keepOff keeps it off the house and the chimney.
+
+Building together (Builder.PROJECTS, help, friendBuilding). begin() registers every plan but statues under the
+builder's UUID; finish() and cancel() remove it. friendBuilding(): the nearest registered project within 48 blocks
+whose builder is in its tribe, on its team, or trusted > 0.4. help(): begin() on the same Plan object; Builder.done()
+checks the world, so a block either one places is done for both. A helper's finish() doesn't set its home, says a line,
+trust +0.05 for the owner. Goals: HOUSE tries helping first (when it has a home, or with chance = kindness); with no
+goal above the bar, 15% + 50% x kindness of the time it helps a friend's build near. MindSense allows HOUSE when a
+friend's build is near. Chat: "help <name> build" (request helpbuild). Chat routing: of the Xens named in a message,
+the one named first is addressed ("Bex, help Aria build" goes to Bex).
+
+Village layout (Tribe.layout, plot). The leader (Laws.leader) decides once: diligence + 0.5 x power > curiosity + 0.45
+modern, else freeform. Modern: 8 lots per street, streets 44 apart alternating either side of the middle, lots 16
+apart at x = +-8, +-24..., 11 blocks either side of the street, facing it. Freeform: round the middle at angle i x 2.4
+(+-0.3), radius 16 + 5 per 5 houses (+0..4), facing the middle. Builder.startNear(what, near, facing) builds it facing
+that way.
+
+Places (Places.rememberAnother, find, all, biomeAt; Structures). A Place keeps its biome. Kinds there can be many of
+(village, temple, cave...) are kept as "village", "village 2"... unless within 160 (villages), 96 or 48 (caves) blocks
+of one it knows. Seen by give-away blocks (Structures.SIGNS, one kind per glance): bell, rail, spawner, crying obsidian,
+chiseled sandstone, end portal frame, nether bricks, gilded blackstone, purpur, stripped dark oak (shipwreck), and new:
+prismarine bricks (monument), reinforced deepslate (ancient city), trial spawner, tripwire hook (jungle temple),
+suspicious gravel (trail ruins), cauldron (witch hut). Its own house under construction isn't someone's house.
+SmallTalk: "where's the nearest <kind>" (coordinates, biome, rough distance and compass direction), "what places do
+you know" (the 6 nearest), "what biome is this".
+
+Lore (Lore, Companion.lore, writeChronicle). XenMod.lore holds up to 600 entries (day, text), saved in the world's
+xen/lore.json at each save and on stop. Entries: a build finished (and its helpers), a village founded (with its
+layout), a structure found (not "old ruins"), a death (by whom or what, where), the dragon killed. A chronicler
+(curiosity + chattiness > 1.1) at each new day, with 4+ entries since its last volume and a writable book (or a book,
+a feather and an ink sac; always in creative), writes a written book "Chronicle, vol. N" by itself (entries "Day d:
+...", pages up to about 230 characters, at most 90 pages); loreWritten/loreVolume are saved in its roster entry
+("chronicle"). "what happened", "lore", "history": a chronicler tells the last 3 entries; others name a chronicler or
+their own latest entry.
+
+Spawn as Xen (Avatar, setting spawnAsXen, Experimental). Checked every second; never on a dedicated server. On: a Xen
+named <you>_X (created like /xen summon, owned by you, FREE) joins where you stand; your inventory moves to it; your
+health too; you become a spectator with its body as your camera (kept on it after it respawns). Off (or it's gone):
+camera back, its inventory back to you (anything that doesn't fit dropped), you're teleported to it and get your game
+mode back; it leaves. Also on disconnect and server stop.
+
+Settings screen: the open category's widgets scroll (mouse wheel, 24 px a notch) when they reach past the bottom
+buttons; the ones out of view are hidden; arrows at the right show there's more above or below. Short screens get
+smaller category tabs. The Experimental toggles are two per row (Path assist, Solver, Journal, Spawn as Xen).
+
+Development only: -Dxen.designTest=x,z[,y] with -Dxen.designTestRows=palette:design;... puts each design's four stages
+side by side on a levelled field when the server starts (DesignTest), for comparing designs. Nothing happens without
+the flag.
 
 
 WHAT'S NEW IN 1.6.0

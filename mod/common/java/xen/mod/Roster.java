@@ -68,6 +68,13 @@ final class Roster {
 		o.add("knows", c.knowledge.toJson());
 		o.add("taste", c.taste.toJson());
 		o.add("habits", c.habits.toJson());
+		if (c.loreVolume > 0) {
+			var chronicle = new com.google.gson.JsonObject();
+			chronicle.addProperty("written", c.loreWritten);
+			chronicle.addProperty("volume", c.loreVolume);
+			o.add("chronicle", chronicle);
+		}
+		if (c.builder.home != null) o.add("homeBuild", c.builder.homeJson());
 		if (c.chores.mineRecordY != Integer.MIN_VALUE) {
 			JsonObject mine = new JsonObject();
 			mine.addProperty("y", c.chores.mineRecordY);

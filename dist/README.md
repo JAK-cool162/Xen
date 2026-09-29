@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.6.0
+# Xen Companion (Fabric mod) 1.7.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.6.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.6.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.6.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.6.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.7.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.7.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.7.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.7.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.6.0+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.7.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -204,6 +204,11 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "new rule: no fighting" / "from now on everyone works" | the village votes on it; passed rules are kept, broken ones punished |
 | "Pip, build a highway north" / "build an obsidian road east 200" | a tunnel highway in that direction ([more](#building)) |
 | "Pip, build a modern house" / "a house on stilts" / "a tower" / "a cottage" | builds its own design in that style |
+| "Pip, decorate your house" / "upgrade your house" / "make your house nicer" | takes its house a [stage](#building) further (basic, simple, good, perfect) |
+| "Pip, help Aria build" / "help them build" | joins a friend's build: the same plan, and every block either of them puts down counts for both |
+| "Pip, where's the nearest village?" / "have you seen a stronghold?" / "what places do you know?" | where it saw one (coordinates, the biome, how far and which way) |
+| "Pip, what biome is this?" | the biome it's in |
+| "Pip, what happened on the server?" / "tell me the lore" | the latest of the world's story (a chronicler tells it; others send you to one) |
 | "yes" / "no" (no name needed) | answers a question it just asked you, or its trade offer |
 | "Pip, watch this!" / "watch me" / "copy me" | keeps its eyes on you for a minute, to [learn from you](#learning-by-watching) |
 
@@ -771,6 +776,33 @@ slabs, doors, fences and hoes itself, gets more wood and stone when it runs out,
   survival house is small and cheap; with plenty of wood later it builds a better one and moves in. The look fits
   the biome in creative (oak, spruce, birch, medieval, stone, desert); in survival it's its own wood (glass when it
   has some, open windows when not).
+* **Stages, the way builders teach it** (1.7.0): a house goes up the way building guides say to work: **basic**
+  (its shape in one material), **simple** (depth: a log frame, a stone ground floor, log pillars standing out), **good**
+  (details: a light plaster infill between the timbers, darker barge boards on thick roof edges, upside-down stairs
+  under the eaves, window sills, lamps, a stone chimney with its fire in a pot at the top) and **perfect** (polish:
+  flower boxes, bushes, a tree, barrels and hay, moss and cracks in clusters near the ground, a roof with patches of
+  a second wood, and a winding path). A less skilled builder stops at an earlier stage and upgrades later on its own
+  (or when you ask: "decorate your house"): the same house, only more of it.
+* **Its shapes** (1.7.0): not a box. A **front gable** (the gable end facing the way in, the upper floor jutting out
+  over the door on log pillars), a **long house with a cross gable** (a gabled bay in the middle with the door, dormers
+  over a loft) or an **L** (a lower gabled wing at one end, its roof meeting the main one's wall). Roofs meet the way
+  real ones do (in valleys). The place decides some of it: on a slope a narrow house, gable to the front; on flat open
+  ground a long one or an L; on water a house on stilts.
+* **Palettes that fit the place** (1.7.0): white calcite walls, dark oak frames and a teal (warped) roof; cream walls
+  under an orange (acacia) roof in forests and savannas; cherry in a cherry grove; mud brick and mangrove in a swamp;
+  sandstone in the desert; spruce and stone in the snow. A dark frame, a light infill and a roof that stands out:
+  contrast is what makes a build read.
+* **Paths** (1.7.0): two or three wide, winding a little but never broken, of blocks that suit the place laid in
+  patches like a worn path (dirt path, coarse dirt and gravel in a meadow; sandstone in the desert; gravel and cobble
+  in the cold), and along them now and then a bush with a flower, a rock with a smaller stone, a lamp post, a bit of
+  fence or a bench.
+* **Building together** (1.7.0): a Xen whose friend (its village, its team, or someone it trusts) is building close by
+  may lend a hand, a kind one more readily; or ask it ("help Aria build"). They work from the same plan, so a block
+  either one puts down is done for both. It's the friend's house when it's done (the helper doesn't move in), and the
+  chronicle remembers who helped.
+* **Villages have a layout** (1.7.0): the village's leader decides. An orderly, commanding one lays it out **modern**:
+  straight streets with lots in rows on both sides, every house facing the street. A curious, easy-going one lets it
+  grow **freeform** like a Minecraft village: houses scattered round the middle along the paths, facing it.
 * **Underground base**: a staircase down with torches, a door, a room carved in the stone with log pillars, ceiling
   beams and lanterns, a plank floor, chests, a barrel, a crafting table, furnaces, a bed, a table and chair.
 * **Crop farm** (the wiki's 9x9: one water block in the middle keeps every farmland block wet), a fence, a gate,
@@ -805,9 +837,28 @@ Xen jumps gaps and takes bigger drops; a hurt or scared one takes the long safe 
 know: close by it feels everything, further off only what's in the light (a dark cave far away is rock to it until
 it gets there). With many Xens, planning is spread over the server's ticks so it never stutters.
 
+## Places it knows, and the world's story
+
+* **Places** (1.7.0): a Xen remembers where it saw a village, a stronghold, a mineshaft, a dungeon, a ruined portal,
+  a desert or jungle temple, a shipwreck, an ocean monument, an ancient city, a trial chamber, trail ruins, a witch
+  hut, a Nether fortress, a bastion, an End city, a cave, someone's house: each one (the second village is "village
+  2"), with its coordinates and the biome. Ask "where's the nearest village?" or "what places do you know?". It knows
+  the biome it's in ("what biome is this?"), like a player looking at the debug screen.
+* **Lore** (1.7.0): the world keeps its story: who built which house (and who helped), who founded a village and how
+  it's laid out, who found a stronghold or a temple and where, who fell and to what, who killed the dragon. Whether it
+  gets written down is up to the Xens: a **chronicler** (a curious, talkative one) writes what happened since its last
+  volume into a **written book** ("Chronicle, vol. 3", by that Xen) once a day, when there's enough to tell and it has a
+  book and quill (or a book, a feather and an ink sac). Ask it "what happened on the server?"; the others send you to
+  the chronicler, or tell their own part. Kept in the world's `xen/lore.json`.
+
 ## The solver and the journal
 
 Both in the settings' **Experimental** tab (with custom instructions and your script).
+
+* **Spawn as Xen** (`spawnAsXen`, 1.7.0): a Xen named after you ("Steve_X") takes your place where you stand, with
+  your things, and you watch through its eyes (a spectator on its camera). It lives its own life: its own goals, its
+  own mind, and it still listens to you. Turn it off to take over again, where it is, with what it has, in your game
+  mode. Single player and a LAN world's host only: it never works on a dedicated (public) server.
 
 * **The solver** (`solver`): a second little mind for being stuck. When its legs can't find a way, keep failing, or
   it gets no closer, it looks at where it is (a hole? water? underground? is the goal above or below? blocks? a
@@ -826,7 +877,8 @@ Both in the settings' **Experimental** tab (with custom instructions and your sc
 
 With Mod Menu installed, open **Mods → Xen Companion → settings** (the screenshot
 is from a real game client). The categories are down the left side (Talk, Xens,
-Goals, PvP, Build, Speed, Experimental); hover a setting to read what it does,
+Goals, PvP, Build, Speed, Experimental); the settings scroll (mouse wheel) when
+they don't all fit, on a small screen or a phone; hover a setting to read what it does,
 and **Reset** puts the open category back to how it comes. Changes save to `config/xen.json` and apply right
 away in single player. On a server, operators use:
 
@@ -874,6 +926,7 @@ away in single player. On a server, operators use:
 | `localChat` | `true` | chat reaches only those within `chatRange` blocks (Xens close by overhear) |
 | `chatRange` | `32` | how far local chat and local death messages carry |
 | `localDeaths` | `true` | death messages only reach those within `chatRange` |
+| `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
 | `chatModelPick` | `"auto"` | Experimental tab: `"135m"`, `"360m"`, `"off"` or `"auto"` (the Talk tab decides) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |

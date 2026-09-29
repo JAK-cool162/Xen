@@ -32,6 +32,13 @@ final class SmallTalk {
 	private static final Pattern MEAN = p("\\b(noob|stupid|dumb|trash|idiot|useless|shut up|i hate you|you suck|bad bot|loser|bozo|clown)\\b");
 	private static final Pattern JOKE = p("\\b(tell (me )?a joke|say something funny|joke|make me laugh)\\b");
 	private static final Pattern WHERE = p("\\b(where are you|where r u|your (coords|coordinates|location)|what are your coords)\\b");
+	private static final String PLACE_WORDS = "village|stronghold|mineshaft|dungeon|ruined portal|portal|desert temple|jungle temple|temple|fortress|bastion"
+			+ "|end city|shipwreck|ocean monument|monument|ancient city|trial chamber|trail ruins|witch hut|cave|shop|mine";
+	private static final Pattern PLACE_Q = p("\\b(where('?s| is| are| was)|have you (seen|found)|do you know (where|of)|know (a|any|where)|seen (a|any)|any)\\b.*?\\b("
+			+ PLACE_WORDS + ")s?\\b");
+	private static final Pattern PLACES_Q = p("\\b((what|which) places|places (do )?you know|what have you (found|discovered)|what do you know about the (world|map|area))\\b");
+	private static final Pattern LORE_Q = p("\\b(lore|history|chronicles?|what('?s| has)? happened|tell me (a|the|a little) story|story of (the|this) (server|world))\\b");
+	private static final Pattern BIOME_Q = p("\\b(what|which) biome\\b");
 	private static final Pattern HOME = p("\\b(where('?s| is) your (house|home|base)|where do you live)\\b");
 	private static final Pattern TIME = p("\\b(what time is it|is it (night|day|morning)|what'?s the time)\\b");
 	private static final Pattern OK = p("\\b(are you (ok|okay|alright|hurt|hungry)|you (ok|good)\\??$)");
@@ -243,6 +250,14 @@ final class SmallTalk {
 		if (state != null) return state;
 		if (JOKE.matcher(w).find()) return JOKES[random.nextInt(JOKES.length)];
 		if (LAUGH.matcher(w).find() && w.split("\\s+").length <= 2) return c.pick3("Haha.", "Right?", "Hehe.");
+		if (LORE_Q.matcher(w).find()) return loreAnswer();
+		var pq = PLACE_Q.matcher(w);
+		if (pq.find()) return placeAnswer(pq.group(pq.groupCount()));
+		if (PLACES_Q.matcher(w).find()) return placesAnswer();
+		if (BIOME_Q.matcher(w).find()) {
+			String b = c.places.biome();
+			return b.isEmpty() ? "No idea." : c.pick3("A " + b + ".", "We're in a " + b + ".", "This is a " + b + ".");
+		}
 		if (WHERE.matcher(w).find()) {
 			var b = c.player.blockPosition();
 			String biome = c.player.level().getBiome(b).unwrapKey().map(k -> k.identifier().getPath().replace('_', ' ')).orElse("somewhere");
@@ -348,4 +363,67 @@ final class SmallTalk {
 		}
 		return null;
 	}
+
+	/** Where the nearest one it knows of a kind of place is (it remembers them: where, which biome). */
+	private String placeAnswer(String word) {
+		String kind = switch (word) {
+			case "monument" -> "ocean monument";
+			case "temple" -> c.places.find("desert temple") != null ? "desert temple" : "jungle temple";
+			default -> word;
+		};
+		Places.Place pl = c.places.find(kind);
+		String a = kind.endsWith("ruins") ? "" : "aeiou".indexOf(kind.charAt(0)) >= 0 ? "an " : "a ";
+		if (pl == null) return c.pick3("I haven't found " + a + kind + " yet.", "No idea, I haven't seen one.", "Haven't come across " + a + kind + " yet.");
+		net.minecraft.core.BlockPos at = pl.pos(), me = c.player.blockPosition();
+		String where = String.format(Locale.ROOT, "%d %d %d", at.getX(), at.getY(), at.getZ());
+		if (!pl.dim().equals(Places.dim(c.player.level()))) return "There's " + (a.isEmpty() ? "" : a) + kind + " at " + where + " in the " + pl.dim().replace("the_", "").replace('_', ' ') + ".";
+		int dx = at.getX() - me.getX(), dz = at.getZ() - me.getZ(), far = (int) Math.sqrt((double) dx * dx + (double) dz * dz);
+		String dir = far < 12 ? "right here" : "about " + (far / 10 * 10) + " blocks " + compass(dx, dz);
+		return "The nearest " + kind + " I know is at " + where + (pl.biome().isEmpty() ? "" : ", in a " + pl.biome()) + ", " + dir + ".";
+	}
+
+	/** The places it knows, nearest first (a few). */
+	private String placesAnswer() {
+		java.util.List<Places.Place> all = c.places.all();
+		if (all.isEmpty()) return "I haven't found anything worth remembering yet.";
+		StringBuilder b = new StringBuilder("I know ");
+		int n = 0;
+		for (Places.Place pl : all) {
+			if (pl.name().equals("crumb")) continue;
+			if (n > 0) b.append(n == Math.min(all.size(), 6) - 1 ? " and " : ", ");
+			String what = pl.name().replaceAll(" \\d+$", "");
+			b.append(what.endsWith("ruins") ? "" : "aeiou".indexOf(what.charAt(0)) >= 0 ? "an " : "a ").append(what)
+					.append(String.format(Locale.ROOT, " (%d %d)", pl.pos().getX(), pl.pos().getZ()));
+			if (++n >= 6) break;
+		}
+		return b.append(all.size() > 6 ? ", and more." : ".").toString();
+	}
+
+	private static String compass(int dx, int dz) {
+		double a = Math.toDegrees(Math.atan2(dx, -dz));
+		String[] names = {"north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"};
+		return names[(int) Math.round(((a % 360) + 360) % 360 / 45) % 8];
+	}
+
+
+	/** The world's story: a chronicler tells the last of it; the others send you to one, or tell their own part. */
+	private String loreAnswer() {
+		var entries = c.mod.lore.entries;
+		if (!Lore.chronicler(c)) {
+			for (Companion o : c.mod.companions) {
+				if (o != c && o.loreVolume > 0) return c.pick3("I don't keep track of it all. Ask " + o.name + ", they write everything down.",
+						o.name + " keeps the chronicle. Ask them.", "History? That's " + o.name + "'s thing. They have books of it.");
+			}
+			for (int i = entries.size() - 1; i >= 0; i--) {
+				if (entries.get(i).text().contains(c.name)) return "All I know is my part: day " + entries.get(i).day() + ", " + entries.get(i).text() + ".";
+			}
+			return c.pick3("Not much to tell yet.", "Nothing worth a story yet.", "History's still being made.");
+		}
+		var recent = c.mod.lore.recent(3);
+		if (recent.isEmpty()) return "Nothing's happened yet worth writing down. Give it time.";
+		StringBuilder b = new StringBuilder(c.loreVolume > 0 ? "From my chronicle: " : "Here's what I've seen: ");
+		for (Lore.Entry e : recent) b.append("day ").append(e.day()).append(", ").append(e.text()).append(". ");
+		return b.toString().trim();
+	}
+
 }

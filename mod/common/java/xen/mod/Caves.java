@@ -50,7 +50,7 @@ final class Caves {
 		BlockPos at = c.player.blockPosition();
 		BlockPos spot = sample(level, at, 24, -18, 6, 600, false);
 		if (spot == null || !rocky(level, spot) || !remember(level, spot)) return;
-		c.places.remember("cave", spot);
+		c.places.rememberAnother("cave", spot, 48);
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
 		c.chatter(caveLine(spot), false);
@@ -66,7 +66,7 @@ final class Caves {
 		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
 		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7 || !rocky(level, spot) || !remember(level, spot)) return;
 		c.eyes.caves++;
-		c.places.remember("cave", spot);
+		c.places.rememberAnother("cave", spot, 48);
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
 		c.chatter(caveLine(spot), false);

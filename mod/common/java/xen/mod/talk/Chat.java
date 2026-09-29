@@ -126,7 +126,8 @@ public final class Chat {
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
-			{"build", "\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture|tower|skyscraper|mansion)\\b|\\bunderground\\b|\\bstatue of\\b"},
+			{"helpbuild", "\\bhelp ([a-z0-9_]{3,16}) (build|with (the |their |his |her )?(house|build|building|home))\\b|\\bhelp (them|him|her) (build|with (the |their |his |her )?(house|build|building))\\b"},
+			{"build", "\\b(decorate|upgrade|improve|fix up|renovate|polish|prettify) (your |my |our |the )?(house|home|base|place)\\b|\\bmake (your |the )?(house|home) (better|nicer|prettier|look good)\\b|\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture|tower|skyscraper|mansion)\\b|\\bunderground\\b|\\bstatue of\\b"},
 			{"wood", "\\b(wood|woods|logs?|trees?|chop|timber|lumber|planks?)\\b"},
 			{"coal", "\\bcoal\\b"},
 			{"iron", "\\biron\\b"},
@@ -265,6 +266,13 @@ public final class Chat {
 			String b = m.find() ? m.group(1) : "crafting table";
 			thing = b.equals("table") || b.equals("workbench") ? "crafting_table" : b.equals("torches") ? "torch" : b.replace(' ', '_');
 			amount = 0;
+		}
+		if (intent.equals("helpbuild")) {                                     // "help Aria build" is (helpbuild, aria)
+			Matcher m = Pattern.compile("\\bhelp ([a-z0-9_]{3,16})\\b").matcher(words);
+			return new Request(intent, m.find() && !m.group(1).matches("them|him|her") ? m.group(1) : "", 0);
+		}
+		if (intent.equals("build") && Pattern.compile("\\b(decorate|upgrade|improve|fix up|renovate|polish|prettify|better|nicer|prettier|look good)\\b").matcher(words).find()) {
+			return new Request(intent, "upgrade", 0);                             // its own house, a stage better
 		}
 		if (intent.equals("build")) {                                         // a house, or a base under the ground
 			Matcher of = Pattern.compile("\\b(statue|sculpture)( of ([a-z0-9_]+))?").matcher(words);

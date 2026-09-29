@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Builds a plan from {@link Architect}, block by block, with a player's hands: it walks (or, in creative, flies) to
@@ -39,6 +40,96 @@ final class Builder {
 	Architect.Plan plan;
 	/** The house it designed and is building (null: not a house of its own design). */
 	Taste.Design design;
+
+	/**
+	 * Its home, as it designed and built it: where (the front left corner), which way the door faces, the design, the
+	 * blocks, and how far it has taken it (Architect.STAGES: basic, simple, good, perfect). A house gets better the way a
+	 * player's does: the same spot and shape, one stage at a time (depth, then details, then polish).
+	 */
+	record Home(BlockPos corner, Direction front, Taste.Design design, Architect.Palette palette, int stage) {}
+
+	/** Its home (null: none of its own design yet), and the one it's building or upgrading right now. */
+	Home home;
+	private Home building;
+
+	/** How far a new house goes: its skill (building makes it better); a first house in survival is kept simple; creative: all the way. */
+	int stageFor(boolean starter) {
+		if (c.player.isCreative()) return Architect.POLISH;
+		float skill = c.skills.get(Skills.BUILD);
+		int stage = skill < 0.35f ? Architect.SHAPE : skill < 0.6f ? Architect.DEPTH : skill < 0.8f ? Architect.DETAIL : Architect.POLISH;
+		return starter ? Math.min(stage, Architect.DEPTH) : stage;
+	}
+
+	/** Can it make its home better (the next stage)? */
+	boolean canUpgrade() {
+		return home != null && home.stage() < Architect.POLISH && plan == null && c.player != null
+				&& c.player.blockPosition().closerThan(home.corner(), 128);
+	}
+
+	/** Its home, one stage better: the same spot and shape, only what's new (and what's different) gets built. */
+	String upgrade() {
+		if (home == null) return "You can't: you have no house of your own design to improve yet.";
+		if (home.stage() >= Architect.POLISH) return "You can't make your house any better: it's already as good as you can make it.";
+		if (!c.player.blockPosition().closerThan(home.corner(), 128)) return "You can't work on your house from here: it's too far away.";
+		creative = c.player.isCreative();
+		int next = home.stage() + 1;
+		Architect.Plan made = keepWhatsThere(Architect.designed(home.corner(), home.front(), home.design(), home.palette(),
+				new Random(home.corner().asLong()), next));
+		String plan = begin(made, " (" + WHAT_STAGE_ADDS[next] + ")", home.palette().name());
+		building = new Home(home.corner(), home.front(), home.design(), home.palette(), next);
+		design = null;
+		c.journal("build", "makes its house " + Architect.STAGES[next]);
+		return plan.replaceFirst("^You will build an? [a-z ]+ here", "You will make your house " + Architect.STAGES[next]);
+	}
+
+	private static final String[] WHAT_STAGE_ADDS = {"the shape", "depth: a log frame, pillars and a stone base",
+			"details: eaves, sills, shutters, a hood over the door, lamps and timber-framed gables",
+			"polish: flower boxes, bushes, a garden, a gravel path, barrels and hay, finials and a little wear"};
+
+	/**
+	 * An upgrade keeps what's already right and what isn't the house's own: no digging out its bed or its chest to put
+	 * them back, nor anything made by hand that's there (a chest it set down later): only natural blocks are cleared.
+	 */
+	private Architect.Plan keepWhatsThere(Architect.Plan made) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		Map<BlockPos, Architect.Step> blocks = new HashMap<>();
+		for (Architect.Step st : made.steps()) if (!st.dig()) blocks.put(st.pos(), st);
+		List<Architect.Step> out = new ArrayList<>();
+		for (Architect.Step st : made.steps()) {
+			if (st.dig()) {
+				BlockState here = level.getBlockState(st.pos());
+				Architect.Step goes = blocks.get(st.pos());
+				if (goes != null && here.getBlock() == goes.state().getBlock()) continue;   // its own block, already right
+				if (goes == null && !here.isAir() && !Walker.natural(here)) continue;       // something made by hand: left be
+			}
+			out.add(st);
+		}
+		return new Architect.Plan(made.name(), out, made.door(), made.middle(), made.front(), made.inside());
+	}
+
+	// kept with the world: its home
+	com.google.gson.JsonObject homeJson() {
+		if (home == null) return null;
+		com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+		o.addProperty("at", home.corner().getX() + "," + home.corner().getY() + "," + home.corner().getZ());
+		o.addProperty("front", home.front().getName());
+		o.addProperty("design", Taste.designString(home.design()));
+		Architect.Palette pl = home.palette();
+		o.addProperty("palette", String.join(",", pl.name(), pl.wall(), pl.frame(), pl.base(), pl.roof(), pl.floor(), pl.window(), pl.door(),
+				pl.fence(), pl.trapdoor(), pl.light()));
+		o.addProperty("stage", home.stage());
+		return o;
+	}
+
+	void loadHome(com.google.gson.JsonObject o) {
+		String[] at = o.get("at").getAsString().split(",");
+		String[] pl = o.get("palette").getAsString().split(",");
+		Direction front = Direction.byName(o.get("front").getAsString());
+		Taste.Design ds = Taste.designOf(o.get("design").getAsString());
+		if (front == null || ds == null || pl.length < 11) return;
+		home = new Home(new BlockPos(Integer.parseInt(at[0]), Integer.parseInt(at[1]), Integer.parseInt(at[2])), front, ds,
+				new Architect.Palette(pl[0], pl[1], pl[2], pl[3], pl[4], pl[5], pl[6], pl[7], pl[8], pl[9], pl[10]), o.get("stage").getAsInt());
+	}
 	private final List<Architect.Step> left = new ArrayList<>();
 	private final Set<BlockPos> skipped = new HashSet<>();
 	private final Map<BlockPos, Integer> tries = new HashMap<>();
@@ -139,6 +230,54 @@ final class Builder {
 		this.c = c;
 	}
 
+	/**
+	 * A build going on that friends can help with: whose it is and the plan. Everyone on it works from the same plan,
+	 * and a block anyone puts down is done for all of them (a plan checks the world, not who did it): shared progress,
+	 * the way players build a base together.
+	 */
+	record Project(UUID owner, String name, Architect.Plan plan, String look) {}
+
+	static final Map<UUID, Project> PROJECTS = new java.util.concurrent.ConcurrentHashMap<>();
+	/** Whose build it's helping with (null: its own, or none). */
+	UUID helping;
+	private String helpingName = "";
+
+	/** A friend's build close by (its tribe, its team, or someone it trusts), or null. */
+	Companion friendBuilding() {
+		if (c.player == null || busy()) return null;
+		Companion best = null;
+		double bestD = 48 * 48;
+		String team = c.mod.teamOf(c);
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.player() == null || o.player().level() != c.player.level()) continue;
+			Project pr = PROJECTS.get(o.player().getUUID());
+			if (pr == null) continue;
+			boolean friend = c.tribe() != null && c.tribe() == o.tribe() || team != null && team.equals(c.mod.teamOf(o)) || c.trust(o.player().getUUID()) > 0.4f;
+			if (!friend) continue;
+			double d = c.player.distanceToSqr(Vec3.atCenterOf(pr.plan().middle()));
+			if (d < bestD) {
+				bestD = d;
+				best = o;
+			}
+		}
+		return best;
+	}
+
+	/** Lend a hand with a friend's build: the same plan, the blocks it still needs (whatever's done is done). */
+	String help(Companion o) {
+		Project pr = o.player() == null ? null : PROJECTS.get(o.player().getUUID());
+		if (pr == null) return "You can't: " + o.name + " isn't building anything.";
+		creative = c.player.isCreative();
+		design = null;
+		building = null;
+		String r = begin(pr.plan(), " together with " + o.name + " (it's their " + pr.plan().name() + ")", pr.look());
+		helping = o.player().getUUID();
+		helpingName = o.name;
+		PROJECTS.remove(c.player.getUUID());
+		c.journal("build", "helps " + o.name + " build their " + pr.plan().name());
+		return r;
+	}
+
 	boolean busy() {
 		return plan != null;
 	}
@@ -151,6 +290,8 @@ final class Builder {
 	}
 
 	void cancel() {
+		if (c.player != null) PROJECTS.remove(c.player.getUUID());
+		helping = null;
 		plan = null;
 		left.clear();
 		current = null;
@@ -182,10 +323,15 @@ final class Builder {
 
 	/** The same, near a spot someone picked (a boss laying out its village), or next to it if null. */
 	String startNear(String what, BlockPos near) {
+		return startNear(what, near, null);
+	}
+
+	/** The same, its front facing a given way (a village's street, its middle), or where it stood looking from if null. */
+	String startNear(String what, BlockPos near, Direction facing) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		creative = c.player.isCreative();
 		design = null;
-		Direction front = c.player.getDirection().getOpposite();             // the door faces where it stood looking from
+		Direction front = facing != null ? facing : c.player.getDirection().getOpposite();   // the door faces where it stood looking from
 		BlockPos feet = c.player.blockPosition();
 		boolean base = what.contains("base") || what.contains("underground") || what.contains("bunker");
 		boolean mobs = what.contains("mob") || what.contains("grinder") || what.contains("xp");
@@ -217,16 +363,19 @@ final class Builder {
 			boolean starter = !creative && c.goals.home == null;            // its first house: what a few trees give
 			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
-			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked);
+			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked, area(level, feet));
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, ds.w() + 1, ds.d() + 1);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 			if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
 				p = Architect.ofWood(p.name(), true, p.window().equals("glass_pane"));   // it wants stone at the bottom: it'll dig some
-			made = Architect.designed(corner, front, ds, p, random);
+			int stage = stageFor(starter);
+			made = Architect.designed(corner, front, ds, p, new Random(corner.asLong()), stage);
 			design = ds;
 			String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
-			c.journal("build", "designs a house: " + ds.describe());
-			return begin(made, of + " (your own design: " + ds.describe() + ")", p.name());
+			c.journal("build", "designs a house: " + ds.describe() + " (" + Architect.STAGES[stage] + ")");
+			String planned = begin(made, of + " (your own design: " + ds.describe() + "; " + Architect.STAGES[stage] + " for now)", p.name());
+			building = new Home(corner, front, ds, p, stage);
+			return planned;
 		}
 		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
 		return begin(made, of, p.name());
@@ -261,6 +410,7 @@ final class Builder {
 		c.mode = Companion.Mode.STAY;                                         // it's working here now
 		c.anchor = made.middle();
 		int blocks = (int) made.steps().stream().filter(s -> !s.dig()).count();
+		if (c.player != null && !made.name().startsWith("statue")) PROJECTS.put(c.player.getUUID(), new Project(c.player.getUUID(), c.name, made, look));
 		XenMod.LOG.info("{} starts building a {} at {} ({} blocks, {} palette)", c.name, made.name(), made.middle(), blocks, look);
 		return "You will build " + ("aeiou".indexOf(made.name().charAt(0)) >= 0 ? "an " : "a ") + made.name() + " here" + of + ": about " + blocks
 				+ " blocks, one at a time.";
@@ -323,14 +473,58 @@ final class Builder {
 	private Architect.Palette palette(ServerLevel level, BlockPos feet) {
 		if (creative) {
 			String biome = level.getBiome(feet).unwrapKey().map(k -> k.identifier().getPath()).orElse("plains");
-			if (biome.contains("desert") || biome.contains("badlands")) return Architect.PALETTES.get("desert");
-			if (biome.contains("taiga") || biome.contains("snow") || biome.contains("grove")) return Architect.PALETTES.get("spruce");
-			if (biome.contains("birch")) return Architect.PALETTES.get("birch");
-			String[] any = {"oak", "medieval", "stone", "spruce"};
-			return Architect.PALETTES.get(any[random.nextInt(any.length)]);
+			String[] fits = paletteFor(biome);
+			return Architect.PALETTES.get(fits[random.nextInt(fits.length)]);
 		}
 		var items = c.items();
 		return Architect.ofWood(woodType(), items.getOrDefault("cobblestone", 0) >= 24, count(n -> n.equals("glass_pane")) >= 6);
+	}
+
+	/**
+	 * Palettes that fit a place (the way builders choose one: the house belongs there, yet stands out from it; warm
+	 * colours in a dark green forest, a bright roof in the jungle, sandstone in the desert).
+	 */
+	static String[] paletteFor(String biome) {
+		if (biome.contains("desert") || biome.contains("badlands")) return new String[] {"desert"};
+		if (biome.contains("cherry")) return new String[] {"cherry"};
+		if (biome.contains("swamp") || biome.contains("mangrove")) return new String[] {"swamp"};
+		if (biome.contains("snow") || biome.contains("frozen") || biome.contains("ice") || biome.contains("grove") || biome.contains("peaks")) {
+			return new String[] {"spruce", "stone"};
+		}
+		if (biome.contains("taiga") || biome.contains("dark_forest")) return new String[] {"autumn", "spruce", "medieval"};
+		if (biome.contains("jungle")) return new String[] {"teal", "autumn"};
+		if (biome.contains("savanna")) return new String[] {"autumn", "desert"};
+		if (biome.contains("birch")) return new String[] {"birch", "teal"};
+		if (biome.contains("forest")) return new String[] {"autumn", "medieval", "oak"};
+		return new String[] {"oak", "medieval", "teal", "stone", "autumn"};
+	}
+
+	/**
+	 * What the place is like, for the kind of house: "wet" (water all round: a house on stilts), "steep" (a slope:
+	 * a narrow house, its gable to the front), "flat" (room to spread out: a long house, a cross gable or an L),
+	 * else "" (nothing in particular).
+	 */
+	static String area(ServerLevel level, BlockPos feet) {
+		String biome = level.getBiome(feet).unwrapKey().map(k -> k.identifier().getPath()).orElse("plains");
+		int water = 0, n = 0, lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+		for (int dx = -12; dx <= 12; dx += 3) {
+			for (int dz = -12; dz <= 12; dz += 3) {
+				int x = feet.getX() + dx, z = feet.getZ() + dz;
+				if (!level.hasChunkAt(new BlockPos(x, feet.getY(), z))) continue;
+				int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+				n++;
+				if (level.getFluidState(new BlockPos(x, y - 1, z)).is(net.minecraft.tags.FluidTags.WATER)) water++;
+				else {
+					lo = Math.min(lo, y);
+					hi = Math.max(hi, y);
+				}
+			}
+		}
+		if (n == 0) return "";
+		if (water * 3 >= n || biome.contains("swamp") || biome.contains("mangrove")) return "wet";
+		if (hi - lo >= 7) return "steep";
+		if (hi - lo <= 2) return "flat";
+		return "";
 	}
 
 	private String woodType() {
@@ -473,13 +667,33 @@ final class Builder {
 		land();
 		String what = plan.name();
 		int miss = skipped.size();
-		if (design != null && what.equals("house")) {                         // how did its design go? (it learns from that)
+		if (c.player != null) PROJECTS.remove(c.player.getUUID());
+		if (helping != null) {                                                // a friend's build: done (or its part of it); not its home
+			XenMod.LOG.info("{} finished helping {} with the {} ({} placed)", c.name, helpingName, what, placed);
+			c.say(c.pick3("Done! " + helpingName + "'s " + what + " looks great.", "There, finished with " + helpingName + ".",
+					"That's " + helpingName + "'s " + what + " done. Teamwork!"));
+			c.trust(helping, 0.05f);
+			helping = null;
+			c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;
+			plan = null;
+			return Action.IDLE;
+		}
+		if (building != null && what.endsWith("house")) {                     // its home, as it stands now (the next upgrade starts from it)
+			home = building;
+			building = null;
+		}
+		if (design != null && what.endsWith("house")) {                       // how did its design go? (it learns from that)
 			long took = (now() - started) / 20;
 			float r = 0.3f - Math.min(0.6f, miss / (float) Math.max(10, placed) * 3f) - (took > 1800 ? 0.2f : 0);
 			c.taste.built(design, plan.middle(), r);
 			design = null;
 		}
 		XenMod.LOG.info("{} finished the {} ({} placed, {} dug, {} left out) in {} s", c.name, what, placed, dug, miss, (now() - started) / 20);
+		java.util.List<String> helpers = new ArrayList<>();
+		for (Companion o : c.mod.companions) if (o != c && c.player != null && c.player.getUUID().equals(o.builder.helping)) helpers.add(o.name);
+		BlockPos at = plan.middle();
+		c.lore(c.name + " built " + ("aeiou".indexOf(what.charAt(0)) >= 0 ? "an " : "a ") + what + " at " + at.getX() + " " + at.getZ()
+				+ (helpers.isEmpty() ? "" : ", with help from " + String.join(" and ", helpers)));
 		c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
 		switch (plan.name()) {
 			case "farm" -> c.goals.farm = plan.middle();

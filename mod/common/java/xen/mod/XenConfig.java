@@ -81,6 +81,11 @@ public final class XenConfig {
 	public boolean solver = true;
 	/** (Experiment) Keep a journal of what Xens see, think, say and hear (copy it or save it from the Experiment tab). */
 	public boolean journal = true;
+	/**
+	 * (Experiment) Spawn as Xen: in single player (or hosting a LAN world) a Xen named after you plays your character
+	 * with your things, and you watch through its eyes; off, you take over again. Never on a dedicated server.
+	 */
+	public boolean spawnAsXen = false;
 	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
 	public boolean antics = true;
 	/**

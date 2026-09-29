@@ -352,6 +352,7 @@ final class Dragon {
 			c.antics.celebrate();
 			c.journal("fight", "the Ender Dragon is dead");
 			c.goals.dragonDown = true;
+			c.lore(c.name + " and friends killed the Ender Dragon");
 		}
 		if (c.voyager.onQuest()) return null;                                 // (after an elytra first: its own steps)
 		if (c.voyager.wantsQuest()) {
