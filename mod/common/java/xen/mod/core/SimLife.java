@@ -669,8 +669,17 @@ public final class SimLife {
 			try (var in = new java.io.DataInputStream(new java.io.BufferedInputStream(new java.io.FileInputStream(args[2])))) {
 				mind = Mind.load(in);
 			}
-			eps0 = 0.3f;
-			System.out.println("going on from " + args[2] + " (" + mind.updates + " learning steps)");
+			eps0 = Float.parseFloat(System.getProperty("xen.eps", "0.3"));
+			float lr = Float.parseFloat(System.getProperty("xen.lr", "3e-4"));     // (gentler for fine-tuning a mind that already knows a lot)
+			mind.striatum.net.lr = mind.amygdala.net.lr = mind.world.net.lr = lr;
+			System.out.println("going on from " + args[2] + " (" + mind.updates + " learning steps), learning rate " + lr + ", chance-taking " + eps0);
+		}
+		long evalEvery = Long.getLong("xen.evalEvery", 0);                   // keep the best along the way (training goes up and down)
+		double best = Double.NEGATIVE_INFINITY;
+		if (evalEvery > 0) {
+			best = score(mind, 150);
+			save(mind, out);
+			System.out.printf(Locale.ROOT, "start: score %.1f (kept)%n", best);
 		}
 		mind.think = false;                                                    // (quick while it trains)
 		SimLife life = new SimLife(r);
@@ -702,6 +711,15 @@ public final class SimLife {
 			picks[c.option]++;
 			mind.remember(f, c.option, rew, harm, g, life.dead, minutes, Mind.bits(life.allowed()));
 			if (mind.remembered() > 2000) mind.learn(32, r);
+			if (evalEvery > 0 && s % evalEvery == 0) {
+				double sc = score(mind, 150);
+				boolean better = sc > best;
+				if (better) {
+					best = sc;
+					save(mind, out);
+				}
+				System.out.printf(Locale.ROOT, "%7d steps: score %.1f%s%n", s, sc, better ? " (best so far: kept)" : "");
+			}
 			if (s % 20000 == 0) {
 				StringBuilder h = new StringBuilder();
 				int total = 0;
@@ -715,12 +733,47 @@ public final class SimLife {
 				java.util.Arrays.fill(picks, 0);
 			}
 		}
+		if (evalEvery > 0) {                                                    // the best one it had, not the last
+			try (var in = new java.io.DataInputStream(new java.io.BufferedInputStream(new java.io.FileInputStream(out)))) {
+				mind = Mind.load(in);
+			}
+		} else {
+			save(mind, out);
+		}
 		mind.think = true;
 		evaluate(mind, new Random(99), 300);
+		System.out.println("saved " + out);
+	}
+
+	private static void save(Mind mind, String out) throws java.io.IOException {
 		try (DataOutputStream d = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(out)))) {
 			mind.save(d);
 		}
-		System.out.println("saved " + out);
+	}
+
+	/**
+	 * How good a mind is at a whole life, with no chance-taking, over n fresh lives (always the same ones): progress
+	 * (a pickaxe, iron, a home, diamonds, the dragon) minus deaths, in points out of about 400.
+	 */
+	static double score(Mind mind, int n) {
+		boolean was = mind.think;
+		mind.think = false;
+		Random r = new Random(1234);
+		SimLife life = new SimLife(r);
+		int dead = 0, pick = 0, iron = 0, home = 0, dia = 0, dragon = 0;
+		for (int i = 0; i < n; i++) {
+			life.reset();
+			while (!life.midLifeFree()) life.reset();
+			while (!life.over()) life.step(mind.choose(life.features(), life.allowed(), life.caution(), 0f, r, life.bias()).option);
+			if (life.dead) dead++;
+			if (life.firstPick >= 0) pick++;
+			if (life.firstIron >= 0) iron++;
+			if (life.home) home++;
+			if (life.diamond > 0 || life.pick >= 4) dia++;
+			if (life.dragon) dragon++;
+		}
+		mind.think = was;
+		return 100.0 * (pick + iron + home + dia + 2 * dragon - 1.5 * dead) / n;
 	}
 
 	private static int pct(int n, int of) {
