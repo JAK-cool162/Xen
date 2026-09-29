@@ -71,6 +71,19 @@ training and in the game), at 0.12 of their full size: a nudge. At full size the
 SimLife, Xen 5.2 with them: 57% of lives died instead of 38%, a home in 56% instead of 81%); at 0.1 it did as well as
 without them. Running away only hurts its pride while it's healthy (half its health or more). Trained on in SimLife from Xen 5.2: every simulated life is born with sins, beliefs and a
 plan (70% its own pick, 30% any, so every plan gets lived), lives last ten days (long enough for the dragon).
+Gently (learning rate 1e-4, 10% chance-taking at first, 200,000 steps), and the best of it kept: every 20,000 steps
+it's scored on the same 150 fresh lives (a pickaxe, iron, a home, diamonds, the dragon, minus deaths) and only a
+better one is kept (training swings up and down: straight on at full speed, it came out worse than 5.2). Xen 5.2
+scored 284.7, the one that ships 338.7. Over 300 other fresh ten-day lives:
+                        Xen 5.2      Xen 6.0
+  died                  35%          36%
+  iron pickaxe          85% (day 2.2)  86% (day 2.0)
+  a home                85% (day 1.7)  95% (day 0.8)
+  diamonds              68%          71%
+  the dragon            0%           1%
+and without thinking ahead (another 300 lives): died 37% / 29%, iron 89% / 93%, a home 82% / 95%, diamonds 83% / 88%,
+the dragon 0% / 2%. Its plan shows: builders have a home in 96% of lives, settlers a farm in 100%, explorers farm
+least (71%), speedrunners reach the dragon most often.
 
 Reactions (Reactions). Twice a second it looks for players in view (20 blocks, line of sight) it hasn't had in view
 for five minutes, and reacts to the first: hello (crouches twice, says hi; always for its owner or a friend),
