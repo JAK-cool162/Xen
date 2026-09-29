@@ -1353,7 +1353,7 @@ final class Chores {
 		java.util.Set<BlockPos> found = new java.util.LinkedHashSet<>();
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-GLANCE, -6, -GLANCE), feet.offset(GLANCE, 8, GLANCE))) {
 			int cat = WorldSenses.category(level, q, level.getBlockState(q));
-			if (!want[cat] || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || !open(level, q) || underwater(q)) continue;
+			if (!want[cat] || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || !open(level, q) || underwater(q) || lavaBehind(level, q)) continue;
 			found.add(q.immutable());
 		}
 		for (int k = 0; k < Blocks.COUNT; k++) {
@@ -1372,10 +1372,18 @@ final class Chores {
 		return out.size() > max ? new ArrayList<>(out.subList(0, max)) : out;
 	}
 
+	/** Lava beside or above it: mining it lets the lava in (below it can't flow up). */
+	static boolean lavaBehind(ServerLevel level, BlockPos b) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+		}
+		return false;
+	}
+
 	/** Ore it can mine right from where it stands (showing, in sight, within reach): for mining on its way. */
 	BlockPos oreWithinReach() {
 		BlockPos o = oreInReach();
-		if (o == null || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ()))) return null;
+		if (o == null || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ())) || lavaBehind((ServerLevel) c.player.level(), o)) return null;
 		return c.player.getEyePosition().distanceTo(Vec3.atCenterOf(o)) <= c.player.blockInteractionRange() - 0.3 ? o : null;
 	}
 
@@ -1620,6 +1628,14 @@ final class Chores {
 	}
 
 	private Action mine(BlockPos b) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {   // lava right behind it (a player hears it pop, sees it drip): leave it
+			if (d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) {
+				c.journal("does", "leaves the block at " + b.toShortString() + " (lava behind it)");
+				if (c.personality.chattiness > 0.4f) c.chatter(c.personality.say("lava"), false);
+				return giveUp(b);
+			}
+		}
 		if (!c.hands.mine(b)) {
 			if (b.equals(c.hands.cantMine)) giveUp(b);                    // it can't break that: another one, not waiting forever
 			return null;
