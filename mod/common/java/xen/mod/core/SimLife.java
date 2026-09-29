@@ -660,6 +660,7 @@ public final class SimLife {
 	// ------------------------------------------------------------------------------- training
 	public static void main(String[] args) throws Exception {
 		String out = args.length > 0 ? args[0] : "mind.bin";
+		Mind.shaping = Integer.getInteger("xen.shaping", 1);
 		long steps = args.length > 1 ? Long.parseLong(args[1]) : 200_000;
 		Random r = new Random(7);
 		Mind mind = Mind.standard(11);

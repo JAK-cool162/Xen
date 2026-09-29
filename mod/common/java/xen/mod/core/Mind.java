@@ -101,27 +101,30 @@ public final class Mind {
 		return r;
 	}
 
-	/** Xen 6.0: what its sins make of it (the same things feel different to a greedy Xen and a lazy one). */
+	/**
+	 * How its nature shapes what feels good (Xen 6.0): 1 (bonuses for the progress its sins and plan care about), 0
+	 * (none: Xen 5.2's rewards). Only bonuses for getting somewhere, never a cost per minute: a cost per minute makes
+	 * every long job (mining, a trip) look bad, and it learned to rest instead (in SimLife: iron in 47% of lives, not 89%).
+	 */
+	public static int shaping = 1;
+
+	/** Xen 6.0: what its sins make of it (the same ore feels better to a greedy Xen, the same armor to a proud one). */
 	private static float sins(float[] b, float[] a, int option, float minutes) {
+		if (shaping == 0) return 0;
 		float pride = b[SIN0 + Sins.PRIDE], greed = b[SIN0 + Sins.GREED], lust = b[SIN0 + Sins.LUST], envy = b[SIN0 + Sins.ENVY];
-		float glut = b[SIN0 + Sins.GLUTTONY], wrath = b[SIN0 + Sins.WRATH], sloth = b[SIN0 + Sins.SLOTH];
+		float glut = b[SIN0 + Sins.GLUTTONY], wrath = b[SIN0 + Sins.WRATH];
 		float r = 0;
 		r += 0.8f * greed * (2f * (v(a[DIAMOND]) - v(b[DIAMOND])) + v(a[EMERALD]) - v(b[EMERALD]) + v(a[GOLD]) - v(b[GOLD]) + v(a[IRON]) - v(b[IRON])
 				+ 0.3f * (v(a[COAL]) - v(b[COAL])));
-		if (option == HELP) r -= 1.5f * greed;                                  // (giving hurts a greedy one)
-		r += pride * (4f * (a[ARMOR] - b[ARMOR]) + 3f * (a[SWORD] - b[SWORD]) + 3f * (a[HOME] - b[HOME]) + 2f * (a[ENCHANTED] - b[ENCHANTED])
+		if (option == HELP) r -= 0.5f * greed;                                  // (giving hurts a greedy one, a little)
+		r += pride * (3f * (a[ARMOR] - b[ARMOR]) + 2f * (a[SWORD] - b[SWORD]) + 2f * (a[HOME] - b[HOME]) + 2f * (a[ENCHANTED] - b[ENCHANTED])
 				+ 10f * (a[DRAGON] - b[DRAGON]));
-		if (option == FLEE && b[HEALTH] > 0.5f) r -= pride + 0.5f * wrath;     // (running while it could still fight hurts its pride; nearly dead, it's just sense)
+		if (option == FLEE && b[HEALTH] > 0.5f) r -= 0.5f * pride;              // (running while it could still fight hurts its pride)
 		boolean won = (b[ENEMY] > 0.5f || b[DANGER] > 0.3f) && a[ENEMY] < 0.5f && a[DANGER] < 0.3f;
-		if (option == FIGHT && won) r += 1.5f * wrath;
-		float seen = b[FRIENDNEAR] > 0.5f || b[TRIBE] > 0 ? 1.5f : 1f;            // (envy: gear counts more with others around)
-		r += envy * seen * (3f * (a[ARMOR] - b[ARMOR]) + 3f * (a[PICK] - b[PICK]) + 2f * (a[SWORD] - b[SWORD]));
-		r += glut * (1.2f * (v(a[FOODITEMS]) - v(b[FOODITEMS])) + 0.5f * (v(a[RAWFOOD]) - v(b[RAWFOOD])) + 2f * (a[FARMED] - b[FARMED]));
-		if (a[FOODLVL] < 0.6f) r -= 0.3f * glut * minutes;                      // (a glutton feels hunger early)
-		if (a[FRIENDNEAR] > 0.5f) r += 0.15f * lust * minutes;                  // (company)
+		if (option == FIGHT && won) r += wrath;
+		r += envy * (2f * (a[ARMOR] - b[ARMOR]) + 2f * (a[PICK] - b[PICK]) + 1.5f * (a[SWORD] - b[SWORD]));
+		r += glut * (v(a[FOODITEMS]) - v(b[FOODITEMS]) + 2f * (a[FARMED] - b[FARMED]));
 		r += lust * (v(a[GOLD]) - v(b[GOLD]) + v(a[EMERALD]) - v(b[EMERALD]));
-		if (option == REST || option == SLEEP) r += 0.04f * sloth * minutes;    // (rest is sweet)
-		else r -= 0.02f * sloth * Math.min(minutes, 5f);                         // (and effort costs)
 		return r;
 	}
 
@@ -132,18 +135,17 @@ public final class Mind {
 	}
 
 	private static float plan(float[] b, float[] a, int option, float minutes) {
+		if (shaping == 0) return 0;
 		boolean won = (b[ENEMY] > 0.5f || b[DANGER] > 0.3f) && a[ENEMY] < 0.5f && a[DANGER] < 0.3f;
-		return switch (planOf(b)) {
-			case Strategy.SPEEDRUN -> 6f * (a[PICK] - b[PICK]) + 4f * (a[SWORD] - b[SWORD]) + 3f * (a[ARMOR] - b[ARMOR]) + 15f * (a[DRAGON] - b[DRAGON])
-					- 0.03f * minutes;                                                 // (the clock is ticking)
-			case Strategy.BUILDER -> 5f * (a[HOME] - b[HOME]) + 0.4f * (v(a[PLANKS]) - v(b[PLANKS]) + v(a[COBBLE]) - v(b[COBBLE]));
-			case Strategy.SETTLER -> 4f * (a[FARMED] - b[FARMED]) + 2f * (a[HOME] - b[HOME]) + v(a[FOODITEMS]) - v(b[FOODITEMS]) + 1f * (a[BED] - b[BED]);
-			case Strategy.MINER -> 0.8f * (v(a[RAWIRON]) - v(b[RAWIRON]) + v(a[COAL]) - v(b[COAL]) + 2f * (v(a[DIAMOND]) - v(b[DIAMOND]))) + 1f * (a[MINED] - b[MINED]);
-			case Strategy.EXPLORER -> (option == EXPLORE ? 0.2f * minutes : 0) + 1f * (a[VILLAGER] - b[VILLAGER]);
-			case Strategy.TRADER -> 1.5f * (v(a[EMERALD]) - v(b[EMERALD])) + (option == TRADE ? 0.5f : 0);
-			case Strategy.WARRIOR -> 3f * (a[SWORD] - b[SWORD]) + 3f * (a[ARMOR] - b[ARMOR]) + (option == FIGHT && won ? 1f : 0);
-			case Strategy.SURVIVOR -> (b[NIGHT] > 0.5f ? 0.1f * minutes * (a[SHELTERED] - 0.5f) : 0) + 2f * (a[ARMOR] - b[ARMOR]) + 1f * (a[BED] - b[BED])
-					- 2f * Math.max(0, b[HEALTH] - a[HEALTH]);
+		return switch (planOf(b)) {                                          // (what counts as getting on, for each plan: bonuses only)
+			case Strategy.SPEEDRUN -> 4f * (a[PICK] - b[PICK]) + 3f * (a[SWORD] - b[SWORD]) + 2f * (a[ARMOR] - b[ARMOR]) + 15f * (a[DRAGON] - b[DRAGON]);
+			case Strategy.BUILDER -> 5f * (a[HOME] - b[HOME]) + 0.3f * (v(a[PLANKS]) - v(b[PLANKS]) + v(a[COBBLE]) - v(b[COBBLE]));
+			case Strategy.SETTLER -> 4f * (a[FARMED] - b[FARMED]) + 2f * (a[HOME] - b[HOME]) + v(a[FOODITEMS]) - v(b[FOODITEMS]) + a[BED] - b[BED];
+			case Strategy.MINER -> 0.8f * (v(a[RAWIRON]) - v(b[RAWIRON]) + v(a[COAL]) - v(b[COAL]) + 2f * (v(a[DIAMOND]) - v(b[DIAMOND]))) + a[MINED] - b[MINED];
+			case Strategy.EXPLORER -> (option == EXPLORE ? 0.1f * minutes : 0) + a[VILLAGER] - b[VILLAGER];
+			case Strategy.TRADER -> 1.5f * (v(a[EMERALD]) - v(b[EMERALD])) + (option == TRADE ? 0.3f : 0);
+			case Strategy.WARRIOR -> 3f * (a[SWORD] - b[SWORD]) + 3f * (a[ARMOR] - b[ARMOR]) + (option == FIGHT && won ? 0.5f : 0);
+			case Strategy.SURVIVOR -> 3f * (a[ARMOR] - b[ARMOR]) + 1.5f * (a[BED] - b[BED]) + 2f * (a[HOME] - b[HOME]);
 			default -> 0f;
 		};
 	}

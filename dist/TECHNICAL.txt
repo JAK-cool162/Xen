@@ -59,12 +59,14 @@ Xen 6.0 (core/Mind). 73 inputs: the 58 of Xen 5.2, its seven sins, and its plan 
 is carried over: every weight kept (the critics' first layer gets zero rows for the new inputs; the world model gets
 zero rows in and zero columns out for them), so it chooses exactly as 5.2 did (checked: no difference at all over
 200 random states) until it learns what they mean. A world's own 5.2 mind is set aside (mind.bin.old) for the one
-that ships. The reward adds what its sins make of things (greed: ore, emeralds, gold worth more, helping hurts;
-pride: gear, a home, enchanting, the dragon, running away hurts; wrath: fights won; envy: gear, more with others
-around; gluttony: food, a farm, hunger felt early; lust: company, gold and emeralds; sloth: rest sweet, effort
-costs) and what counts for its plan (a speedrunner: tools, gear and the dragon, and the clock; a builder: a home;
-a settler: a farm, food, a bed; a miner: ore; an explorer: exploring, villages; a trader: emeralds; a warrior: gear
-and fights won; a survivor: safe nights, armor, no harm). Choices lean by its sins, beliefs and plan (the same in
+that ships. The reward adds bonuses for what its sins make of things (greed: ore, emeralds, gold worth more, helping costs a
+little; pride: gear, a home, enchanting, the dragon, running away while healthy costs; wrath: fights won; envy: gear;
+gluttony: food and a farm; lust: gold and emeralds) and for what counts for its plan (a speedrunner: tools, gear and
+the dragon; a builder: a home; a settler: a farm, food, a bed; a miner: ore; an explorer: exploring, villages; a
+trader: emeralds; a warrior: gear and fights won; a survivor: armor, a bed, a home). Only bonuses for getting
+somewhere, never a cost per minute: a cost per minute (a speedrunner's clock, a lazy one's effort) made every long
+job look bad, and it learned to rest instead (in SimLife: iron in 47% of lives instead of 89%). Sloth shows in how
+it plays (patience, rest, giving up), not in its rewards. Choices lean by its sins, beliefs and plan (the same in
 training and in the game), at 0.12 of their full size: a nudge. At full size they overruled what the mind knows (in
 SimLife, Xen 5.2 with them: 57% of lives died instead of 38%, a home in 56% instead of 81%); at 0.1 it did as well as
 without them. Running away only hurts its pride while it's healthy (half its health or more). Trained on in SimLife from Xen 5.2: every simulated life is born with sins, beliefs and a
