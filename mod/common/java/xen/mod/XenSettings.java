@@ -32,6 +32,7 @@ public final class XenSettings {
 	public void set(String key, String value) {
 		String error = config.set(key, value);
 		if (error != null) XenMod.LOG.warn("Setting {}: {}", key, error);
+		else config.save();                                               // saved right away: nothing's lost if the game stops
 	}
 
 	public void reset() {

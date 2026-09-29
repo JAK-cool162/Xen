@@ -49,7 +49,7 @@ final class Caves {
 		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
 		BlockPos at = c.player.blockPosition();
 		BlockPos spot = sample(level, at, 24, -18, 6, 600, false);
-		if (spot == null || !remember(level, spot)) return;
+		if (spot == null || !rocky(level, spot) || !remember(level, spot)) return;
 		c.places.remember("cave", spot);
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
@@ -64,7 +64,7 @@ final class Caves {
 		if (c.player == null) return;
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
-		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7 || !remember(level, spot)) return;
+		if (air(level, spot) < 10 || level.getBrightness(LightLayer.BLOCK, spot) > 7 || !rocky(level, spot) || !remember(level, spot)) return;
 		c.eyes.caves++;
 		c.places.remember("cave", spot);
 		c.journal("sees", "a cave at " + spot.toShortString());
@@ -157,6 +157,25 @@ final class Caves {
 			}
 		}
 		return inside && bestScore < -20 ? null : best;
+	}
+
+	/**
+	 * The simple rule for ore: a big dark space with rock all round (stone, deepslate, tuff...) is a cave, and caves
+	 * are where ore shows. Half or more of the solid blocks around the spot (9 wide, 5 high) must be rock (not dirt,
+	 * logs, planks: a dark forest or someone's cellar isn't a cave), and there must be real room (20+ air).
+	 */
+	static boolean rocky(ServerLevel level, BlockPos q) {
+		int air = 0, solid = 0, rock = 0;
+		for (BlockPos b : BlockPos.betweenClosed(q.offset(-4, -1, -4), q.offset(4, 3, 4))) {
+			var st = level.getBlockState(b);
+			if (st.isAir()) {
+				air++;
+			} else if (!st.getCollisionShape(level, b).isEmpty()) {
+				solid++;
+				if (Eyes.deepStone(st) || Eyes.kind(st) != null && !"log".equals(Eyes.kind(st)) && !"built".equals(Eyes.kind(st))) rock++;
+			}
+		}
+		return air >= 20 && solid > 0 && rock * 2 >= solid;
 	}
 
 	private static int air(ServerLevel level, BlockPos q) {

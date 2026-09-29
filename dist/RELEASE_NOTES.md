@@ -1,7 +1,19 @@
-**Xen Companion 1.3.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.3.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.3.1
+
+* **Ore sense**: dark stone or deepslate means ore may be close, and a big dark space walled with stone or deepslate
+  is a real cave (the best place for ore). A dark forest or a cellar doesn't count as a cave any more.
+* **Giving up, like a player**: a chase ends after 15 seconds without getting closer (or a minute in all); mining or
+  gathering with nothing for 3 minutes stops (and a mine that gave nothing is forgotten: next time, somewhere new).
+* **Old worlds upgrade**: Xens left in a world from an older version come back and just upgrade. A brain or mind
+  file it can't use is kept aside (.old) and the one that ships takes over; an older mind is upgraded to Xen 5.2;
+  a saved part it can't read is started fresh without losing the rest; old minions come back as Xens of their own.
+* **Settings are saved**: every change is saved right away, there's a Save button, and before an update changes your
+  settings file it keeps a copy (xen.json.bak).
 
 ### New in 1.3.0
 

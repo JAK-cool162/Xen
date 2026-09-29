@@ -176,6 +176,9 @@ public final class XenConfig {
 			if (Files.exists(path)) {
 				com.google.gson.JsonObject j = gson.fromJson(Files.readString(path), com.google.gson.JsonObject.class);
 				config = gson.fromJson(j, XenConfig.class);
+				if (!j.has("version") || j.get("version").getAsInt() < config.version || j.get("version").getAsInt() < new XenConfig().version) {
+					Files.copy(path, path.resolveSibling(path.getFileName() + ".bak"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);   // (settings from an older version: a copy first)
+				}
 				if (!j.has("version") && config.followDistance == 10) config.followDistance = 4;   // it stayed too far behind
 				if ((!j.has("version") || j.get("version").getAsInt() < 3) && config.pvp.equals("defend")) config.pvp = "own";   // the new default
 				if (!j.has("version") || j.get("version").getAsInt() < 4) {           // 0.7: names and skins like real players now
@@ -243,8 +246,10 @@ public final class XenConfig {
 
 	/** Save the settings (after changing them in game). */
 	void save() {
-		try {
-			Files.writeString(path, new GsonBuilder().setPrettyPrinting().create().toJson(this));
+		try {                                                                      // (to a new file, then swapped in: never half written)
+			Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+			Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().create().toJson(this));
+			Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
 		} catch (IOException e) {
 			XenMod.LOG.warn("Could not save {}: {}", path, e.toString());
 		}

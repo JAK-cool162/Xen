@@ -131,6 +131,36 @@ final class Chores {
 		wander = null;
 		closest = Double.MAX_VALUE;
 		lastCloser = now();
+		lastGain = now();
+		gained = -1;
+	}
+
+	/** When it last got something for this chore (and how much it had then): too long with nothing, it gives up. */
+	private long lastGain;
+	private int gained = -1;
+
+	/**
+	 * Giving up, like a player: mining or gathering with nothing to show for three minutes (a mine with no ore, a
+	 * forest cut bare): it stops and does something else; a mine that gave nothing is forgotten (next time, somewhere
+	 * new). True if it gave up.
+	 */
+	private boolean fruitless() {
+		if (kind != Kind.MINE && kind != Kind.GATHER && kind != Kind.BLOCKS || items == null) return false;
+		int n = kind == Kind.BLOCKS ? countItem(blocksItem) : count(items);
+		if (n != gained) {
+			gained = n;
+			lastGain = now();
+			return false;
+		}
+		if (now() - lastGain < 20 * 60 * 3) return false;
+		if (kind == Kind.MINE) {
+			if (!caveMode) c.places.forget("mine");
+			mineRecordY = Integer.MIN_VALUE;
+			if (caveMode && !c.caves.known.isEmpty()) c.caves.known.remove(c.caves.nearest(200));   // (that cave's done)
+		}
+		c.journal("does", "gives up: nothing for three minutes (" + what + ")");
+		finish(c.pick3("Nothing here. I'll try somewhere else.", "This isn't working. Time for something else.", "Giving up on this spot."));
+		return true;
 	}
 
 	private int count(String... keys) {
@@ -531,6 +561,7 @@ final class Chores {
 	/** The next action for the chore, or null to let the brain (or following) decide this moment. */
 	Action next() {
 		if (kind == null) return null;
+		if (fruitless()) return null;
 		if (now() > until && kind != Kind.HIDE) {
 			finish(kind == Kind.GATHER && count(items) > had ? "I only found " + (count(items) - had) + " " + what + "."
 					: c.pick3("No luck here. On to something else.", "That didn't work out. Something else, then.", "Can't get to it. I'll do something else."));

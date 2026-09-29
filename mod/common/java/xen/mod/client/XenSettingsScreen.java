@@ -161,6 +161,10 @@ public class XenSettingsScreen extends Screen {
 			settings.reset(new ArrayList<>(keys));
 			rebuildWidgets();
 		}).bounds(width - 10 - 2 * half - 8, y, half, 20).tooltip(tip(Component.literal("Put " + TABS[tab] + "'s settings back to how they come."))).build());
+		addRenderableWidget(Button.builder(Component.literal("Save"), b -> {
+			settings.save();
+			b.setMessage(Component.literal("Saved"));
+		}).bounds(width - 10 - 3 * half - 16, y, half, 20).tooltip(tip(Component.literal("Save the settings now (to config/xen.json; they're also saved as you change them, and kept when the mod updates)."))).build());
 		addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose()).bounds(width - 10 - half, y, half, 20).build());
 	}
 

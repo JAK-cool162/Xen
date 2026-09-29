@@ -147,6 +147,15 @@ public class XenMod implements ModInitializer {
 	}
 
 	// --------------------------------------------------------------------------------- brain
+	/** Keep a file it won't use any more next to it (name.old), in case someone wants it back. */
+	private static void keepOld(Path file) {
+		try {
+			Files.move(file, file.resolveSibling(file.getFileName() + ".old"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+		} catch (IOException e) {
+			LOG.warn("Couldn't keep {} aside: {}", file, e.toString());
+		}
+	}
+
 	Path brainFile() {
 		return server.getWorldPath(LevelResource.ROOT).resolve("xen").resolve("brain.bin");
 	}
@@ -154,23 +163,53 @@ public class XenMod implements ModInitializer {
 	private void started(MinecraftServer s) {
 		server = s;
 		roster.load(brainFile().resolveSibling("companions.json"));
+		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
+		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
 		Path file = brainFile();
-		try (InputStream in = Files.exists(file) ? Files.newInputStream(file) : XenMod.class.getResourceAsStream("/assets/xen/brain.bin")) {
-			if (in == null) throw new IOException("no bundled brain");
-			brain = Brain.read(in);
-			LOG.info("Xen's brain loaded ({} steps lived, {} lives){}", brain.steps, brain.lives, Files.exists(file) ? "" : " - pre-trained");
-		} catch (IOException e) {
-			LOG.warn("Starting Xen with a newborn brain: {}", e.toString());
-			brain = new Brain(Perception.OBS_DIM);
+		brain = null;
+		if (Files.exists(file)) {
+			try (InputStream in = Files.newInputStream(file)) {
+				brain = Brain.read(in);
+				if (brain.obsDim != Perception.OBS_DIM) throw new IOException("made for another version (" + brain.obsDim + " senses, now " + Perception.OBS_DIM + ")");
+				LOG.info("Xen's brain loaded ({} steps lived, {} lives)", brain.steps, brain.lives);
+			} catch (IOException | RuntimeException e) {
+				LOG.warn("Xen's brain in this world couldn't be read ({}): kept as brain.bin.old, starting from the one that ships", e.toString());
+				keepOld(file);
+				brain = null;
+			}
+		}
+		if (brain == null) {
+			try (InputStream in = XenMod.class.getResourceAsStream("/assets/xen/brain.bin")) {
+				if (in == null) throw new IOException("no bundled brain");
+				brain = Brain.read(in);
+				LOG.info("Xen's brain loaded ({} steps lived, {} lives) - pre-trained", brain.steps, brain.lives);
+			} catch (IOException | RuntimeException e) {
+				LOG.warn("Starting Xen with a newborn brain: {}", e.toString());
+				brain = new Brain(Perception.OBS_DIM);
+			}
 		}
 		Path mindFile = brainFile().resolveSibling("mind.bin");
-		try (InputStream in = Files.exists(mindFile) ? Files.newInputStream(mindFile) : XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
-			mind = in == null ? null : xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
-			if (mind != null) LOG.info("Xen 5.2's mind loaded ({} learning steps){}", mind.updates, Files.exists(mindFile) ? "" : " - trained in SimLife");
-		} catch (IOException e) {
-			LOG.warn("No Xen 2.0 mind ({}): Xens choose the old way", e.toString());
-			mind = null;
+		xen.mod.core.Mind shipped = null, own = null;
+		try (InputStream in = XenMod.class.getResourceAsStream("/assets/xen/mind.bin")) {
+			if (in != null) shipped = xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
+		} catch (IOException | RuntimeException e) {
+			LOG.warn("The bundled mind couldn't be read: {}", e.toString());
 		}
+		if (Files.exists(mindFile)) {
+			try (InputStream in = Files.newInputStream(mindFile)) {
+				own = xen.mod.core.Mind.load(new java.io.DataInputStream(new java.io.BufferedInputStream(in)));
+			} catch (IOException | RuntimeException e) {
+				own = null;
+			}
+			if (own == null || shipped != null && own.updates < shipped.updates) {    // unreadable, or an older mind than the one that ships
+				LOG.info("Upgrading this world's Xen mind to the one that ships (the old one is kept as mind.bin.old)");
+				keepOld(mindFile);
+				own = null;
+			}
+		}
+		mind = own != null ? own : shipped;
+		if (mind != null) LOG.info("Xen 5.2's mind loaded ({} learning steps){}", mind.updates, own != null ? "" : " - trained in SimLife");
+		else LOG.warn("No Xen 2.0 mind: Xens choose the old way");
 		loadAway();
 		deathMessages();
 		later(60, () -> comeBack(o -> !o.has("owner")));                          // the free ones: back when the world is up
@@ -497,13 +536,7 @@ public class XenMod implements ModInitializer {
 				c.mode = Companion.Mode.FOLLOW;
 			}
 			if (o.has("ax")) c.anchor = new BlockPos(o.get("ax").getAsInt(), o.get("ay").getAsInt(), o.get("az").getAsInt());
-			if (o.has("boss")) {
-				Companion boss = companions.stream().filter(b -> b.name.equals(o.get("boss").getAsString())).findFirst().orElse(null);
-				if (boss == null || boss.player() == null) continue;              // its boss isn't here: it stays away
-				c.minion = true;
-				c.boss = boss;
-				boss.crew.minions.add(c);
-			}
+			if (o.has("boss")) c.mode = Companion.Mode.FREE;                   // (minions are gone since 1.2: an old world's minion is a Xen of its own now)
 			c.join(server.overworld(), null, 0);                                // (the server puts it back where it was, bag and all)
 			companions.add(c);
 			back++;
@@ -937,41 +970,63 @@ public class XenMod implements ModInitializer {
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (config.ownLife && config.wants) c.mode = Companion.Mode.FREE;   // its own life: it plays its own game
 		if (known != null && known.has("known")) {
-			for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
+			try {
+				for (var u : known.getAsJsonArray("known")) c.known.add(java.util.UUID.fromString(u.getAsString()));
+			} catch (RuntimeException e) {
+				LOG.warn("{}'s saved friends list couldn't be read: {}", name, e.toString());
+			}
 		}
 		if (known == null) {                                                    // a new Xen: its own talents, its hobby
 			c.skills.born();
 			c.life.born();
 		}
 		if (known != null) {
-			c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null);
-			if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills"));
-			if (known.has("abilities")) c.skills.load(known.getAsJsonObject("abilities"));
-			else c.skills.born();
-			if (known.has("rumors")) c.rumors.load(known.getAsJsonObject("rumors"));
-			if (known.has("life")) c.life.load(known.getAsJsonObject("life"));
+			try {
+				restore(c, known);
+			} catch (RuntimeException e) {                                        // (a part saved by another version it can't read: the rest stays)
+				LOG.warn("Some of {}'s saved life couldn't be read ({}); the rest is kept", name, e.toString());
+			}
+		}
+		return c;
+	}
+
+	/** A Xen's saved life, part by part: a part it can't read (saved by another version) is skipped, not the whole Xen. */
+	private void restore(Companion c, com.google.gson.JsonObject known) {
+		java.util.function.BiConsumer<String, Runnable> part = (what, job) -> {
+			try {
+				job.run();
+			} catch (RuntimeException e) {
+				LOG.warn("{}'s saved {} couldn't be read ({}): starting that part fresh", c.name, what, e.toString());
+			}
+		};
+		{
+			part.accept("goals", () -> c.goals.load(known.has("likes") ? known.getAsJsonObject("likes") : null, known.has("goals") ? known.getAsJsonObject("goals") : null));
+			part.accept("moves", () -> { if (known.has("skills")) c.mimic.load(known.getAsJsonObject("skills")); });
+			part.accept("skills", () -> { if (known.has("abilities")) c.skills.load(known.getAsJsonObject("abilities")); else c.skills.born(); });
+			part.accept("rumors", () -> { if (known.has("rumors")) c.rumors.load(known.getAsJsonObject("rumors")); });
+			part.accept("life", () -> { if (known.has("life")) c.life.load(known.getAsJsonObject("life")); });
 			if (c.life.hobby == null) c.life.born();
-			if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString());
-			if (known.has("places")) c.places.load(known.getAsJsonObject("places"));
-			if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests"));
-			if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows"));
-			if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT);
-			if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops"));
-			if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste"));
-			if (known.has("mine")) {
+			part.accept("memories", () -> { if (known.has("memories")) for (var m : known.getAsJsonArray("memories")) c.memories.add(m.getAsString()); });
+			part.accept("places", () -> { if (known.has("places")) c.places.load(known.getAsJsonObject("places")); });
+			part.accept("chests", () -> { if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests")); });
+			part.accept("knowledge", () -> { if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows")); });
+			part.accept("portal math", () -> { if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT); });
+			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });
+			part.accept("taste", () -> { if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste")); });
+			part.accept("mine", () -> {
+				if (!known.has("mine")) return;
 				com.google.gson.JsonObject mine = known.getAsJsonObject("mine");
 				c.chores.mineRecordY = mine.get("y").getAsInt();
 				c.chores.mineRecordLeg = mine.get("leg").getAsInt();
 				var d = net.minecraft.core.Direction.byName(mine.get("dir").getAsString());
 				if (d != null) c.chores.mineRecordDir = d;
-			}
-			c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean();
-			if (known.has("band")) c.band = known.get("band").getAsString();
-			if (known.has("trust")) {
-				for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
-			}
+			});
+			part.accept("adventure", () -> c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean());
+			part.accept("band", () -> { if (known.has("band")) c.band = known.get("band").getAsString(); });
+			part.accept("trust", () -> {
+				if (known.has("trust")) for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
+			});
 		}
-		return c;
 	}
 
 	private static final String[] TEAM_COLORS = {"red", "blue", "green", "yellow", "purple", "aqua"};

@@ -258,6 +258,7 @@ public final class Companion {
 		tickHealthBefore = tickHealth;
 		tickHealth = player.getHealth();
 		if (player.tickCount % 40 == 0) readSigns();                    // signs it can see: it reads them, like anyone
+		if (player.tickCount % 20 == 10) giveUpChase();                // chasing someone who keeps away: not forever
 		if (player.tickCount % 40 == 20) {
 			wearArmor();
 			hands.shieldToOffhand(fighting);                             // a shield lives in the off hand
@@ -1376,6 +1377,43 @@ public final class Companion {
 
 	/** The mobs and animals around it: arrows, drowned, poison, breeding, shearing, cats (see {@link Critters}). */
 	final Critters critters = new Critters(this);
+
+	/** Who it's chasing, since when, and the closest it got (and when). */
+	private LivingEntity chasing;
+	private long chaseSince, closestAt;
+	private double closestTo;
+
+	/**
+	 * Giving up a chase, like a player: after 15 seconds without getting any closer, or a minute in all, it lets them
+	 * go (and doesn't pick that fight again for a while).
+	 */
+	private void giveUpChase() {
+		long now = player.level().getGameTime();
+		LivingEntity foe = chosenFoe;
+		if (foe == null || !foe.isAlive() || foe.level() != player.level()) {
+			chasing = null;
+			return;
+		}
+		double d = player.distanceTo(foe);
+		if (foe != chasing) {
+			chasing = foe;
+			chaseSince = closestAt = now;
+			closestTo = d;
+			return;
+		}
+		if (d < closestTo - 1) {
+			closestTo = d;
+			closestAt = now;
+		}
+		if (d > 4 && (now - closestAt > 300 || now - chaseSince > 1200)) {
+			journal("fight", "gives up chasing " + foe.getName().getString());
+			chosenFoe = null;
+			chasing = null;
+			lastPickedFight = now;
+			if (goals.option == xen.mod.core.Mind.FIGHT) goals.finishOption(false);
+			chatter(pick3("Not worth chasing.", "Run then. I've got better things to do.", "Forget it, you're too fast."), false);
+		}
+	}
 
 	/** Its eyes: every block in view, worth knowing or not (see {@link Eyes}). */
 	final Eyes eyes = new Eyes(this);

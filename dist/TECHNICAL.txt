@@ -1,7 +1,31 @@
-XEN COMPANION 1.3.0: TECHNICAL NOTES
+XEN COMPANION 1.3.1: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.3.1
+===================
+
+Caves, the simple rule: a spot only counts as a cave when, in the 9 x 5 x 9 blocks around it, there are 20+ air
+blocks and at least half of the solid ones are rock (stone, deepslate, tuff, andesite, diorite, granite, ore, gravel,
+sand, clay; not logs or anything built). Dark stone faces seen after dim underground air stay "deepstone" (1.3.0).
+
+Giving up. A chase (the one it picked, a rival, a duel): given up after 15 s without getting a block closer, or 60 s
+in all, when it's more than 4 blocks away; that fight isn't picked again for a while. A mining, gathering or
+block-breaking chore that got nothing for 3 minutes ends ("Nothing here. I'll try somewhere else."); a mine that gave
+nothing is forgotten, and a cave that gave nothing comes off its list.
+
+Old worlds. At start, the world's brain.bin that can't be read, or was made for another number of senses, is renamed
+brain.bin.old and the bundled brain is used (was: a newborn brain, or a crash). The world's mind.bin that can't be
+read, or has fewer learning steps than the bundled Xen 5.2 (an older mind), is renamed mind.bin.old and the bundled
+one is used; a world mind that learned on from 5.2 is kept. Each part of a saved Xen (goals, skills, rumors, life,
+memories, places, chests, knowledge, farm, taste, mine, trust...) is read on its own: one it can't read is started
+fresh and logged, the rest is kept. A minion saved by an older version comes back as a free Xen.
+
+Settings. Every change (settings screen or /xen set) is written at once, to a new file swapped in whole (never half
+written). A Save button next to Reset and Done. Settings from an older version are copied to xen.json.bak before
+they're updated.
 
 
 WHAT'S NEW IN 1.3.0
