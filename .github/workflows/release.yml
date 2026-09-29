@@ -8,12 +8,17 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  # Or start it by hand (Actions -> Release -> Run workflow): it makes the tag on the commit it runs on.
+  # Or start it by hand (Actions -> Release -> Run workflow): it makes the tag on the commit it runs on, or on an older
+  # commit given as "commit" (for a version that never got its release; it isn't marked Latest).
   workflow_dispatch:
     inputs:
       tag:
         description: "Version tag to make and publish, e.g. v0.3.0-alpha"
         required: true
+      commit:
+        description: "Optional: an older commit to release (its dist/ jars and notes) instead of this one"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -23,6 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+
+      # An older commit may not have the bundling script yet: take it from this one.
+      - uses: actions/checkout@v4
+        if: ${{ inputs.commit != '' }}
+        with:
+          path: .current
+          sparse-checkout: scripts
 
       - name: Chat model (SmolLM2-360M-Instruct by Hugging Face, Apache-2.0)
         run: |
@@ -37,13 +51,17 @@ jobs:
           echo "5a1395716f7913741cc51d98581b9b1228d80987a9f7d3664106742eb06bba83  SmolLM2-135M-Instruct-Q8_0.gguf" | sha256sum -c
 
       - name: All-in-one jars (the mod with its chat model inside)
-        run: for jar in dist/*.jar; do python3 scripts/bundle_chat_model.py "$jar" smollm2-360m-instruct-q8_0.gguf; done
+        run: |
+          script=scripts/bundle_chat_model.py
+          [ -f "$script" ] || script=.current/scripts/bundle_chat_model.py
+          for jar in dist/*.jar; do python3 "$script" "$jar" smollm2-360m-instruct-q8_0.gguf; done
 
       - name: Xen's brain and checksums
         run: |
           cp mod/common/resources/assets/xen/brain.bin xen-brain.bin
           cp brains/*.bin . 2>/dev/null || true
-          sha256sum dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf dist/TECHNICAL.txt | sed 's| dist/| |' > SHA256SUMS.txt
+          ls dist/TECHNICAL.txt 2>/dev/null > extra.txt || true
+          sha256sum dist/*.jar xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf $(cat extra.txt) | sed 's| dist/| |' > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Publish
@@ -54,7 +72,9 @@ jobs:
           [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || { echo "not a version tag: $TAG"; exit 1; }
           prerelease=""
           case "$TAG" in *alpha*|*beta*|*rc*|v0.*) prerelease="--prerelease" ;; esac
-          gh release create "$TAG" $prerelease --target "$GITHUB_SHA" \
+          latest=""
+          [ -n "${{ inputs.commit }}" ] && latest="--latest=false"
+          gh release create "$TAG" $prerelease $latest --target "$(git rev-parse HEAD)" \
             --title "Xen Companion $TAG" \
             --notes-file dist/RELEASE_NOTES.md \
-            dist/*.jar dist/TECHNICAL.txt xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf SHA256SUMS.txt
+            dist/*.jar $(cat extra.txt) xen-brain*.bin smollm2-360m-instruct-q8_0.gguf SmolLM2-135M-Instruct-Q8_0.gguf SHA256SUMS.txt
