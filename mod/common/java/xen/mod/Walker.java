@@ -1059,6 +1059,11 @@ final class Walker {
 	}
 
 	/** For developing the walking only (-Dxen.walkDebug=true): every step, every plan, every "no way" in the log. */
+	/** Where it's walking to (null: nowhere now). */
+	Vec3 goal() {
+		return path == null ? null : goal;
+	}
+
 	/** Taking its time (a first look around): it walks, it doesn't run (a gap it still jumps at a run). */
 	boolean stroll;
 	static final boolean WALK_DEBUG = Boolean.getBoolean("xen.walkDebug");

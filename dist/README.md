@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.8.0
+# Xen Companion (Fabric mod) 1.9.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.8.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.8.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.8.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.8.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.9.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.9.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.8.0+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.9.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,22 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## Eyes on its work, safe at sea, ready for the worst (1.9.0)
+
+* **It looks at what it works on**: it turns to a block before digging it (a quick flick of the view), and its eyes
+  stay on a block it just put down, the table it's using, the chest it opens. It only digs a block it can see and only
+  clicks a face it can see: ground, rock or plants in the way it digs through first, like a player; something someone
+  built it never breaks to get past. Blocks right by its feet (bridging, building up) go down by feel, as a player's do.
+* **At sea**: out in open water it heads for the nearest real shore, or back the way it came (the last dry ground it
+  stood on), or toward the world spawn; exploring doesn't lead it out to sea.
+* **Picking things up**: the best first (diamonds, tools and armor, iron, food, then the rest), near before far, and it
+  sticks with the one it's going for.
+* **Busy, not standing about**: it rests when resting helps (at night, hurt and fed enough to heal), not one breather
+  after another; hurt and hungry, it gets food; a rival just being nearby doesn't stop its plans.
+* **Ready for the worst**: before a trip it packs food, blocks to get out of trouble, and a spare pickaxe for a mine;
+  before a risky one (diamonds, the End) it leaves its valuables and spare tools (never its best ones) in its chest at
+  home. If it dies and its things are gone, it fetches its spares from that chest instead of starting from nothing.
 
 ## Why it does what it does (1.8.0)
 

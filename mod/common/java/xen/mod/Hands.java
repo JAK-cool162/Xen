@@ -106,6 +106,7 @@ public final class Hands {
 
 	private void keepPillaring() {
 		p.setJumping(ticks < 4);
+		p.setXRot(Math.min(90f, p.getXRot() + 30f));                        // eyes down on the block it puts under itself
 		if (p.getY() < pillarFrom.getY() + 1.0) return;
 		ServerLevel level = (ServerLevel) p.level();
 		if (!level.getBlockState(pillarFrom).canBeReplaced()) return;
@@ -139,9 +140,98 @@ public final class Hands {
 	 * pillaring up and bridging, go the way a player's do, by feel, without this.)
 	 */
 	boolean strictSight;
+	/** A builder that has tried from everywhere: a block it can't see goes in (or out) anyway. */
+	boolean blindOk;
+	/** The last cantMine was because it couldn't see the block (and couldn't dig its way to it). */
+	boolean cantMineUnseen;
+	/** Where its eyes stay a moment after it clicked something (the block it just put down, the table it used), and till when. */
+	private Vec3 holdAt;
+	private int holdUntil;
+	/** The point on the block it's mining that it looks at; turning: its eyes aren't on it yet (it turns first, then digs). */
+	private Vec3 aimPoint;
+	private boolean turning;
+
+	/** Keep its eyes on this for a few ticks (unless it moves off or something else needs them). */
+	void holdLook(Vec3 at, int ticks) {
+		holdAt = at;
+		holdUntil = p.tickCount + ticks;
+	}
+
+	/**
+	 * Turn its view toward a point, at most this many degrees a tick (a quick flick of the mouse, never a jump). True
+	 * once it's looking right at it.
+	 */
+	private boolean turnToward(Vec3 at, float maxYaw, float maxPitch) {
+		Vec3 d = at.subtract(p.getEyePosition());
+		float toY = (float) Math.toDegrees(Math.atan2(-d.x, d.z)), toX = (float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)));
+		float dy = net.minecraft.util.Mth.wrapDegrees(toY - p.getYRot()), dx = toX - p.getXRot();
+		float y = p.getYRot() + net.minecraft.util.Mth.clamp(dy, -maxYaw, maxYaw), x = p.getXRot() + net.minecraft.util.Mth.clamp(dx, -maxPitch, maxPitch);
+		p.setYRot(y);
+		p.setYHeadRot(y);
+		p.setXRot(x);
+		yaw = Math.floorMod(Math.round((y + 180f) / 90f), 4);
+		return Math.abs(dy) <= maxYaw && Math.abs(dx) <= maxPitch;
+	}
+
+	/**
+	 * A point of this block its eyes can see (its middle, or the middle of a face turned its way, with nothing in
+	 * between: grass and flowers count, a player's click would hit them first), or null: it's behind something.
+	 */
+	Vec3 seePoint(ServerLevel level, BlockPos pos) {
+		Vec3 eye = p.getEyePosition(), mid = Vec3.atCenterOf(pos);
+		if (clearTo(level, eye, mid, pos)) return mid;
+		for (Direction d : Direction.values()) {
+			Vec3 n = Vec3.atLowerCornerOf(d.getUnitVec3i());
+			Vec3 face = mid.add(n.scale(0.45));
+			if (eye.subtract(face).dot(n) <= 0) continue;                    // a face turned away from it
+			if (clearTo(level, eye, face, pos)) return face;
+		}
+		return null;
+	}
+
+	private boolean clearTo(ServerLevel level, Vec3 eye, Vec3 to, BlockPos pos) {
+		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
+	}
+
+	/** The first thing between its eyes and that block, or null. */
+	private BlockHitResult inTheWay(ServerLevel level, BlockPos pos) {
+		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), Vec3.atCenterOf(pos),
+				net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+		return r.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !r.getBlockPos().equals(pos) ? r : null;
+	}
+
+	/** Ground, rock, ore, plants: what a player digs through to get at something (never what someone built: planks, cobblestone, glass...). */
+	static boolean natural(BlockState s) {
+		String n = BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+		return n.endsWith("_ore") || n.endsWith("_leaves") || n.equals("stone") || n.equals("deepslate") || n.equals("tuff") || n.equals("granite")
+				|| n.equals("diorite") || n.equals("andesite") || n.equals("calcite") || n.equals("dripstone_block") || n.equals("netherrack")
+				|| n.equals("basalt") || n.equals("blackstone") || n.equals("end_stone") || n.equals("dirt") || n.equals("grass_block")
+				|| n.equals("coarse_dirt") || n.equals("rooted_dirt") || n.equals("podzol") || n.equals("mycelium") || n.equals("sand")
+				|| n.equals("red_sand") || n.equals("gravel") || n.equals("clay") || n.equals("snow") || n.equals("snow_block") || n.equals("mud")
+				|| n.equals("sandstone") || n.equals("red_sandstone") || n.equals("terracotta") || n.endsWith("_terracotta") && !n.contains("glazed")
+				|| n.equals("moss_block") || n.equals("soul_sand") || n.equals("soul_soil") || n.equals("magma_block")
+				|| s.canBeReplaced() && s.getFluidState().isEmpty();
+	}
+
+	/** Right by its feet (the blocks around and under where it stands): placed by feel, the way a player bridges and builds up. */
+	private boolean byFeet(BlockPos pos) {
+		BlockPos f = p.blockPosition();
+		int dx = pos.getX() - f.getX(), dy = pos.getY() - f.getY(), dz = pos.getZ() - f.getZ();
+		return Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && dy >= -1 && dy <= 1;
+	}
 
 	void look() {
 		if (aim != null) return;                                      // eyes on the block it's mining
+		if (holdAt != null) {                                         // eyes a moment on what it just put down or used
+			boolean moving = current == Action.FORWARD || current == Action.BACK || current == Action.LEFT || current == Action.RIGHT || current == Action.JUMP;
+			if (p.tickCount <= holdUntil && !moving && watching == null) {
+				turnToward(holdAt, 30f, 25f);
+				return;
+			}
+			holdAt = null;
+		}
 		if (glance != null && current == Action.IDLE && watching == null) {
 			Vec3 d = glance.subtract(p.getEyePosition());
 			float toY = (float) Math.toDegrees(Math.atan2(-d.x, d.z)), toX = (float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)));
@@ -282,6 +372,8 @@ public final class Hands {
 	void stop() {
 		pillar = false;
 		aim = null;
+		aimPoint = null;
+		turning = false;
 		if (flyTarget != null) flyToward(null);
 		if (digging != null) {
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP,
@@ -330,6 +422,13 @@ public final class Hands {
 	}
 
 	private void keepMining() {
+		if (turning && aim != null && aimPoint != null) {                  // eyes to the block first, then the pickaxe
+			if (turnToward(aimPoint, 40f, 30f)) {
+				turning = false;
+				startMining();
+			}
+			return;
+		}
 		if (digging == null) return;
 		ServerLevel level = (ServerLevel) p.level();
 		BlockState state = level.getBlockState(digging);
@@ -340,6 +439,14 @@ public final class Hands {
 		}
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
+		if (ticks > 60 && progress < 0.15f) {                                // (swimming, in the air: getting nowhere) it stops, and tries again from better footing
+			cantMine = digging.immutable();
+			cantMineUnseen = true;                                           // (not from here: from somewhere else it could)
+			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP, level.getMaxY(), 0);
+			digging = null;
+			limit = ticks;
+			return;
+		}
 		if (progress >= 1f) {
 			String broke = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
 			if (p.companion != null && broke.endsWith("_ore")) {
@@ -423,17 +530,38 @@ public final class Hands {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
 		ServerLevel level = (ServerLevel) p.level();
 		BlockState state = level.getBlockState(pos);
+		cantMineUnseen = false;
 		if (state.getDestroySpeed(level, pos) < 0 || tooSlow(bestSpeed(state, level, pos))) {   // bedrock, or far too slow
 			cantMine = pos.immutable();
 			return false;
 		}
+		BlockPos target = pos;
+		Vec3 point = seePoint(level, pos);
+		if (point == null && !blindOk) {                                   // behind something: what's in the way first, as a player digs to it
+			BlockHitResult in = inTheWay(level, pos);
+			BlockState bs = in == null ? null : level.getBlockState(in.getBlockPos());
+			if (in == null || !natural(bs) || p.getEyePosition().distanceTo(Vec3.atCenterOf(in.getBlockPos())) > p.blockInteractionRange()
+					|| bs.getDestroySpeed(level, in.getBlockPos()) < 0 || tooSlow(bestSpeed(bs, level, in.getBlockPos()))) {
+				cantMine = pos.immutable();                                    // (never through a wall someone built: from elsewhere, or not at all)
+				cantMineUnseen = true;
+				return false;
+			}
+			target = in.getBlockPos();
+			point = in.getLocation();
+		}
+		if (point == null) point = Vec3.atCenterOf(pos);
 		stop();
-		face(Vec3.atCenterOf(pos));
-		aim = pos.immutable();
+		aim = target.immutable();
+		aimPoint = point;
 		current = Action.MINE;
 		ticks = 0;
-		limit = 5;
-		startMining();
+		if (turnToward(point, 12f, 12f)) {                                // already looking about there: at it
+			limit = 5;
+			startMining();
+		} else {                                                           // it turns to it first (a few ticks), then digs
+			turning = true;
+			limit = 16;
+		}
 		return true;
 	}
 
@@ -448,11 +576,14 @@ public final class Hands {
 		for (Direction d : Direction.values()) {
 			BlockPos against = pos.relative(d);
 			if (!level.getBlockState(against).isCollisionShapeFullBlock(level, against)) continue;
+			Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
+			if (!canSee(level, against, d.getOpposite(), hit) && !byFeet(pos)) continue;   // only a face it can see (or right by its feet)
 			p.getInventory().setSelectedSlot(slot);
 			ItemStack stack = p.getInventory().getSelectedItem();
-			Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
+			face(hit);
 			p.gameMode.useItemOn(p, level, stack, InteractionHand.MAIN_HAND, new BlockHitResult(hit, d.getOpposite(), against, false));
 			Compat.swing(p);
+			holdLook(hit, 8);
 			return;
 		}
 	}
@@ -554,23 +685,30 @@ public final class Hands {
 			cantPlace = "no blocks left";
 			return false;
 		}
-		for (Direction d : Direction.values()) {
-			BlockPos against = pos.relative(d);
-			if (!level.getBlockState(against).isCollisionShapeFullBlock(level, against)) continue;
-			stop();
-			p.getInventory().setSelectedSlot(slot);
-			Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
-			face(hit);
-			p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
-					new BlockHitResult(hit, d.getOpposite(), against, false));
-			Compat.swing(p);
-			current = Action.PLACE;
-			ticks = 0;
-			limit = 4;
-			cantPlace = level.getBlockState(pos).canBeReplaced() ? "the block didn't stay" : "";
-			return cantPlace.isEmpty();
+		boolean solid = false;
+		for (int pass = 0; pass < 2; pass++) {                              // a face it can see first; by feel only right by its feet
+			if (pass == 1 && !byFeet(pos) && !blindOk) break;
+			for (Direction d : Direction.values()) {
+				BlockPos against = pos.relative(d);
+				if (!level.getBlockState(against).isCollisionShapeFullBlock(level, against)) continue;
+				solid = true;
+				Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
+				if (pass == 0 && !canSee(level, against, d.getOpposite(), hit)) continue;
+				stop();
+				p.getInventory().setSelectedSlot(slot);
+				face(hit);
+				p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
+						new BlockHitResult(hit, d.getOpposite(), against, false));
+				Compat.swing(p);
+				holdLook(hit, 8);                                              // (its eyes stay on it a moment, as a player's do)
+				current = Action.PLACE;
+				ticks = 0;
+				limit = 4;
+				cantPlace = level.getBlockState(pos).canBeReplaced() ? "the block didn't stay" : "";
+				return cantPlace.isEmpty();
+			}
 		}
-		cantPlace = "nothing solid to place it against";
+		cantPlace = solid ? "it can't see that spot from here" : "nothing solid to place it against";
 		return false;
 	}
 
@@ -604,7 +742,7 @@ public final class Hands {
 			return false;
 		}
 		Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(0.5));
-		if (strictSight && !canSee(level, against, side, hit)) {     // like a player: only where it can see the face it clicks
+		if ((strictSight || !blindOk && !byFeet(pos)) && !canSee(level, against, side, hit)) {   // like a player: only where it can see the face it clicks
 			cantPlace = "it can't see that spot from here";
 			return false;
 		}
@@ -625,6 +763,7 @@ public final class Hands {
 		var result = p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
 		if (sneak) p.setShiftKeyDown(false);
 		Compat.swing(p);
+		holdLook(hit, 8);
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 4;
@@ -711,6 +850,7 @@ public final class Hands {
 		face(hit);
 		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, Direction.UP, pos, false));
 		Compat.swing(p);
+		holdLook(hit, 6);
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 3;

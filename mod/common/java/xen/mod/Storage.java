@@ -51,6 +51,7 @@ final class Storage {
 	void cancel() {
 		job = null;
 		chest = null;
+		stashing = false;
 		if (c.player != null && c.player.containerMenu != c.player.inventoryMenu) c.player.closeContainer();
 	}
 
@@ -97,6 +98,68 @@ final class Storage {
 			if (!s.isEmpty() && JUNK.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath())) junk += s.getCount();
 		}
 		return usedSlots() >= 30 || junk >= 96;
+	}
+
+	// ------------------------------------------------------------------------------ in case the worst happens
+	/** What it leaves at home before a risky trip (what it can't afford to lose, and doesn't need down there). */
+	private static final Set<String> STASH = Set.of("diamond", "emerald", "gold_ingot", "raw_gold", "netherite_ingot", "netherite_scrap",
+			"ancient_debris", "enchanted_book", "lapis_lazuli", "name_tag", "saddle", "experience_bottle", "diamond_block", "emerald_block",
+			"gold_block", "iron_block", "heart_of_the_sea", "nautilus_shell", "trident", "elytra");
+	/** Stashing: the deposit leaves valuables and spare tools, and keeps the everyday things on it. */
+	private boolean stashing;
+
+	/** Leave its valuables and spare tools in the chest at home (not far) before a risky trip. False: nothing to leave, or no chest. */
+	boolean stash() {
+		if (c.player == null) return false;
+		BlockPos at = homeChest();
+		if (at == null || at.distSqr(c.player.blockPosition()) > 128 * 128) return false;
+		var inv = c.player.getInventory();
+		java.util.List<ItemStack> bag = new java.util.ArrayList<>();
+		for (int i = 0; i < 36; i++) bag.add(inv.getItem(i));
+		boolean any = !spares(bag).isEmpty();
+		for (int i = 0; i < 36 && !any; i++) {
+			ItemStack s = inv.getItem(i);
+			if (s.isEmpty()) continue;
+			String key = c.itemKey(s);
+			any = STASH.contains(key) || key.equals("iron_ingot") && s.getCount() > 10;
+		}
+		if (!any) return false;
+		begin(Job.STORE);
+		chest = at;
+		until = now() + 20 * 90;
+		stashing = true;
+		return true;
+	}
+
+	/**
+	 * Of these stacks, the tools it doesn't take along: it keeps its best of each kind (and a spare pickaxe: the two
+	 * best), the rest stay home. Their indexes.
+	 */
+	private static Set<Integer> spares(java.util.List<ItemStack> stacks) {
+		Map<String, java.util.List<Integer>> byKind = new HashMap<>();
+		for (int i = 0; i < stacks.size(); i++) {
+			ItemStack s = stacks.get(i);
+			if (s.isEmpty()) continue;
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			String kind = n.endsWith("_pickaxe") ? "pickaxe" : n.endsWith("_sword") ? "sword" : n.endsWith("_axe") ? "axe"
+					: n.endsWith("_shovel") ? "shovel" : n.endsWith("_hoe") ? "hoe" : null;
+			if (kind != null) byKind.computeIfAbsent(kind, k -> new java.util.ArrayList<>()).add(i);
+		}
+		Set<Integer> out = new java.util.HashSet<>();
+		for (var e : byKind.entrySet()) {
+			var list = e.getValue();
+			list.sort((a, b) -> Float.compare(rank(stacks.get(b)), rank(stacks.get(a))));   // best first
+			int keep = e.getKey().equals("pickaxe") ? 2 : 1;
+			for (int k = keep; k < list.size(); k++) out.add(list.get(k));
+		}
+		return out;
+	}
+
+	/** How good a tool is: its material (netherite, diamond, iron, stone, gold, wood), a little more if enchanted. */
+	private static float rank(ItemStack s) {
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		float r = n.startsWith("netherite") ? 5 : n.startsWith("diamond") ? 4 : n.startsWith("iron") ? 3 : n.startsWith("stone") ? 2 : n.startsWith("golden") ? 1 : 0;
+		return r + (s.isEnchanted() ? 0.5f : 0);
 	}
 
 	// ------------------------------------------------------------------------------ requests
@@ -215,7 +278,8 @@ final class Storage {
 		c.player.closeContainer();
 		Job was = job;
 		job = null;
-		if (was == Job.STORE) c.chatter(c.pick3("All put away.", "Stored my stuff in the chest.", "There, the chest has it."), false);
+		if (was == Job.STORE && !stashing) c.chatter(c.pick3("All put away.", "Stored my stuff in the chest.", "There, the chest has it."), false);
+		stashing = false;
 		if (was == Job.TAKE) {
 			int got = c.items().getOrDefault(takeKey, 0) - had;
 			c.chatter(got > 0 ? "Got " + got + " " + takeKey.replace('_', ' ') + " from the chest." : "The chest didn't have it after all.", false);
@@ -225,11 +289,22 @@ final class Storage {
 
 	private void deposit(AbstractContainerMenu menu, int size) {
 		Map<String, Integer> kept = new HashMap<>();
-		int stored = 0;
+		int stored = 0, iron = 0;
+		java.util.List<ItemStack> bag = new java.util.ArrayList<>();
+		for (int i = size; i < menu.slots.size(); i++) bag.add(menu.getSlot(i).getItem().copy());
+		Set<Integer> spare = stashing ? spares(bag) : Set.of();
 		for (int i = size; i < menu.slots.size(); i++) {
 			ItemStack s = menu.getSlot(i).getItem();
 			if (s.isEmpty()) continue;
 			String key = c.itemKey(s);
+			if (stashing) {                                                        // before a risky trip: the valuables and spares, nothing else
+				boolean leave = STASH.contains(key) || spare.contains(i - size) || key.equals("iron_ingot") && (iron += s.getCount()) > 10;
+				if (!leave) continue;
+				Compat.click(menu, i, true, c.player);
+				if (menu.getSlot(i).getItem().isEmpty()) stored++;
+				else break;
+				continue;
+			}
 			int k = keep(key, s), have = kept.getOrDefault(key, 0);
 			if (k == Integer.MAX_VALUE || have + s.getCount() <= k) {
 				kept.merge(key, s.getCount(), Integer::sum);
@@ -239,7 +314,7 @@ final class Storage {
 			if (menu.getSlot(i).getItem().isEmpty()) stored++;
 			else break;                                                          // the chest is full
 		}
-		c.journal("does", "put " + stored + " stacks in the chest at " + chest.toShortString());
+		c.journal("does", (stashing ? "left " : "put ") + stored + " stacks in the chest at " + chest.toShortString() + (stashing ? " (in case the worst happens)" : ""));
 	}
 
 	private void withdraw(AbstractContainerMenu menu, int size) {

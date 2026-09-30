@@ -1,7 +1,65 @@
-XEN COMPANION 1.8.0: TECHNICAL NOTES
+XEN COMPANION 1.9.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.9.0
+===================
+
+Eyes on its work (Hands). mine(pos): seePoint() is the block's middle, or the middle of a face turned toward the eyes
+(0.45 out), with a clip from the eyes (OUTLINE: grass and flowers count, as a click would hit them) that hits nothing
+or that block. None: the first thing in the way (clip to the middle) is dug instead if natural() (ores, stone family,
+dirt family, sand, gravel, clay, snow, leaves, plants and other replaceable non-fluids, terracotta, sandstone...) and
+reachable and not too slow; else cantMine = pos with cantMineUnseen (Builder: tried again in 2 s, and after 3 tries
+blindOk lets it through, as with placing). Aim: if already within 12 degrees it digs at once, else it turns first,
+40 degrees yaw and 30 pitch a tick at most (turnToward), up to 16 ticks, then starts. A dig with under 15% progress
+after 60 ticks (swimming, in the air) stops with cantMine/cantMineUnseen. Placing: placeAt tries the faces it can see
+(canSee) first, by feel only right by its feet (the 3x3 around it from one below to one above) or with blindOk;
+placeItem needs sight unless strictSight is off and it's by its feet or blindOk; place() (the small brain) the same.
+After a click it holds its eyes on the spot (holdLook: 8 ticks after placing, 6 after using a block; eased 30/25
+degrees a tick) unless it moves or watches someone; before, look() snapped back to its cardinal facing the next tick.
+Pillaring looks straight down. Crafting prep looks at the table when there is one. Measured with a client watching
+every block change near a Xen (angle between its view, sampled over 300 ms, and the block; a raycast for sight):
+placing more than 30 degrees off 15 of 103 (crafting tables 100+) -> 0-1 of 25-63, median 1-2; breaking median 4 ->
+1; through a block 2 of 255 -> 0.
+
+At sea (Companion.backToShore, Goals.seaThatWay). In water with nothing to stand on 2 blocks under it and 6 of 8
+points 6 blocks out water (openWater), unless its walk ends on dry land within 24 or it follows a swimming friend: it
+drops what it was doing, turns its exploring round, and swims to nearestLand (rings out to 160 blocks, 3 apart to 48
+then 8; surface above sea level and at most 5 over it, and 5 of 8 points 2 blocks round it dry), else lastDry (the
+last ground it stood on, within 300), else 64 blocks toward the world spawn; a new target every 40 s or once there.
+Exploring: a direction into unloaded land is skipped when half or more of the loaded samples along it (every 8 blocks)
+are water. The first look around doesn't happen in water or off the ground, and a direction with a jump of more than
+12 in the ground height counts as risky.
+
+Pickups (Companion.pickValue, pickUpNearby, backForMyThings, Chores.dropToPickUp). Value: 10 diamond, emerald,
+netherite, ancient debris, totem, elytra, golden apples, heavy core, trial keys; 7 any tool, weapon or armor; 6 iron,
+gold, pearls, eyes, blaze and breeze rods, obsidian, books, lapis, coal, name tags, saddles; 4 food; 2 the rest.
+Score value / (1 + 0.25 distance); it keeps its current target unless another scores twice as much. Chores: the one
+it's going for first, else what it came for, then the nearest.
+
+No standing about (MindSense.allowed, Goals). REST only at night, below 8 health, below 14 when fed 18+ (it heals),
+or told to stay; not twice running by day (lastOption). In the day the plan steps aside only for real danger
+(DANGER > 0.2), a friend in need or its village under attack (before: whenever FIGHT or FLEE was allowed, which a
+rival merely in sight made so). Below 14 health and under 18 food: eat, else get food. MindSense.enemy: no bully or SMP
+picks before 3 minutes in the world (age()), and a bully doesn't pick on its own village.
+
+Ready for the worst (Prepared, Storage.stash). Goals.trip() wraps MINE (iron; diamonds = deep), EXPLORE and
+ADVENTURE: fewer than 3 meals -> FOOD (at most every 8 min); explore/adventure with fewer than 16 cobblestone+dirt ->
+STONE (same); MINE with one pickaxe, 3 cobblestone and sticks or wood -> a quiet order for a stone pickaxe; deep or
+adventure, with a home chest within 128, at most every 10 min -> Storage.stash() and STORE ("its valuables left at
+home first"). stash deposits STASH items (diamond, emerald, gold ingot/raw, netherite, ancient debris, enchanted book,
+lapis, name tag, saddle, experience bottle, mineral blocks, heart of the sea, nautilus shell, trident, elytra), iron
+ingots over 10, and spare tools (by kind it keeps the best by material, +0.5 enchanted: two pickaxes, one of the
+rest). On death Prepared.died(); once its things aren't lying there any more (lostAt null) and its pickaxe tier is
+under 2, Companion asks Prepared.next() (free, or on its own build) before any leftover job: Storage.take() the best
+pickaxe, a sword if it has none, 8 food if it has under 3, one at a time from chests it remembers; nothing there:
+it starts over. The STORE option leaves a storage job already running alone.
+
+Fixes. Crafter: every step of an ordered craft uses the order id as the goal (it alternated between "wooden hoe" and
+"wooden_hoe", so each step counted as a new recipe: 14-26 ticks and a journal line each time). takeTableAlong: not in
+the water, and at most 3 tries.
 
 
 WHAT'S NEW IN 1.8.0

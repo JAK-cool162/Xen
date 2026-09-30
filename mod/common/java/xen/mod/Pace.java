@@ -71,7 +71,9 @@ final class Pace {
 		if (now >= readyAt) return null;
 		c.goals.instant = goal == null ? "getting ready to craft" : (prepFresh ? (made.contains(goal) ? "going to make " : "working out how to make ") : "making ")
 				+ goal.replace('_', ' ');
-		look(readyAt, 35, "");
+		net.minecraft.core.BlockPos table = c.crafter.tableNear();
+		if (table != null && step.equals(goal)) c.hands.holdLook(net.minecraft.world.phys.Vec3.atCenterOf(table), (int) (readyAt - now) + 2);   // (at the table: its eyes on it)
+		else look(readyAt, 35, "");
 		return Action.IDLE;
 	}
 

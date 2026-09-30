@@ -1,7 +1,36 @@
-**Xen Companion 1.8.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.9.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.9.0: eyes on its work, safe at sea, ready for the worst
+
+* **It looks at what it mines and places**: it turns to a block before it digs (a quick flick, not a snap) and its eyes
+  stay on a block it just put down, a table it uses, a chest it opens. Before, the view jumped back the next tick, so
+  it looked like it built without looking. Measured on four Xens over 7 minutes: 1 degree off the block, typically
+  (placing used to be off by 60 to 130 degrees at times).
+* **Never through walls**: it only mines a block it can see and only clicks a face it can see. Something in the way that's
+  ground, rock or plants, it digs through first, like a player; something someone built (planks, cobblestone, glass)
+  it never breaks to get past: it goes round or leaves it.
+* **Safe at sea**: out in open water (a sea, a big lake) it swims for the nearest real shore (not a rock sticking out),
+  or back the way it came, or toward the world spawn if it has never stood on land. Exploring won't take it out to sea
+  any more. A Xen dropped in the middle of the ocean now swims steadily for land and stays alive.
+* **Picking things up**: the best first (diamonds, then tools and armor, then iron, then food, then the rest), the near
+  ones before the far, and it sticks with the one it went for instead of turning between two. The same when it picks
+  its things back up after dying.
+* **No more standing about**: a Xen that had been in a scuffle stood there taking "a breather" twelve times in a row.
+  Now it rests only when resting helps (hurt and fed enough to heal, at night), not twice in a row by day; hurt and too
+  hungry to heal, it gets food. A rival just being nearby no longer puts its plans on hold. In the same test, time
+  with its hands idle went from up to 82% to 5-15%.
+* **Fewer pointless fights**: no picking fights in its first minutes in the world, and a bully doesn't pick on its own
+  village.
+* **Ready for the worst**: before a trip it packs food and blocks (to pillar up or wall off) and, going down a mine, a
+  spare pickaxe. Before a risky one (diamonds, the End) it leaves its valuables and spare tools in its chest at home
+  (it keeps its best tools). If it dies and its things are gone, it goes home and takes its spares out of that chest
+  instead of starting over with nothing.
+* **Fixes**: a new recipe was "worked out" again at every step of an ordered craft (a wooden hoe took 38 s); it no
+  longer tries for ten seconds at a time to dig while swimming (it stops and tries from better footing), and leaves a
+  crafting table it can't pick up.
 
 ### 1.8.0: more like a person
 

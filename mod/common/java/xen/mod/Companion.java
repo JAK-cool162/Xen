@@ -82,6 +82,11 @@ public final class Companion {
 	private Vec3 walkedFrom;
 	private int stuck;
 	private int lifeTicks;
+
+	/** Ticks since it came into the world (this life). */
+	int age() {
+		return lifeTicks;
+	}
 	private float lifeReward;
 	/** Its nature (genes) and how it looks. */
 	final Personality personality;
@@ -279,6 +284,7 @@ public final class Companion {
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
 		if (player.tickCount % 10 == 0) {
+			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			places.tick();                                               // the way it walked, remembered
 			totems();
 			rumors.look();                                               // who's that? (a shock, a warning to pass on)
@@ -703,6 +709,100 @@ public final class Companion {
 		return s.getFluidState().isEmpty() && s.getCollisionShape(level, p).isEmpty();
 	}
 
+	/** The last dry ground it stood on (to swim back to), and the shore it's swimming for, since when; when it last said so. */
+	BlockPos lastDry;
+	private BlockPos shoreTo;
+	private long shoreSince, shoreSaidAt = -1_000_000;
+
+	/**
+	 * Open water (a sea, a big lake: water all round, nothing to stand on under it): a player doesn't swim about out
+	 * there (drowned, no food, night coming), they head for land: the nearest shore it can see, else the way it came.
+	 * Not when it's just crossing a river to somewhere dry close by, or keeping up with a friend who swims.
+	 */
+	private Action backToShore() {
+		if (!player.isInWater() || player.isPassenger() || inArena || fighting || player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+			shoreTo = null;
+			return null;
+		}
+		var level = (ServerLevel) player.level();
+		BlockPos feet = player.blockPosition();
+		long now = level.getGameTime();
+		if (shoreTo == null) {
+			if (!openWater(level, feet)) return null;
+			Vec3 going = walker.goal();
+			if (going != null && going.distanceTo(player.position()) < 24 && XenMod.surface(level, (int) Math.floor(going.x), (int) Math.floor(going.z)) != null) return null;   // (crossing to land close by)
+			if (mode == Mode.FOLLOW && leader != null) {
+				ServerPlayer l = server.getPlayerList().getPlayer(leader);
+				if (l != null && l.isInWater() && l.distanceTo(player) < 16) return null;   // (its friend is swimming: it keeps up)
+			}
+		}
+		if (shoreTo == null || now - shoreSince > 20 * 40 || shoreTo.closerThan(feet, 2.5)) {   // (there and still in the water: somewhere it can climb out)
+			shoreTo = nearestLand(level, feet, 160);
+			if (shoreTo == null && lastDry != null && lastDry.distSqr(feet) < 300 * 300) shoreTo = lastDry;
+			if (shoreTo == null) {                                        // no land in sight: toward the world's spawn (land), 64 blocks at a time
+				BlockPos spawn = level.getRespawnData().pos();
+				Vec3 way = Vec3.atCenterOf(spawn).subtract(player.position());
+				if (way.horizontalDistance() > 8) {
+					way = way.multiply(1, 0, 1).normalize().scale(Math.min(64, way.horizontalDistance()));
+					shoreTo = BlockPos.containing(player.position().add(way));
+				}
+			}
+			shoreSince = now;
+			if (shoreTo == null) return null;
+			journal("does", "out in open water: swims for the shore at " + shoreTo.toShortString());
+			if (now - shoreSaidAt > 1200) {
+				shoreSaidAt = now;
+				chatter(pick3("Too deep out here. Back to land.", "Okay, enough swimming. Shore!", "Where's the land... there."), false);
+			}
+			goals.turnAround();                                           // (exploring: the other way now)
+			goals.drop();
+			chores.cancel();
+		}
+		goals.instant = "swimming back to the shore";
+		return walkTo(Vec3.atBottomCenterOf(shoreTo));
+	}
+
+	/** Water under it and water all round (at least 6 of 8 ways, 6 blocks out): a sea or a lake, not a stream. */
+	private static boolean openWater(ServerLevel level, BlockPos feet) {
+		BlockPos under = feet.below();
+		if (!level.getBlockState(under).getCollisionShape(level, under).isEmpty() || !level.getBlockState(under.below()).getCollisionShape(level, under.below()).isEmpty()) return false;
+		int wet = 0;
+		for (int k = 0; k < 8; k++) {
+			double a = k * Math.PI / 4;
+			int x = feet.getX() + (int) Math.round(Math.cos(a) * 6), z = feet.getZ() + (int) Math.round(Math.sin(a) * 6);
+			if (!level.hasChunkAt(new BlockPos(x, feet.getY(), z)) || XenMod.surface(level, x, z) == null) wet++;
+		}
+		return wet >= 6;
+	}
+
+	/** The nearest dry ground by the water (a block to stand on, air over it, not much above the water), out to that far. */
+	private static BlockPos nearestLand(ServerLevel level, BlockPos from, int far) {
+		for (int r = 3; r <= far; r += r < 48 ? 3 : 8) {
+			BlockPos best = null;
+			double bestD = Double.MAX_VALUE;
+			int n = Math.max(12, r * 2);
+			for (int k = 0; k < n; k++) {
+				double a = k * Math.PI * 2 / n;
+				int x = from.getX() + (int) Math.round(Math.cos(a) * r), z = from.getZ() + (int) Math.round(Math.sin(a) * r);
+				if (!level.hasChunkAt(new BlockPos(x, from.getY(), z))) continue;
+				Vec3 top = XenMod.surface(level, x, z);
+				if (top == null || top.y > from.getY() + 5 || top.y < level.getSeaLevel() || top.y < from.getY() - 3) continue;   // (above the water line)
+				int dry = 0;                                                     // real land, not a rock sticking out: dry ground round it too
+				for (int[] o : new int[][] {{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 2}, {-2, -2}, {2, -2}, {-2, 2}}) {
+					if (level.hasChunkAt(new BlockPos(x + o[0], from.getY(), z + o[1])) && XenMod.surface(level, x + o[0], z + o[1]) != null) dry++;
+				}
+				if (dry < 5) continue;
+				double d = top.distanceToSqr(Vec3.atCenterOf(from));
+				if (d < bestD) {
+					bestD = d;
+					best = BlockPos.containing(top);
+				}
+			}
+			if (best != null) return best;
+		}
+		return null;
+	}
+
 	/** Holding sneak to swim down (out from under a roof): let go once its head is out. */
 	private boolean diving;
 
@@ -725,6 +825,8 @@ public final class Companion {
 			player.setShiftKeyDown(false);
 			return Action.JUMP;                                       // hold space to swim up, like a player
 		}
+		Action shore = backToShore();                                 // out in open water: back to land before anything else
+		if (shore != null) return shore;
 		if (player.getFoodData().getFoodLevel() <= personality.eatAt() && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
 			goals.instant = "eating";
 			return Action.EAT;
@@ -775,6 +877,8 @@ public final class Companion {
 		}
 		Action back = backForMyThings();                              // it died: its things are lying where it fell
 		if (back != null) return back;
+		Action spares = mode == Mode.FREE || builder.busy() ? prepared.next() : null;   // they're gone: its spares from the chest at home (building its own: then too)
+		if (spares != null) return spares;
 		Action pick = pickUpNearby();                                  // good things lying close by: it picks them up
 		if (pick != null) return pick;
 		Action bed = bedtime();                                       // night, and a bed at home: it sleeps, like a player
@@ -1305,6 +1409,14 @@ public final class Companion {
 	private boolean saidGoingBack;
 
 	/** Back for its things after dying, like a player (before they're gone, and not straight into what killed it). */
+	/** Going back for its things (they're lying where it died)? */
+	boolean lostThings() {
+		return lostAt != null;
+	}
+
+	/** Of its things lying where it died, the one it's picking up now. */
+	private UUID lostItem, lostItemNext;
+
 	private Action backForMyThings() {
 		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
 		long now = player.level().getGameTime();
@@ -1323,10 +1435,23 @@ public final class Companion {
 		Vec3 target = Vec3.atBottomCenterOf(lostAt);
 		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) <= 3) {        // there: its things, the ones it can see (or right by it)
 			target = null;
+			double bestScore = 0;
 			for (var item : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(6),
 					e -> e.isAlive() && (e.distanceTo(player) < 2 || player.hasLineOfSight(e)))) {
-				if (target == null || item.position().distanceTo(player.position()) < target.distanceTo(player.position())) target = item.position();
+				if (item.getUUID().equals(lostItem)) {                          // the one it's going for: that first (no dithering)
+					target = item.position();
+					lostItemNext = lostItem;
+					break;
+				}
+				double score = pickValue(item.getItem()) / (1 + 0.25 * item.distanceTo(player));   // its best things first, then the nearest
+				if (target == null || score > bestScore) {
+					target = item.position();
+					bestScore = score;
+					lostItemNext = item.getUUID();
+				}
 			}
+			if (target != null && lostItemNext != null) lostItem = lostItemNext;
+			lostItemNext = null;
 			if (target == null) {
 				lostAt = null;
 				saidGoingBack = false;
@@ -1394,6 +1519,8 @@ public final class Companion {
 	final Purpose purpose = new Purpose(this);
 	/** How quickly it gets to things: a moment to get ready to craft, noticing a broken tool (game ticks, never sleeps). */
 	final Pace pace = new Pace(this);
+	/** Ready for the worst: packed before a trip, valuables at home, spares after a death (see {@link Prepared}). */
+	final Prepared prepared = new Prepared(this);
 	/** What people around it need (it may help: its choice). */
 	final Needs needs = new Needs(this);
 	/** Highways it builds (in the Nether from a portal, or roads). */
@@ -1482,20 +1609,42 @@ public final class Companion {
 			"music_disc_bounce", "bread", "cooked_beef", "cooked_porkchop", "nether_wart", "gold_nugget", "iron_nugget", "coal", "wheat", "wheat_seeds",
 			"carrot", "potato", "beetroot", "beetroot_seeds", "bone_meal", "elytra", "firework_rocket", "lapis_lazuli", "sugar_cane", "leather",
 			"paper", "experience_bottle", "shulker_shell", "netherite_scrap", "ancient_debris");
+	/** How much a thing lying there is worth going for: diamonds before a sword, a sword before iron, iron before bread, bread before string. */
+	static int pickValue(ItemStack s) {
+		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+		if (n.contains("diamond") || n.contains("emerald") || n.contains("netherite") || n.equals("ancient_debris") || n.equals("totem_of_undying")
+				|| n.equals("elytra") || n.contains("golden_apple") || n.equals("heavy_core") || n.contains("trial_key")) return 10;
+		if (s.isDamageableItem()) return 7;
+		if (n.contains("iron") || n.contains("gold") || n.equals("ender_pearl") || n.equals("ender_eye") || n.equals("blaze_rod") || n.equals("breeze_rod")
+				|| n.equals("obsidian") || n.equals("enchanted_book") || n.equals("lapis_lazuli") || n.equals("coal") || n.equals("name_tag") || n.equals("saddle")) return 6;
+		if (s.get(net.minecraft.core.component.DataComponents.FOOD) != null) return 4;
+		return 2;
+	}
+
 	private final Set<UUID> leftLying = new java.util.HashSet<>();
 	private UUID goingFor;
 	private long goingSince;
 
 	private Action pickUpNearby() {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
-		net.minecraft.world.entity.item.ItemEntity best = null;
+		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
+		double bestScore = 0, currentScore = 0;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
 				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
-						|| sharing.expected(x.getItem())))) {                   // (or what a friend just tossed to it)
+						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem())))) {   // (a tool or armor lying there too; what a friend just tossed to it)
 			if (!player.hasLineOfSight(e)) continue;
-			if (best == null || e.distanceTo(player) < best.distanceTo(player)) best = e;
+			double score = pickValue(e.getItem()) / (1 + 0.25 * e.distanceTo(player));   // the best first, then the nearest
+			if (e.getUUID().equals(goingFor)) {
+				current = e;
+				currentScore = score;
+			}
+			if (best == null || score > bestScore) {
+				best = e;
+				bestScore = score;
+			}
 		}
 		if (best == null) return null;
+		if (current != null && bestScore < currentScore * 2) best = current;   // it keeps to the one it went for (no dithering between two)
 		long now = player.level().getGameTime();
 		if (!best.getUUID().equals(goingFor)) {
 			goingFor = best.getUUID();
@@ -2340,6 +2489,7 @@ public final class Companion {
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
 		habits.died();
+		prepared.died();
 		if (goals.option >= 0) goals.finishOption(true);                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
 		if (skills.partner != null) skills.endSpar(false);

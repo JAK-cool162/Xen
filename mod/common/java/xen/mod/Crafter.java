@@ -406,31 +406,40 @@ final class Crafter {
 	/** A table it put down out in the wild (not at home): done with it, it takes it along, like a player does. */
 	private BlockPos placedTable;
 
+	private int tableTries;
+
 	private Action takeTableAlong() {
 		if (placedTable == null || c.builder.busy()) return null;         // (building: it keeps using it)
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos home = c.goals.home;
-		if (!isTable(level, placedTable) || home != null && home.distManhattan(placedTable) < 24
+		if (!isTable(level, placedTable) || home != null && home.distManhattan(placedTable) < 24 || c.player.isInWater() || tableTries >= 3
 				|| c.player.getEyePosition().distanceTo(Vec3.atCenterOf(placedTable)) > c.player.blockInteractionRange()) {
-			placedTable = null;                                               // (at home it stays: that's where the workshop is)
+			placedTable = null;                                               // (at home it stays: that's where the workshop is; in the water, or it won't come: left)
+			tableTries = 0;
 			return null;
 		}
+		tableTries++;
 		if (!c.hands.mine(placedTable)) {
 			placedTable = null;
+			tableTries = 0;
 			return null;
 		}
 		c.acted = true;
 		c.goals.instant = "picking its crafting table back up";
-		if (level.getBlockState(placedTable).isAir()) placedTable = null;
+		if (level.getBlockState(placedTable).isAir()) {
+			placedTable = null;
+			tableTries = 0;
+		}
 		return Action.MINE;
 	}
 
 	private Action step(java.util.function.BooleanSupplier doIt, String what) {
-		Action wait = c.pace.craftPrep(what, making);                    // a moment to get ready (quick for what it knows)
+		String goal = order != null ? order : making;                        // (one name for what it's making: "wooden_hoe", every step)
+		Action wait = c.pace.craftPrep(what, goal);                          // a moment to get ready (quick for what it knows)
 		if (wait != null) return wait;
 		if (order != null) orderSteps++;
 		boolean ok = doIt.getAsBoolean();
-		c.pace.crafted(what, making, ok);
+		c.pace.crafted(what, goal, ok);
 		c.acted = true;
 		if (!ok) {
 			XenMod.LOG.info("{} couldn't make {} (making {})", c.name, what, making);
@@ -491,6 +500,11 @@ final class Crafter {
 	private BlockPos tableSeen;
 
 	/** A crafting table within reach (it knows what's within 6 blocks). */
+	/** A crafting table within reach, or null. */
+	BlockPos tableNear() {
+		return c.player == null ? null : nearbyTable();
+	}
+
 	private BlockPos nearbyTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		double reach = c.player.blockInteractionRange();

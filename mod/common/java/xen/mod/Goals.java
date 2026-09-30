@@ -265,7 +265,7 @@ final class Goals {
 				String h = plot != null ? c.builder.startNear("house", plot, t != null && t.members.size() > 1 ? t.plotFront : null) : c.builder.start("house");
 				yield h.startsWith("You will") ? h : "You can't: " + h;
 			}
-			case STORE -> c.storage.store();
+			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
@@ -369,6 +369,25 @@ final class Goals {
 	 * not back where it came from) and walks there, sprinting; there it stops and looks around for a moment, and on to
 	 * the next. At dusk, with a home, it heads home instead. (What it sees on the way is what makes it want things.)
 	 */
+	/** It swam out to sea that way: exploring goes the other way now. */
+	void turnAround() {
+		if (!Double.isNaN(heading)) heading += Math.PI;
+		exploreTo = null;
+	}
+
+	/** Most of what it can see that way (every 8 blocks, as far as the world is there) is water: the sea. */
+	private boolean seaThatWay(BlockPos from, double a, double r) {
+		var level = (net.minecraft.server.level.ServerLevel) c.player.level();
+		int seen = 0, wet = 0;
+		for (double d = 8; d <= r; d += 8) {
+			int x = (int) Math.round(from.getX() + Math.cos(a) * d), z = (int) Math.round(from.getZ() + Math.sin(a) * d);
+			if (!level.hasChunkAt(new BlockPos(x, from.getY(), z))) break;
+			seen++;
+			if (XenMod.surface(level, x, z) == null) wet++;
+		}
+		return seen >= 2 && wet * 2 >= seen;
+	}
+
 	Action exploreStep() {
 		var p = c.player;
 		long now = p.level().getGameTime();
@@ -419,6 +438,7 @@ final class Goals {
 				BlockPos from = p.blockPosition();
 				int x = (int) Math.round(from.getX() + Math.cos(a) * r), z = (int) Math.round(from.getZ() + Math.sin(a) * r);
 				if (!p.level().hasChunkAt(new BlockPos(x, from.getY(), z))) {          // land nobody has seen yet: it walks that way, and sees
+					if (seaThatWay(from, a, r)) continue;                             // (not out to sea)
 					exploreTo = new Vec3(x + 0.5, p.getY(), z + 0.5);
 					heading = a;
 					break;
@@ -568,6 +588,13 @@ final class Goals {
 	// ----------------------------------------------------------------------------- Xen 2.0
 	/** Xen 2.0's choice now (a {@link Mind} option), what it knew when it chose, when, until when; -1: none. */
 	int option = -1;
+	/** The option it chose before this one. */
+	private int lastOption = -1;
+
+	/** Was its last choice a breather (it doesn't take one after another in daylight)? */
+	boolean restedLast() {
+		return lastOption == Mind.REST || option == Mind.REST;
+	}
 	private float[] optionFeatures;
 	private long optionAt, optionUntil;
 	private java.util.UUID followWho;
@@ -739,7 +766,14 @@ final class Goals {
 			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
 			return -1;
 		}
-		if (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // (monsters about in the day: its own call)
+		if (f[Mind.DANGER] > 0.2f || can[Mind.HELP] || can[Mind.GUARD]) return -1;   // (monsters at it in the day, a friend in need: its own call; a rival just being about isn't)
+		if (c.player.getHealth() < 14 && hunger < 18) {                        // hurt, and too hungry to heal: food first (a player doesn't stand about waiting)
+			if (can[Mind.EAT]) return why(Mind.EAT, "hurt: eating to heal");
+			if (can[Mind.FOOD]) {
+				c.chores.forWool = false;
+				return why(Mind.FOOD, "hurt: food to heal");
+			}
+		}
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
 		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
 		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {
@@ -767,9 +801,12 @@ final class Goals {
 		}
 		boolean farmed = c.places.get("farm") != null;
 		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
-		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");   // (nothing else open)
+		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "iron");   // (nothing else open)
 		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
-		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f && iron < 24 ? "iron for armor" : "diamonds");
+		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) {
+			boolean diamonds = !(f[Mind.ARMOR] < 0.6f && iron < 24);
+			return trip(Mind.MINE, diamonds, can, items, diamonds ? "diamonds" : "iron for armor");
+		}
 		if (tier >= 3 && home == null && plan != Strategy.SPEEDRUN && !holeOnly) {
 			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home");
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for a house");
@@ -816,7 +853,7 @@ final class Goals {
 		}
 		if (!time) return -1;
 		if (items.getOrDefault("food", 0) < 8 && can[Mind.FOOD]) return why(Mind.FOOD, "food for the journey to the End");
-		return can[Mind.ADVENTURE] ? why(Mind.ADVENTURE, "the dragon: the end of the game (" + (plan >= 0 ? Strategy.NAMES[plan] : "its plan") + ")") : -1;
+		return can[Mind.ADVENTURE] ? trip(Mind.ADVENTURE, true, can, items, "the dragon: the end of the game (" + (plan >= 0 ? Strategy.NAMES[plan] : "its plan") + ")") : -1;
 	}
 
 	private long netherTryAt;
@@ -955,7 +992,7 @@ final class Goals {
 		}
 		c.purpose.goal = Purpose.CHOICE[stoneGoal];
 		return switch (stoneGoal) {
-			case Purpose.IRON -> why(Mind.MINE, "iron (" + stoneWhy + ")");
+			case Purpose.IRON -> trip(Mind.MINE, false, can, items, "iron (" + stoneWhy + ")");
 			case Purpose.FOOD -> {
 				c.chores.forWool = false;
 				yield why(Mind.FOOD, "food (" + stoneWhy + ")");
@@ -965,7 +1002,7 @@ final class Goals {
 				yield why(Mind.FOOD, "wool for a bed (" + stoneWhy + ")");
 			}
 			case Purpose.HOME -> can[Mind.HOUSE] ? why(Mind.HOUSE, "a home (" + stoneWhy + ")") : why(Mind.WOOD, "wood for a home (" + stoneWhy + ")");
-			default -> why(Mind.EXPLORE, "a look around (" + stoneWhy + ")");
+			default -> trip(Mind.EXPLORE, false, can, items, "a look around (" + stoneWhy + ")");
 		};
 	}
 
@@ -1014,6 +1051,12 @@ final class Goals {
 	/** Sheep it can see or knows are close (within 48 blocks). */
 	private boolean sheepSeen() {
 		return !c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, c.player.getBoundingBox().inflate(48), x -> x.isAlive()).isEmpty();
+	}
+
+	/** Off on a trip: ready for the worst first (food, blocks, a spare pickaxe; valuables left at home before a risky one). */
+	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
+		Prepared.Step first = c.prepared.before(option, deep, can, items);
+		return first != null ? why(first.option(), first.why()) : why(option, why);
 	}
 
 	private int why(int option, String why) {
@@ -1244,6 +1287,7 @@ final class Goals {
 	void finishOption(boolean died) {
 		int o = option;
 		float[] before = optionFeatures;
+		if (o >= 0) lastOption = o;
 		option = -1;
 		optionFeatures = null;
 		c.chosenFoe = null;

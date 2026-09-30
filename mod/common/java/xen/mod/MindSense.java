@@ -93,10 +93,11 @@ final class MindSense {
 	static ServerPlayer enemy(Companion c) {
 		Tribe t = c.tribe();
 		long now = c.player.level().getGameTime();
-		boolean bully = c.personality.aggressive() && c.personality.power > 0.55f && now - c.lastPickedFight > 20 * 60 * 5;   // (not every minute)
+		boolean settled = c.age() > 20 * 60 * 3;                              // (new in the world: it looks around first, it doesn't start fights)
+		boolean bully = settled && c.personality.aggressive() && c.personality.power > 0.55f && now - c.lastPickedFight > 20 * 60 * 5;   // (not every minute)
 		// Teams on auto (an SMP): anyone not on its team is a rival. Near its base it defends its land; a good fighter,
 		// healthy and armed, goes looking for a fight now and then (not the ones it likes).
-		boolean smp = c.mod.config.teams < 0 && c.mod.config.pvp.equals("own") && now - c.lastPickedFight > 20 * 60 * 4 && !c.inArena;
+		boolean smp = settled && c.mod.config.teams < 0 && c.mod.config.pvp.equals("own") && now - c.lastPickedFight > 20 * 60 * 4 && !c.inArena;
 		boolean armed = smp && count(c, n -> n.endsWith("_sword") || n.endsWith("_axe")) > 0;
 		boolean duelist = smp && armed && c.player.getHealth() >= 16 && c.skills.get(Skills.FIGHT) >= 0.55f && c.personality.bravery > 0.45f;
 		var myTeam = c.server.getScoreboard().getPlayersTeam(c.name);
@@ -107,8 +108,9 @@ final class MindSense {
 			if (p.getUUID().equals(c.owner) || c.diplomacy.atPeace(p)) continue;
 			float trust = c.trust(p.getUUID());
 			boolean weaker = p.getHealth() + 2 * armor(p) < c.player.getHealth() + 2 * armor(c.player) + 4;   // a bully picks on the weaker
-			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker;
 			Companion other = p instanceof XenPlayer x ? x.companion : null;
+			boolean ours = t != null && other != null && t.members.contains(other);   // (its own village: not someone to pick on)
+			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker && !ours;
 			var theirTeam = c.server.getScoreboard().getPlayersTeam(p.getScoreboardName());
 			boolean rival = other == null ? myTeam == null || theirTeam != myTeam                   // a player: anyone not on its team
 					: myTeam != null && theirTeam != null && theirTeam != myTeam                          // a Xen: only one of another team (team wars)
@@ -241,7 +243,9 @@ final class MindSense {
 		int wood = count(c, n -> n.endsWith("_planks")) + 4 * c.items().getOrDefault("log", 0);
 		int food = c.player.getFoodData().getFoodLevel();
 		boolean night = f[Mind.NIGHT] > 0.5f;
-		a[Mind.REST] = night || c.player.getHealth() < 14 || c.mode == Companion.Mode.STAY;   // (in daylight, a player gets on with something)
+		float health = c.player.getHealth();
+		a[Mind.REST] = night || health < 8 || health < 14 && food >= 18 || c.mode == Companion.Mode.STAY;   // (in daylight a player gets on with something; hurt, a rest only helps if it heals, fed)
+		if (!night && c.goals.restedLast() && health >= 8) a[Mind.REST] = false;   // (one breather, not one after another)
 		a[Mind.WOOD] = true;
 		a[Mind.STONE] = c.crafter.pickTier() >= 1;
 		a[Mind.CRAFT] = c.crafter.upgrade() != null;

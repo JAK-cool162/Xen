@@ -179,7 +179,7 @@ final class Habits {
 		var p = c.player;
 		var level = p.level();
 		BlockPos at = p.blockPosition();
-		if (!level.canSeeSky(at.above()) || level.isDarkOutside()) return null;   // (under a roof, or night: no stroll, it decides at once)
+		if (!level.canSeeSky(at.above()) || level.isDarkOutside() || p.isInWater() || !p.onGround()) return null;   // (under a roof, at night, swimming: no stroll, it decides at once)
 		var random = c.random();
 		BlockPos best = null;
 		double bestScore = -1e9;
@@ -197,6 +197,10 @@ final class Habits {
 					break;
 				}
 				int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+				if (Math.abs(top - lastY) > 12) {                                     // (a wall of rock, or the world not ready there: not that way)
+					risk += 5;
+					break;
+				}
 				BlockPos ground = new BlockPos(x, top - 1, z);
 				var fluid = level.getFluidState(ground);
 				if (fluid.is(net.minecraft.tags.FluidTags.LAVA)) risk += 10;

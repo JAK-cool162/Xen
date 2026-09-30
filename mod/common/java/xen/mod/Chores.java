@@ -1464,7 +1464,11 @@ final class Chores {
 			boolean wanted = false;
 			for (String i : items) wanted |= i.equals(k);
 			if (!wanted && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
-			if (best == null || drop.distanceTo(c.player) < best.distanceTo(c.player)) best = drop;
+			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
+				best = drop;
+				break;
+			}
+			if (best == null || (wanted ? 0 : 3) + drop.distanceTo(c.player) < (isWanted(best) ? 0 : 3) + best.distanceTo(c.player)) best = drop;   // (what it came for first)
 		}
 		if (best == null) {
 			dropSince = -1;
@@ -1478,6 +1482,12 @@ final class Chores {
 			return null;
 		}
 		return best;
+	}
+
+	private boolean isWanted(ItemEntity drop) {
+		String k = c.itemKey(drop.getItem());
+		for (String i : items) if (i.equals(k)) return true;
+		return false;
 	}
 
 	private final Set<UUID> ignoredDrops = new HashSet<>();

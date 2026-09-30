@@ -722,10 +722,18 @@ final class Builder {
 
 	// ---------------------------------------------------------------------------- hands on
 	private Action dig(ServerLevel level, Architect.Step s) {
-		if (c.hands.mine(s.pos())) {
+		c.hands.blindOk = tries.getOrDefault(s.pos(), 0) >= 3;              // (one it can't see from anywhere, boxed in by what it built: out anyway)
+		boolean ok = c.hands.mine(s.pos());
+		c.hands.blindOk = false;
+		if (ok) {
 			c.acted = true;
 			if (level.getBlockState(s.pos()).isAir()) progress(true);
 			return Action.MINE;
+		}
+		if (s.pos().equals(c.hands.cantMine) && c.hands.cantMineUnseen) {    // behind something it built: from somewhere else, in a moment
+			tries.merge(s.pos(), 1, Integer::sum);
+			notNow.put(s.pos(), now() + 40);
+			return null;
 		}
 		if (s.pos().equals(c.hands.cantMine)) skip(s.pos(), "can't mine");          // bedrock, or far too slow
 		return null;
@@ -872,9 +880,11 @@ final class Builder {
 		if (b instanceof DoorBlock || b instanceof BedBlock || n.endsWith("_stairs") || b instanceof net.minecraft.world.level.block.FenceGateBlock) yaw = yawIndex(f);
 		else if (n.equals("furnace") || n.equals("chest") || n.equals("barrel") || n.equals("smoker")) yaw = yawIndex(f.getOpposite());
 		c.hands.strictSight = tries.getOrDefault(s.pos(), 0) < 3;             // (one it can't see from anywhere, boxed in by what it built, goes in anyway)
+		c.hands.blindOk = !c.hands.strictSight;
 		boolean ok = c.hands.placeItem(s.pos(), st -> st.getItem() == item, wall, side, b instanceof DoorBlock || b instanceof BedBlock
 				|| b instanceof net.minecraft.world.level.block.FenceGateBlock ? yaw : -1);   // (stairs: turned to the plan after; its eyes stay on the spot)
 		c.hands.strictSight = false;
+		c.hands.blindOk = false;
 		int t = tries.merge(s.pos(), 1, Integer::sum);
 		if (!ok) {
 			if (c.hands.cantPlace.startsWith("it can't see")) notNow.put(s.pos(), now() + 40);   // from somewhere else, in a moment
