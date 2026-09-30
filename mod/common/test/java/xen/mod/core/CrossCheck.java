@@ -175,6 +175,12 @@ public final class CrossCheck {
 		}
 		System.out.println("chat rules: " + same + "/" + total + " cases match");
 
+		// A world closes and the next opens in the same game (single player): the chat still takes requests. (1.7.0
+		// crashed the game here: the closed world had shut the chat thread down for good.)
+		boolean chatOk = chatSurvivesWorlds();
+		check(chatOk, "chat broke after a world closed");
+		System.out.println("chat across worlds: " + (chatOk ? "3 worlds, answered in each" : "FAILED"));
+
 		// Finding a way on foot through what it knows.
 		check(pathTest(), "path finding failed");
 
@@ -183,6 +189,24 @@ public final class CrossCheck {
 
 		System.out.println(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
 		if (failures > 0) System.exit(1);
+	}
+
+	/** Three worlds in one game: in each a question is answered, then the chat rests and the world closes. */
+	static boolean chatSurvivesWorlds() {
+		var chat = new xen.mod.talk.Chat(java.nio.file.Path.of("no-such-model.gguf"), () -> "off", () -> false, 1, line -> {});
+		try {
+			for (int world = 0; world < 3; world++) {
+				var answered = new java.util.concurrent.CountDownLatch(1);
+				chat.ask("Steve", "xen, hello", "xen", request -> "It's a nice day.", reply -> answered.countDown());
+				if (!answered.await(10, java.util.concurrent.TimeUnit.SECONDS)) return false;
+				chat.sleep();
+				chat.close();                                               // the world closes
+			}
+			return true;
+		} catch (Exception e) {
+			System.out.println("chat across worlds: " + e);
+			return false;
+		}
 	}
 
 	/** obs[0] = lava ahead. Walking FORWARD into lava burns; elsewhere FORWARD finds treasure. */

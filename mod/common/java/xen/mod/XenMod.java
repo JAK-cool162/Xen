@@ -364,7 +364,25 @@ public class XenMod implements ModInitializer {
 	}
 
 	// --------------------------------------------------------------------------------- world
+	private long lastTickTrouble;
+
+	/**
+	 * Every server tick. Nothing Xen does may take the server down with it: a part that fails is logged (at most once a
+	 * minute) and the game goes on without it for that tick.
+	 */
 	private void tick(MinecraftServer s) {
+		try {
+			tickWorld(s);
+		} catch (RuntimeException e) {
+			long now = System.currentTimeMillis();
+			if (now - lastTickTrouble > 60_000L) {
+				lastTickTrouble = now;
+				LOG.error("Xen stumbled this tick (the game goes on): {}", e.toString(), e);
+			}
+		}
+	}
+
+	private void tickWorld(MinecraftServer s) {
 		DesignTest.maybeRun(s);                                          // (developing designs: only with -Dxen.designTest)
 		if (s.getTickCount() % 40 == 0) chatModelNews();
 		if (s.getTickCount() % 20 == 0) avatar.tick();
@@ -384,7 +402,11 @@ public class XenMod implements ModInitializer {
 			save();
 		}
 		if (s.getTickCount() % 100 == 0) {
-			wakeChat();
+			try {
+				wakeChat();                                                   // (the chat model: loaded when needed, unloaded when not)
+			} catch (RuntimeException e) {
+				LOG.warn("Xen's chat model stumbled: {}", e.toString(), e);
+			}
 			try {
 				Tribe.tickAll(this);                                          // tribes: who's in which, sharing, the night watch
 			} catch (RuntimeException e) {
@@ -673,6 +695,14 @@ public class XenMod implements ModInitializer {
 	}
 
 	private void heard(ServerPlayer sender, String text) {
+		try {
+			hear(sender, text);
+		} catch (RuntimeException e) {                                        // (a chat problem never stops the chat, or the game)
+			LOG.warn("Xen couldn't take in what {} said: {}", sender.getName().getString(), e.toString(), e);
+		}
+	}
+
+	private void hear(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
 		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);

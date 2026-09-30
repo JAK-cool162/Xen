@@ -1635,6 +1635,7 @@ public final class Companion {
 			if (w == null && player.position().distanceTo(goal) < 2) return digToward(goal);   // right there (a drop at its feet): a step, not being stuck
 			if (w != null && !walker.stuck()) return w;
 			String why = w == null ? "no way it knows of" : walker.lastProblem.isEmpty() ? "getting no closer" : walker.lastProblem;
+			if (Walker.WALK_DEBUG) XenMod.LOG.info("[walk] {} calls the solver at {}: {} (w {}, stuck {})", name, player.blockPosition().toShortString(), why, w, walker.stuck());
 			if (solver.start(goal, why)) {
 				walker.stop();
 				Action a = solver.next(goal);

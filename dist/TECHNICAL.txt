@@ -1,7 +1,37 @@
-XEN COMPANION 1.7.0: TECHNICAL NOTES
+XEN COMPANION 1.7.1: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.7.1
+===================
+
+Chat thread (talk/Chat). The chat is made once per game, but a world closing called close(), which shut its executor
+down for good (ExecutorService.shutdownNow is final); the next world opened in the same game submitted to the dead
+executor and the RejectedExecutionException went up through the server tick (Chat.sleep from XenMod.wakeChat, or
+Chat.ask from chat). Now worker() makes a new single-thread executor when there's none or the last was shut down, and
+submit() never throws (it retries once on a fresh executor, else drops the job: ask() gives back its pending slot,
+sleep() closes the model on the calling thread). close() also drops the model reference (it kept a closed model
+before) and bumps a generation, so a model that finishes loading after its world closed is closed, not kept.
+XenMod.tick wraps the whole tick (a RuntimeException is logged at most once a minute, the tick goes on), wakeChat and
+the chat-message hook each in their own guard. CrossCheck: "chat across worlds" asks, rests and closes three times.
+
+Walking (Walker.steer, arrived, floorOnceDug, plan). The body yaw aims at the step it's on, or at the next once it's
+within half a block of it or moving away from it (in the air, or overshot within 1.2 blocks; not after a knockback);
+before, it always aimed at the step's centre, so mid-jump or mid-fall it turned right round and braked. The pitch looks
+at the path 3 steps ahead at 1.5 above the ground (never nearer than 2 blocks, -30..35 degrees, eased 30% a tick);
+before, a point 1.2 above the step it was on (steeply down when close). A running step (walk, diagonal, straight on)
+counts as reached by its column up to 2 blocks up (mid-jump); on foot, standing on the next step's column (within a
+block of height) skips to it, unless that's a gap jump, a bridge or a tower, or this step had digging. ASCEND moves are
+offered when the block to stand on can be dug out (floorOnceDug: the block under it firm, it and the one above
+diggable); before, only a block over its own head could be dug, so at a wall two high the search found nothing, the
+solver backed it off five blocks and it came back. With nothing better than where it stands, a search may go on to
+4 x 2500 nodes. On a test course (flat, a 2-block drop, a 2-high wall), per run: facing against its motion 27-30 ticks
+-> 0-1, looking more than 45 degrees down ~310 of ~490 moving ticks -> 0-3, backing off at the wall 3 of 6 runs -> 0 of
+10, 26.4 s -> ~21.5 s. -Dxen.walkDebug=true logs every step, plan and "no way" (development only).
+
+Settings: the Brain choice shows Mind.VERSION (Xen 6.0).
 
 
 WHAT'S NEW IN 1.7.0

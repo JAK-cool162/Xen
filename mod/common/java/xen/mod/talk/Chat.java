@@ -350,11 +350,13 @@ public final class Chat {
 	private final java.util.function.BooleanSupplier download;
 	private final int threads;
 	private final java.util.function.Supplier<String> policy;
-	private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
-		Thread t = new Thread(r, "xen-chat");
-		t.setDaemon(true);
-		return t;
-	});
+	/**
+	 * The chat thread. Made when it's needed: a world that closes shuts it down for good (an executor can't be started
+	 * again), and the next world opened in the same game gets a new one.
+	 */
+	private ExecutorService worker;
+	/** Counts worlds closed: a model that finishes loading after its world closed is thrown away, not kept. */
+	private volatile int generation;
 	private final java.util.concurrent.atomic.AtomicInteger pending = new java.util.concurrent.atomic.AtomicInteger();
 	private volatile Llm llm;
 	/**
@@ -396,6 +398,31 @@ public final class Chat {
 		return llm != null;
 	}
 
+	/** The chat thread (a new one if there's none, or the last was shut down when a world closed). */
+	private synchronized ExecutorService worker() {
+		if (worker == null || worker.isShutdown()) {
+			worker = Executors.newSingleThreadExecutor(r -> {
+				Thread t = new Thread(r, "xen-chat");
+				t.setDaemon(true);
+				return t;
+			});
+		}
+		return worker;
+	}
+
+	/** A job for the chat thread. Never throws into the game: if it can't be taken (a world closing), false. */
+	private boolean submit(Runnable job) {
+		for (int attempt = 0; attempt < 2; attempt++) {
+			try {
+				worker().submit(job);
+				return true;
+			} catch (java.util.concurrent.RejectedExecutionException e) {
+				// shut down between worker() and submit(): the next try makes a new one
+			}
+		}
+		return false;
+	}
+
 	/** The chat model's state in words, for players: ready, waking up, or off and why. */
 	public String status() {
 		if (llm != null) return "ready (" + (loaded == null ? "" : loaded.name() + ", ") + "on the " + runsOn + ")";
@@ -427,9 +454,12 @@ public final class Chat {
 		}
 		problem = null;
 		loading = true;
+		int forWorld = generation;
 		Thread t = new Thread(() -> {
 			try {
-				llm = model();
+				Llm made = model();
+				if (forWorld != generation) made.close();                      // (its world closed while it loaded)
+				else llm = made;
 			} catch (Throwable e) {
 				problem = e.toString();
 				log.accept("Xen's chat model is not available: " + e + ". Xen still answers in plain words.");
@@ -456,7 +486,7 @@ public final class Chat {
 			pending.decrementAndGet();
 			return;
 		}
-		worker.submit(() -> {
+		boolean taken = submit(() -> {
 			try {
 				Llm model = llm;
 				Request request = understand(message, name);
@@ -492,6 +522,7 @@ public final class Chat {
 				pending.decrementAndGet();
 			}
 		});
+		if (!taken) pending.decrementAndGet();                           // (a world closing: it wasn't heard)
 	}
 
 	private Llm model() throws IOException {
@@ -593,13 +624,23 @@ public final class Chat {
 		llm = null;
 		loaded = null;
 		problem = null;
-		worker.submit(model::close);                                   // after anything it's still saying
+		if (!submit(model::close)) model.close();                      // after anything it's still saying
 		log.accept("Xen's chat model is resting (nobody around to talk to).");
 	}
 
-	public void close() {
-		worker.shutdownNow();
-		if (llm != null) llm.close();
+	/**
+	 * The world is closing: the chat thread stops and the model is unloaded. Nothing is kept that the next world could
+	 * trip over: it gets a new thread and loads the model again when someone's around.
+	 */
+	public synchronized void close() {
+		generation++;
+		if (worker != null) worker.shutdownNow();
+		worker = null;
+		Llm model = llm;
+		llm = null;
+		loaded = null;
+		pending.set(0);
+		if (model != null) model.close();
 	}
 
 	/** One line of plain chat: no commands, no special tokens, at most two sentences. */

@@ -1,7 +1,21 @@
-**Xen Companion 1.7.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.7.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.7.1: fixes
+
+* **Crash fixed**: in single player, leaving a world and opening one again (without restarting the game) could crash
+  the game a little later ("RejectedExecutionException ... Chat.sleep" in the crash report). Closing a world shut Xen's
+  chat thread down for good, and the next world used the dead thread. Now each world gets a new one, the chat model is
+  fully unloaded when a world closes, and nothing Xen does in a server tick can take the game down with it any more
+  (a part that fails is logged and the game goes on).
+* **Walking like a player**: while running and jumping it no longer turns round mid-jump to look back at the spot it
+  just passed, or stares down at its feet: its body turns to where it's going, its eyes look a few steps ahead. Turning
+  round also braked it (the keys push the way it faces), so it's faster too (about 20% on a test course).
+* **No more backing off at a two-high wall**: it digs a step into it and goes up, like a player, instead of finding
+  "no way" and walking back and forth.
+* The settings show the brain as **Xen 6.0** (the mind 1.5.0 and later ship); it said "Xen 5.2".
 
 ### 1.7.0: houses that look built by a builder, villages with a plan, a world with a story
 
@@ -252,10 +266,10 @@ before noon of day 1) and 2.4 deaths a day, none drowned.
 
 | file | what |
 |---|---|
-| `xen-companion-1.7.0+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
-| `xen-companion-1.7.0+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
-| `xen-companion-1.7.0+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
-| `xen-companion-1.7.0+mc26.x.jar` | the light mod for 26.1 - 26.3 |
+| `xen-companion-1.7.1+mc1.21.11-with-chat.jar` | **all in one** for Minecraft 1.21.11: the mod with its chat model inside |
+| `xen-companion-1.7.1+mc26.x-with-chat.jar` | **all in one** for Minecraft 26.1 - 26.3 |
+| `xen-companion-1.7.1+mc1.21.11.jar` | the light mod for 1.21.11 (the chat model downloads if you want it). **For phones** |
+| `xen-companion-1.7.1+mc26.x.jar` | the light mod for 26.1 - 26.3 |
 | `SmolLM2-135M-Instruct-Q8_0.gguf`, `smollm2-360m-instruct-q8_0.gguf` | the chat models on their own (small for phones, normal for PCs) |
 | `TECHNICAL.txt` | **how it all works**: Xen 6.0, the settings, the commands, every change |
 | `xen-brain*.bin`, `SHA256SUMS.txt` | the classic brain (already inside the jars), checksums |

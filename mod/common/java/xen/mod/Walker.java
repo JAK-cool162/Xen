@@ -177,6 +177,12 @@ final class Walker {
 				return null;
 			}
 			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} plans {} moves to {}: {}", c.name, path.size(), BlockPos.containing(to), summary());
+			if (WALK_DEBUG) {
+				StringBuilder w = new StringBuilder();
+				for (int i = 0; i < Math.min(path.size(), 12); i++) w.append(path.get(i).kind()).append('>').append(path.get(i).to().toShortString()).append("; ");
+				XenMod.LOG.info("[walk] {} plan from {} to {} (goal {}, partial {}, moved {}, was {}): {}", c.name, p.blockPosition().toShortString(),
+						BlockPos.containing(to).toShortString(), want, partial, moved, was == null ? "-" : was.kind() + ">" + was.to().toShortString(), w);
+			}
 			String plan = summary();
 			if (!plan.equals(journaled)) c.journal("way", path.size() + " moves to " + BlockPos.containing(to).toShortString() + ": " + plan);
 			journaled = plan;
@@ -359,7 +365,10 @@ final class Walker {
 		Node best = first;
 		double bestH = first.f;
 		int expanded = 0;
-		while (!open.isEmpty() && expanded < LIMIT) {
+		// Nothing better yet than where it stands (at the foot of a wall that takes digging, the cheap ways all lead
+		// further from the goal): it thinks harder, up to four times as long, before it says there's no way (then the
+		// solver would back it off to look again: walking back and forth).
+		while (!open.isEmpty() && (expanded < LIMIT || best == first && expanded < LIMIT * 4)) {
 			Node n = open.poll();
 			if (n.closed) continue;
 			n.closed = true;
@@ -387,7 +396,15 @@ final class Walker {
 				open.add(next);
 			}
 		}
-		if (best == first) return null;
+		if (best == first) {
+			if (WALK_DEBUG) {
+				StringBuilder w = new StringBuilder();
+				for (Move m : moves(start, first.placedFloor, blocks)) w.append(m.kind()).append('>').append(m.to().toShortString()).append(String.format(" %.0f; ", m.cost()));
+				XenMod.LOG.info("[walk] {} no way from {} (expanded {}, open {}, h {}, dig {}, onGround {}): {}", c.name, start.toShortString(), expanded, open.size(),
+						String.format("%.1f", bestH), dig, c.player.onGround(), w);
+			}
+			return null;
+		}
 		partial = !aim.isIn(best.pos) && !(want == null && h(aim, best.pos) < 0.01);   // (only part of the way: more later)
 		List<Move> out = new ArrayList<>();
 		for (Node n = best; n.via != null; n = n.parent) out.add(0, n.via);
@@ -476,7 +493,7 @@ final class Walker {
 			}
 			// jump up a block (digging a staircase up if need be: over its head, then the two above the step)
 			BlockPos up = q.above();
-			if (!passable(q) && step(q) && floor(up) && !farmland(up)) {        // (never jump onto farmland: it tramples it)
+			if (!passable(q) && step(q) && floorOnceDug(up) && !farmland(up)) {   // (never jump onto farmland: it tramples it)
 				double br = breaks(p.above(2)) + breaks(up.above()) + breaks(up);
 				if (br < INF) add(Kind.ASCEND, p, up, SPRINT + JUMP + br + danger(up), br > 0 ? List.of(p.above(2), up.above(), up) : List.of());
 			}
@@ -625,6 +642,21 @@ final class Walker {
 	}
 
 	/** Something it can jump up onto (a full block, a slab, stairs; not a fence or a wall). */
+	/**
+	 * It could stand at p once what's in the way is dug out: the block under it firm to stand on, and p and the block
+	 * over it clear or diggable (a wall two high: it digs a step into it and goes up, like a player; before, only a
+	 * block over its own head could be dug, and at such a wall it found no way and backed off to look again).
+	 */
+	private boolean floorOnceDug(BlockPos p) {
+		if (floor(p)) return true;
+		if (breaks(p) >= INF || breaks(p.above()) >= INF) return false;
+		BlockPos b = p.below();
+		BlockState s = state(b);
+		VoxelShape shape = s.getCollisionShape(level, b);
+		if (shape.isEmpty() || shape.max(Direction.Axis.Y) > 1.0) return false;
+		return !s.is(Blocks.MAGMA_BLOCK) && !s.is(Blocks.CAMPFIRE) && !s.is(Blocks.SOUL_CAMPFIRE) && !s.is(Blocks.CACTUS);
+	}
+
 	private boolean step(BlockPos p) {
 		VoxelShape shape = state(p).getCollisionShape(level, p);
 		return !shape.isEmpty() && shape.max(Direction.Axis.Y) <= 1.0 || breaks(p) < INF;
@@ -729,6 +761,9 @@ final class Walker {
 			}
 			m = path.get(index);
 		}
+		if (WALK_DEBUG) XenMod.LOG.info("[walk] {} #{} {} {}->{} feet={} pos={} ground={} yaw={} zza={} v={}", c.name, index, m.kind(), m.from().toShortString(),
+				m.to().toShortString(), c.player.blockPosition().toShortString(), String.format("%.2f,%.2f,%.2f", c.player.getX(), c.player.getY(), c.player.getZ()),
+				c.player.onGround(), Math.round(c.player.getYRot()), c.player.zza, String.format("%.2f,%.2f", c.player.getDeltaMovement().x, c.player.getDeltaMovement().z));
 		if (c.hands.busy()) return false;                                   // its hands are at it (digging, a block down, a jump up)
 		// out of the way first: dig what's in it (its hands do that; the walking waits)
 		for (BlockPos b : m.dig()) {
@@ -786,7 +821,17 @@ final class Walker {
 		boolean settled = p.onGround() || p.isInWater() || p.onClimbable();
 		if (m.kind() == Kind.PILLAR || m.kind() == Kind.CLIMB_UP || m.kind() == Kind.CLIMB_DOWN) return feet.equals(m.to()) && settled;
 		if (m.kind() == Kind.SWIM) return flat < 0.6 && Math.abs(p.getY() - m.to().getY()) < 1.0;   // (bobbing in the water)
-		if (!last && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL) && smooth()) return feet.equals(m.to()) && flat < 0.9;   // (running on through)
+		boolean onFoot = m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.ASCEND || m.kind() == Kind.FALL;
+		if (!last && onFoot) {                                               // already on the next step (it ran or jumped on): on with it
+			BlockPos next = path.get(index + 1).to();
+			Kind nextKind = path.get(index + 1).kind();
+			if (feet.getX() == next.getX() && feet.getZ() == next.getZ() && Math.abs(feet.getY() - next.getY()) <= 1
+					&& nextKind != Kind.PARKOUR && nextKind != Kind.BRIDGE && nextKind != Kind.PILLAR && m.dig().isEmpty()) return true;
+		}
+		if (!last && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL) && smooth()) {   // (running on through; in the air mid-jump too)
+			return feet.getX() == m.to().getX() && feet.getZ() == m.to().getZ() && feet.getY() >= m.to().getY() && feet.getY() <= m.to().getY() + 2
+					&& flat < 0.9;
+		}
 		return feet.equals(m.to()) && settled && flat < (last || turning ? 0.35 : 0.7);
 	}
 
@@ -835,7 +880,7 @@ final class Walker {
 			}
 			default -> { }
 		}
-		face(to.add(0, 1.2, 0));
+		steer(m, to, last);
 		boolean straight = !last && direction(path.get(index + 1)) == direction(m);
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
 		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || m.kind() == Kind.ASCEND)
@@ -987,6 +1032,34 @@ final class Walker {
 	private int remaining() {
 		return path == null ? 0 : path.size() - index;
 	}
+
+	/**
+	 * Where it looks while it walks, like a player running: its body turned to where it's going (the step it's on, or
+	 * the next one once it's right on top of this one or already past it: never turning round mid-jump or mid-fall to
+	 * face a spot behind it, which would also brake it, as the keys push the way it faces), and its eyes on the way a
+	 * few steps ahead at about eye height, not down at its feet. The eyes follow smoothly.
+	 */
+	private void steer(Move m, Vec3 to, boolean last) {
+		var p = c.player;
+		Vec3 aim = to;
+		double dx = to.x - p.getX(), dz = to.z - p.getZ(), flat = Math.hypot(dx, dz);
+		Vec3 v = p.getDeltaMovement();
+		boolean passed = v.horizontalDistance() > 0.05 && dx * v.x + dz * v.z < 0     // (moving away from it: it's behind,
+				&& (flat < 1.2 || !p.onGround());                                      //  just overshot or in the air; not knocked back)
+		if (!last && (flat < 0.5 || passed)) aim = Vec3.atBottomCenterOf(path.get(index + 1).to());
+		double ax = aim.x - p.getX(), az = aim.z - p.getZ();
+		float yRot = Math.hypot(ax, az) < 0.1 ? p.getYRot() : (float) Math.toDegrees(Math.atan2(-ax, az));
+		p.setYRot(yRot);
+		p.setYHeadRot(yRot);
+		Vec3 gaze = Vec3.atBottomCenterOf(path.get(Math.min(path.size() - 1, index + 3)).to()).add(0, 1.5, 0);
+		Vec3 d = gaze.subtract(p.getEyePosition());
+		float want = (float) -Math.toDegrees(Math.atan2(d.y, Math.max(2.0, Math.hypot(d.x, d.z))));   // (never closer than 2 blocks: no staring down)
+		want = Math.max(-30, Math.min(35, want));
+		p.setXRot(p.getXRot() + (want - p.getXRot()) * 0.3f);
+	}
+
+	/** For developing the walking only (-Dxen.walkDebug=true): every step, every plan, every "no way" in the log. */
+	static final boolean WALK_DEBUG = Boolean.getBoolean("xen.walkDebug");
 
 	private void face(Vec3 at) {
 		var p = c.player;
