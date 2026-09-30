@@ -70,6 +70,27 @@ final class Critters {
 			c.acted = true;
 			return side > 0 ? Action.LEFT : Action.RIGHT;
 		}
+		// the same archer between shots: in close and hit it (armed, not badly hurt), or out of its sight (not standing there to be shot again)
+		for (Mob m : p.level().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(16), x -> x.isAlive() && x instanceof RangedAttackMob
+				&& x.getTarget() == p && !x.isUsingItem())) {
+			if (!p.hasLineOfSight(m)) continue;
+			boolean armed = c.hands.hotbar(Companion::isWeapon) >= 0;
+			if (armed && p.getHealth() >= 10 || p.getHealth() >= 16 && c.personality.bravery > 0.5f) {
+				c.goals.instant = "going for the " + id(m).replace('_', ' ') + " between its shots";
+				if (p.distanceTo(m) <= p.entityInteractionRange()) {
+					if (p.getAttackStrengthScale(0.5f) < 0.9f) return Action.IDLE;
+					c.hands.hit(m);
+					c.acted = true;
+					return Action.ATTACK;
+				}
+				c.run(true);
+				return c.walkTo(m.position());
+			}
+			Vec3 away = p.position().subtract(m.position()).normalize().scale(14).add(p.position());
+			c.goals.instant = "getting out of the " + id(m).replace('_', ' ') + "'s sight";
+			c.run(true);
+			return c.walkTo(away);
+		}
 		// drowned about while it swims
 		if (p.isInWater() && !p.level().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(12), x -> x.isAlive() && id(x).equals("drowned")).isEmpty()) {
 			Vec3 shore = c.walker.nearestDryLand(12);

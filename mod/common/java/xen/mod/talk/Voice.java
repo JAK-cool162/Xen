@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -369,6 +370,71 @@ public final class Voice {
 		else if (t.endsWith("ches") || t.endsWith("shes")) t = t.substring(0, t.length() - 2);
 		else if (t.endsWith("s") && !t.endsWith("ss") && !t.endsWith("glass") && t.length() > 3) t = t.substring(0, t.length() - 1);
 		return t;
+	}
+
+	// ------------------------------------------------------------------------------------ what was said before
+	private static final Pattern FOLLOW = Pattern.compile("^(and what about|what about|how about|what of|and|also|same for|same with|now)\\s+(.+?)[?!.\\s]*$");
+	private static final Pattern BACK = Pattern.compile("^(.*?)[,.!\\s]*\\b(and you|and u|what about you|how about you|wbu|hbu|you too|u too)\\s*\\??$");
+	private static final Pattern PRONOUN = Pattern.compile("\\b(it|that|them|those|this one|that one)\\b");
+
+	/**
+	 * A short follow-up, read with what went before: "what about cows?" after "do you like pigs?" is "do you like cows?";
+	 * "and a chest?" after "how do I make a bed?" is "how do I make a chest?"; "and you?" after "I'm good" is "how are
+	 * you?"; "is it good?" after asking about diamonds is about diamonds. The full question, or null (not a follow-up).
+	 */
+	public static String followUp(String text, String myName, String lastQuestion, String lastSubject, String lastLine) {
+		String t = text.toLowerCase(Locale.ROOT);
+		if (myName != null && !myName.isEmpty()) t = t.replaceAll("\\b" + Pattern.quote(myName.toLowerCase(Locale.ROOT)) + "\\b[,:]?", " ");
+		t = t.replaceAll("\\s+", " ").trim();
+		if (t.isEmpty()) return null;
+		Matcher back = BACK.matcher(t);
+		if (back.matches()) {                                                          // "I'm good, and you?": the same question back
+			String before = back.group(1).trim();
+			Heard said = hear(before.isEmpty() ? (lastLine == null ? "" : lastLine) : before, myName);
+			if (said.topic != null && (said.polarity > 0 || said.words.contains("like") || said.words.contains("love") || said.polarity < 0))
+				return "do you like " + said.topic.many() + "?";
+			if (said.flat.contains(" i'm ") || said.flat.contains(" i am ")) {
+				return said.feelMe || said.polarity != 0 || said.words.size() <= 3 ? "how are you?" : "what are you doing?";
+			}
+			return "how are you?";
+		}
+		if (lastQuestion == null || lastSubject == null || lastSubject.isBlank()) return null;
+		Matcher f = FOLLOW.matcher(t);
+		if (f.matches()) {                                                             // "what about cows?": the last question, about cows
+			String x = f.group(2).replaceAll("^(a|an|the|some|any|my|your)\\s+", "").trim();
+			if (x.isEmpty() || x.split(" ").length > 3 || x.matches(".*\\b(you|we|i|me|us|let's|lets|go|get|make|do|one|it|that|this|them)\\b.*")) return null;
+			String swapped = swap(lastQuestion, lastSubject, x);
+			return swapped == null || swapped.equalsIgnoreCase(lastQuestion) ? null : swapped;
+		}
+		Heard h = hear(t, myName);
+		Matcher pr = PRONOUN.matcher(t);
+		if (h.question && h.topic == null && h.about.isEmpty() && pr.find()) {          // "is it good?": the thing it was about
+			return t.substring(0, pr.start()) + lastSubject + t.substring(pr.end());
+		}
+		return null;
+	}
+
+	/** The last question with its subject swapped ("pigs" for "cows", plural or not as it was): null if it isn't in there. */
+	private static String swap(String question, String subject, String with) {
+		Matcher m = Pattern.compile("\\b" + Pattern.quote(subject.toLowerCase(Locale.ROOT)) + "(s|es)?\\b").matcher(question.toLowerCase(Locale.ROOT));
+		if (!m.find()) return null;
+		Lexicon.Topic tp = Lexicon.get().topic(with);
+		boolean plural = m.group(1) != null && !with.endsWith("s") && (tp == null || tp.plural() != null);   // ("iron" stays "iron")
+		return question.substring(0, m.start()) + with + (plural ? "s" : "") + question.substring(m.end());
+	}
+
+	/** What a question is about, to follow up on ("bed" in "how do I make a bed?", "pig" in "do you like pigs?"): empty if nothing. */
+	public static String subject(String text, String myName) {
+		Heard h = hear(text, myName);
+		if (!h.about.isEmpty()) return h.about.contains(" ") && !h.ask.equals("recipe") ? h.about.substring(h.about.lastIndexOf(' ') + 1) : h.about;
+		if (h.topic != null) {
+			for (String w : h.words) if (Lexicon.get().topic(w) == h.topic) return w.endsWith("s") && w.length() > 3 ? w.substring(0, w.length() - 1) : w;
+		}
+		Matcher m = Pattern.compile("\\bhow (many|much) ([a-z_]+)").matcher(h.flat);
+		if (m.find()) return m.group(2).endsWith("s") && m.group(2).length() > 3 ? m.group(2).substring(0, m.group(2).length() - 1) : m.group(2);
+		m = Pattern.compile("\\b(where('s| is| are)|have you (seen|found)|do you have|got any) (a |an |the |some |any )?([a-z_]+)").matcher(h.flat);
+		if (m.find()) return m.group(5);
+		return "";
 	}
 
 	/** One of the harder questions (why, what next, how to make something...): it answers those from what it knows. */

@@ -133,6 +133,7 @@ final class Chores {
 		gaveAt = -1;
 		kind = k;
 		own = false;
+		moves = 0;
 		shelterBuilt = false;
 		until = now() + (long) (TIME * c.personality.patience());
 		skip.clear();
@@ -356,6 +357,20 @@ final class Chores {
 				c.mode = Companion.Mode.STAY;
 				until = now() + 20 * 60;
 				return "You will dig into the hill here for the night (a little tunnel, then seal the way in behind you).";
+			}
+		}
+		if (!level.canSeeSky(feet.above()) && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && c.crafter.pickTier() >= 1) {
+			List<BlockPos> hole = pitPlan(level, feet);                     // under the ground already (a cave): a hole two deep and a lid, not a hut
+			if (hole != null) {
+				begin(Kind.SHELTER);
+				pit = hole;
+				walls = List.of();
+				shape = "hole";
+				waited = 0;
+				resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+				c.mode = Companion.Mode.STAY;
+				until = now() + 20 * 60;
+				return "You will dig a hole two deep right here and put a block over your head for the night (you're under the ground: no hut down here).";
 			}
 		}
 		int blocks = count("dirt", "cobblestone");
@@ -750,7 +765,7 @@ final class Chores {
 					resume = null;
 					yield null;
 				}
-				Action dig = own && resume == null ? mineFromShelter() : null;  // (not just sitting there all night: it digs down and mines, safe underground)
+				Action dig = own && resume != Companion.Mode.FOLLOW ? mineFromShelter() : null;   // (not just sitting there all night: it digs down and mines, safe underground)
 				yield dig != null ? dig : Action.IDLE;
 			}
 			case EAT -> {
@@ -777,11 +792,14 @@ final class Chores {
 		if (!c.player.level().isDarkOutside() || now() - hidAt < 400 || now() < nightMineAt || tier < 1 || c.player.getHealth() < 12
 				|| c.player.getFoodData().getFoodLevel() < 8 || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
 		nightMineAt = now() + 20 * 60 * 3;
+		Companion.Mode back = resume;
 		String ore = tier >= 3 ? "diamonds" : tier >= 2 ? "iron" : "coal";
 		int y = c.lessons.depth(ore, ore.equals("diamonds") ? -58 : ore.equals("iron") ? 16 : 40);
 		String plan = mine(Math.min(y, c.player.getBlockY() - 4), ore, ore.equals("diamonds") ? 3 : 6);
 		if (!plan.startsWith("You will")) return null;
 		own = true;
+		if (back != null) c.mode = back;                                      // (the shelter kept it put: free again, down its mine)
+		resume = null;
 		c.journal("does", "night in its shelter: digs down for " + ore + " instead of waiting for morning");
 		return next();
 	}
@@ -1399,6 +1417,28 @@ final class Chores {
 		return n;
 	}
 
+	/** While the furnace works: a block worth having within reach (ore first, then stone, then a log) it mines, or null. */
+	private Action whileItSmelts() {
+		if (c.hands.busy()) return Action.MINE;                               // (at it already)
+		if (c.crafter.pickTier() < 1) return null;
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		int bestRank = 0;
+		double reach = c.player.blockInteractionRange() - 0.5;
+		for (BlockPos p : BlockPos.betweenClosed(feet.offset(-4, 0, -4), feet.offset(4, 2, 4))) {   // (at its level and up: it doesn't dig out its own floor)
+			if (p.equals(furnace) || furnace != null && p.equals(furnace.below())) continue;
+			String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p).getBlock()).getPath();
+			int rank = id.endsWith("_ore") ? 3 : id.equals("stone") || id.equals("deepslate") || id.equals("cobblestone") ? 2 : id.endsWith("_log") ? 1 : 0;
+			if (rank == 0 || rank <= bestRank || c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) > reach || p.equals(c.hands.cantMine)) continue;
+			if (c.hands.seePoint(level, p) == null) continue;
+			best = p.immutable();
+			bestRank = rank;
+		}
+		if (best == null || !c.hands.mine(best)) return null;
+		c.acted = true;
+		return Action.MINE;
+	}
+
 	private BlockPos findFurnace() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition(), best = null;
@@ -1438,7 +1478,8 @@ final class Chores {
 		}
 		if (now() < checkFurnaceAt) {
 			doing = "waiting by the furnace (" + made + " of " + want + " done)";
-			return Action.IDLE;
+			Action meanwhile = whileItSmelts();                               // (not standing there: ore, stone, a log in reach, like a player)
+			return meanwhile != null ? meanwhile : Action.IDLE;
 		}
 		checkFurnaceAt = now() + 100;                                        // every five seconds a look
 		c.hands.stop();
@@ -1635,7 +1676,8 @@ final class Chores {
 					int cat = WorldSenses.category(level, m, state);
 					if (!want[cat]) continue;
 					if (cat == Blocks.STONE && !WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath())) continue;
-					double d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.max(0, dy - 1);   // high up counts as further
+					double d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 4 * Math.max(0, dy - 1)   // high up counts as further;
+							+ (dy < 0 ? 1.5 * -dy + (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 ? 8 : 0) : 0);   // down, and right under it, too: a face at its own level first (no crater round its feet)
 					if (cat == Blocks.LOG && lastLog != null && Math.abs(m.getX() - lastLog.getX()) <= 1 && Math.abs(m.getZ() - lastLog.getZ()) <= 1
 							&& m.getY() >= lastLog.getY() && m.getY() - feet.getY() <= 6) {
 						d = Math.sqrt(dx * dx + dz * dz) - 8;                            // the rest of the tree it's chopping, first
@@ -2118,11 +2160,13 @@ final class Chores {
 		int left = 0;
 		for (BlockPos p : walls) if (level.getBlockState(p).canBeReplaced()) left++;
 		doing = "building a " + shape + ", " + left + " blocks to go";
+		java.util.function.Predicate<BlockPos> notInside = q -> inside == null || inside.stream().noneMatch(i -> i.getX() == q.getX() && i.getZ() == q.getZ());
 		for (BlockPos p : walls) {
 			if (!level.getBlockState(p).canBeReplaced()) continue;
 			done = false;
-			if (c.hands.placeAt(p, c.personality.material)) {
+			if (c.hands.placeSupported(p, c.personality.material, notInside)) {   // (a gap under a wall: filled first, never its own room)
 				c.acted = true;
+				waited = 0;
 				return Action.PLACE;
 			}
 		}
@@ -2137,9 +2181,29 @@ final class Chores {
 			return Action.IDLE;
 		}
 		doing = "building a " + shape + ", " + left + " blocks to go, stuck: " + c.hands.cantPlace;
-
-		if (++waited < 30) return Action.IDLE;                          // someone in the way? wait a little
-		finish("I couldn't finish the " + shape + ": " + c.hands.cantPlace + ".");
+		if (++waited == 12 && inside != null && inside.size() > 1 && moves < inside.size()) {   // it can't see that side from here: another spot inside
+			BlockPos to = inside.get(++moves % inside.size());
+			waited = 0;
+			return c.walkTo(Vec3.atBottomCenterOf(to));
+		}
+		if (waited < 30) return Action.IDLE;                             // someone in the way? wait a little
+		String why = c.hands.cantPlace;
+		if (c.player.level().isDarkOutside() && (c.crafter.pickTier() >= 1 || diggableByHand(level, c.player.blockPosition()))) {
+			List<BlockPos> hole = pitPlan(level, c.player.blockPosition());   // the night won't wait: a hole in the ground instead
+			if (hole != null) {
+				c.journal("does", "couldn't finish the " + shape + " (" + why + "): digs a hole for the night instead");
+				walls = List.of();
+				inside = null;
+				pit = hole;
+				shape = "hole";
+				waited = 0;
+				return Action.IDLE;
+			}
+		}
+		finish("I couldn't finish the " + shape + ": " + why + ".");
 		return null;
 	}
+
+	/** Spots inside its shelter it has tried building from. */
+	private int moves;
 }

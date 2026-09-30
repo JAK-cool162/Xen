@@ -1,7 +1,38 @@
-**Xen Companion 1.9.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.9.3**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.9.3: no more standing about, building that works, chat that remembers
+
+* **No more standing about**:
+  * At night, a Xen with a pickaxe digs down and mines (stone, coal, more iron), from the surface, its shelter or a
+    cave. Before, some just stood "looking around" all night, or kept "taking a breather" with iron ore a block away.
+  * With nothing to do for 20 seconds (it used to be a minute), it goes off exploring.
+  * At a furnace it mines ore, stone or logs within reach while the iron smelts, instead of standing and waiting.
+* **"go explore" means it**: told to explore, it explores for a few minutes, day or night. Before, it said "Okay!"
+  and went back to smelting, or built a hut. "go explore?" with a question mark is an order too.
+* **"go to the cave"**: "go to the cave", "take me to the village", "go home", "go to the portal" take it to places it
+  remembers ("Okay, to the cave at 257 58 -190. Follow me!"). If it hasn't found one, it says so.
+* **Building its shelter**:
+  * It can put blocks against any block face (slabs, stairs, fences, leaves), not only full blocks.
+  * It fills a gap under a wall first, and steps to another spot inside if it can't see where a block goes.
+  * Under the ground it digs in instead of building a hut; if a hut can't be finished at night, it digs a hole.
+  * "Stuck: nothing solid to place it against" was this.
+* **Gathering stone**: it takes stone at its own level first instead of digging a 3x3 crater around its feet.
+* **Skeletons**: between shots, armed and healthy, it goes in and hits the skeleton; weak or unarmed, it gets out of
+  its sight. Before, it dodged, stood still, and dodged again.
+* **Chat that remembers**:
+  * Follow-ups are read with what went before: "do you like pigs?" then "what about cows?"; "how do I make a bed?"
+    then "and a chest?"; "how many logs?" then "what about iron?".
+  * "I'm good, and you?" and "wbu" ask it back.
+  * "Is it hard?" is about what you were talking about.
+  * With the AI chat model on, it's told what was just said too.
+  * "I love diamonds" is talk now, not an order to go mining.
+* **Grudges fade**: "sorry" mends things after a hit (a kind Xen forgives faster, a wrathful one slower), and old
+  grudges fade by themselves. When it won't do something because you hurt it, it says a sorry would help.
+* **Fixes**: "me'll come back to it" and "before me can make tools" read "I'll" and "I can" now; "I want to smelt your
+  iron" reads "smelt the iron".
 
 ### 1.9.2: the right tool, useful nights, chat that counts
 

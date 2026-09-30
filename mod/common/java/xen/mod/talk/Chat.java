@@ -231,6 +231,7 @@ public final class Chat {
 		} else if (TRADE.matcher(words).find()) {
 			intent = "trade";
 		} else {
+			if (ORDER.matcher(words).lookingAt()) words = words.replaceAll("[?\\s]+$", "");   // "go explore?": an order with a question mark is still an order
 			Matcher lead = SUGGESTION.matcher(words);                      // "why don't you build a house", "want to get some iron?": asked, nicely
 			boolean led = lead.lookingAt();
 			boolean notAsked = led && Pattern.compile("^(what|who|where|when|which|how many|how much|like|love|be|have|know|mind if|ever|still|think|remember|need|some|any)\\b")
@@ -248,6 +249,10 @@ public final class Chat {
 		}
 		return details(intent, words);
 	}
+
+	/** Starts with a verb that orders something ("go", "get", "build"...). */
+	private static final Pattern ORDER = Pattern.compile("^(go|get|come|follow|build|make|mine|dig|craft|explore|stay|stop|give|bring|find|hunt|chop|collect|gather|"
+			+ "fetch|kill|attack|sleep|eat|put|store|guard|help|fish|trade|light|smelt|cook|plant|farm|wait|run|take|grab|pick)\\b");
 
 	/** A suggestion or a nice way to ask: what's after it is the request ("why don't you get some wood" is get some wood). */
 	private static final Pattern SUGGESTION = Pattern.compile("^(why (don'?t|dont|not) (you|we) |why not |how about (you |we )?(go |try )?|maybe (you |we )?(should|could|can) "
@@ -690,7 +695,10 @@ public final class Chat {
 	private static final String[][] FIRST_PERSON = {{"\\bYou are\\b", "I'm"}, {"\\b[Yy]ou were\\b", "I was"}, {"\\bYou know there is\\b", "I know there's"},
 			{"\\b[Yy]ou will\\b", "I'll"}, {"\\byou won't\\b", "I won't"}, {"\\byou're\\b", "I'm"}, {"\\byou are\\b", "I'm"},
 			{"\\b(so|and|but|because|if|when) you\\b", "$1 I"}, {"\\b(tree|block|ore|lava|water|mob|mobs|it) you\\b", "$1 I"},
-			{"\\byou (need|have|know|saw|see)\\b", "I $1"}, {"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},
+			{"\\byou'll\\b", "I'll"}, {"\\byou've\\b", "I've"}, {"\\byou'd\\b", "I'd"}, {"\\bYou'll\\b", "I'll"},   // ("me'll come back to it": no)
+			{"\\byou (need|have|know|saw|see)\\b", "I $1"},
+			{"\\byou (can|can't|could|should|would|might|must|do|did|don't|didn't|get|got|go|want|like|make|feel|think|hate|love|found|made|built)\\b", "I $1"},   // ("before you can make tools": "I can", not "me can")
+			{"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},
 			{"\\bYou\\b", "I"}, {"\\byou\\b", "me"}};
 	private static final Pattern PLAN = Pattern.compile("\\bPlan: (.+)$");
 	/** Talk can't make it do things (only requests do), so it mustn't promise to. */

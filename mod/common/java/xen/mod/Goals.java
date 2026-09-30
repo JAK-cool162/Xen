@@ -39,10 +39,10 @@ final class Goals {
 		ORE("look for ore", "you would like to find treasure"),
 		HOUSE("build a house", "you have no home yet and a real player builds one"),
 		MINE("go mining", "you want iron and diamonds for better tools"),
-		SMELT("smelt your iron", "raw iron has to be smelted before you can make tools of it"),
-		FARM("build a farm", "a farm by your house means food without hunting"),
-		MOBFARM("build a mob farm", "a mob farm brings bones, string, gunpowder and experience to your door"),
-		STORE("put your things away in a chest", "your bag is getting full"),
+		SMELT("smelt the iron", "raw iron has to be smelted before you can make tools of it"),
+		FARM("build a farm", "a farm by the house means food without hunting"),
+		MOBFARM("build a mob farm", "a mob farm brings bones, string, gunpowder and experience to the door"),
+		STORE("put things away in a chest", "your bag is getting full"),
 		ADVENTURE("go on an adventure to beat the Ender Dragon", "you are well equipped now and the dragon is waiting"),
 		TRIALS("take on the trial chamber", "its vaults are full of loot"),
 		TRADE("trade with a villager", "you have things a villager may want"),
@@ -194,7 +194,7 @@ final class Goals {
 		long now = c.player.level().getGameTime();
 		reviewPlan(now);
 		if (current != null) {
-			boolean over = current == Short.EXPLORE ? now > until || progressWaiting() && now > until - EXPLORE_TICKS / 2
+			boolean over = current == Short.EXPLORE ? now > until || progressWaiting() && now > until - EXPLORE_TICKS / 2 && now >= exploreAskedUntil
 					: current == Short.FARM ? !c.farmer.on && !c.chores.busy()
 					: building(current) ? !c.builder.busy() : current == Short.STORE ? !c.storage.busy()
 					: current == Short.ADVENTURE ? !c.adventure.on : current == Short.TRIALS ? !c.trials.on : !c.chores.busy();
@@ -370,6 +370,43 @@ final class Goals {
 	 * not back where it came from) and walks there, sprinting; there it stops and looks around for a moment, and on to
 	 * the next. At dusk, with a home, it heads home instead. (What it sees on the way is what makes it want things.)
 	 */
+	/** Until when it's exploring because it was asked to (nothing of its own takes over, not even the dark). */
+	long exploreAskedUntil;
+
+	/**
+	 * Asked to go exploring ("go explore"): it goes, now, for a few minutes, instead of whatever it had in mind (it
+	 * used to say "okay" and then go back to its smelting, or build a hut for the night).
+	 */
+	String exploreAsked(long ticks) {
+		String plan = exploreFor(ticks);
+		if (plan.startsWith("You will")) exploreAskedUntil = c.player.level().getGameTime() + ticks;
+		return plan;
+	}
+
+	/** Off exploring for a while now (its own idea: stood about too long), whatever it had in mind. */
+	String exploreFor(long ticks) {
+		long now = c.player.level().getGameTime();
+		drop();
+		c.chores.cancel();
+		if (!begin(Short.EXPLORE, false, now)) return "You can't go exploring right now.";
+		until = now + ticks;
+		if (useMind()) {
+			option = Mind.EXPLORE;
+			optionFeatures = MindSense.features(c);
+			optionAt = now;
+			optionUntil = now + ticks;
+			optionHow = "to see new ground";
+		}
+		exploreTo = null;
+		lookUntil = 0;
+		return c.player.level().isDarkOutside() ? "You will go exploring, even though it's dark (carefully, a torch at the ready)."
+				: "You will go exploring on your own.";
+	}
+
+	boolean exploringAsked() {
+		return c.player != null && current == Short.EXPLORE && c.player.level().getGameTime() < exploreAskedUntil;
+	}
+
 	/** It swam out to sea that way: exploring goes the other way now. */
 	void turnAround() {
 		if (!Double.isNaN(heading)) heading += Math.PI;
@@ -392,7 +429,7 @@ final class Goals {
 	Action exploreStep() {
 		var p = c.player;
 		long now = p.level().getGameTime();
-		if (home != null && evening() && p.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+		if (home != null && evening() && now >= exploreAskedUntil && p.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
 				&& p.blockPosition().distSqr(home) > 12 * 12 && p.blockPosition().distSqr(home) < 400 * 400) {
 			instant = "heading home for the night";
 			c.run(true);
@@ -406,7 +443,7 @@ final class Goals {
 			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
 			if (top - feet.getY() > 8) {
 				int tier = c.crafter.pickTier();
-				if (tier >= 1 && !evening() && now >= nextMineUnderground) {
+				if (tier >= 1 && !evening() && now >= nextMineUnderground && now >= exploreAskedUntil) {   // (asked to explore: up and out instead)
 					nextMineUnderground = now + 20 * 60 * 3;
 					String plan = tier >= 3 && feet.getY() < 10 ? c.chores.mine(feet.getY(), "diamonds", 3)
 							: tier >= 2 ? c.chores.mine(feet.getY(), "iron", 6) : c.chores.mine(feet.getY(), "coal", 8);
@@ -580,6 +617,7 @@ final class Goals {
 
 	/** Someone asked it for something: that comes first. */
 	void drop() {
+		exploreAskedUntil = 0;
 		current = null;
 		buildingHome = false;
 		c.chores.own = false;
@@ -715,7 +753,7 @@ final class Goals {
 	 */
 	boolean nightfall() {
 		long now = c.player.level().getGameTime();
-		if (option < 0 || now - nightCheckedAt < 100 || !useMind() || c.mode != Companion.Mode.FREE) return false;
+		if (option < 0 || now - nightCheckedAt < 100 || !useMind() || c.mode != Companion.Mode.FREE || now < exploreAskedUntil) return false;
 		nightCheckedAt = now;
 		boolean outdoorWork = option == Mind.WOOD || option == Mind.EXPLORE || option == Mind.HOUSE || option == Mind.FARM
 				|| option == Mind.STONE && !needBlocksForTheNight() || option == Mind.REST;
@@ -771,9 +809,12 @@ final class Goals {
 			int mineRange = who.believes("night_mining") ? 96 : who.believes("night_belongs_to_monsters") ? 0 : 32;   // (its beliefs about the night)
 			boolean sheltered = f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below;
 			boolean atHome = home != null && c.player.blockPosition().closerThan(home, 24);
-			if (tier >= 1 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), mineRange) || sheltered && !atHome)
-					&& wantsOre(tier, iron)) return why(Mind.MINE, sheltered && !below ? "night: digging down from its shelter (mining is safe under the ground)"
-							: "night: mining (safe under the ground)");
+			boolean monstersNight = who.believes("night_belongs_to_monsters") && !below;   // (its belief: it stays in, unless it's down a mine already)
+			if (tier >= 1 && can[Mind.MINE] && !monstersNight) {               // a pickaxe: the night's for mining, as players do (stone, coal, more iron: all worth having)
+				boolean mineNear = mine != null && mine.closerThan(c.player.blockPosition(), mineRange);
+				return why(Mind.MINE, below || mineNear ? "night: mining (safe under the ground)"
+						: sheltered ? "night: digging down from its shelter (mining is safe under the ground)" : "night: digging down to mine (safe under the ground)");
+			}
 			if (sheltered || atHome) {                                          // in for the night: something useful, not just waiting
 				if (can[Mind.CRAFT]) return why(Mind.CRAFT, "night: crafting inside");
 				if (can[Mind.SMELT]) return why(Mind.SMELT, "night: smelting inside");

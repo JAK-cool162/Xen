@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.9.2
+# Xen Companion (Fabric mod) 1.9.3
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.9.2+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.2+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.2+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.9.2+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.9.3+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.3+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.3+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.9.3+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.9.2+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.9.3+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,25 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## No standing about, building that works, chat that remembers (1.9.3)
+
+* **Busy nights**: with a pickaxe it digs down and mines at night instead of standing about.
+* **Never idle long**: with nothing to do for 20 seconds it goes exploring.
+* **Furnaces**: while its iron smelts, it mines what's in reach.
+* **"go explore" means it**, day or night; so does "go explore?".
+* **"go to the cave" / "take me to the village" / "go home"**: it takes you to places it remembers.
+* **Shelters**:
+  * It builds against any block face, and fills a gap under a wall first.
+  * It moves to see where a block goes.
+  * Under the ground it digs in instead of building a hut.
+* **Stone**: it takes stone at its own level, not a crater round its feet.
+* **Skeletons**: between shots it charges in (armed) or gets out of sight.
+* **Chat remembers**:
+  * "do you like pigs?" then "what about cows?", "how do I make a bed?" then "and a chest?".
+  * "and you?", "wbu", and "is it hard?" about what you were just talking about.
+  * The AI chat model is told what was just said.
+* **Grudges fade**: say sorry after hitting it; old grudges fade by themselves.
 
 ## The right tool, useful nights, chat that counts (1.9.2)
 

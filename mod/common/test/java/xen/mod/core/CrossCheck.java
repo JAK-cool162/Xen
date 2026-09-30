@@ -267,7 +267,8 @@ public final class CrossCheck {
 		String[][] asks = {{"why don't you build a house", "build"}, {"want to get some iron?", "iron"}, {"get wool for a bed", "bed"}, {"make a bed", "bed"},
 				{"you should get some wood", "wood"}, {"should we go mining?", "mine"}, {"should i go mining?", "chat"}, {"how many diamonds do you have?", "chat"},
 				{"what should we do now?", "chat"}, {"how do i make a bed?", "chat"}, {"i need wool", "chat"}, {"would you like some food?", "chat"},
-				{"do you want some wood?", "chat"}, {"can you come here?", "follow"}, {"why not explore", "explore"}};
+				{"do you want some wood?", "chat"}, {"can you come here?", "follow"}, {"why not explore", "explore"}, {"go explore?", "explore"},
+				{"get some wood?", "wood"}};
 		int acted = 0;
 		for (String[] c : asks) {
 			String got = xen.mod.talk.Chat.understand(c[0], "aria").intent();
@@ -275,6 +276,23 @@ public final class CrossCheck {
 			else System.out.println("  chat misread \"" + c[0] + "\" as " + got + " (not " + c[1] + ")");
 		}
 		ok &= acted == asks.length;
+		String[][] follows = {                                                     // follow-ups, read with what went before
+				{"do you like pigs?", "what about cows?", "do you like cows?"}, {"how do i make a bed?", "and a chest?", "how do i make a chest?"},
+				{"how many logs do you have?", "what about iron?", "how many iron do you have?"}, {"i'm good", "and you?", "how are you?"},
+				{"how do i get diamonds?", "is it hard?", "is diamond hard?"}, {"do you like pigs?", "how about you get some food", null}};
+		int followed = 0;
+		for (String[] f : follows) {
+			String got = xen.mod.talk.Voice.followUp(f[1], "Aria", f[0], xen.mod.talk.Voice.subject(f[0], "Aria"), f[0]);
+			if (java.util.Objects.equals(got, f[2])) followed++;
+			else System.out.println("  follow-up \"" + f[1] + "\" after \"" + f[0] + "\" read as " + got + " (not " + f[2] + ")");
+		}
+		ok &= followed == follows.length;
+		String person = xen.mod.talk.Chat.firstPerson("raw iron has to be smelted before you can make tools of it");
+		ok &= person.equals("raw iron has to be smelted before I can make tools of it");
+		String later = xen.mod.talk.Chat.firstPerson("a staircase down (you'll come back to it)");
+		ok &= later.equals("a staircase down (I'll come back to it)");
+		if (!later.contains("I'll")) System.out.println("  first person: " + later);
+		if (!person.contains("I can")) System.out.println("  first person: " + person);
 		float[] x = new float[xen.mod.talk.ActNet.F];                                // a reaction teaches it: that reply likelier next time
 		x[0] = 1;
 		x[18] = 1;
@@ -295,8 +313,9 @@ public final class CrossCheck {
 		}
 		ok &= saved;
 		System.out.println(String.format(java.util.Locale.ROOT, "word engine: network agrees with its teacher %.1f%%, understood %d/%d, %d replies in 6 tones (%d different, %d bad), "
-				+ "harder questions %d/%d, suggestions and asks %d/%d, learning %.3f -> %.3f, saved %s",
-				agree * 100, understood, cases.length, replies, distinct.size(), bad, answered, harder.length, acted, asks.length, before, after, saved ? "and loaded" : "FAILED"));
+				+ "harder questions %d/%d, suggestions and asks %d/%d, follow-ups %d/%d, learning %.3f -> %.3f, saved %s",
+				agree * 100, understood, cases.length, replies, distinct.size(), bad, answered, harder.length, acted, asks.length, followed, follows.length,
+				before, after, saved ? "and loaded" : "FAILED"));
 		return ok;
 	}
 

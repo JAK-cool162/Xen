@@ -285,6 +285,10 @@ public final class Companion {
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
 		if (player.tickCount % 20 == 7) noticeSheep();                  // (where the sheep were: for wool, for a bed)
+		if (player.tickCount % 6000 == 11) {                            // every five minutes, old grudges fade a little (a kind one's faster, a wrathful one's slower)
+			float fade = 0.02f + 0.05f * personality.kindness - 0.02f * personality.sin(xen.mod.core.Sins.WRATH);
+			if (fade > 0) trust.replaceAll((k, v) -> v < 0 ? Math.min(0f, v + fade) : v);
+		}
 		if (player.tickCount % 10 == 0) {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			places.tick();                                               // the way it walked, remembered
@@ -1378,7 +1382,7 @@ public final class Companion {
 				}
 			} else return walkTo(Vec3.atBottomCenterOf(woolTrip));
 		}
-		if (mode != Mode.FREE || builder.busy() && !builder.ownHouse()) return null;   // (its own house can wait while it gets wool: the building picks up after)
+		if (mode != Mode.FREE || builder.busy() && !builder.ownHouse() || goals.exploringAsked()) return null;   // (its own house can wait while it gets wool: the building picks up after; not what it was asked)
 		if (chores.busy() && (!chores.own || chores.forWool && chores.kind == Chores.Kind.HUNT)) return null;   // (asked for something: that first; already after wool)
 		if (now - bedCheckAt < 100) return null;
 		bedCheckAt = now;
@@ -2134,6 +2138,34 @@ public final class Companion {
 	/**
 	 * Go to a block: "x y z" (or "x z": the ground there). It walks to that very block and stays there. Its answer.
 	 */
+	private static final java.util.regex.Pattern GO_PLACE = java.util.regex.Pattern.compile("\\b(?:go|walk|move|head|run|take me|lead me|bring me|show me the way)\\s+"
+			+ "(?:back )?(?:to|over to|into)\\s+(?:the |a |that |this |your |our |its )?(cave|village|house|home|base|mine|nether portal|portal|temple|desert temple|"
+			+ "jungle temple|monument|ocean monument|stronghold|shipwreck|ruins|ruined portal|outpost|pillager outpost|mansion|trial chamber|farm)\\b");
+
+	/** Off to a place it knows ("the cave", "home"): where, how far; or that it doesn't know one. */
+	String goToPlace(String kind) {
+		BlockPos at = switch (kind) {
+			case "house", "home", "base" -> goals.home;
+			case "mine" -> places.get("mine");
+			case "cave" -> caves.nearest(400) != null ? caves.nearest(400) : places.find("cave") != null ? places.find("cave").pos() : null;
+			case "portal" -> places.get("portal") != null ? places.get("portal") : places.find("ruined portal") != null ? places.find("ruined portal").pos() : null;
+			case "temple" -> places.find("desert temple") != null ? places.find("desert temple").pos() : places.find("jungle temple") != null ? places.find("jungle temple").pos() : null;
+			case "monument" -> places.find("ocean monument") != null ? places.find("ocean monument").pos() : null;
+			case "outpost" -> places.find("pillager outpost") != null ? places.find("pillager outpost").pos() : null;
+			case "mansion" -> places.find("woodland mansion") != null ? places.find("woodland mansion").pos() : null;
+			default -> places.find(kind) != null ? places.find(kind).pos() : null;
+		};
+		String a = kind.equals("home") ? "" : "the ";
+		if (at == null) return pick3("I don't know where " + (a.isEmpty() ? "home is" : "a " + kind + " is") + " yet.", "I haven't found " + ("aeiou".indexOf(kind.charAt(0)) >= 0 ? "an " : "a ") + kind + " yet.",
+				"No idea where " + (a.isEmpty() ? "home is" : "one is") + ", sorry.");
+		commandedTo = at;
+		commandedAt = player.level().getGameTime();
+		chores.cancel();
+		goals.drop();
+		return String.format(java.util.Locale.ROOT, "Okay, to %s%s at %d %d %d (%.0f blocks from here). Follow me!", a, kind, at.getX(), at.getY(), at.getZ(),
+				Math.sqrt(player.blockPosition().distSqr(at)));
+	}
+
 	String goTo(String where) {
 		var m = COORDS.matcher(where);
 		if (!m.find() || player == null) return "Where? Tell me the spot: x y z (or x z).";
@@ -2576,7 +2608,23 @@ public final class Companion {
 		if (player != null) mod.overheardBy(player, name, text);          // and the Xens close by
 		life.said(text);                                                // a nod, a shake of the head, a wave
 		journal("says", text);
+		if (talkingWith != null && player != null && player.level().getGameTime() < talkingUntil) {
+			Talk t = talks.get(talkingWith);
+			if (t != null) t.reply = text;                                  // (what it answered them: a follow-up is read with it)
+		}
 	}
+
+	private static String clip(String s, int n) {
+		return s.length() <= n ? s : s.substring(0, n) + "...";
+	}
+
+	/** A conversation with one player: what they said last and before, their last question and what it was about, its answer. */
+	private static final class Talk {
+		String line, prevLine, question, subject, reply, prevReply;
+		long at = -1_000_000;
+	}
+
+	private final Map<UUID, Talk> talks = new HashMap<>();
 
 	/** How much of the world's lore it has written down (entries), and its volumes so far (a chronicler: see {@link Lore}). */
 	int loreWritten, loreVolume;
@@ -2784,7 +2832,7 @@ public final class Companion {
 		if (!mod.config.refuse) return null;
 		String who = from.getName().getString();
 		float t = trust(from.getUUID());
-		if (t < -0.2f) return "No, you won't, because " + who + " hurt you.";
+		if (t < -0.2f) return "No, you won't, because " + who + " hurt you (a sorry would help).";
 		if (PLEASE.matcher(words).find()) return null;
 		String intent = r.intent();
 		float health = player.getHealth() / player.getMaxHealth();
@@ -2825,9 +2873,33 @@ public final class Companion {
 		UUID u = from.getUUID();
 		known.add(u);                                                 // now it knows them
 		String who = from.getName().getString();
+		Talk talk = talks.computeIfAbsent(u, k -> new Talk());         // what was said before: "what about cows?", "and you?", "is it good?"
+		long saidAt = player.level().getGameTime();
+		if (said != null && r.intent().equals("chat")) {
+			boolean fresh = saidAt - talk.at < 20 * 60 * 3;
+			String full = xen.mod.talk.Voice.followUp(said, name, fresh ? talk.question : null, fresh ? talk.subject : null, fresh ? talk.line : null);
+			if (full != null && !full.equalsIgnoreCase(said)) {
+				journal("thinks", "follow-up: \"" + said + "\" means \"" + full + "\"");
+				said = full;
+				r = xen.mod.talk.Chat.understand(full, name);
+			}
+		}
+		if (said != null) {
+			talk.prevLine = talk.line;
+			talk.prevReply = talk.reply;
+			talk.reply = null;
+			talk.line = said;
+			talk.at = saidAt;
+			if (xen.mod.talk.Voice.hear(said, name).question) {
+				talk.question = said;
+				String subject = xen.mod.talk.Voice.subject(said, name);
+				if (!subject.isEmpty()) talk.subject = subject;
+			}
+		}
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
 		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
-		if ((told.news || told.feelMe) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!" is news, not "go mine diamonds"
+		boolean aboutThem = words.toLowerCase(java.util.Locale.ROOT).matches("(?s)^\\s*i('m| am| really| just| also)? ?(love|like|hate|found|got|have|had|made|saw|think|mined|killed|built|am|was)\\b.*");
+		if ((told.news || told.feelMe || aboutThem) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!", "I love diamonds": talk, not "go mine diamonds"
 		needs.heard(from, words);                                      // "I'm hungry", "I need wood": it may help (its choice)
 		Tribe village = tribe();
 		if (village != null && village.members.size() >= 2) {             // "new rule: no fighting in the village": they vote
@@ -2844,6 +2916,11 @@ public final class Companion {
 				say(xen.mod.talk.Chat.firstPerson(road));
 				return null;
 			}
+		}
+		var place = GO_PLACE.matcher(words.toLowerCase(java.util.Locale.ROOT));
+		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && place.find()) {   // "go to the cave", "take me to the village": a place it knows
+			say(goToPlace(place.group(1)));
+			return null;
 		}
 		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).find()) {
 			say(goTo(words.substring(GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).results().findFirst().get().start())));
@@ -3020,7 +3097,7 @@ public final class Companion {
 				case "explore" -> {
 					chores.cancel();
 					mode = Mode.FREE;
-					plan = "You will go exploring on your own.";
+					plan = goals.exploreAsked(20 * 60 * 3);                // (three minutes of it, then its own plans again)
 				}
 				case "stop" -> {
 					fisher.stop();
@@ -3106,7 +3183,9 @@ public final class Companion {
 				say(reply);
 				return null;
 			}
-			return notes();                                           // just talk: the chat answers
+			String before = talk.prevLine == null || saidAt - talk.at > 20 * 60 * 3 ? ""
+					: "Just before, " + who + " said \"" + clip(talk.prevLine, 90) + "\"" + (talk.prevReply == null ? "" : " and you answered \"" + clip(talk.prevReply, 90) + "\"") + ". ";
+			return before + notes();                                  // just talk: the chat answers (knowing what was just said)
 		}
 		if (!refused) lastThought = "Asked by " + who + ": " + plan;
 		say(voice.ack(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, "")));   // what it will do (or why not), right away, in its own tone
@@ -3352,26 +3431,29 @@ public final class Companion {
 		}
 		boolean legit = player.isSleeping() || player.level().isDarkOutside() && (goals.option == xen.mod.core.Mind.REST || goals.option == xen.mod.core.Mind.SLEEP)
 				|| builder.busy() || farmer.on || fisher.on || crafter.hasOrder() || storage.busy() || player.isInWater() || adventure.on && dragon.next() != null
-				|| chores.busy() && (chores.kind == Chores.Kind.HIDE || chores.kind == Chores.Kind.SHELTER) || rider.busy();   // (in its shelter for the night, riding)
+				|| chores.busy() && (chores.kind == Chores.Kind.HIDE || chores.kind == Chores.Kind.SHELTER || chores.kind == Chores.Kind.SMELT) || rider.busy();   // (in its shelter for the night, at its furnace, riding)
 		Vec3 here = player.position();
 		if (legit || idleFrom == null || idleFrom.distanceTo(here) > 3) {
 			idleFrom = here;
 			idleSince = now;
 			return null;
 		}
-		if (now - idleSince < 1200) return null;
+		boolean doingNothing = !chores.busy() && (goals.instant.isEmpty() || goals.instant.startsWith("looking around") || goals.instant.equals("exploring"));
+		if (now - idleSince < (doingNothing ? 400 : 1200)) return null;      // (twenty seconds of nothing is a lot for a player; a stuck chore gets a minute)
 		standings++;
 		String was = goals.instant.isEmpty() ? chores.busy() ? "a chore" : "nothing" : goals.instant;
-		journal("does", "stood about for a minute (" + was + "): moves on");
+		journal("does", "stood about " + (doingNothing ? "doing nothing" : "for a minute") + " (" + was + "): moves on");
 		chores.cancel();
 		goals.drop();
 		walker.stop();
-		double a = random().nextDouble() * Math.PI * 2;
-		movingOnTo = here.add(Math.cos(a) * 16, 0, Math.sin(a) * 16);
-		movingOnUntil = now + 300;
 		idleFrom = null;
 		chatter(personality.sin(xen.mod.core.Sins.SLOTH) > 0.6f ? pick3("Fine, fine. I'll do something.", "Ugh, okay, moving.", "Alright, alright.")
 				: pick3("Enough standing around.", "Right, let's do something.", "Okay, what next?"), false);
+		String out = goals.exploreFor(20 * 45);                              // off to see new ground a while (then its own plans again)
+		if (out.startsWith("You will")) return null;
+		double a = random().nextDouble() * Math.PI * 2;
+		movingOnTo = here.add(Math.cos(a) * 16, 0, Math.sin(a) * 16);
+		movingOnUntil = now + 300;
 		return walkTo(movingOnTo);
 	}
 	/** Its owner's own rules (the script setting). */

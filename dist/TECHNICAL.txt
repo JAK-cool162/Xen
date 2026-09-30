@@ -1,7 +1,80 @@
-XEN COMPANION 1.9.2: TECHNICAL NOTES
+XEN COMPANION 1.9.3: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.9.3
+===================
+
+Standing about:
+- Goals.agenda, dark: with a pickaxe (tier 1+) and MINE allowed, the night's for mining, above ground too.
+  - Reasons in the journal: "night: mining" (underground or near its mine), "digging down from its shelter", or
+    "digging down to mine".
+  - The old wantsOre() gate is gone at night.
+  - Only the belief night_belongs_to_monsters keeps it in (above ground). Then, sheltered or home, it crafts, smelts
+    or stores, else rests; out in the open it builds a shelter.
+- Companion.standingAbout: idle with no chore (instant empty, "looking around" or "exploring") moves on after 400
+  ticks (was 1200; a chore still gets 1200).
+  - Moving on is Goals.exploreFor(900): option EXPLORE with the Short EXPLORE goal (was a random 16-block walk).
+  - At its furnace (SMELT) counts as busy.
+- Chores.smeltNext, while waiting (checkFurnaceAt): whileItSmelts() mines the best natural block in reach. It looks
+  from its level to 2 up, within 4 blocks, visible: ore, then stone/deepslate/cobblestone, then logs. Never the
+  furnace or what's under it.
+- Critters.danger: a ranged mob targeting it, not drawing, in sight.
+  - Armed and health 10+ (or health 16+ and brave): it walks in and hits between shots.
+  - Otherwise it runs 14 blocks away from it.
+
+Requests:
+- "explore" is Goals.exploreAsked(3 min): drop(), begin(Short.EXPLORE), option EXPLORE, exploreAskedUntil. Until then:
+  - nightfall() doesn't drop it;
+  - progressWaiting doesn't cut it short;
+  - exploreStep doesn't head home at dusk or turn to tunnel mining underground (it goes up and out);
+  - bedBeforeNight leaves it alone.
+- Chat.understand: a line starting with an order verb (go, get, build, mine, explore...) loses a trailing "?".
+- Companion.GO_PLACE: "go/walk/head/run/take me/lead me/bring me (back) to/into (the) <place>" goes through
+  goToPlace(kind), which sets commandedTo:
+  - cave: Caves.nearest(400), else Places "cave";
+  - home/house/base: goals.home;
+  - mine, portal (or ruined portal), temple (desert or jungle), monument, outpost, mansion, trial chamber, village,
+    stronghold...: Places.
+  - Owner, or trust 0.5+.
+
+Placing:
+- Hands.placeAt clicks any clickable neighbour (not air, not replaceable, a non-empty shape), not only full blocks.
+- It sneaks when clicking an interactive block (containers, tables, doors, trapdoors, gates, buttons, levers, diodes,
+  anvils, beds).
+- Hands.placeSupported(pos, material, underOk): with nothing to put a block against, it puts one under it first (down
+  to 3 below, where underOk allows).
+- Chores.shelterNext:
+  - uses placeSupported, never filling the room's own columns;
+  - after 12 stuck ticks it walks to another cell inside (as many tries as cells);
+  - after 30, at night, with a pickaxe or diggable ground, it switches to pitPlan (a hole two deep with a lid) instead
+    of giving up.
+- Chores.shelter: under the ground (no sky above) with a pickaxe, it digs a pit first, not a hut.
+- Chores.glance (gathering): blocks below its feet cost 1.5 per block down, and +8 in the 3x3 column under it. It takes
+  faces at its own level first instead of a crater round its feet.
+
+Chat:
+- Companion keeps a Talk per player: last and previous line, last question, its subject (Voice.subject), its own last
+  answer (recorded in say() while talkingWith).
+- Voice.followUp, within 3 minutes:
+  - "what about / how about / and / also X" swaps X into the last question for its subject. It keeps the plural
+    unless X is a mass word, and skips pronouns and verbs.
+  - "(...,) and you / wbu / hbu / what about you": liking a topic is "do you like <topic>?", "I'm ..." is "how are
+    you?" or "what are you doing?".
+  - A question with it/that/them and no subject of its own gets the last subject.
+  - The request is re-read with Chat.understand (journal: "follow-up: ... means ...").
+- The chat model's notes start with the exchange before ("Just before, X said ... and you answered ...").
+- Lines about oneself ("I love/like/hate/found/got/have/made/saw/think X") aren't gathering orders.
+- Chat.firstPerson: you'll/you've/you'd become I'll/I've/I'd, and "you can/could/should/want/..." becomes "I ...", not
+  "me ...". The goal texts say "smelt the iron", "put things away".
+- Grudges:
+  - Diplomacy.asked outside a fight with negative trust mends it by 0.25 + 0.35 kindness - 0.25 wrath (at least 0.1,
+    at most up to +0.05), and says whether it forgives.
+  - Every 5 minutes negative trust fades by 0.02 + 0.05 kindness - 0.02 wrath.
+  - The refusal adds "(a sorry would help)".
+- CrossCheck adds follow-ups 6/6, "go explore?" and "get some wood?", and the first-person cases.
 
 
 WHAT'S NEW IN 1.9.2

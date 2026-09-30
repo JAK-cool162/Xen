@@ -761,15 +761,18 @@ public final class Hands {
 			if (pass == 1 && !byFeet(pos) && !blindOk) break;
 			for (Direction d : Direction.values()) {
 				BlockPos against = pos.relative(d);
-				if (!level.getBlockState(against).isCollisionShapeFullBlock(level, against)) continue;
+				if (!clickable(level, against)) continue;                      // (any block with a face to click: a slab, stairs, a fence, leaves too)
 				solid = true;
 				Vec3 hit = Vec3.atCenterOf(against).add(Vec3.atLowerCornerOf(d.getOpposite().getUnitVec3i()).scale(0.5));
 				if (pass == 0 && !canSee(level, against, d.getOpposite(), hit)) continue;
 				stop();
 				p.getInventory().setSelectedSlot(slot);
 				face(hit);
+				boolean sneak = interactive(level.getBlockState(against).getBlock());   // (a chest, a table: sneak, or the click opens it)
+				if (sneak) p.setShiftKeyDown(true);
 				p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
 						new BlockHitResult(hit, d.getOpposite(), against, false));
+				if (sneak) p.setShiftKeyDown(false);
 				Compat.swing(p);
 				holdLook(hit, 8);                                              // (its eyes stay on it a moment, as a player's do)
 				current = Action.PLACE;
@@ -780,6 +783,43 @@ public final class Hands {
 			}
 		}
 		cantPlace = solid ? "it can't see that spot from here" : "nothing solid to place it against";
+		return false;
+	}
+
+	/** A block a click can put something against: anything solid with a shape (not air, water, grass or snow it'd replace). */
+	static boolean clickable(ServerLevel level, BlockPos at) {
+		BlockState st = level.getBlockState(at);
+		return !st.isAir() && !st.canBeReplaced() && !st.getShape(level, at).isEmpty();
+	}
+
+	/** Blocks a plain right-click uses instead of building against (a player sneaks to put a block on them). */
+	static boolean interactive(net.minecraft.world.level.block.Block b) {
+		return b instanceof net.minecraft.world.level.block.EntityBlock || b instanceof net.minecraft.world.level.block.CraftingTableBlock
+				|| b instanceof net.minecraft.world.level.block.DoorBlock || b instanceof net.minecraft.world.level.block.TrapDoorBlock
+				|| b instanceof net.minecraft.world.level.block.FenceGateBlock || b instanceof net.minecraft.world.level.block.ButtonBlock
+				|| b instanceof net.minecraft.world.level.block.LeverBlock || b instanceof net.minecraft.world.level.block.DiodeBlock
+				|| b instanceof net.minecraft.world.level.block.AnvilBlock || b instanceof net.minecraft.world.level.block.BedBlock;
+	}
+
+	/**
+	 * Place a block, and if there's nothing at all to put it against, a block under it first (as a player builds up
+	 * from the ground), when {@code underOk} says the spot below may be filled. True when it put something down.
+	 */
+	boolean placeSupported(BlockPos pos, String material, java.util.function.Predicate<BlockPos> underOk) {
+		if (placeAt(pos, material)) return true;
+		if (!cantPlace.startsWith("nothing solid")) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockPos under = pos.below();
+		String why = cantPlace;
+		for (int down = 0; down < 3; down++, under = under.below()) {         // (down to the ground: the lowest free spot that has a face to go against)
+			if (!level.getBlockState(under).canBeReplaced() || !underOk.test(under)) break;
+			if (placeAt(under, material)) {
+				cantPlace = "";
+				return true;
+			}
+			if (!cantPlace.startsWith("nothing solid")) break;
+		}
+		cantPlace = why;
 		return false;
 	}
 

@@ -174,7 +174,16 @@ final class Diplomacy {
 	String asked(ServerPlayer from) {
 		String who = from.getName().getString();
 		boolean fightingThem = c.player.getLastHurtByMob() == from && c.player.tickCount - c.player.getLastHurtByMobTimestamp() < 600;
-		if (!fightingThem) return c.pick3("We're good, " + who + ".", "No worries.", "Peace? We were never at war!");
+		if (!fightingThem) {
+			float t = c.trust(from.getUUID());
+			if (t < 0) {                                                        // an old hit: a sorry mends it (a vengeful one less)
+				float mend = 0.25f + 0.35f * c.personality.kindness - 0.25f * c.personality.sin(xen.mod.core.Sins.WRATH);
+				c.trust.put(from.getUUID(), Math.min(0.05f, t + Math.max(0.1f, mend)));
+				return c.trust(from.getUUID()) >= -0.2f ? c.pick3("Okay. I forgive you, " + who + ".", "Fine. Apology accepted.", "Alright, we're good again.")
+						: c.pick3("I heard you. Give me some time.", "Hmph. Maybe later.", "Sorry isn't much, " + who + ".");
+			}
+			return c.pick3("We're good, " + who + ".", "No worries.", "Peace? We were never at war!");
+		}
 		float trust = c.trust(from.getUUID());
 		boolean armed = c.isWeapon(from.getMainHandItem());
 		if (trust >= 0.2f || c.player.getHealth() < 10 || !armed || random.nextFloat() < 0.4f) {
