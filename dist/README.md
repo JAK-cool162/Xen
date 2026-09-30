@@ -44,8 +44,8 @@ an adventure...). It picks with **Xen 2.0**, three small neural networks:
   afraid, before it commits.
 
 It was trained from scratch over thousands of simulated lives with random
-personalities; since 1.1.0 it's **Xen 5.2**, two trained versions merged into one
-that dies less and gets iron and diamonds more often. It **keeps learning in your world** on a background thread
+personalities. Since 1.5.0 it's **Xen 6.0**: Xen 5.2 (two trained versions merged into one
+that dies less and gets iron and diamonds more often) trained on with its seven sins and its own plan as inputs. It **keeps learning in your world** on a background thread
 (`<world>/xen/mind.bin`), so it doesn't slow the game. What it wants comes
 from its nature: kindness, loyalty, power and money pull it different ways.
 It only sees what a player could see. Minions keep the lighter classic brain
