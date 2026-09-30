@@ -248,7 +248,7 @@ final class MindSense {
 		if (!night && c.goals.restedLast() && health >= 8) a[Mind.REST] = false;   // (one breather, not one after another)
 		a[Mind.WOOD] = true;
 		a[Mind.STONE] = c.crafter.pickTier() >= 1;
-		a[Mind.CRAFT] = c.crafter.upgrade() != null;
+		a[Mind.CRAFT] = c.crafter.canTry() && c.crafter.upgrade() != null;
 		a[Mind.FOOD] = true;
 		a[Mind.EAT] = (food < 16 || food < 19 && c.player.getHealth() < 14) && c.items().getOrDefault("food", 0) > 0;
 		a[Mind.SHELTER] = night || f[Mind.DUSK] > 0.5f;

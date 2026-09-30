@@ -118,7 +118,9 @@ final class Crafter {
 		if (tier >= 3 && diamonds >= 2 && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
 		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
 		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
-		if (tier >= 2 && has("_sword") && has("_axe")) return null;           // (most of the time: nothing to make)
+		String bed = bedFromWool();                                                  // the wool's in: a bed now (the night's coming)
+		if (bed != null) return bed;
+		if (tier >= 2 && has("_sword") && has("_axe") && (has("_shovel") || count(Crafter::isStoneMaterial) == 0)) return null;   // (most of the time: nothing to make)
 		if (wood() < 2 && count(n -> n.equals("stick")) == 0) return null;     // no wood, no tools
 		int stone = count(Crafter::isStoneMaterial);
 		if (tier == 0 && (canMake(1) || canMake(2))) return stone >= 3 && canMake(2) ? "stone_pickaxe" : "wooden_pickaxe";   // (cobblestone and sticks: stone at once)
@@ -128,6 +130,7 @@ final class Crafter {
 			if (stone == 0 && sticksOrWood(1, 2 + 4)) return "wooden_sword";         // with wood to spare only
 		}
 		if (tier >= 2 && !has("_axe") && stone >= 3 && sticksOrWood(2, 0)) return "stone_axe";
+		if (tier >= 2 && !has("_shovel") && stone >= 1 && sticksOrWood(2, 0)) return "stone_shovel";   // (dirt, sand and gravel: the right tool)
 		return null;
 	}
 
@@ -160,16 +163,35 @@ final class Crafter {
 		int coal = count(n -> n.equals("coal") || n.equals("charcoal"));
 		int torches = c.personality.believes("torches_safe") ? 48 : 16;       // ("light makes a place safe": plenty)
 		if (count(n -> n.equals("torch")) < torches && coal >= 1 && (count(n -> n.equals("stick")) > 0 || wood() >= 2)) return "torch";
-		if (!has("_bed") && wood() >= 3) {
-			var inv = c.player.getInventory();
-			java.util.Map<String, Integer> wool = new java.util.HashMap<>();
-			for (int i = 0; i < inv.getContainerSize(); i++) {
-				String n = inv.getItem(i).isEmpty() ? "" : path(inv.getItem(i));
-				if (n.endsWith("_wool")) wool.merge(n, inv.getItem(i).getCount(), Integer::sum);
-			}
-			for (var e : wool.entrySet()) if (e.getValue() >= 3) return e.getKey().replace("_wool", "_bed");
-		}
 		return null;
+	}
+
+	/** Three wool of one color (a bed's worth), no bed yet, but not the planks for it: it needs a log first. */
+	boolean bedNeedsWood() {
+		return !has("_bed") && !c.hasBed() && wood() < bedWood() && woolForBed() != null;
+	}
+
+	/** The color of wool it has three of (the bed that makes), or null. */
+	private String woolForBed() {
+		var inv = c.player.getInventory();
+		java.util.Map<String, Integer> wool = new java.util.HashMap<>();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			String n = inv.getItem(i).isEmpty() ? "" : path(inv.getItem(i));
+			if (n.endsWith("_wool")) wool.merge(n, inv.getItem(i).getCount(), Integer::sum);
+		}
+		for (var e : wool.entrySet()) if (e.getValue() >= 3) return e.getKey().replace("_wool", "_bed");
+		return null;
+	}
+
+	/** A bed from three wool of one color (and planks), if it has no bed yet: the name of it, or null. */
+	private String bedFromWool() {
+		if (has("_bed") || c.hasBed() || wood() < bedWood()) return null;
+		return woolForBed();
+	}
+
+	/** The planks a bed takes: 3, and 4 more for a crafting table if there's none about. */
+	private int bedWood() {
+		return 3 + (tableNearOrCarried() ? 0 : 4);
 	}
 
 	private static net.minecraft.world.entity.EquipmentSlot slotOf(String piece) {
@@ -199,6 +221,11 @@ final class Crafter {
 	private int orderLeft, orderSteps;
 
 	/** Busy with something it was asked to craft? */
+	/** Not just after failing to make something (then it waits half a minute before trying again). */
+	boolean canTry() {
+		return c.player != null && c.player.level().getGameTime() >= nextTry;
+	}
+
 	boolean hasOrder() {
 		return order != null;
 	}
@@ -332,11 +359,12 @@ final class Crafter {
 		making = orderName;
 		String lack = missing(r);
 		if (!lack.isEmpty()) {                                            // make the planks and sticks it needs from what it has
-			boolean planks = lack.contains("planks") && count(Crafter::isLog) > 0;
 			boolean sticks = lack.contains("stick") && count(n -> n.endsWith("_planks")) >= 2;
-			if (planks) return step(() -> craftSmall(planksRecipe()), "planks");
+			boolean planks = (lack.contains("planks") || lack.contains("stick") && !sticks) && count(Crafter::isLog) > 0;   // (sticks from planks from a log)
 			if (sticks) return step(() -> craftSmall("stick"), "sticks");
+			if (planks) return step(() -> craftSmall(planksRecipe()), "planks");
 			if (!quietOrder) c.chatter("I can't make the " + orderName + ": I need " + lack + ".", true);
+			if (quietOrder) nextTry = c.player.level().getGameTime() + 600;   // (its own idea: not again for half a minute)
 			order = null;
 			making = null;
 			return null;
@@ -380,6 +408,7 @@ final class Crafter {
 	 */
 	Action next() {
 		if (order != null) return orderNext();
+		if (c.player.level().getGameTime() < nextTry) return takeTableAlong();   // (it just failed at something: not again yet, only its table to pick up)
 		String goal = wanted();
 		if (goal == null) {
 			making = null;
@@ -388,12 +417,19 @@ final class Crafter {
 		if (making == null || !making.equals(goal)) c.chatter("I'll make " + (goal.endsWith("s") ? "" : "aeiou".indexOf(goal.charAt(0)) >= 0 ? "an " : "a ") + goal.replace('_', ' ') + ".", false);
 		making = goal;
 		c.goals.instant = "making a " + goal.replace('_', ' ');
-		boolean wooden = goal.startsWith("wooden_");
-		int sticks = goal.endsWith("_sword") ? 1 : 2;
+		boolean wooden = goal.startsWith("wooden_"), tool = goal.matches(".*_(pickaxe|axe|shovel|hoe|sword)$");
+		int sticks = !tool ? 0 : goal.endsWith("_sword") ? 1 : 2;
 		int heads = goal.endsWith("_sword") ? 2 : 3;
-		int planksNeeded = (wooden ? heads : 0) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)
+		int planksNeeded = (wooden ? heads : goal.endsWith("_bed") ? 3 : 0) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)   // (a bed: 3 planks, no sticks)
 				+ (tableNearOrCarried() ? 0 : 4);
-		if (count(n -> n.endsWith("_planks")) < planksNeeded) return step(() -> craftSmall(planksRecipe()), "planks");
+		if (count(n -> n.endsWith("_planks")) < planksNeeded) {
+			if (count(Crafter::isLog) == 0) {                                          // (no log to make them from: later)
+				nextTry = c.player.level().getGameTime() + 600;
+				making = null;
+				return null;
+			}
+			return step(() -> craftSmall(planksRecipe()), "planks");
+		}
 		if (count(n -> n.equals("stick")) < sticks) return step(() -> craftSmall("stick"), "sticks");
 		BlockPos at = nearbyTable();
 		if (at == null) {

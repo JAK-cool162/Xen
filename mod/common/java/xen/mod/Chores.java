@@ -249,7 +249,8 @@ final class Chores {
 	String hunt(int amount) {
 		begin(Kind.HUNT);
 		want = Math.max(1, amount);
-		had = count("food");
+		had = forWool ? wool() : count("food");
+		sinceSheep = now();
 		prey = nearestAnimal();
 		if (prey == null) return "You don't see any animals, so you will look around for some to hunt for food.";
 		return String.format(java.util.Locale.ROOT, "You will hunt the %s you see %.0f blocks away for food.",
@@ -549,6 +550,7 @@ final class Chores {
 		shelterBuilt = true;
 		doing = "hiding in its hole until morning";
 		kind = Kind.HIDE;
+		hidAt = now();
 		until = now() + 1200;
 		return Action.IDLE;
 	}
@@ -748,7 +750,8 @@ final class Chores {
 					resume = null;
 					yield null;
 				}
-				yield Action.IDLE;
+				Action dig = own && resume == null ? mineFromShelter() : null;  // (not just sitting there all night: it digs down and mines, safe underground)
+				yield dig != null ? dig : Action.IDLE;
 			}
 			case EAT -> {
 				cancel();
@@ -760,6 +763,27 @@ final class Chores {
 	private void finish(String say) {
 		cancel();
 		c.chatter(say, !own);
+	}
+
+	/** When it went into its shelter for the night, and when it may next start a mine from one. */
+	private long hidAt, nightMineAt;
+
+	/**
+	 * Settled in its shelter at night (20 s), with a pickaxe, fed and not hurt: like a player it digs down from where it
+	 * is and mines (enclosed all the way) instead of waiting for morning. Null: it stays put.
+	 */
+	private Action mineFromShelter() {
+		int tier = c.crafter.pickTier();
+		if (!c.player.level().isDarkOutside() || now() - hidAt < 400 || now() < nightMineAt || tier < 1 || c.player.getHealth() < 12
+				|| c.player.getFoodData().getFoodLevel() < 8 || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		nightMineAt = now() + 20 * 60 * 3;
+		String ore = tier >= 3 ? "diamonds" : tier >= 2 ? "iron" : "coal";
+		int y = c.lessons.depth(ore, ore.equals("diamonds") ? -58 : ore.equals("iron") ? 16 : 40);
+		String plan = mine(Math.min(y, c.player.getBlockY() - 4), ore, ore.equals("diamonds") ? 3 : 6);
+		if (!plan.startsWith("You will")) return null;
+		own = true;
+		c.journal("does", "night in its shelter: digs down for " + ore + " instead of waiting for morning");
+		return next();
 	}
 
 	/** Trading with a villager ({@link Trader} walks it there and does the clicking). */
@@ -1890,13 +1914,27 @@ final class Chores {
 		return best;
 	}
 
+	/** The wool it carries (any color). */
+	int wool() {
+		return MindSense.count(c, n -> n.endsWith("_wool"));
+	}
+
+	/** When it last saw a sheep (hunting for wool: no sheep for a while, it gives up). */
+	private long sinceSheep;
+
 	private Action huntNext() {
-		int got = count("food") - had;
+		int got = (forWool ? wool() : count("food")) - had;
 		if (got >= want) {
-			finish("Got some food!");
+			finish(forWool ? "Got the wool!" : "Got some food!");
 			return null;
 		}
 		if (prey == null || !prey.isAlive() || c.player.distanceTo(prey) > 48) prey = nearestAnimal();
+		if (forWool && prey != null && !(prey instanceof net.minecraft.world.entity.animal.sheep.Sheep)) prey = null;   // (wool: only sheep)
+		if (forWool && prey != null) sinceSheep = now();
+		if (forWool && now() - sinceSheep > 600) {
+			finish("No sheep around.");
+			return null;
+		}
 		if (prey != null) {
 			doing = String.format(java.util.Locale.ROOT, "hunting a %s %.1f blocks away",
 					prey.getType().getDescription().getString().toLowerCase(java.util.Locale.ROOT), c.player.distanceTo(prey));
@@ -1910,11 +1948,13 @@ final class Chores {
 		}
 		double feet = c.player.getY();
 		for (ItemEntity drop : c.player.level().getEntitiesOfClass(ItemEntity.class, c.player.getBoundingBox().inflate(Perception.NEAR),
-				x -> x.getItem().has(net.minecraft.core.component.DataComponents.FOOD) && Math.abs(x.getY() - feet) <= 1.5)) {
-			doing = "picking up food";
+				x -> (x.getItem().has(net.minecraft.core.component.DataComponents.FOOD)
+						|| forWool && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath().endsWith("_wool"))
+						&& Math.abs(x.getY() - feet) <= 1.5)) {
+			doing = forWool ? "picking up what the sheep dropped" : "picking up food";
 			return c.walkTo(drop.position());                             // pick up what it hunted
 		}
-		doing = "no animals in sight, looking around";
+		doing = forWool ? "looking around for sheep" : "no animals in sight, looking around";
 		return lookAround();
 	}
 
@@ -2059,6 +2099,7 @@ final class Chores {
 		shelterBuilt = true;
 		doing = "hiding in its dugout until morning";
 		kind = Kind.HIDE;
+		hidAt = now();
 		until = now() + 1200;
 		return Action.IDLE;
 	}
@@ -2091,6 +2132,7 @@ final class Chores {
 			shelterBuilt = true;
 			doing = "hiding in its " + shape + " until morning";
 			kind = Kind.HIDE;
+			hidAt = now();
 			until = now() + 1200;
 			return Action.IDLE;
 		}

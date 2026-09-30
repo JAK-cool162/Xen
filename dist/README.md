@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.9.1
+# Xen Companion (Fabric mod) 1.9.2
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.9.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.9.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.9.2+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.2+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.2+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.9.2+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.9.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.9.2+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,28 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## The right tool, useful nights, chat that counts (1.9.2)
+
+* **Tools**: it digs dirt with a shovel, wood with an axe and stone with a pickaxe, taking the tool from its backpack
+  if needed. It never digs with a sword.
+* **A bed before night**: late in the day with no bed, it goes for wool from sheep it can see, or back to where it saw
+  sheep. With three wool it makes a bed (it fetches a log if it has no planks). It puts the bed down wherever there's
+  room and sleeps. Ask it: "get wool for a bed", "make a bed".
+* **Nights**: in its shelter it digs down and mines instead of sitting there till morning. At home it crafts, smelts
+  or sorts its chest. It no longer stands still retrying something it can't do.
+* **Suggestions are requests**: "why don't you build a house", "want to get some iron?", "you should get some wood",
+  "should we go mining?" all make it do the thing.
+* **Harder questions**, answered from what it knows:
+  * "why are you doing that?"
+  * "what should we do tonight?"
+  * "how do I make a bed?", "how do I get diamonds?"
+  * "who's your best friend?"
+  * "iron or diamond?"
+  * "should I go exploring?"
+  * "where are you going?"
+  * "what did you do today?"
+  * "is it safe out here?"
 
 ## Its own words (1.9.1)
 

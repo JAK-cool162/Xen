@@ -63,6 +63,35 @@ public final class Voice {
 
 		/** What it thinks of a topic (-1..1): what Xens think, and its own nature and life. */
 		float like(Lexicon.Topic t);
+
+		/** Why it's doing what it's doing, as "I need wood for a pickaxe" (empty: no reason it can say). */
+		default String why() {
+			return "";
+		}
+
+		/** What it'll do next, as "get stone for better tools" (empty: no idea). */
+		default String next() {
+			return "";
+		}
+
+		/** Who it likes best (a player or a Xen; empty: nobody yet). */
+		default String bestFriend() {
+			return "";
+		}
+
+		/** What it did lately, as "went mining, got some wood and ate" (empty: nothing much). */
+		default String lately() {
+			return "";
+		}
+
+		/** How dangerous it is around it now (0..1: monsters near, how it's doing). */
+		default float danger() {
+			return 0;
+		}
+
+		default boolean night() {
+			return false;
+		}
 	}
 
 	/** What it made of a line. */
@@ -73,6 +102,10 @@ public final class Voice {
 		public boolean question, greet, bye, thanks, sorry, praise, insult, laugh, yes, no, howAreYou, whatDoing, likeQ, suggest, feelMe, news,
 				confused, aboutYou, aboutMe, name, tellMe;
 		public String wh = "", suggestion = "";
+		/** A harder question (why, next, recipe, friend, compare, should, going, lately, safe; empty: none) and what it's about. */
+		public String ask = "", about = "", other = "";
+		/** The suggestion is for it ("you should get wood"), not for both ("let's get wood"). */
+		public boolean forMe;
 		public int polarity;
 		public Lexicon.Topic topic;
 
@@ -98,7 +131,8 @@ public final class Voice {
 					confused, aboutYou, aboutMe};
 			for (int i = 0; i < n.length; i++) if (v[i]) sb.append(sb.length() > 0 ? "," : "").append(n[i]);
 			return sb + (topic == null ? "" : " topic=" + topic.key()) + (polarity != 0 ? " polarity=" + polarity : "")
-					+ (suggestion.isEmpty() ? "" : " suggest=\"" + suggestion + "\"");
+					+ (suggestion.isEmpty() ? "" : " suggest=\"" + suggestion + "\"") + (ask.isEmpty() ? "" : " ask=" + ask + (about.isEmpty() ? "" : ":" + about)
+					+ (other.isEmpty() ? "" : "|" + other));
 		}
 	}
 
@@ -207,14 +241,16 @@ public final class Voice {
 				|| s.contains(" you good ") && h.question || s.contains(" how is it going");
 		h.whatDoing = s.contains(" what are you doing") || s.contains(" what you doing") || s.contains(" what are you up to")
 				|| s.contains(" what're you doing") || s.contains(" what's up with you") || s.contains(" whatcha doing") || s.contains(" what are you working on")
-				|| s.contains(" what's the plan") || s.contains(" busy ") && h.question && w.size() <= 3;
+				|| s.contains(" busy ") && h.question && w.size() <= 3;
 		h.likeQ = s.contains(" do you like ") || s.contains(" you like ") && h.question || s.contains(" do you love ") || s.contains(" do you hate ")
 				|| s.contains(" think of ") || s.contains(" think about ") || s.contains(" feel about ") || s.contains(" favorite ")
 				|| s.contains(" favourite ") || s.contains(" thoughts on ") || s.contains(" opinion ");
-		for (String mark : new String[] {" let's ", " lets ", " we should ", " shall we ", " do you want to ", " want to ", " how about we ", " wanna "}) {
+		for (String mark : new String[] {" let's ", " lets ", " we should ", " shall we ", " should we ", " do you want to ", " want to ", " how about we ", " wanna ",
+				" why don't we ", " we could ", " can we ", " why don't you ", " you should ", " you could ", " how about you ", " maybe you should ", " why not "}) {
 			int at = s.indexOf(mark);
-			if (at < 0 || mark.equals(" want to ") && !h.question) continue;
+			if (at < 0 || mark.equals(" want to ") && !h.question || s.startsWith(" what ", 0) && !mark.startsWith(" why")) continue;
 			h.suggest = true;
+			h.forMe = mark.contains("you");
 			String rest = s.substring(at + mark.length()).trim().replaceAll("\\b(please|with me|together|now)\\b", "").replaceAll("\\s+", " ").trim();
 			String[] parts = rest.split(" ");
 			h.suggestion = String.join(" ", java.util.Arrays.copyOf(parts, Math.min(parts.length, 5))).replace("my ", "your ").trim();
@@ -227,6 +263,7 @@ public final class Voice {
 		h.confused = w.size() <= 3 && (first.equals("what") || first.equals("huh") || first.equals("eh")) && !h.aboutYou
 				|| s.contains(" what do you mean ") || s.contains(" i don't get it ") || s.contains(" makes no sense ") || s.contains(" wdym ");
 		h.name = s.contains(" your name ") || s.contains(" who are you ");
+		harder(h, s, w);
 		h.tellMe = s.contains(" tell me ") || s.contains(" say something ") || s.contains(" talk to me ") || s.contains(" entertain me ");
 		boolean insultWord = false;
 		for (String x : w) insultWord |= INSULTS.contains(x);
@@ -244,6 +281,99 @@ public final class Voice {
 			}
 		}
 		return h;
+	}
+
+	private static final String[] RECIPE_ASK = {" how do i make ", " how do you make ", " how to make ", " how do we make ", " how can i make ", " how do i craft ",
+			" how do you craft ", " how to craft ", " how can i craft ", " what do i need for ", " what do you need for ", " what do i need to make ",
+			" what do you need to make ", " what do i need to craft ", " recipe for ", " how do i get ", " how do you get ", " how to get ", " where do i get ",
+			" where do you get ", " where do i find ", " where can i find ", " how do i find "};
+	private static final String[] NEXT_ASK = {" what should we do", " what should i do", " what now ", " what's next", " what next", " what's the plan",
+			" what are we doing", " what do we do", " any ideas ", " what are you going to do", " what will you do", " what do you think we should do",
+			" what are you gonna do", " what's your plan", " what are we doing next", " what do you plan"};
+	private static final String[] FRIEND_ASK = {" best friend", " who do you like", " who's your friend", " who are your friends", " who do you trust",
+			" your favorite person", " your favourite person", " who's your favorite", " who do you like most"};
+	private static final String[] GOING_ASK = {" where are you going", " where you going", " where are you headed", " where are you off to", " where to "};
+	private static final String[] LATELY_ASK = {" what did you do", " what have you been doing", " what have you done", " how was your day", " what did you get up to",
+			" what were you doing", " been up to", " what have you been up to"};
+	private static final String[] SAFE_ASK = {" is it safe", " are we safe", " is it dangerous", " any monsters", " any mobs", " are there monsters",
+			" are there mobs", " safe to go out", " safe out there", " safe outside"};
+	private static final Set<String> FILLER = Set.of("a", "an", "some", "the", "any", "more", "my", "your", "me", "us");
+
+	/** The harder questions: why it's doing that, what's next, how to make something, which is better, who its best friend is... */
+	private static void harder(Heard h, String s, List<String> w) {
+		for (String lead : RECIPE_ASK) {
+			int at = s.indexOf(lead);
+			if (at < 0) continue;
+			h.ask = "recipe";
+			h.about = thing(s.substring(at + lead.length()));
+			return;
+		}
+		if (s.startsWith(" should i ") || s.startsWith(" should we ") || s.startsWith(" is it a good idea to ") || s.startsWith(" do you think i should ")
+				|| s.startsWith(" do you think we should ")) {
+			h.ask = "should";
+			String rest = s.replaceFirst("^ (should (i|we)|is it a good idea to|do you think (i|we) should) ", "").trim();
+			h.about = rest.replaceAll("\\b(now|tonight|today|right now|first)\\b", "").replaceAll("\\s+", " ").trim();
+			return;
+		}
+		for (String lead : NEXT_ASK) if (s.contains(lead)) {
+			h.ask = "next";
+			h.about = s.contains(" tonight ") || s.contains(" at night ") ? "night" : "";
+			return;
+		}
+		for (String lead : FRIEND_ASK) if (s.contains(lead)) {
+			h.ask = "friend";
+			return;
+		}
+		for (String lead : GOING_ASK) if (s.contains(lead)) {
+			h.ask = "going";
+			return;
+		}
+		for (String lead : LATELY_ASK) if (s.contains(lead) && !s.contains(" that ")) {
+			h.ask = "lately";
+			return;
+		}
+		for (String lead : SAFE_ASK) if (s.contains(lead)) {
+			h.ask = "safe";
+			return;
+		}
+		int or = s.indexOf(" or ");
+		if (or > 0 && h.question && w.size() <= 10) {                                // "iron or diamond?", "which is better, a sword or an axe?"
+			String a = s.substring(0, or).replaceAll(".*\\b(better|best|prefer|like|rather|pick|choose|want|is|are|between)\\b", "").trim();
+			String b = s.substring(or + 4).trim();
+			a = thing(a.contains(" ") ? a.substring(a.lastIndexOf(' ') + 1) : a);
+			b = thing(b);
+			if (!a.isEmpty() && !b.isEmpty() && !a.equals(b)) {
+				h.ask = "compare";
+				h.about = a;
+				h.other = b;
+				return;
+			}
+		}
+		if (h.wh.equals("why") && w.size() > 1 && (h.aboutYou || s.contains(" that ") || s.contains(" this ") || w.size() <= 3) && !h.suggest
+				|| s.startsWith(" how come ") || s.startsWith(" what for ") || s.contains(" what's that for ")) {
+			h.ask = "why";
+		}
+	}
+
+	/** The thing a few words are about: "a bed?" is "bed", "some iron pickaxes" is "iron pickaxe". */
+	private static String thing(String rest) {
+		List<String> out = new ArrayList<>();
+		for (String x : rest.trim().split(" ")) {
+			if (x.isEmpty() || FILLER.contains(x) && out.isEmpty()) continue;
+			if (x.matches("(please|pls|then|with|for|in|to|from|and|so|that|now|mc|minecraft|you|i|we|do|is|are|more|better|best|most|less|instead)")) break;
+			out.add(x);
+			if (out.size() == 3) break;
+		}
+		String t = String.join(" ", out).replaceAll("[?!.,]", "").trim();
+		if (t.endsWith("ies")) t = t.substring(0, t.length() - 3) + "y";
+		else if (t.endsWith("ches") || t.endsWith("shes")) t = t.substring(0, t.length() - 2);
+		else if (t.endsWith("s") && !t.endsWith("ss") && !t.endsWith("glass") && t.length() > 3) t = t.substring(0, t.length() - 1);
+		return t;
+	}
+
+	/** One of the harder questions (why, what next, how to make something...): it answers those from what it knows. */
+	public static boolean hard(Heard h) {
+		return !h.ask.isEmpty();
 	}
 
 	/** The network's inputs: what it heard, who it is, who's talking (see {@link ActNet#F}). */
@@ -472,13 +602,18 @@ public final class Voice {
 			out.add(new Sent("I'm " + me.name(), false));
 			return write(out);
 		}
+		if (hard(h) && answer(h, speaker, out)) {                                    // a harder question: an answer from what it knows
+			lastAct = "answer " + h.ask;
+			return write(out);
+		}
 		float[] x = features(h, me, speaker);
 		int act = choose(net().probs(x), h);
 		if (h.greet && (h.howAreYou || h.whatDoing)) {                                // "hey, how's it going?": hello, and an answer
 			out.add(new Sent(w("greet"), false));
 			act = h.howAreYou ? ActNet.FEELING : ActNet.DOING;
 		}
-		if (h.tellMe && !h.flagged()) act = h.topic != null ? ActNet.OPINION : random.nextFloat() < ("silly".equals(me.tone()) ? 0.5f : 0.2f) ? ActNet.JOKE : ActNet.SHARE;
+		if (h.tellMe && h.flat.contains(" joke")) act = ActNet.JOKE;                // "tell me a joke", "why don't you tell me a joke"
+		else if (h.tellMe && !h.flagged()) act = h.topic != null ? ActNet.OPINION : random.nextFloat() < ("silly".equals(me.tone()) ? 0.5f : 0.2f) ? ActNet.JOKE : ActNet.SHARE;
 		lastAct = ActNet.ACTS[act];
 		if (learn) lastTo.put(speaker, new Last(x, act, System.currentTimeMillis()));
 		if (grounded != null && !grounded.isBlank() && !h.greet && !h.thanks && !h.likeQ && !h.howAreYou) {
@@ -637,11 +772,114 @@ public final class Voice {
 			}
 			case ActNet.ACCEPT -> {
 				String yes = w("accept");
-				out.add(new Sent(yes + (h.suggestion.isEmpty() ? "" : yes.endsWith("let's") ? " " + h.suggestion : ", let's " + h.suggestion), false));
+				String what = h.suggestion.replaceAll("\\byou\\b", "I").replaceAll("\\byour\\b", "my").replaceAll("\\bme\\b", "you");
+				if (h.forMe) out.add(new Sent(yes.replaceAll(",? ?let's$", "") + (what.isEmpty() ? "" : ", I'll " + what), false));   // "you should X": I'll X
+				else out.add(new Sent(yes + (what.isEmpty() ? "" : yes.endsWith("let's") ? " " + what : ", let's " + what), false));
 			}
 			case ActNet.DECLINE -> out.add(new Sent(w("decline") + (me.doing().isEmpty() ? "" : ", I'm " + me.doing()), false));
 			default -> {}
 		}
+	}
+
+	/** Better materials first: which of two is better (for tools, armor), by this. */
+	private static final List<String> TIERS = List.of("wood", "wooden", "gold", "golden", "stone", "leather", "chain", "chainmail", "iron", "diamond", "netherite");
+
+	/** An answer to a harder question, from what it knows (false: it has nothing to say, the rest of its voice answers). */
+	private boolean answer(Heard h, String speaker, List<Sent> out) {
+		switch (h.ask) {
+			case "why" -> {
+				String why = me.why();
+				if (why.isEmpty()) out.add(new Sent(pickOf("no big reason, it just felt right", "why not", "I just felt like it", "honestly? no idea"), false));
+				else out.add(new Sent(pickOf("because ", "well, ", "", "because ") + why, false));
+			}
+			case "next" -> {
+				String next = me.next();
+				if (me.night() && !me.busy() || h.about.equals("night")) {
+					out.add(new Sent((me.night() ? pickOf("it's night, so ", "at night? ", "") : pickOf("tonight, ", "once it's dark, ")) + pickOf("stay inside and craft, or dig a mine", "stay in and sort things out",
+							"dig down, the mines don't care if it's night", "sleep if we have beds"), false));
+					if (!next.isEmpty()) out.add(new Sent("tomorrow I'll " + next, false));
+				} else if (next.isEmpty()) {
+					out.add(new Sent(w("dunno"), false));
+					out.add(new Sent(pickOf("what do you want to do", "any ideas"), true));
+				} else {
+					out.add(new Sent(pickOf("I'm going to ", "next I'll ", "I think I'll ", "the plan is to ") + next, false));
+					if (me.chattiness() > 0.4f || me.kindness() > 0.6f) {
+						String come = pickOf("want to come", "you could help if you want", "want to help");
+						out.add(new Sent(come, !come.startsWith("you could")));
+					}
+				}
+			}
+			case "recipe" -> {
+				String how = HowTo.of(h.about);
+				if (how == null) {
+					out.add(new Sent(pickOf("I don't know how to make ", "no idea how you get ", "I've never made ") + (h.about.isEmpty() ? "that" : a(h.about)), false));
+					if (me.curiosity() > 0.5f) out.add(new Sent(pickOf("tell me if you find out", "let me know if you figure it out"), false));
+				} else out.add(new Sent(how, false));
+			}
+			case "friend" -> {
+				String best = me.bestFriend();
+				if (best.isEmpty()) out.add(new Sent(pickOf("I don't really have one yet", "nobody yet", "still looking for one"), false));
+				else if (best.equalsIgnoreCase(speaker)) out.add(new Sent(pickOf("you, of course", "you! who else", "it's you"), false));
+				else out.add(new Sent(pickOf("probably ", "I'd say ", "", "that's ") + best, false));
+			}
+			case "going" -> {
+				String d = me.doing();
+				out.add(new Sent(d.isEmpty() ? pickOf("nowhere really", "just looking around", "nowhere, I'm taking it easy")
+						: d.startsWith("going ") ? "I'm " + d : pickOf("I'm ", "just ") + d, false));
+			}
+			case "lately" -> {
+				String did = me.lately();
+				out.add(new Sent(did.isEmpty() ? pickOf("not much yet", "nothing much, honestly", "just getting started") : "I " + did, false));
+				if (!me.saw().isEmpty() && random.nextFloat() < 0.5f) out.add(new Sent("I saw " + me.saw() + " too", false));
+			}
+			case "safe" -> {
+				float d = me.danger();
+				out.add(new Sent(d > 0.5f ? pickOf("no, there are monsters around", "not really, stay close", "no! watch out")
+						: me.night() ? pickOf("not really, it's night", "at night? be careful", "it's dark, so not really")
+						: d > 0.2f ? pickOf("mostly, just watch out", "kind of, stay alert") : pickOf("yeah, looks safe", "seems fine to me", "yes, it's quiet"), false));
+			}
+			case "compare" -> {
+				int a = TIERS.indexOf(h.about), b = TIERS.indexOf(h.other);
+				Lexicon.Topic ta = lx().topic(h.about.contains(" ") ? h.about.substring(h.about.lastIndexOf(' ') + 1) : h.about);
+				Lexicon.Topic tb = lx().topic(h.other.contains(" ") ? h.other.substring(h.other.lastIndexOf(' ') + 1) : h.other);
+				String fact = HowTo.better(h.about, h.other);
+				if (fact != null) out.add(new Sent(fact, false));
+				else if (a >= 0 && b >= 0) {
+					String best = a > b ? h.about : h.other;
+					out.add(new Sent(pickOf("", "easy, ", "definitely ") + best + pickOf(", it lasts longer", ", it's stronger", "", ", no contest"), false));
+				} else if (ta != null && tb != null) {
+					float la = me.like(ta), lb = me.like(tb);
+					if (Math.abs(la - lb) < 0.1f) out.add(new Sent(pickOf("both are fine", "hard to say", "I like both the same"), false));
+					else out.add(new Sent(pickOf("I'd pick ", "", "I like ") + (la > lb ? ta.many() : tb.many()) + pickOf("", " more", ", for sure"), false));
+				} else return false;
+			}
+			case "should" -> {
+				String what = h.about;
+				Lexicon.Topic tp = null;
+				for (String x : what.split(" ")) if (tp == null && !x.isEmpty()) tp = lx().topic(x);
+				boolean outside = what.matches(".*\\b(explore|exploring|go out|outside|travel|walk|look around|hunt|hunting)\\b.*");
+				if (what.matches(".*\\b(sleep|go to bed)\\b.*")) out.add(new Sent(me.night() ? pickOf("yes, sleep skips the night", "yeah, get some sleep")
+						: pickOf("it's not even night", "you can't sleep in the day"), false));
+				else if (me.night() && outside) out.add(new Sent(pickOf("not at night, wait for the morning", "I wouldn't, it's dark out", "better not, the mobs are out"), false));
+				else if (me.danger() > 0.5f) out.add(new Sent(pickOf("not now, it's dangerous here", "not with monsters around"), false));
+				else if (tp != null) {
+					float like = me.like(tp);
+					out.add(new Sent(like > 0.2f ? pickOf("yes, go for it", "sure", "definitely") + (random.nextBoolean() ? "" : ", " + opinion(tp))
+							: like < -0.2f ? pickOf("I wouldn't", "nah", "not if you ask me") + ", " + opinion(tp)
+							: pickOf("up to you", "why not", "sure, if you want"), false));
+				} else out.add(new Sent(pickOf("up to you", "sure, why not", "if you want to", "hmm, maybe"), false));
+			}
+			default -> {
+				return false;
+			}
+		}
+		return !out.isEmpty();
+	}
+
+	/** "a spaceship", "an apple", "iron" (a mass word or plural as it is). */
+	private static String a(String thing) {
+		if (thing.endsWith("s") || Lexicon.get().topic(thing) != null && Lexicon.get().topic(thing).plural() == null) return thing;
+		return ("aeiou".indexOf(thing.charAt(0)) >= 0 ? "an " : "a ") + thing;
 	}
 
 	private String feeling() {

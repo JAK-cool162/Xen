@@ -221,6 +221,7 @@ public final class Companion {
 	void tick() {
 		tickInner();
 		gesture();                                                      // last: nothing this tick undoes it
+		if (player != null) hands.keepTool();                           // (mid-dig: the tool it picked is what it holds, whatever else went on this tick)
 	}
 
 	/** Its head is in a block (sand fell on it, it was pushed in, it woke up in a wall): it breaks it, like a player. */
@@ -283,6 +284,7 @@ public final class Companion {
 		eyes.tick();                                                    // a yes or no for every block it can see
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
+		if (player.tickCount % 20 == 7) noticeSheep();                  // (where the sheep were: for wool, for a bed)
 		if (player.tickCount % 10 == 0) {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			places.tick();                                               // the way it walked, remembered
@@ -910,6 +912,8 @@ public final class Companion {
 		}
 		Action hungry = starving();                                   // starving with nothing to eat: food before errands
 		if (hungry != null) return hungry;
+		Action bedFirst = bedBeforeNight();                           // night coming, no bed: wool first (its own errands wait)
+		if (bedFirst != null) return bedFirst;
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.nightfall() && goals.think()) {   // dark, out in the open: a roof before errands
 			Action roof = chores.busy() ? chores.next() : null;
 			if (roof != null) return roof;
@@ -1325,6 +1329,163 @@ public final class Companion {
 		return null;
 	}
 
+	/** Where it last saw sheep, and when (a player remembers where the sheep were). */
+	private BlockPos sheepSeenAt;
+	private long sheepSeenTime = -1_000_000, bedCheckAt, woolTripAt;
+	/** Until when what it's doing is for a bed tonight (its mind doesn't start anything over it). */
+	long bedErrandUntil;
+
+	/** Where it's walking to find those sheep again (null: not), and whether that was its own idea (or it was asked). */
+	private BlockPos woolTrip;
+	private boolean woolOwn;
+
+	/** Every second: sheep in sight (or right by it) are remembered. */
+	private void noticeSheep() {
+		net.minecraft.world.entity.animal.sheep.Sheep near = null;
+		for (var sheep : player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, player.getBoundingBox().inflate(48), x -> x.isAlive())) {
+			if (sheep.distanceTo(player) > 12 && !WorldSenses.sees(player, hands.yaw, hands.pitch, sheep)) continue;
+			if (near == null || sheep.distanceTo(player) < near.distanceTo(player)) near = sheep;
+		}
+		if (near != null) {
+			sheepSeenAt = near.blockPosition();
+			sheepSeenTime = player.level().getGameTime();
+		}
+	}
+
+	/**
+	 * No bed and the day's getting on (or it's night and there are sheep right here): a bed is how a player gets
+	 * through the night, so wool first: it drops its own errands (never what it was asked) and hunts sheep, or goes to
+	 * where it saw some. With three wool the crafter makes the bed, and it sleeps.
+	 */
+	private Action bedBeforeNight() {
+		if (fighting || inArena || player.isCreative() || minion || player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+			woolTrip = null;
+			return null;
+		}
+		long now = player.level().getGameTime();
+		if (woolTrip != null && (!woolOwn || mode == Mode.FREE && !builder.busy()) && !(chores.busy() && !chores.own)) {   // on its way to the sheep it saw: keep going
+			boolean there = woolTrip.closerThan(player.blockPosition(), 6) || !player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class,
+					player.getBoundingBox().inflate(10), x -> x.isAlive()).isEmpty();
+			if (now - woolTripAt > 20 * 90 || there || emotions.fear > 0.6f) {
+				woolTrip = null;
+				int wool = 0;
+				for (var e : items().entrySet()) if (e.getKey().endsWith("_wool")) wool += e.getValue();
+				if (there && wool < 3) {                                          // there: after them (it looks around for them; none in half a minute, it gives up)
+					chores.forWool = true;
+					chores.hunt(3 - wool);
+					chores.own = woolOwn;
+					return chores.next();
+				}
+			} else return walkTo(Vec3.atBottomCenterOf(woolTrip));
+		}
+		if (mode != Mode.FREE || builder.busy() && !builder.ownHouse()) return null;   // (its own house can wait while it gets wool: the building picks up after)
+		if (chores.busy() && (!chores.own || chores.forWool && chores.kind == Chores.Kind.HUNT)) return null;   // (asked for something: that first; already after wool)
+		if (now - bedCheckAt < 100) return null;
+		bedCheckAt = now;
+		long time = Compat.timeOfDay(player.level()) % 24000;
+		boolean late = time > 8500 && time < 12500, night = time >= 12500 && time < 23000;
+		if (!late && !night) return null;
+		var items = items();
+		if (items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || hasBed()) return null;
+		int wool = 0;
+		for (var e : items.entrySet()) if (e.getKey().endsWith("_wool")) wool += e.getValue();
+		if (wool >= 3) {                                                      // (the crafter makes the bed: with a log for the planks)
+			if (!crafter.bedNeedsWood() || chores.busy() && chores.kind == Chores.Kind.GATHER && (chores.doing.contains("wood") || chores.doing.contains("trees"))) return null;   // (already after wood)
+			if (chores.busy()) chores.cancel();
+			goals.drop();
+			String plan = chores.gather("wood", 2);
+			chores.own = true;
+			bedErrandUntil = now + 20 * 60;
+			if (plan.startsWith("You will")) journal("does", "has the wool for a bed: a log for the planks");
+			return chores.next();
+		}
+		net.minecraft.world.entity.animal.sheep.Sheep near = null;
+		for (var sheep : player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, player.getBoundingBox().inflate(night ? 16 : 40),
+				x -> x.isAlive() && !x.isBaby() && Math.abs(x.getY() - player.getY()) < 8 && player.hasLineOfSight(x))) {   // (one it can see: not through the rock)
+			if (near == null || sheep.distanceTo(player) < near.distanceTo(player)) near = sheep;
+		}
+		if (night && (near == null || emotions.fear > 0.5f || player.getHealth() < 12
+				|| !player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, player.getBoundingBox().inflate(12), m -> m.isAlive()).isEmpty())) return null;
+		if (near != null) {
+			neededAt = now;
+			if (chores.busy()) chores.cancel();
+			goals.drop();
+			chores.forWool = true;
+			chores.hunt(3 - wool);
+			chores.own = true;
+			journal("does", "no bed for the night: goes for wool (sheep " + Math.round(near.distanceTo(player)) + " blocks away)");
+			chatter(pick3("I need a bed before night. Sheep!", "Wool for a bed. Sorry, sheep.", "Three wool and I can sleep tonight."), true);
+			return chores.next();
+		}
+		if (late && sheepSeenAt != null && now - sheepSeenTime < 20 * 60 * 5 && sheepSeenAt.closerThan(player.blockPosition(), 96)) {
+			if (chores.busy()) chores.cancel();
+			goals.drop();
+			goals.instant = "going to where it saw sheep (wool for a bed)";
+			if (now - neededAt > 1200) journal("does", "no bed for the night: back to the sheep it saw at " + sheepSeenAt.toShortString());
+			neededAt = now;
+			woolTrip = sheepSeenAt;
+			woolTripAt = now;
+			woolOwn = true;
+			sheepSeenTime = -1_000_000;                                         // (one trip per sighting: no sheep there, it gives up on them)
+			return walkTo(Vec3.atBottomCenterOf(woolTrip));
+		}
+		return null;
+	}
+
+	/** "Get wool for a bed", "make a bed": it makes one if it has the wool, else goes for wool (sheep it sees, or where it saw some). */
+	private String bedAsked() {
+		var items = items();
+		if (items.keySet().stream().anyMatch(k -> k.endsWith("_bed"))) return "You already have a bed with you.";
+		int wool = 0;
+		for (var e : items.entrySet()) if (e.getKey().endsWith("_wool")) wool += e.getValue();
+		if (wool >= 3) return crafter.request("bed", 1);
+		chores.forWool = true;
+		String hunt = chores.hunt(3 - wool);
+		if (!hunt.startsWith("You don't see")) return "You will get " + (3 - wool) + " wool from the sheep nearby, for a bed.";
+		if (sheepSeenAt != null && sheepSeenAt.closerThan(player.blockPosition(), 160)) {
+			chores.cancel();
+			woolTrip = sheepSeenAt;
+			woolTripAt = player.level().getGameTime();
+			woolOwn = false;
+			goals.instant = "going to where it saw sheep (wool for a bed)";
+			return "You will go back to the sheep you saw at " + sheepSeenAt.getX() + " " + sheepSeenAt.getZ() + " for wool, for a bed.";
+		}
+		return "You don't see any sheep, so you will look around for some (wool for a bed).";
+	}
+
+	/** Where a bed can go: its foot, and which way its head points (a facing index: north, east, south, west). */
+	record BedRoom(BlockPos foot, int facing) {}
+
+	private static final net.minecraft.core.Direction[] FACINGS = {net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.EAST,
+			net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.WEST};
+
+	/** Room for a bed close by (within reach): both halves free (no water), solid ground under both. Null: nowhere (a tight tunnel). */
+	BedRoom bedRoom() {
+		var level = player.level();
+		BlockPos feet = player.blockPosition();
+		for (int r = 1; r <= 2; r++) {
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+					for (int dy = 0; dy >= -1; dy--) {
+						BlockPos foot = feet.offset(dx, dy, dz);
+						if (!free(level, foot) || player.getEyePosition().distanceTo(Vec3.atCenterOf(foot)) > player.blockInteractionRange() - 0.5) continue;
+						for (int i = 0; i < 4; i++) {
+							BlockPos head = foot.relative(FACINGS[i]);
+							if (!head.equals(feet) && !head.equals(feet.above()) && free(level, head)) return new BedRoom(foot.immutable(), i);
+						}
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/** Free for half a bed: replaceable, dry, on something solid. */
+	private static boolean free(net.minecraft.world.level.Level level, BlockPos p) {
+		return level.getBlockState(p).canBeReplaced() && level.getFluidState(p).isEmpty() && !level.getBlockState(p.below()).canBeReplaced();
+	}
+
 	/** A bed it put down out in the wild for the night (it takes it with it in the morning). */
 	private BlockPos campBed;
 
@@ -1352,20 +1513,14 @@ public final class Companion {
 				&& mode != Mode.FOLLOW && !chores.busy() && !builder.busy() && player.onGround() && level.getGameTime() - lookedForBedAt > 600) {
 			lookedForBedAt = level.getGameTime();                                 // out in the wild with a bed on it: it puts it down and sleeps
 			int slot = hands.hotbar(st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed"));
-			if (slot >= 0) {
-				net.minecraft.core.Direction f = player.getDirection();
-				BlockPos foot = player.blockPosition().relative(f);
-				if (level.getBlockState(foot).canBeReplaced() && level.getBlockState(foot.relative(f)).canBeReplaced()
-						&& !level.getBlockState(foot.below()).canBeReplaced() && !level.getBlockState(foot.relative(f).below()).canBeReplaced()) {
-					if (hands.placeItem(foot, st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed"), foot.below(),
-							net.minecraft.core.Direction.UP, -1)) {                     // (it faces that way: the bed goes that way)
-						campBed = foot;
-						bedAt = foot;
-						chatter(pick3("Camping out here tonight.", "Bed down, sleep time.", "Good thing I brought my bed."), false);
-						acted = true;
-						return Action.PLACE;
-					}
-				}
+			BedRoom room = slot >= 0 ? bedRoom() : null;                           // (room for it: two free blocks on solid ground, any way round)
+			if (room != null && hands.placeItem(room.foot(), st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed"), room.foot().below(),
+					net.minecraft.core.Direction.UP, room.facing())) {                   // (it faces that way: the bed goes that way)
+				campBed = room.foot();
+				bedAt = campBed;
+				chatter(pick3("Camping out here tonight.", "Bed down, sleep time.", "Good thing I brought my bed."), false);
+				acted = true;
+				return Action.PLACE;
 			}
 		}
 		if (campBed != null && night && !fighting && level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
@@ -2835,6 +2990,7 @@ public final class Companion {
 				if (!r.intent().equals("ride")) rider.cancel();
 				if (!r.intent().equals("use")) uses.cancel();
 				sharing.cancel();
+				woolTrip = null;
 			}
 			switch (r.intent()) {
 				case "follow" -> {
@@ -2891,6 +3047,7 @@ public final class Companion {
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
 				case "craft" -> plan = crafter.request(r.thing(), r.amount());
+				case "bed" -> plan = bedAsked();
 				case "helpbuild" -> {                                              // a friend's build: help with it (shared progress)
 					Companion mate = null;
 					for (Companion o : mod.companions) if (o != this && o.name.equalsIgnoreCase(r.thing())) mate = o;
@@ -2928,6 +3085,14 @@ public final class Companion {
 			boolean ownWords = !mod.chat.hasModel();                         // no chat model: it talks with its own words
 			xen.mod.talk.Voice.Heard heard = told;
 			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
+			if (straight == null && r.intent().equals("chat") && xen.mod.talk.Voice.hard(heard)) {   // why, what next, how to make, which is better...: what it knows, its own words
+				String reply = voice.reply(from == null ? "you" : from.getName().getString(), said, null, true);
+				journal("thinks", "own words: " + voice.lastAct + " (heard: " + voice.lastHeard + ")");
+				if (reply != null && !reply.isBlank() && voice.lastAct.startsWith("answer")) {
+					say(reply);
+					return null;
+				}
+			}
 			if (straight == null && r.intent().equals("chat") && !(ownWords && xen.mod.talk.Voice.social(heard))) straight = smallTalk.answer(from, words);   // hellos, jokes, "do you like me"...
 			if (straight != null) {
 				say(straight);
@@ -3007,7 +3172,8 @@ public final class Companion {
 		@Override public String doing() {
 			String d = !goals.instant.isEmpty() ? goals.instant : chores.busy() ? chores.doing : "";
 			if (d.isEmpty() && goals.option >= 0 && goals.option != xen.mod.core.Mind.REST) d = "going to " + xen.mod.core.Mind.SAYS[goals.option];
-			d = d.replaceAll("[,(].*$", "").replaceAll("\\bits\\b", "my").replaceAll("\\bitself\\b", "myself").trim();
+			d = d.replaceAll("[,(].*$", "").replaceAll("\\bits\\b", "my").replaceAll("\\bitself\\b", "myself").replaceAll("\\b(where|what|when) it\\b", "$1 I").trim();
+			if (d.startsWith("no ") || d.startsWith("nothing")) d = "looking around";          // ("no animals in sight": what it's doing is looking)
 			return d.equals("looking around") || d.equals("exploring") && goals.option < 0 ? "" : d;
 		}
 
@@ -3024,6 +3190,7 @@ public final class Companion {
 			}
 			if (latest == null) return "";
 			String n = latest.name().replaceAll("\\s*\\d+$", "");
+			if (n.endsWith("s")) return "some " + n;                              // ("some old ruins", not "an old ruins")
 			return ("aeiou".indexOf(n.charAt(0)) >= 0 ? "an " : "a ") + n;
 		}
 
@@ -3054,6 +3221,103 @@ public final class Companion {
 			int h = (name + ":" + t.key()).hashCode();                        // its own tastes: a favourite here, a pet hate there
 			v += ((h & 0xff) / 255f - 0.5f) * 0.5f;
 			return Math.max(-1, Math.min(1, v));
+		}
+
+		/** Why it chose each thing, when its mind chose it (not the plan). */
+		private static final String[] WHY = {"I needed a break", "you always need wood", "stone makes better tools", "better gear keeps me alive",
+				"I'll need food", "I'm hungry", "nights are dangerous", "sleep skips the night", "everyone needs a home", "a farm means food forever",
+				"the good stuff is underground", "raw iron is no use till it's smelted", "my pockets are full", "I want to see what's out there",
+				"trading gets me things I can't make", "I like the company", "friends help friends", "someone has to keep watch", "they had it coming",
+				"it's too dangerous here", "I want an adventure", "enchanted gear is way better"};
+		private static final String[] DID = {"took a breather", "got some wood", "got some stone", "made better gear", "found food", "ate",
+				"made a shelter", "slept", "worked on a house", "worked on a farm", "went mining", "smelted my ores", "put my things away", "explored",
+				"traded", "stayed with a friend", "helped out", "kept watch", "fought", "ran from a fight", "went on an adventure", "enchanted my gear"};
+
+		@Override public String why() {
+			if (chores.busy() && !chores.own) return askedBy != null ? askedBy.getName().getString() + " asked me to" : "I was asked to";
+			String i = goals.instant;                                             // what an instinct has it doing right now
+			String instinct = i.contains("shore") || i.contains("swimming") ? "I'm too far out in the water"
+					: i.contains("air") ? "I need air" : i.startsWith("eating") ? "I'm hungry"
+					: i.startsWith("fighting") ? "it came at me" : i.contains("running") || i.contains("fleeing") || i.contains("getting away") ? "it's too dangerous here"
+					: i.contains("hiding") || i.contains("dugout") || i.contains("fort") ? "it's dark and the mobs are out"
+					: i.startsWith("staying with") || i.startsWith("following") ? "I like the company"
+					: i.contains("sheep") ? "I need wool for a bed" : i.startsWith("going back for its things") ? "I want my things back" : "";
+			if (!instinct.isEmpty()) return instinct;
+			String how = goals.optionHow == null ? "" : goals.optionHow;
+			if (how.startsWith("the plan: ") || how.equals("a duel")) return reason(how.replace("the plan: ", ""));
+			if (goals.option >= 0 && goals.option < WHY.length) return WHY[goals.option];
+			var m = java.util.regex.Pattern.compile("\\(([^)]+)\\)").matcher(goals.instant);
+			if (m.find()) return reason(m.group(1));
+			return goals.current != null ? "I want to " + goals.current.what : "";
+		}
+
+		/** A reason in its words: "night: crafting inside" is "it's dark out, so I'm crafting inside". */
+		private String reason(String how) {
+			String h = how.replaceAll("\\s*\\([^)]*\\)", "").replaceAll("\\bitself\\b", "myself").replaceAll("\\bits\\b", "my").trim();
+			if (h.startsWith("night: ")) {
+				String x = h.substring(7);
+				return x.equals("bed") ? "it's night, time for bed" : "it's dark out, so " + (x.matches("[a-z]+ing\\b.*") ? "I'm " : "") + x;
+			}
+			if (h.startsWith("dusk: ")) return "it's getting dark and I need " + h.substring(6);
+			if (h.startsWith("hurt")) return "I'm hurt";
+			if (h.equals("hungry") || h.startsWith("low on")) return "I'm " + h;
+			if (h.equals("a rival")) return "there's a rival around";
+			if (h.equals("a duel")) return "we're having a duel";
+			if (h.startsWith("iron to smelt")) return "I have iron to smelt";
+			if (h.startsWith("off to")) return "I'm " + h;
+			return "I need " + h;
+		}
+
+		@Override public String next() {
+			int tier = crafter.pickTier();
+			var items = items();
+			if (tier == 0) return "get wood for a pickaxe";
+			if (tier == 1) return "get stone for better tools";
+			if (!hasBed() && items.keySet().stream().noneMatch(k -> k.endsWith("_bed"))) return "get some wool for a bed";
+			if (tier == 2) return "go down the mine for iron";
+			if (goals.home == null) return "build a house of my own";
+			if (player != null && player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()) return "get iron for armor";
+			if (tier < 4 || items.getOrDefault("diamond", 0) < 3) return "find diamonds";
+			return "go to the Nether for netherite";
+		}
+
+		@Override public String bestFriend() {
+			String best = "";
+			float most = 0.3f;
+			for (var e : trust.entrySet()) {
+				if (e.getValue() <= most) continue;
+				String who = null;
+				ServerPlayer p = server.getPlayerList().getPlayer(e.getKey());
+				if (p != null) who = p.getName().getString();
+				for (Companion o : mod.companions) if (o != Companion.this && o.player != null && o.player.getUUID().equals(e.getKey())) who = o.name;
+				if (who == null || who.equals(name)) continue;
+				most = e.getValue();
+				best = who;
+			}
+			if (best.isEmpty() && owner != null && ownerName != null && !ownerName.isEmpty()) best = ownerName;
+			return best;
+		}
+
+		@Override public String lately() {
+			java.util.List<String> did = new java.util.ArrayList<>();
+			var it = goals.done.descendingIterator();
+			while (it.hasNext() && did.size() < 3) {
+				int o = it.next();
+				if (o >= 0 && o < DID.length) did.add(DID[o]);
+			}
+			if (did.isEmpty()) return "";
+			if (did.size() == 1) return did.get(0);
+			return String.join(", ", did.subList(0, did.size() - 1)) + " and " + did.get(did.size() - 1);
+		}
+
+		@Override public float danger() {
+			if (player == null) return 0;
+			int n = player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, player.getBoundingBox().inflate(16), m -> m.isAlive()).size();
+			return Math.min(1, 0.3f * n + (player.getHealth() < 8 ? 0.3f : 0));
+		}
+
+		@Override public boolean night() {
+			return player != null && player.level().isDarkOutside();
 		}
 	}
 	/** Learning by watching: moves it copies from players when they work out. */

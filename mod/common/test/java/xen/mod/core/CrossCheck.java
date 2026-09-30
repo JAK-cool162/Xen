@@ -247,6 +247,34 @@ public final class CrossCheck {
 			if (o == null || o.isBlank()) bad++;
 		}
 		ok &= bad == 0 && distinct.size() > replies / 2;
+		String[][] harder = {                                                      // harder questions: answered from what it knows
+				{"Aria why are you doing that?", "why"}, {"what should we do now?", "next"}, {"how do i make a bed?", "recipe bed"},
+				{"who is your best friend?", "friend"}, {"iron or diamond?", "compare"}, {"should i go mining?", "should"},
+				{"where are you going?", "going"}, {"what did you do today?", "lately"}, {"is it safe outside?", "safe"},
+				{"how do you craft an iron pickaxe", "recipe iron pickaxe"}, {"which is better, a sword or an axe?", "compare"}};
+		int answered = 0;
+		xen.mod.talk.Voice hv = new xen.mod.talk.Voice(testSelf("calm"), 13);
+		for (String[] c : harder) {
+			var h = xen.mod.talk.Voice.hear(c[0], "Aria");
+			String[] want = c[1].split(" ", 2);
+			String r = hv.reply("Steve", c[0], null, true);
+			boolean fine = h.ask.equals(want[0]) && (want.length < 2 || h.about.equals(want[1])) && hv.lastAct.equals("answer " + want[0])
+					&& r != null && !r.isBlank() && !r.contains("null") && (!want[0].equals("recipe") || !r.contains("know"));
+			if (fine) answered++;
+			else System.out.println("  word engine missed \"" + c[0] + "\": " + h + " -> \"" + r + "\" [" + hv.lastAct + "]");
+		}
+		ok &= answered == harder.length;
+		String[][] asks = {{"why don't you build a house", "build"}, {"want to get some iron?", "iron"}, {"get wool for a bed", "bed"}, {"make a bed", "bed"},
+				{"you should get some wood", "wood"}, {"should we go mining?", "mine"}, {"should i go mining?", "chat"}, {"how many diamonds do you have?", "chat"},
+				{"what should we do now?", "chat"}, {"how do i make a bed?", "chat"}, {"i need wool", "chat"}, {"would you like some food?", "chat"},
+				{"do you want some wood?", "chat"}, {"can you come here?", "follow"}, {"why not explore", "explore"}};
+		int acted = 0;
+		for (String[] c : asks) {
+			String got = xen.mod.talk.Chat.understand(c[0], "aria").intent();
+			if (got.equals(c[1])) acted++;
+			else System.out.println("  chat misread \"" + c[0] + "\" as " + got + " (not " + c[1] + ")");
+		}
+		ok &= acted == asks.length;
 		float[] x = new float[xen.mod.talk.ActNet.F];                                // a reaction teaches it: that reply likelier next time
 		x[0] = 1;
 		x[18] = 1;
@@ -266,8 +294,9 @@ public final class CrossCheck {
 			saved = false;
 		}
 		ok &= saved;
-		System.out.println(String.format(java.util.Locale.ROOT, "word engine: network agrees with its teacher %.1f%%, understood %d/%d, %d replies in 6 tones (%d different, %d bad), learning %.3f -> %.3f, saved %s",
-				agree * 100, understood, cases.length, replies, distinct.size(), bad, before, after, saved ? "and loaded" : "FAILED"));
+		System.out.println(String.format(java.util.Locale.ROOT, "word engine: network agrees with its teacher %.1f%%, understood %d/%d, %d replies in 6 tones (%d different, %d bad), "
+				+ "harder questions %d/%d, suggestions and asks %d/%d, learning %.3f -> %.3f, saved %s",
+				agree * 100, understood, cases.length, replies, distinct.size(), bad, answered, harder.length, acted, asks.length, before, after, saved ? "and loaded" : "FAILED"));
 		return ok;
 	}
 

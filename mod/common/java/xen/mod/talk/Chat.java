@@ -125,6 +125,7 @@ public final class Chat {
 			{"guard", "\\b(guard|protect|defend|patrol|keep watch over) (the |our |my |this )?(village|base|home|house|area|territory|farm)\\b|\\bkeep (the )?(monsters|mobs) (out|away)\\b"},
 			{"give", "\\b(give|hand (me|over)|pass me|toss|throw me|share|can i (have|get)|i need your)\\b"},
 			{"redstone", "\\b(redstone|circuit|logic gate|(not|or|and) gate|wire)\\b"},
+			{"bed", "\\b(get|find|collect|gather|grab|go for|shear)( me| us| yourself| some)* wool\\b|\\bwool for\\b|\\b(shear (the |some |a )?sheep|sheep for (a |the |my |your )?bed)\\b|\\b(get|find|make|craft|need) (yourself |me |us |you )?(a |some |your )?(new )?bed\\b"},
 			{"craft", "\\b(craft|crafting)\\b|\\bmake (me |us )?(a |an |some |the |\\d+ )?((wooden|wood|stone|iron|golden|gold|diamond) )?(" + String.join("|", CRAFTABLE) + ")"},
 			{"helpbuild", "\\bhelp ([a-z0-9_]{3,16}) (build|with (the |their |his |her )?(house|build|building|home))\\b|\\bhelp (them|him|her) (build|with (the |their |his |her )?(house|build|building))\\b"},
 			{"build", "\\b(decorate|upgrade|improve|fix up|renovate|polish|prettify) (your |my |our |the )?(house|home|base|place)\\b|\\bmake (your |the )?(house|home) (better|nicer|prettier|look good)\\b|\\b(build|make|dig|design) (me |us )?(a |an |our |my |the |some )?(\\w+ )?(house|home|cottage|cabin|base|bunker|hideout|farm|pen|barn|grinder|statue|sculpture|tower|skyscraper|mansion)\\b|\\bunderground\\b|\\bstatue of\\b"},
@@ -229,16 +230,29 @@ public final class Chat {
 			}
 		} else if (TRADE.matcher(words).find()) {
 			intent = "trade";
-		} else if (!QUESTION.matcher(words).lookingAt()) {
-			for (int i = 0; i < RULE.length; i++) {
-				if (RULE[i].matcher(words).find()) {
-					intent = RULES[i][0];
-					break;
+		} else {
+			Matcher lead = SUGGESTION.matcher(words);                      // "why don't you build a house", "want to get some iron?": asked, nicely
+			boolean led = lead.lookingAt();
+			boolean notAsked = led && Pattern.compile("^(what|who|where|when|which|how many|how much|like|love|be|have|know|mind if|ever|still|think|remember|need|some|any)\\b")
+					.matcher(lead.group("rest")).find();                     // ("would you like some food?", "do you need wood?": an offer or a question, not a request)
+			String asked = led && !notAsked ? lead.group("rest").replaceAll("[?!.\\s]+$", "") : null;
+			if (!notAsked && (asked != null || !QUESTION.matcher(words).lookingAt())) {
+				String look = asked != null ? asked : words;
+				for (int i = 0; i < RULE.length; i++) {
+					if (RULE[i].matcher(look).find()) {
+						intent = RULES[i][0];
+						break;
+					}
 				}
 			}
 		}
 		return details(intent, words);
 	}
+
+	/** A suggestion or a nice way to ask: what's after it is the request ("why don't you get some wood" is get some wood). */
+	private static final Pattern SUGGESTION = Pattern.compile("^(why (don'?t|dont|not) (you|we) |why not |how about (you |we )?(go |try )?|maybe (you |we )?(should|could|can) "
+			+ "|(you|we) (should|could|can|might want to|need to|ought to|gotta|have to) |(do you |you |u )?(want to|wanna) |do you wanna |shall we |should (we|you) "
+			+ "|(can|could) we |(would|will|could|can) you (please )?|(please |pls )?(go )?try (to |and )?)(?<rest>.+)$");
 
 	/** Questions and thanks: the chat model isn't asked to find a request in them. */
 	static boolean justTalk(String words) {

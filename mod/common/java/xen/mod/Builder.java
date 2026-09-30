@@ -282,6 +282,11 @@ final class Builder {
 		return plan != null;
 	}
 
+	/** Building for itself, its own idea (not a friend's house, not something it was asked for). */
+	boolean ownHouse() {
+		return plan != null && helping == null && (c.goals.option >= 0 || c.goals.current != null);
+	}
+
 	/** Is a block of its plan still to go here? (So it doesn't put its crafting table there.) */
 	boolean planned(BlockPos p) {
 		if (plan == null) return false;

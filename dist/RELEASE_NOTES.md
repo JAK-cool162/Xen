@@ -1,7 +1,45 @@
-**Xen Companion 1.9.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.9.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.9.2: the right tool, useful nights, chat that counts
+
+* **The right tool for the job**: a Xen picks the tool that breaks a block fastest (a shovel for dirt and sand, an axe
+  for wood, a pickaxe for stone), from anywhere in its bag (a tool in its backpack goes to its hotbar first). It never
+  digs with a sword, and it no longer swaps to its sword halfway through a block when something armed walks by. It
+  also makes a stone shovel with its stone tools. In the last test runs (4 Xens, 665 blocks) it never dug with a
+  sword; the few bare-handed digs were right after its pickaxe broke. It also holds the right tool as others see it
+  (before, it could look like it was chopping with a sword).
+* **A bed before night**: late in the day, with no bed, it goes for wool from sheep it can see, or walks back to where
+  it saw sheep earlier (it remembers). It even stops work on its own house for this; the house picks up after.
+  * It only counts wool when it's hunting for a bed, so it no longer stops after one sheep or kills cows instead.
+  * With three wool it makes the bed at once, fetching a log first if it has no planks.
+  * At night it puts the bed down wherever there's room nearby and sleeps.
+  * At night it only goes after sheep if they're close and it's safe.
+  * Ask it: "get wool for a bed", "make a bed".
+  * In the test, Xens at dusk with sheep about went from sheep to wool to a log to a bed, and slept in it.
+* **Useful nights, no standing about**:
+  * In its shelter at night it no longer sits until morning: settled, fed and armed with a pickaxe, it digs down from
+    inside and mines.
+  * At home it crafts, smelts or sorts its chest, and rests only when there's nothing else to do.
+  * Some Xens stood still for a minute or more, stuck on the same thing:
+    * one wanted torches but had only logs, and tried again three times a second. Now it makes planks, then sticks,
+      then the torches.
+    * one kept failing to craft a bed while it had a crafting table down.
+    * one was holding a bed in a tunnel too tight to put it down.
+  * Now a failed craft waits 30 seconds. Anything that ends the moment it starts isn't picked again for 20 seconds.
+* **Chat controls what it does**: suggestions are requests now, however you put them: "why don't you build a house",
+  "want to get some iron?", "you should get some wood", "should we go mining?", "how about you get some food". It does
+  them (if it's yours to ask), and tells you in its own words. With the AI chat model on too.
+* **Harder questions**: it answers from what it really knows and does, in its own tone:
+  * why it's doing that ("Because I need wool for a bed.");
+  * what to do next, or tonight;
+  * how to make or find things ("how do I make a bed?", "how do I get diamonds?", about 80 of them);
+  * who its best friend is;
+  * which is better ("iron or diamond?", "a sword or an axe?");
+  * "should I go exploring?" (not at night, it'll say);
+  * where it's going, what it did today, and whether it's safe out there.
 
 ### 1.9.1: Xens talk with their own words
 

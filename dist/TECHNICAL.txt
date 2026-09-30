@@ -1,7 +1,87 @@
-XEN COMPANION 1.9.1: TECHNICAL NOTES
+XEN COMPANION 1.9.2: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.9.2
+===================
+
+Tools (Hands). selectBestTool(state) before every dig:
+- It looks over all 36 slots for the item with the highest destroy speed above 1.0. A sword counts only on cobweb or
+  bamboo. On a tie, the hotbar wins.
+- A backpack tool is swapped into the hotbar first: an empty slot 0-7, else a slot without a damageable item, else 7.
+- If nothing beats a bare hand, it holds an empty or non-damageable slot rather than wear a tool out.
+- The slot is kept to the end of the block: digSlot is restored every tick, and again at the very end of the Xen's tick
+  (Hands.keepTool). Its player ticks before its mind, so a later switch in the same tick was what others saw.
+- ready() won't switch while digging.
+- If the item in the dig slot changes (handed a sword into the empty slot it was punching with), it picks again.
+- Crafter.wanted() also makes a stone shovel once it has stone tools.
+
+Beds (Companion):
+- noticeSheep(), every second, remembers the nearest sheep in view (or within 12 blocks) and the time.
+- bedBeforeNight(), in the instinct chain right after starving, applies when all of these hold: in the overworld, free,
+  not building, not asked for something, no bed or bed item, fewer than 3 wool.
+  - Late day (8500-12500) or night: every 5 s, it hunts sheep it can see. The range is 40 blocks by day. At night it is
+    16 blocks, and only with fear <= 0.5, health >= 12 and no monster within 12.
+  - Late day with none in sight: it walks to the sheep it saw within the last 5 minutes and 96 blocks. The trip is kept
+    for up to 90 s, then it hunts the sheep there.
+- Chores.hunt with forWool counts wool, not food. It only goes after sheep, picks up wool drops, and gives up after
+  30 s with no sheep.
+- A "bed" intent (get/find/collect wool, wool for, make/craft/need a bed) runs bedAsked(). It crafts the bed if it has
+  3 wool, else it hunts the sheep nearby or walks back to where it saw some.
+
+Beds, the rest of the way:
+- Crafter.wanted() makes the bed (bedFromWool: 3 wool of one colour, with 3 planks + 4 for a table if none is near),
+  crafted at once like tools.
+- next() plans a bed's planks (3, no sticks), not a tool's.
+- With the wool but not the wood (bedNeedsWood), bedBeforeNight gathers 2 logs.
+- bedErrandUntil, and a wool hunt, stop Goals.think from starting something over it.
+- bedtime() looks for room within 2 blocks: both halves free and dry, solid under both, any of 4 ways. The agenda only
+  camps (REST "night: it camps with its bed") where there's room.
+- Xen 2.0 choices set chores.own (its own idea). Before, everything it chose looked like a player's request, and the
+  bed check never interrupted it. It may also interrupt its own house (Builder.ownHouse); chores run before the builder,
+  so the build waits.
+
+Nights (Goals.agenda, dark):
+- A Xen tier >= 1 in its shelter (or a hut it built below ground) goes mining when it wants ore.
+- Sheltered or within 24 blocks of home, it crafts, smelts or stores before REST.
+- Crafter:
+  - An order that lacks sticks and has no planks makes planks first.
+  - A failed order it chose itself sets nextTry to 30 s later.
+  - MindSense only allows CRAFT when crafter.canTry().
+- Goals.thinkMind: a choice (other than eat or flee) that is over in under 2 s is barred for 20 s (quickUntil). This
+  stops the three-times-a-second loops.
+- Crafter.next() does nothing but pick its table back up until nextTry: a table it had put down used to keep it
+  "ready" and retrying a failing craft.
+- Chores HIDE (a shelter for the night, its own idea, not following anyone): after 20 s, fed (8+), health 12+, pickaxe
+  tier 1+, it starts mine() from where it is, down to the depth it believes in for coal/iron/diamonds. At most once
+  per 3 minutes.
+
+Chat that acts (talk/Chat.understand):
+- A suggestion or polite lead-in is stripped, and the rest is matched against the request rules. Lead-ins: why
+  don't/not you or we, why not, how about (you/we), maybe you/we should/could, you/we should/could/can/need to,
+  (do you) want/wanna (to), shall we, should we/you, can/could we, would/will/could/can you, try to.
+- A rest starting with what/who/where/when/how many stays a question.
+- "should I ..." stays chat (advice, answered below).
+- The requests then run as usual: owner rules, refusals, ack in its tone.
+
+Harder questions (talk/Voice):
+- hear() sets ask/about/other: recipe (how do I make/craft/get/find, what do I need for, recipe for), should (should
+  I/we, is it a good idea to), next (what should we/I do, what now, what's next, the plan, tonight), friend, going,
+  lately, safe, compare ("X or Y", with better/prefer/... cut away), why (why + about it or that, how come).
+- reply() answers these before the network, from Voice.Self defaults (the game fills them in):
+  - why(): who asked it, else the agenda's reason or why its mind chose that option, in first person.
+  - next(): its next step as a verb phrase.
+  - bestFriend(): the highest trust above 0.3 among players and Xens, else its owner.
+  - lately(): its last 3 finished choices, from Goals.done.
+  - danger(): 0.3 per monster within 16, +0.3 if hurt.
+  - night()
+- Recipes and where to find things: talk/HowTo, about 80 entries. "Which is better": HowTo.better() facts, else
+  material tiers, else like().
+- Companion.request asks the Voice first for these, in both modes (own words or chat model), before SmallTalk.
+- Voice.hear also marks "you should/why don't you/..." as suggestions for it: an ACCEPT says "I'll ..." not "let's ...".
+- CrossCheck: 11/11 harder questions answered and 11/11 suggestions and asks mapped, besides the 1.9.1 checks.
 
 
 WHAT'S NEW IN 1.9.1

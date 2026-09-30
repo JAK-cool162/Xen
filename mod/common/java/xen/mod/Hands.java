@@ -403,6 +403,8 @@ public final class Hands {
 			return;
 		}
 		digging = pos;
+		digSlot = p.getInventory().getSelectedSlot();
+		digItem = p.getInventory().getItem(digSlot).getItem();
 		progress = 0;
 		limit = 200;                                                  // give up after 10 seconds
 		p.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, face(),
@@ -437,6 +439,12 @@ public final class Hands {
 			limit = ticks;
 			return;
 		}
+		if (digSlot >= 0 && p.getInventory().getItem(digSlot).getItem() != digItem) {   // (something new in that slot, say a sword it was just handed: the right tool again)
+			selectBestTool(state);
+			digSlot = p.getInventory().getSelectedSlot();
+			digItem = p.getInventory().getItem(digSlot).getItem();
+		}
+		if (digSlot >= 0 && p.getInventory().getSelectedSlot() != digSlot) p.getInventory().setSelectedSlot(digSlot);   // (the tool it picked, to the end)
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
 		if (ticks > 60 && progress < 0.15f) {                                // (swimming, in the air: getting nowhere) it stops, and tries again from better footing
@@ -488,26 +496,89 @@ public final class Hands {
 	}
 
 	private float bestSpeed(BlockState state, ServerLevel level, BlockPos pos) {
-		int was = p.getInventory().getSelectedSlot();
-		selectBestTool(state);
+		Inventory inv = p.getInventory();
+		int was = inv.getSelectedSlot(), slot = bestSlot(state);
+		if (slot >= 9) {                                                          // (a tool in its backpack: held for a moment to see, then back)
+			ItemStack held = inv.getItem(was), tool = inv.getItem(slot);
+			inv.setItem(was, tool);
+			inv.setItem(slot, held);
+			float f = state.getDestroyProgress(p, level, pos);
+			inv.setItem(slot, tool);
+			inv.setItem(was, held);
+			return f;
+		}
+		if (slot >= 0) inv.setSelectedSlot(slot);
 		float f = state.getDestroyProgress(p, level, pos);
-		p.getInventory().setSelectedSlot(was);
+		inv.setSelectedSlot(was);
 		return f;
 	}
 
-	/** Pick the hotbar item that breaks this block fastest (like pressing a number key). */
-	private void selectBestTool(BlockState state) {
+	/** The slot (0-35) of the tool that breaks this fastest, better than a bare hand (not a sword, unless cobweb); -1: none. */
+	private int bestSlot(BlockState state) {
 		Inventory inv = p.getInventory();
-		int best = inv.getSelectedSlot();
-		float speed = inv.getItem(best).getDestroySpeed(state);
-		for (int slot = 0; slot < 9; slot++) {
-			float s = inv.getItem(slot).getDestroySpeed(state);
-			if (s > speed) {
-				speed = s;
+		boolean cobweb = state.is(net.minecraft.world.level.block.Blocks.COBWEB) || state.is(net.minecraft.world.level.block.Blocks.BAMBOO);
+		int best = -1;
+		float speed = 1.0001f;
+		for (int slot = 0; slot < 36; slot++) {
+			ItemStack st = inv.getItem(slot);
+			if (st.isEmpty() || isSword(st) && !cobweb) continue;
+			float sp = st.getDestroySpeed(state);
+			if (sp > speed || sp == speed && best >= 9 && slot < 9) {
+				speed = sp;
 				best = slot;
 			}
 		}
-		inv.setSelectedSlot(best);
+		return best;
+	}
+
+	/** The hotbar slot of the tool it's digging with (it keeps to it while the block breaks). */
+	private int digSlot = -1;
+	private net.minecraft.world.item.Item digItem;
+
+	/** Mid-dig, it holds the tool it picked for the block (what others see it hold: something else this tick switched away). */
+	void keepTool() {
+		if (digging != null && digSlot >= 0 && p.getInventory().getSelectedSlot() != digSlot) p.getInventory().setSelectedSlot(digSlot);
+	}
+
+	/**
+	 * The right tool for the job, like a player: the one that breaks this fastest, from anywhere in its bag (a tool in
+	 * the backpack goes to its hotbar first). A sword is for fighting (on blocks it only wears out), and when no tool
+	 * beats a bare hand it doesn't dig with its tools either: an empty hand, or something that isn't a tool.
+	 */
+	private void selectBestTool(BlockState state) {
+		Inventory inv = p.getInventory();
+		int best = bestSlot(state);
+		if (best >= 9) best = toHotbar(best);
+		if (best >= 0) {
+			inv.setSelectedSlot(best);
+			return;
+		}
+		if (!inv.getItem(inv.getSelectedSlot()).isDamageableItem()) return;           // (a block, food, nothing in hand: fine)
+		for (int slot = 0; slot < 9; slot++) if (inv.getItem(slot).isEmpty()) {
+			inv.setSelectedSlot(slot);
+			return;
+		}
+		for (int slot = 0; slot < 9; slot++) if (!inv.getItem(slot).isDamageableItem()) {
+			inv.setSelectedSlot(slot);
+			return;
+		}
+	}
+
+	private static boolean isSword(ItemStack s) {
+		return BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_sword");
+	}
+
+	/** A tool from its backpack onto its hotbar (an empty slot, else one without a tool; never the block slot, 8). Its new slot. */
+	private int toHotbar(int from) {
+		Inventory inv = p.getInventory();
+		int to = -1;
+		for (int s = 0; s < 8 && to < 0; s++) if (inv.getItem(s).isEmpty()) to = s;
+		for (int s = 7; s >= 0 && to < 0; s--) if (!inv.getItem(s).isDamageableItem()) to = s;
+		if (to < 0) to = 7;
+		ItemStack moving = inv.getItem(from), there = inv.getItem(to);
+		inv.setItem(to, moving);
+		inv.setItem(from, there);
+		return to;
 	}
 
 	/** The last block it gave up on: it would take too long with what it has (or can't be broken). */
@@ -871,6 +942,7 @@ public final class Hands {
 
 	/** The same, but an axe first when axeFirst (an axe hit disables a raised shield). */
 	void ready(boolean axeFirst) {
+		if (digging != null) return;                                  // (a block half mined: it finishes it with the tool it picked)
 		String first = axeFirst ? "_axe" : "_sword", second = axeFirst ? "_sword" : "_axe";
 		int weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith(first));
 		if (weapon < 0) weapon = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith(second));

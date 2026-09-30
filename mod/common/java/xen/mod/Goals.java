@@ -202,6 +202,7 @@ final class Goals {
 			learn();
 			next = now;                                                      // done: straight on to the next thing, like a player
 		}
+		if (option < 0 && c.chores.busy() && (c.chores.forWool && c.chores.kind == Chores.Kind.HUNT || now < c.bedErrandUntil)) return true;   // (a bed for the night: that first, nothing new over it)
 		if (useMind()) return thinkMind(nearby, now);
 		if (now < next) return false;
 		next = now + THINK;
@@ -590,6 +591,8 @@ final class Goals {
 	int option = -1;
 	/** The option it chose before this one. */
 	private int lastOption = -1;
+	/** What it did lately (its last few choices, newest last). */
+	final java.util.ArrayDeque<Integer> done = new java.util.ArrayDeque<>();
 
 	/** Was its last choice a breather (it doesn't take one after another in daylight)? */
 	boolean restedLast() {
@@ -635,9 +638,14 @@ final class Goals {
 		return b;
 	}
 
+	/** Until when each choice is off (one that ended the moment it began isn't picked again right away: no spinning on the spot). */
+	private final long[] quickUntil = new long[Mind.N];
+
 	private boolean thinkMind(boolean nearby, long now) {
 		if (option >= 0 && current == null) {                              // one of its own kind of choices (rest, follow, eat, help...)
 			if (!extraOver(now)) return c.chores.busy();
+			int o = option;
+			if (now - optionAt < 40 && o != Mind.EAT && o != Mind.FLEE) quickUntil[o] = now + 400;   // (over in under 2 s: nothing came of it)
 			finishOption(false);
 			next = now;
 		}
@@ -647,11 +655,13 @@ final class Goals {
 		Mind mind = c.mod.mind;
 		float[] f = MindSense.features(c);
 		boolean[] can = MindSense.allowed(c, f, nearby);
+		for (int i = 0; i < can.length && i < quickUntil.length; i++) if (now < quickUntil[i]) can[i] = false;
 		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
 		int planned = agenda(f, can);                                          // the obvious next step, like any player: that first
 		if (planned >= 0) {
 			if (startOption(planned, nearby, now)) {
+				c.chores.own = true;                                           // (its own idea: what it's asked for comes first)
 				option = planned;
 				c.habits.started(option);
 				optionFeatures = f;
@@ -670,6 +680,7 @@ final class Goals {
 				can[ch.option] = false;
 				continue;
 			}
+			c.chores.own = true;
 			option = ch.option;
 			c.habits.started(option);
 			optionFeatures = f;
@@ -755,12 +766,20 @@ final class Goals {
 		if (dark) {
 			if (can[Mind.SLEEP]) return why(Mind.SLEEP, "night: bed");
 			boolean bedWithIt = items.keySet().stream().anyMatch(k -> k.endsWith("_bed"));
-			if (bedWithIt && (home == null || !c.player.blockPosition().closerThan(home, 64))) return why(Mind.REST, "night: it camps with its bed");
+			if (bedWithIt && (home == null || !c.player.blockPosition().closerThan(home, 64)) && c.bedRoom() != null) return why(Mind.REST, "night: it camps with its bed");   // (room for it here: else, something useful)
 			BlockPos mine = c.places.get("mine");
 			int mineRange = who.believes("night_mining") ? 96 : who.believes("night_belongs_to_monsters") ? 0 : 32;   // (its beliefs about the night)
-			if (tier >= 2 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), mineRange)) && wantsOre(tier, iron))
-				return why(Mind.MINE, "night: mining (safe under the ground)");
-			if (f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below) return why(Mind.REST, "night: staying in");
+			boolean sheltered = f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below;
+			boolean atHome = home != null && c.player.blockPosition().closerThan(home, 24);
+			if (tier >= 1 && can[Mind.MINE] && (below || mine != null && mine.closerThan(c.player.blockPosition(), mineRange) || sheltered && !atHome)
+					&& wantsOre(tier, iron)) return why(Mind.MINE, sheltered && !below ? "night: digging down from its shelter (mining is safe under the ground)"
+							: "night: mining (safe under the ground)");
+			if (sheltered || atHome) {                                          // in for the night: something useful, not just waiting
+				if (can[Mind.CRAFT]) return why(Mind.CRAFT, "night: crafting inside");
+				if (can[Mind.SMELT]) return why(Mind.SMELT, "night: smelting inside");
+				if (can[Mind.STORE]) return why(Mind.STORE, "night: sorting its things");
+				return why(Mind.REST, "night: staying in");
+			}
 			if (f[Mind.NIGHT] < 0.5f && blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below
 					&& (home == null || !c.player.blockPosition().closerThan(home, 96))) return why(Mind.STONE, "dusk: dirt for a hut");   // (before dark, like a player)
 			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
@@ -781,7 +800,7 @@ final class Goals {
 			return why(Mind.FOOD, "low on food");
 		}
 		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || c.bedAt != null;
-		if (!bed && tier >= 1 && tier != 2 && can[Mind.FOOD] && wool() < 3 && sheepNear()) {
+		if (!bed && tier >= 1 && can[Mind.FOOD] && wool() < 3 && sheepNear() && (tier != 2 || evening())) {   // (with stone tools: iron first, unless night's coming)
 			c.chores.forWool = true;
 			return why(Mind.FOOD, "wool for a bed");
 		}
@@ -1288,6 +1307,11 @@ final class Goals {
 		int o = option;
 		float[] before = optionFeatures;
 		if (o >= 0) lastOption = o;
+		if (o > Mind.REST) {                                                   // (what it did lately: it can tell)
+			done.remove((Integer) o);
+			done.addLast(o);
+			while (done.size() > 6) done.removeFirst();
+		}
 		option = -1;
 		optionFeatures = null;
 		c.chosenFoe = null;
