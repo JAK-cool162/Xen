@@ -772,6 +772,13 @@ public final class Chat {
 		return NOT_UNDERSTOOD;
 	}
 
+	/** Does the message ask about a thing it might have or have seen (iron, wood, a zombie...)? */
+	public static boolean asksAboutThing(String message) {
+		String asked = message.toLowerCase(Locale.ROOT);
+		for (Pattern thing : THING) if (thing.matcher(asked).find()) return true;
+		return false;
+	}
+
 	/** Xen's notes: its feelings, body and what it perceives, in plain words. */
 	public static String notes(String mood, boolean hurt, float health, float hunger, String carrying, String perceived) {
 		StringBuilder sb = new StringBuilder("You feel ").append(mood).append('.');

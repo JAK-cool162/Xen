@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.9.0
+# Xen Companion (Fabric mod) 1.9.1
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.9.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.9.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.9.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.9.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.9.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.9.0+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.9.1+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,17 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## Its own words (1.9.1)
+
+Without the AI chat model (turned off, or a phone without the memory for it), a Xen doesn't just answer simply: it
+talks with its own words. It reads what you said (a hello, a question, what it's about, whether it sounds nice or
+mean, chat shorthand), a tiny network picks what kind of reply fits it, and it builds the sentence from a word library,
+in its tone: shy ones stammer, cheerful ones shout, grumpy ones mutter, bold ones don't hedge, silly ones joke. What it
+thinks of things is its own ("Ugh, creepers. They're sneaky."; "I adore diamonds, they're rare!"). It still does what
+you ask, and says so in its tone. Xens chat with each other the same way, each reading the other's words. A laugh or a
+thanks after a reply teaches it you like that kind of answer. Add your own words, topics and jokes in
+config/xen/words.json (start from the words.json in the mod jar, assets/xen/).
 
 ## Eyes on its work, safe at sea, ready for the worst (1.9.0)
 

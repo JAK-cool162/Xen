@@ -1,7 +1,28 @@
-**Xen Companion 1.9.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.9.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.9.1: Xens talk with their own words
+
+* **Its own words, no big model**: with the AI chat model off (or not loaded yet, or on a phone without the memory for
+  it), a Xen now builds what it says word by word instead of answering simply. It reads what you said (hello, a
+  question, what it's about, whether it sounds good or bad, chat shorthand like "u", "wyd", "lol"), a tiny network picks
+  what kind of reply fits (greet back, say how it feels or what it's doing, give its opinion, agree or not, ask back,
+  cheer you up, crack a joke, take a compliment, answer an insult...), and it puts the sentence together from a word
+  library. Light: about 8 KB of numbers and a word list, nothing to download, answers at once.
+* **In its own style**: a shy Xen stammers and trails off ("U-um, I'm not sure..."), a cheerful one shouts ("Yay, let's
+  go mining!! :)"), a grumpy one mutters ("Finally." to "bye"), a bold one doesn't hedge ("I know."), a silly one jokes.
+  Its temper decides how it takes an insult. What it thinks of creepers, diamonds, the Nether or pigs is its own: its
+  nature, its sins, its skills, plus a few tastes of its own.
+* **Still does what you ask**: requests work as before, and the answer comes in its tone ("On it. I'll stay here.",
+  "O-okay... I'll get some wood.", "Fine. I'll stay here."). "I found diamonds!" is news now, not an order to go mining.
+* **Xens talk to each other with it**: when two meet, one starts (a question, what it thinks of something, its news)
+  and the other reads it and answers ("Found anything good?" "Um, I'm not sure... I really want to grow a village with
+  my tribe someday..." "Villages are super good for trades!").
+* **It learns what you like**: a laugh, thanks or praise after a reply makes that kind of reply likelier with you;
+  "what?" or an insult makes it less likely. Kept in config/xen/words.net.
+* **Your own words**: put a words.json in config/xen/ (copy the one in the mod) to add words, topics and jokes.
 
 ### 1.9.0: eyes on its work, safe at sea, ready for the worst
 

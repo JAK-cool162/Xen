@@ -1,7 +1,54 @@
-XEN COMPANION 1.9.0: TECHNICAL NOTES
+XEN COMPANION 1.9.1: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.9.1
+===================
+
+Its own words (talk/Lexicon, talk/ActNet, talk/Voice). Used when the chat model isn't loaded (off, auto without the
+memory, still loading): Companion.request, after the requests and the grounded answers (Talker.answer; SmallTalk for
+everything but chit-chat), says Voice.reply(speaker, said, grounded, learn). grounded is Chat.plainly's answer when the
+line is a question about a thing it might have or have seen (not an opinion question).
+
+Lexicon: assets/xen/words.json (or config/xen/words.json): normalize (chat shorthand -> words, some to several words),
+polarity (-2..2 per word), topics (about 100: cat, like -1..1, plural or mass, article, verb, pos and neg predicates that
+fit "<topic> is/are ___"), word pools (about 45: greet, bye, agree, dunno, love, hate, very, laugh, care, proud, hurt by
+temper, ask back, accept, decline, ack...) where "word|tone,tone" is three times as likely for those tones and a fifth
+as likely for others, and the last 24 words it used a tenth as likely; jokes; styles per tone (end mark, chance of an
+extra one, a smiley, lower case, a stammer, trailing off, hedging).
+
+Reading (Voice.hear): its name out, letters repeated 3+ times cut to 2, words normalized; question (a "?" or a wh- or
+auxiliary first word); flags: greet, bye, thanks, sorry, praise (about you and good, or "good job"), insult (about you
+and bad, or an insult word), laugh, yes/no (short), how are you, what are you doing, like-question (do you like, think
+of/about, feel about, favorite, opinion), suggestion (let's, we should, shall we, want to...? and the next 5 words),
+feel-me (I'm/I feel + a good or bad word), news (I found/got/built/made/killed/beat/died, guess what), confused, tell me;
+polarity summed with "not/don't/never..." within two words turning it round; the first topic named ("mine" and a bare
+"end" skipped).
+
+ActNet: 43 inputs (1, 16 flags, question/statement, has topic, topic liked/disliked by it (>0.3/<-0.3), sounds
+good/bad, about you/me, chattiness, curiosity, kindness, bravery, temper x3, tone x6, trust in the speaker, mood good/
+bad, busy) -> 32 ReLU -> 18 replies (greet, bye, welcome, feeling, doing, opinion, agree, disagree, ask back, react,
+joke, care, proud, hurt, dunno, share, accept, decline). Trained at first start (6000 made-up situations, 12 epochs,
+about 0.3 s) on a teacher's reply weights (Voice.teach), saved to config/xen/words.net (8 KB); agrees with the teacher's
+favourite 95.9% on new situations. Picking: probabilities cubed, only replies that fit (an opinion needs a topic,
+accept/decline a suggestion...), sampled. Learning: the next line from the same player within 90 s is a reward (+1
+laugh, praise, thanks, yes; -1 insult, confused; +-0.5/-0.3 by how it sounds; +0.2 otherwise), a policy-gradient step
+(lr 0.01) on the reply it gave; Xens talking to each other don't teach it.
+
+Building the reply: each kind of reply is a few sentence shapes filled from the pools, the topic's own predicates, and
+what's true of it (Voice.Self: mood from its emotions, hurt, hungry, what it's doing (goals.instant, first person),
+its dream, the last place it found, what it thinks of a topic: the topic's like + its nature (greed for ores, bravery
+and wrath for monsters, kindness for animals, curiosity for places, skills for building/mining/farming, gluttony for
+food, sloth against work) + a fixed +-0.25 of its own per topic). A chatty Xen may add a second sentence on the same
+subject (ask back, or about itself). Then it's written in its tone (end marks, stammer, lower case, smiley,
+trailing off, contractions). Greeting plus "how are you" gets both. Requests: Voice.ack rewrites "Okay! ..." and
+"I can't ..." with its tone's word. Chat.understand's gathering intents (mine, wood, stone, iron, coal, food) are
+dropped for news and feelings ("I found diamonds!"). Talker: when two Xens chat (85%), one says Voice.opener (a
+question, an opinion, its news, a joke), the other Voice.reply()s to it, and a chatty first one may answer that; 30%
+of its own remarks come from Voice.remark() when there's no chat model. CrossCheck: agreement >= 90%, 16 lines read
+right, 96 replies in 6 tones well formed and varied, learning moves the reply, save/load round trip.
 
 
 WHAT'S NEW IN 1.9.0

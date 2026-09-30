@@ -181,6 +181,9 @@ public final class CrossCheck {
 		check(chatOk, "chat broke after a world closed");
 		System.out.println("chat across worlds: " + (chatOk ? "3 worlds, answered in each" : "FAILED"));
 
+		// Its own words: the reply network learns its teacher, reads what's said, answers in every tone, learns from reactions.
+		check(wordsTest(), "the word engine failed");
+
 		// Finding a way on foot through what it knows.
 		check(pathTest(), "path finding failed");
 
@@ -189,6 +192,104 @@ public final class CrossCheck {
 
 		System.out.println(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
 		if (failures > 0) System.exit(1);
+	}
+
+	static boolean wordsTest() {
+		boolean ok = true;
+		xen.mod.talk.ActNet net = xen.mod.talk.Voice.trained(7);
+		float agree = xen.mod.talk.Voice.agreement(net, 3000, 99);
+		ok &= agree >= 0.9f;
+		String[][] cases = {                                                       // what it should make of these
+				{"Aria, hi!", "greet"}, {"aria how r u?", "howAreYou"}, {"Aria wyd", "whatDoing"}, {"do you like creepers?", "likeQ creeper"},
+				{"what do you think about diamonds", "likeQ diamond"}, {"i found diamonds!!", "news diamond"}, {"you're awesome", "praise"},
+				{"you're a noob", "insult"}, {"lol", "laugh"}, {"i'm so sad today", "feelMe"}, {"thanks!", "thanks"}, {"bye", "bye"},
+				{"lets go mining", "suggest mining"}, {"sorry", "sorry"}, {"how do you feel about storms?", "likeQ storm"}, {"yeah", "yes"}};
+		int understood = 0;
+		for (String[] c : cases) {
+			var h = xen.mod.talk.Voice.hear(c[0], "Aria");
+			String[] want = c[1].split(" ");
+			boolean flag = switch (want[0]) {
+				case "greet" -> h.greet;
+				case "howAreYou" -> h.howAreYou && !h.likeQ;
+				case "whatDoing" -> h.whatDoing;
+				case "likeQ" -> h.likeQ && !h.howAreYou;
+				case "news" -> h.news;
+				case "praise" -> h.praise;
+				case "insult" -> h.insult;
+				case "laugh" -> h.laugh;
+				case "feelMe" -> h.feelMe && h.polarity < 0;
+				case "thanks" -> h.thanks;
+				case "bye" -> h.bye;
+				case "suggest" -> h.suggest;
+				case "sorry" -> h.sorry;
+				case "yes" -> h.yes;
+				default -> false;
+			};
+			boolean topic = want.length < 2 || h.topic != null && h.topic.key().equals(want[1]);
+			if (flag && topic) understood++;
+			else System.out.println("  word engine misread \"" + c[0] + "\": " + h);
+		}
+		ok &= understood == cases.length;
+		int replies = 0, bad = 0;
+		java.util.Set<String> distinct = new java.util.HashSet<>();
+		for (String tone : new String[] {"cheerful", "calm", "grumpy", "shy", "bold", "silly"}) {
+			xen.mod.talk.Voice v = new xen.mod.talk.Voice(testSelf(tone), 11);
+			for (String[] c : cases) {
+				String r = v.reply("Steve", c[0], null, true);
+				replies++;
+				distinct.add(r);
+				if (r == null || r.isBlank() || r.contains("null") || r.contains("  ") || !r.matches("(?s).*[.!?)D^]$")) {
+					bad++;
+					System.out.println("  word engine said badly (" + tone + "): \"" + r + "\" to \"" + c[0] + "\"");
+				}
+			}
+			String o = v.opener("Pip");
+			if (o == null || o.isBlank()) bad++;
+		}
+		ok &= bad == 0 && distinct.size() > replies / 2;
+		float[] x = new float[xen.mod.talk.ActNet.F];                                // a reaction teaches it: that reply likelier next time
+		x[0] = 1;
+		x[18] = 1;
+		x[26] = 0.5f;
+		x[33] = 1;
+		float before = net.probs(x)[xen.mod.talk.ActNet.JOKE];
+		for (int i = 0; i < 20; i++) net.learn(x, xen.mod.talk.ActNet.JOKE, 1f, 0.02f);
+		float after = net.probs(x)[xen.mod.talk.ActNet.JOKE];
+		ok &= after > before;
+		boolean saved = false;
+		try {
+			java.nio.file.Path f = java.nio.file.Files.createTempDirectory("xen-words").resolve("words.net");
+			net.save(f);
+			xen.mod.talk.ActNet back = xen.mod.talk.ActNet.load(f);
+			saved = back != null && java.util.Arrays.equals(back.probs(x), net.probs(x));
+		} catch (IOException e) {
+			saved = false;
+		}
+		ok &= saved;
+		System.out.println(String.format(java.util.Locale.ROOT, "word engine: network agrees with its teacher %.1f%%, understood %d/%d, %d replies in 6 tones (%d different, %d bad), learning %.3f -> %.3f, saved %s",
+				agree * 100, understood, cases.length, replies, distinct.size(), bad, before, after, saved ? "and loaded" : "FAILED"));
+		return ok;
+	}
+
+	private static xen.mod.talk.Voice.Self testSelf(String tone) {
+		return new xen.mod.talk.Voice.Self() {
+			public String name() { return "Aria"; }
+			public String tone() { return tone; }
+			public String temper() { return tone.equals("grumpy") ? "aggressive" : tone.equals("shy") ? "passive" : "friendly"; }
+			public float chattiness() { return 0.7f; }
+			public float curiosity() { return 0.6f; }
+			public float kindness() { return 0.6f; }
+			public float bravery() { return 0.5f; }
+			public float trust(String who) { return 0.2f; }
+			public String mood() { return "pleased"; }
+			public boolean hurt() { return false; }
+			public boolean hungry() { return false; }
+			public boolean busy() { return true; }
+			public String doing() { return "getting wood"; }
+			public String dream() { return "build a home"; }
+			public String saw() { return "a village"; }
+			public float like(xen.mod.talk.Lexicon.Topic t) { return t.like(); }
+		};
 	}
 
 	/** Three worlds in one game: in each a question is answered, then the chat rests and the world closes. */

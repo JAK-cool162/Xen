@@ -2662,12 +2662,17 @@ public final class Companion {
 	 * words, or why it won't. Only its owner can tell it what to do (anyone, if it has no owner), and it can say no.
 	 * Trading is its own business: anyone can make it an offer. Just talk: returns its notes for the chat to answer from.
 	 */
+	/** Requests that are about fetching things (what a statement like "I found diamonds" is mistaken for). */
+	private static final java.util.Set<String> GATHERING = java.util.Set.of("mine", "gather", "wood", "stone", "iron", "coal", "food", "diamonds", "ore");
+
 	public String request(xen.mod.talk.Chat.Request r, ServerPlayer from, String said) {
 		if (player == null) return null;
 		UUID u = from.getUUID();
 		known.add(u);                                                 // now it knows them
 		String who = from.getName().getString();
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
+		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
+		if ((told.news || told.feelMe) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!" is news, not "go mine diamonds"
 		needs.heard(from, words);                                      // "I'm hungry", "I need wood": it may help (its choice)
 		Tribe village = tribe();
 		if (village != null && village.members.size() >= 2) {             // "new rule: no fighting in the village": they vote
@@ -2920,21 +2925,137 @@ public final class Companion {
 			}
 		}
 		if (plan == null) {
+			boolean ownWords = !mod.chat.hasModel();                         // no chat model: it talks with its own words
+			xen.mod.talk.Voice.Heard heard = told;
 			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
-			if (straight == null && r.intent().equals("chat")) straight = smallTalk.answer(from, words);   // hellos, jokes, "do you like me"...
+			if (straight == null && r.intent().equals("chat") && !(ownWords && xen.mod.talk.Voice.social(heard))) straight = smallTalk.answer(from, words);   // hellos, jokes, "do you like me"...
 			if (straight != null) {
 				say(straight);
+				return null;
+			}
+			if (ownWords) {
+				String simple = xen.mod.talk.Chat.plainly(notes(), said);
+				String grounded = heard.question && !heard.likeQ && xen.mod.talk.Chat.asksAboutThing(said) && !simple.equals(xen.mod.talk.Chat.NOT_UNDERSTOOD) ? simple : null;   // (a question about a thing: what it knows; an opinion: its own words)
+				String reply = voice.reply(from == null ? "you" : from.getName().getString(), said, grounded, true);
+				journal("thinks", "own words: " + voice.lastAct + " (heard: " + voice.lastHeard + ")");
+				say(reply);
 				return null;
 			}
 			return notes();                                           // just talk: the chat answers
 		}
 		if (!refused) lastThought = "Asked by " + who + ": " + plan;
-		say(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, ""));   // what it will do (or why not), right away
+		say(voice.ack(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, "")));   // what it will do (or why not), right away, in its own tone
 		return null;
 	}
 
 	/** Talking on its own: remarks, questions and chats with other Xens. */
 	final Talker talker = new Talker(this);
+	/** Its own words (no chat model): it reads what's said, picks what kind of reply fits it, builds the sentence (see {@link xen.mod.talk.Voice}). */
+	final xen.mod.talk.Voice voice = new xen.mod.talk.Voice(new VoiceSelf(), System.nanoTime());
+
+	/** What its voice knows of it: its nature, how it feels, what it does and wants, and what it thinks of things. */
+	private final class VoiceSelf implements xen.mod.talk.Voice.Self {
+		@Override public String name() {
+			return name;
+		}
+
+		@Override public String tone() {
+			return personality.tone == null ? "calm" : personality.tone;
+		}
+
+		@Override public String temper() {
+			return personality.temper;
+		}
+
+		@Override public float chattiness() {
+			return personality.chattiness;
+		}
+
+		@Override public float curiosity() {
+			return personality.curiosity;
+		}
+
+		@Override public float kindness() {
+			return personality.kindness;
+		}
+
+		@Override public float bravery() {
+			return personality.bravery;
+		}
+
+		@Override public float trust(String who) {
+			ServerPlayer p = server.getPlayerList().getPlayerByName(who);
+			return p == null ? 0 : Companion.this.trust(p.getUUID());
+		}
+
+		@Override public String mood() {
+			return emotions.mood();
+		}
+
+		@Override public boolean hurt() {
+			return player != null && player.getHealth() < 10;
+		}
+
+		@Override public boolean hungry() {
+			return player != null && player.getFoodData().getFoodLevel() < 8;
+		}
+
+		@Override public boolean busy() {
+			return chores.busy() || builder.busy() || goals.option >= 0 && goals.option != xen.mod.core.Mind.REST;
+		}
+
+		@Override public String doing() {
+			String d = !goals.instant.isEmpty() ? goals.instant : chores.busy() ? chores.doing : "";
+			if (d.isEmpty() && goals.option >= 0 && goals.option != xen.mod.core.Mind.REST) d = "going to " + xen.mod.core.Mind.SAYS[goals.option];
+			d = d.replaceAll("[,(].*$", "").replaceAll("\\bits\\b", "my").replaceAll("\\bitself\\b", "myself").trim();
+			return d.equals("looking around") || d.equals("exploring") && goals.option < 0 ? "" : d;
+		}
+
+		@Override public String dream() {
+			return goals.dream == null ? "" : goals.dream.what;
+		}
+
+		@Override public String saw() {
+			Places.Place latest = null;
+			for (Places.Place p : places.all()) {
+				String n = p.name();
+				if (n.startsWith("home") || n.startsWith("mine") || n.startsWith("farm") || n.startsWith("bed") || n.startsWith("chest")) continue;
+				if (latest == null || p.day() >= latest.day()) latest = p;
+			}
+			if (latest == null) return "";
+			String n = latest.name().replaceAll("\\s*\\d+$", "");
+			return ("aeiou".indexOf(n.charAt(0)) >= 0 ? "an " : "a ") + n;
+		}
+
+		@Override public float like(xen.mod.talk.Lexicon.Topic t) {
+			Personality p = personality;
+			float v = t.like();
+			switch (t.cat()) {
+				case "ore" -> v += 0.4f * p.sin(xen.mod.core.Sins.GREED) + 0.2f * p.money;
+				case "hostile" -> v += 0.5f * (p.bravery - 0.5f) + 0.3f * p.sin(xen.mod.core.Sins.WRATH) + (p.aggressive() ? 0.2f : 0);
+				case "animal" -> v += 0.5f * (p.kindness - 0.5f);
+				case "build" -> v += 0.4f * (skills.get(Skills.BUILD) - 0.5f) + 0.2f * p.sin(xen.mod.core.Sins.PRIDE);
+				case "food" -> v += 0.4f * p.sin(xen.mod.core.Sins.GLUTTONY);
+				case "place" -> v += 0.4f * (p.curiosity - 0.5f) + 0.2f * p.sin(xen.mod.core.Sins.LUST);
+				case "people" -> v += 0.3f * (p.kindness - 0.5f) - (p.loner ? 0.3f : 0);
+				case "time" -> v += t.key().equals("night") ? 0.4f * (p.bravery - 0.5f) : 0;
+				case "activity" -> v += switch (t.key()) {
+					case "mining" -> 0.4f * (skills.get(Skills.MINE) - 0.5f) + 0.2f * p.sin(xen.mod.core.Sins.GREED);
+					case "building" -> 0.4f * (skills.get(Skills.BUILD) - 0.5f);
+					case "exploring" -> 0.5f * (p.curiosity - 0.5f);
+					case "fighting", "pvp" -> 0.4f * p.sin(xen.mod.core.Sins.WRATH) + 0.3f * (p.bravery - 0.5f) + (p.aggressive() ? 0.3f : 0);
+					case "farming" -> 0.4f * (skills.get(Skills.FARM) - 0.5f) + 0.2f * p.sin(xen.mod.core.Sins.GLUTTONY);
+					case "trading" -> 0.4f * p.money;
+					default -> 0f;
+				};
+				default -> { }
+			}
+			if (t.cat().equals("activity") || t.cat().equals("build") || t.cat().equals("ore")) v -= 0.3f * p.sin(xen.mod.core.Sins.SLOTH) * (t.cat().equals("ore") ? 0.3f : 1);
+			int h = (name + ":" + t.key()).hashCode();                        // its own tastes: a favourite here, a pet hate there
+			v += ((h & 0xff) / 255f - 0.5f) * 0.5f;
+			return Math.max(-1, Math.min(1, v));
+		}
+	}
 	/** Learning by watching: moves it copies from players when they work out. */
 	final Mimic mimic = new Mimic(this);
 	/** The unpredictable side: dancing, showing off, surprises. */

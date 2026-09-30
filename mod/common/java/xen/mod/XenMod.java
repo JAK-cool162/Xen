@@ -123,6 +123,11 @@ public class XenMod implements ModInitializer {
 		skins.prepare(configDir, config.skins);
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
+		try {
+			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
+		} catch (RuntimeException e) {
+			LOG.warn("Xen's word engine couldn't start: {}", e.toString());
+		}
 		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> switch (config.chatModelPick) {
 			case "135m", "360m" -> "on";
 			case "off" -> "off";
@@ -346,6 +351,7 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) roster.remember(c, teamOf(c));
 		roster.save();
 		lore.save();
+		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
 	}
 
 	private void stopping(MinecraftServer s) {
@@ -356,6 +362,7 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) roster.remember(c, teamOf(c));                          // (before they leave: all they know)
 		roster.save();
 		lore.save();
+		xen.mod.talk.Voice.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
 		running = false;
 		if (trainer != null) trainer.interrupt();
@@ -715,7 +722,7 @@ public class XenMod implements ModInitializer {
 		}
 		if (toXen && !chat.hasModel() && toldAboutModel.add(sender.getUUID())) {   // once: why its answers are simple
 			sender.sendSystemMessage(Component.literal("[Xen] The chat model is " + chat.status()
-					+ ". Until it's ready, Xens understand requests and answer simply.").withStyle(net.minecraft.ChatFormatting.GRAY));
+					+ ". Until it's ready, Xens understand requests and talk with their own words (lighter, simpler).").withStyle(net.minecraft.ChatFormatting.GRAY));
 		}
 		Companion named = null;                                               // the one named first ("Bex, help Aria build": Bex)
 		int namedAt = Integer.MAX_VALUE;
