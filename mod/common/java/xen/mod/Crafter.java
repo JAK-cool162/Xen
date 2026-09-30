@@ -93,6 +93,12 @@ final class Crafter {
 	}
 
 	/** Could it make a pickaxe good enough for this tier right now (from what it carries)? */
+	/** Can it make a pickaxe good enough for this tier (this one, or a better one it has the things for)? */
+	boolean canMakeAtLeast(int tier) {
+		for (int t = Math.max(1, tier); t <= 4; t++) if (canMake(t)) return true;
+		return false;
+	}
+
 	boolean canMake(int tier) {
 		int sticks = Math.max(0, 2 - count(n -> n.equals("stick")));
 		int woodForSticks = sticks > 0 ? 2 : 0, woodForTable = tableNearOrCarried() ? 0 : 4;
@@ -115,7 +121,7 @@ final class Crafter {
 		if (tier >= 2 && has("_sword") && has("_axe")) return null;           // (most of the time: nothing to make)
 		if (wood() < 2 && count(n -> n.equals("stick")) == 0) return null;     // no wood, no tools
 		int stone = count(Crafter::isStoneMaterial);
-		if (tier == 0 && canMake(1)) return stone >= 3 && canMake(2) ? "stone_pickaxe" : "wooden_pickaxe";
+		if (tier == 0 && (canMake(1) || canMake(2))) return stone >= 3 && canMake(2) ? "stone_pickaxe" : "wooden_pickaxe";   // (cobblestone and sticks: stone at once)
 		if (tier == 1 && canMake(2)) return "stone_pickaxe";
 		if (tier >= 1 && !has("_sword")) {
 			if (stone >= 2 && sticksOrWood(1, 0)) return "stone_sword";
@@ -317,7 +323,7 @@ final class Crafter {
 	/** One step toward what it was asked to craft: planks or sticks it needs first, a table, then the thing. */
 	private Action orderNext() {
 		RecipeHolder<CraftingRecipe> r = recipe(order);
-		if (r == null || ++orderSteps > 12) {
+		if (r == null || orderSteps > 12) {
 			if (!quietOrder) c.chatter("I couldn't make the " + orderName + ", sorry.", true);
 			order = null;
 			return null;
@@ -328,13 +334,16 @@ final class Crafter {
 		if (!lack.isEmpty()) {                                            // make the planks and sticks it needs from what it has
 			boolean planks = lack.contains("planks") && count(Crafter::isLog) > 0;
 			boolean sticks = lack.contains("stick") && count(n -> n.endsWith("_planks")) >= 2;
-			if (planks) return step(craftSmall(planksRecipe()), "planks");
-			if (sticks) return step(craftSmall("stick"), "sticks");
+			if (planks) return step(() -> craftSmall(planksRecipe()), "planks");
+			if (sticks) return step(() -> craftSmall("stick"), "sticks");
 			if (!quietOrder) c.chatter("I can't make the " + orderName + ": I need " + lack + ".", true);
 			order = null;
 			making = null;
 			return null;
 		}
+		Action wait = c.pace.craftPrep(order, order);                    // a moment to get ready (quick for what it knows)
+		if (wait != null) return wait;
+		orderSteps++;
 		int before = count(n -> n.equals(order));
 		boolean made;
 		if (fitsSmallGrid(r)) {
@@ -343,15 +352,16 @@ final class Crafter {
 			BlockPos at = nearbyTable();
 			if (at == null) {
 				if (count(n -> n.equals("crafting_table")) == 0) {
-					if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(craftSmall(planksRecipe()), "planks");
-					return step(craftSmall("crafting_table"), "a crafting table");
+					if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(() -> craftSmall(planksRecipe()), "planks");
+					return step(() -> craftSmall("crafting_table"), "a crafting table");
 				}
-				return step(placeTable(), "a place for the table");
+				return step(() -> placeTable(), "a place for the table");
 			}
 			made = craftAt(at, order);
 		}
 		c.acted = true;
 		int got = count(n -> n.equals(order)) - before;
+		c.pace.crafted(order, order, made && got > 0);
 		if (made && got > 0) orderLeft -= got;
 		if (orderLeft <= 0 || made && got == 0) {
 			if (!quietOrder) c.chatter(got > 1 || orderName.endsWith("s") ? "Done! I made " + (before + got) + " " + plural(orderName, before + got) + "."
@@ -383,14 +393,14 @@ final class Crafter {
 		int heads = goal.endsWith("_sword") ? 2 : 3;
 		int planksNeeded = (wooden ? heads : 0) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)
 				+ (tableNearOrCarried() ? 0 : 4);
-		if (count(n -> n.endsWith("_planks")) < planksNeeded) return step(craftSmall(planksRecipe()), "planks");
-		if (count(n -> n.equals("stick")) < sticks) return step(craftSmall("stick"), "sticks");
+		if (count(n -> n.endsWith("_planks")) < planksNeeded) return step(() -> craftSmall(planksRecipe()), "planks");
+		if (count(n -> n.equals("stick")) < sticks) return step(() -> craftSmall("stick"), "sticks");
 		BlockPos at = nearbyTable();
 		if (at == null) {
-			if (count(n -> n.equals("crafting_table")) == 0) return step(craftSmall("crafting_table"), "a crafting table");
-			return step(placeTable(), "a place for the table");
+			if (count(n -> n.equals("crafting_table")) == 0) return step(() -> craftSmall("crafting_table"), "a crafting table");
+			return step(() -> placeTable(), "a place for the table");
 		}
-		return step(craftAt(at, goal), goal);
+		return step(() -> craftAt(at, goal), goal);
 	}
 
 	/** A table it put down out in the wild (not at home): done with it, it takes it along, like a player does. */
@@ -415,7 +425,12 @@ final class Crafter {
 		return Action.MINE;
 	}
 
-	private Action step(boolean ok, String what) {
+	private Action step(java.util.function.BooleanSupplier doIt, String what) {
+		Action wait = c.pace.craftPrep(what, making);                    // a moment to get ready (quick for what it knows)
+		if (wait != null) return wait;
+		if (order != null) orderSteps++;
+		boolean ok = doIt.getAsBoolean();
+		c.pace.crafted(what, making, ok);
 		c.acted = true;
 		if (!ok) {
 			XenMod.LOG.info("{} couldn't make {} (making {})", c.name, what, making);

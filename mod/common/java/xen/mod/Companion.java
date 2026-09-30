@@ -273,7 +273,8 @@ public final class Companion {
 		hands.tick();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
 		rider.tick();                                                   // in a boat or on a horse: steering
-		habits.tick();                                                  // getting its bearings, frustration fading
+		habits.tick();                                                  // its first look around (eyes on things), frustration fading
+		pace.tick();                                                    // a tool that just broke; its eyes on its hands
 		eyes.tick();                                                    // a yes or no for every block it can see
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
@@ -766,6 +767,8 @@ public final class Companion {
 		if (fun != null) return fun;
 		Action grudge = mode == Mode.FREE ? uses.grudge() : null;      // someone hurt it badly: their house (the grief setting)
 		if (grudge != null) return grudge;
+		Action pause = pace.next();                                    // its tool just broke (or a new one): a look at its hands
+		if (pause != null) return pause;
 		if (crafter.ready() && !farBehind()) {                        // tools first, like any new player
 			Action craft = crafter.next();
 			if (craft != null) return craft;
@@ -1385,6 +1388,12 @@ public final class Companion {
 	final Trials trials = new Trials(this);
 	/** What it knows of how the game works, and what it doesn't yet (see {@link Knowledge}). */
 	final Knowledge knowledge = new Knowledge(this);
+	/** What it has worked out about playing (where ore is best), how sure, from whom (see {@link Lessons}). */
+	final Lessons lessons = new Lessons(this);
+	/** Its role, purpose and current goal, and how its village's leader leans it (Xen 6.0). */
+	final Purpose purpose = new Purpose(this);
+	/** How quickly it gets to things: a moment to get ready to craft, noticing a broken tool (game ticks, never sleeps). */
+	final Pace pace = new Pace(this);
 	/** What people around it need (it may help: its choice). */
 	final Needs needs = new Needs(this);
 	/** Highways it builds (in the Nether from a portal, or roads). */
@@ -2633,6 +2642,13 @@ public final class Companion {
 			return null;
 		}
 		if (r.intent().equals("chat") && trust(u) >= 0.3f && knowledge.heard(words)) return null;   // it was taught how something works
+		if (r.intent().equals("chat") || r.intent().equals("mine") || r.intent().equals("iron") || r.intent().equals("coal")) {
+			String reply = lessons.heard(words, from.getName().getString(), trust(u));   // a tip where to mine ("diamonds at y -58")
+			if (reply != null) {
+				say(reply);
+				return null;
+			}
+		}
 		if (!words.matches("(?s).*\\b(build|make|dig|craft|put up)\\b.*")) {   // what someone thinks of its house (not a request): it learns
 			String thanks = taste.heard(words, from);
 			if (thanks != null) {
@@ -2708,7 +2724,7 @@ public final class Companion {
 				}
 				case "wood", "stone", "coal", "iron", "mine" -> {
 					plan = (r.intent().equals("mine") || r.intent().equals("iron")) && caves.nearest(160) != null
-							? chores.mine(16, "iron", Math.max(3, r.amount())) : chores.gather(r.intent(), r.amount());   // (a cave it knows: in there)
+							? chores.mine(lessons.depth("iron", 16), "iron", Math.max(3, r.amount())) : chores.gather(r.intent(), r.amount());   // (a cave it knows: in there)
 					asked = r;                                             // (remembered: if something cuts it short, it comes back to it)
 					askedBy = from;
 					askedWords = said;

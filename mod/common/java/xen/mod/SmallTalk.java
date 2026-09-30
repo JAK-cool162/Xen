@@ -38,6 +38,9 @@ final class SmallTalk {
 			+ PLACE_WORDS + ")s?\\b");
 	private static final Pattern PLACES_Q = p("\\b((what|which) places|places (do )?you know|what have you (found|discovered)|what do you know about the (world|map|area))\\b");
 	private static final Pattern LORE_Q = p("\\b(lore|history|chronicles?|what('?s| has)? happened|tell me (a|the|a little) story|story of (the|this) (server|world))\\b");
+	private static final Pattern MINING_Q = p("\\b(where|what (y|level|height)|how (deep|low|high))\\b.*\\b(mine|mining|dig|find|get|look for)\\b.*\\b(iron|diamonds?|coal)\\b"
+			+ "|\\bwhat do you know about (mining|ores?)\\b|\\b(best|good) (y|level|height) for (iron|diamonds?|coal)\\b");
+	private static final Pattern PURPOSE_Q = p("\\b(what'?s your (role|purpose|job|place here)|what are you (for|here for)|why are you here|what'?s your village'?s (way|plan)|who'?s your leader)\\b");
 	private static final Pattern BIOME_Q = p("\\b(what|which) biome\\b");
 	private static final Pattern HOME = p("\\b(where('?s| is) your (house|home|base)|where do you live)\\b");
 	private static final Pattern TIME = p("\\b(what time is it|is it (night|day|morning)|what'?s the time)\\b");
@@ -132,6 +135,7 @@ final class SmallTalk {
 			return b.startsWith("night") ? "It's dark out. " + cap(b.replaceFirst("night: ", "")) + "."
 					: c.pick3("Because " + b + " comes next.", "I need " + b + ". That's how you get ahead.", "The plan: " + b + ".");
 		}
+		if (PURPOSE_Q.matcher(w).find()) return c.purpose.describe();
 		if (PLAN.matcher(w).find() || NEED.matcher(w).find()) {
 			String next = nextStep();
 			because = next;
@@ -251,6 +255,11 @@ final class SmallTalk {
 		if (JOKE.matcher(w).find()) return JOKES[random.nextInt(JOKES.length)];
 		if (LAUGH.matcher(w).find() && w.split("\\s+").length <= 2) return c.pick3("Haha.", "Right?", "Hehe.");
 		if (LORE_Q.matcher(w).find()) return loreAnswer();
+		var mq = MINING_Q.matcher(w);
+		if (mq.find()) {                                                      // what it believes about mining, from where, how sure
+			String ore = w.contains("diamond") ? "diamonds" : w.contains("iron") ? "iron" : w.contains("coal") ? "coal" : null;
+			return c.lessons.describe(ore);
+		}
 		var pq = PLACE_Q.matcher(w);
 		if (pq.find()) return placeAnswer(pq.group(pq.groupCount()));
 		if (PLACES_Q.matcher(w).find()) return placesAnswer();

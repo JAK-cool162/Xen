@@ -1089,6 +1089,7 @@ public class XenMod implements ModInitializer {
 				LOG.warn("Some of {}'s saved life couldn't be read ({}); the rest is kept", name, e.toString());
 			}
 		}
+		if (c.lessons.lessons.isEmpty()) c.lessons.born(random);               // (a rough idea of where ore is: new, or from before 1.8)
 		return c;
 	}
 
@@ -1112,6 +1113,8 @@ public class XenMod implements ModInitializer {
 			part.accept("places", () -> { if (known.has("places")) c.places.load(known.getAsJsonObject("places")); });
 			part.accept("chests", () -> { if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests")); });
 			part.accept("knowledge", () -> { if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows")); });
+			part.accept("lessons", () -> { if (known.has("lessons")) c.lessons.load(known.getAsJsonObject("lessons")); });
+			part.accept("crafted", () -> { if (known.has("crafted")) for (var m : known.getAsJsonArray("crafted")) c.pace.made.add(m.getAsString()); });
 			part.accept("portal math", () -> { if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT); });
 			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });
 			part.accept("taste", () -> { if (known.has("taste")) c.taste.load(known.getAsJsonObject("taste")); });

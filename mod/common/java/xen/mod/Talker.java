@@ -345,6 +345,26 @@ final class Talker {
 			line(o, "I'm off to " + o.goals.current.what + ".", t += 60, null);
 			line(c, pick("Good luck!", "Take care.", "Don't get lost.", "B-be careful.", "Go get it!", "Bring me a souvenir!"), t += 50, null);
 		}
+		Companion teacher = c, pupil = o;                                      // what one of them has worked out (or heard) about where ore is: passed on
+		String[] lesson = c.lessons.tipFor(o.lessons);
+		if (lesson == null) {
+			lesson = o.lessons.tipFor(c.lessons);
+			teacher = o;
+			pupil = c;
+		}
+		if (lesson != null) {
+			final String subject = lesson[1];
+			final int y = Integer.parseInt(lesson[2]);
+			final float sure = Float.parseFloat(lesson[3]);
+			final Companion from = teacher, to = pupil;
+			final UUID fromId = from.player().getUUID();
+			line(from, lesson[0], t += 60, () -> {
+				if (to.player() == null) return;
+				String answer = to.lessons.told(subject, y, Lessons.Source.XEN, from.name, sure, to.trust(fromId));
+				to.talker.sayNear(answer);
+			});
+			t += 50;
+		}
 		String rumor = c.rumors.gossip();                                   // gossip: that's how rumors get around
 		if (rumor != null) {
 			line(c, rumor, t += 60, () -> o.rumors.overheard(c.name, me, rumor));

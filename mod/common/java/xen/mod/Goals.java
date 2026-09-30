@@ -84,6 +84,11 @@ final class Goals {
 	private int[] origin;
 	int achieved;
 	private long next, until;
+
+	/** Think again now (not in a few seconds): it just finished something that wasn't a goal (its first look around). */
+	void thinkNow() {
+		next = 0;
+	}
 	private float rewardAtStart;
 	private boolean buildingHome;
 
@@ -264,8 +269,8 @@ final class Goals {
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
-					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(-58, "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
-					: c.crafter.pickTier() >= 2 ? c.chores.mine(16, "iron", more(6)) : c.chores.mine(40, "coal", more(8));   // (iron armor first, then diamonds; greed: more)
+					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (iron armor first, then diamonds; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
 			case MOBFARM -> {
@@ -597,6 +602,8 @@ final class Goals {
 			b[Mind.STONE] += 0.1f;
 			b[Mind.MINE] += 0.15f;
 		}
+		float[] group = c.purpose.lean();                                       // its village's priorities (its leader's way), as far as it goes along
+		for (int i = 0; i < Mind.N; i++) b[i] += group[i];
 		c.habits.bias(b);                                                       // its routine, what it's sick of, how stung it is
 		return b;
 	}
@@ -623,6 +630,7 @@ final class Goals {
 				optionFeatures = f;
 				optionAt = now;
 				optionHow = "the plan: " + agendaWhy;
+				c.purpose.goal = agendaWhy.replaceAll(" \\(.*", "");
 				c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (the plan: " + agendaWhy + ")");
 				return c.chores.busy();
 			}
@@ -640,6 +648,7 @@ final class Goals {
 			optionFeatures = f;
 			optionAt = now;
 			optionHow = ch.how;
+			c.purpose.goal = Mind.SAYS[option];
 			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + ch.how + ")");
 			return c.chores.busy();
 		}
@@ -738,7 +747,7 @@ final class Goals {
 			return why(Mind.FOOD, "low on food");
 		}
 		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || c.bedAt != null;
-		if (!bed && tier >= 1 && can[Mind.FOOD] && wool() < 3 && sheepNear()) {
+		if (!bed && tier >= 1 && tier != 2 && can[Mind.FOOD] && wool() < 3 && sheepNear()) {
 			c.chores.forWool = true;
 			return why(Mind.FOOD, "wool for a bed");
 		}
@@ -748,13 +757,17 @@ final class Goals {
 		// changes the order: a builder or a settler makes its home first, a speedrunner skips it, a settler farms.
 		boolean holeOnly = who.believes("hole_is_enough");
 		boolean homeFirst = (plan == Strategy.BUILDER || plan == Strategy.SETTLER) && !holeOnly;
-		if (homeFirst && tier >= 2 && home == null) {
+		if (tier == 2) {                                                         // stone tools: what next is its own call, weighed
+			int next = afterStone(can, items, iron, meals, hunger, bed, holeOnly);
+			if (next >= 0) return next;
+		} else stoneGoal = -1;
+		if (homeFirst && tier >= 3 && home == null) {
 			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home first (its plan)");
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for its home (its plan)");
 		}
 		boolean farmed = c.places.get("farm") != null;
 		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
-		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");
+		if (tier == 2 && iron < 3 && can[Mind.MINE]) return why(Mind.MINE, "iron");   // (nothing else open)
 		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
 		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) return why(Mind.MINE, f[Mind.ARMOR] < 0.6f && iron < 24 ? "iron for armor" : "diamonds");
 		if (tier >= 3 && home == null && plan != Strategy.SPEEDRUN && !holeOnly) {
@@ -892,6 +905,115 @@ final class Goals {
 		boolean diamondGear = MindSense.count(c, n -> n.equals("diamond_sword") || n.equals("diamond_chestplate")) > 0
 				|| c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem().toString().contains("diamond");
 		return diamondGear && debris < 4 && c.mod.config.adventures;
+	}
+
+	// --------------------------------------------------------------- after stone tools (Xen 6.0)
+	/** What it settled on after stone tools (a {@link Purpose} choice; -1: nothing yet), until when; how often it went for each. */
+	private int stoneGoal = -1;
+	private long stoneGoalUntil;
+	private String stoneWhy = "";
+	private final int[] stoneTried = new int[Purpose.CHOICES];
+	/** How long it keeps at each choice before it weighs them again (ticks). */
+	private static final int[] STONE_KEEP = {8000, 3600, 3600, 12000, 2400};
+
+	/**
+	 * Stone tools: a decision point, not a script. Iron, food, a bed, a home or a look around, each weighed by how it
+	 * stands (food left, the time of day, sheep about, a cave it knows, how sure it is where iron is), its plan, nature
+	 * and skills, and what its village's leader wants (as much as it goes along). Once it picks, it keeps at it until
+	 * it's done or a good while has passed (no dithering); what it weighed goes in its journal. -1: nothing open.
+	 */
+	private int afterStone(boolean[] can, Map<String, Integer> items, int iron, int meals, int hunger, boolean bed, boolean holeOnly) {
+		long now = now();
+		boolean[] open = new boolean[Purpose.CHOICES];
+		open[Purpose.IRON] = iron < 3 && can[Mind.MINE];
+		open[Purpose.FOOD] = meals < 8 && can[Mind.FOOD];
+		open[Purpose.BED] = !bed && can[Mind.FOOD] && wool() < 3 && sheepSeen();
+		open[Purpose.HOME] = home == null && !holeOnly && (can[Mind.HOUSE] || can[Mind.WOOD]);
+		open[Purpose.EXPLORE] = can[Mind.EXPLORE];
+		if (stoneGoal >= 0 && (now > stoneGoalUntil || !open[stoneGoal] || stoneGoal == Purpose.FOOD && meals >= 6)) {
+			c.journal("thinks", "done with " + Purpose.CHOICE[stoneGoal] + " for now");
+			stoneTried[stoneGoal]++;
+			stoneGoal = -1;
+		}
+		if (stoneGoal < 0) {
+			float[] score = stoneScores(open, items, meals, hunger);
+			int best = -1;
+			for (int i = 0; i < Purpose.CHOICES; i++) if (open[i] && (best < 0 || score[i] > score[best])) best = i;
+			if (best < 0) return -1;
+			stoneGoal = best;
+			stoneGoalUntil = now + STONE_KEEP[best];
+			StringBuilder all = new StringBuilder();
+			for (int i = 0; i < Purpose.CHOICES; i++) {
+				if (all.length() > 0) all.append(", ");
+				all.append(Purpose.CHOICE[i]).append(' ').append(open[i] ? String.format(Locale.ROOT, "%.2f", score[i]) : "-");
+			}
+			stoneWhy = reason(best);
+			c.journal("thinks", "stone tools, what next? " + all + " -> " + Purpose.CHOICE[best] + " (" + stoneWhy + ")");
+			c.purpose.disagree(best, c.purpose.groupPick(open), now);
+			if (random.nextFloat() < 0.35f) c.chatter(c.pick3("Stone tools. Now " + Purpose.CHOICE[best] + ", I think.",
+					"Okay. Next: " + Purpose.CHOICE[best] + ".", "Right, " + Purpose.CHOICE[best] + " next."), false);
+		}
+		c.purpose.goal = Purpose.CHOICE[stoneGoal];
+		return switch (stoneGoal) {
+			case Purpose.IRON -> why(Mind.MINE, "iron (" + stoneWhy + ")");
+			case Purpose.FOOD -> {
+				c.chores.forWool = false;
+				yield why(Mind.FOOD, "food (" + stoneWhy + ")");
+			}
+			case Purpose.BED -> {
+				c.chores.forWool = true;
+				yield why(Mind.FOOD, "wool for a bed (" + stoneWhy + ")");
+			}
+			case Purpose.HOME -> can[Mind.HOUSE] ? why(Mind.HOUSE, "a home (" + stoneWhy + ")") : why(Mind.WOOD, "wood for a home (" + stoneWhy + ")");
+			default -> why(Mind.EXPLORE, "a look around (" + stoneWhy + ")");
+		};
+	}
+
+	/** Each choice after stone tools, weighed (see {@link #afterStone}). */
+	private float[] stoneScores(boolean[] open, Map<String, Integer> items, int meals, int hunger) {
+		Personality who = c.personality;
+		int plan = who.plan;
+		Skills k = c.skills;
+		float[] s = new float[Purpose.CHOICES];
+		int tries = 0;
+		for (int t : stoneTried) tries += t;
+		s[Purpose.IRON] = 0.55f + (plan == Strategy.MINER || plan == Strategy.SPEEDRUN || plan == Strategy.WARRIOR ? 0.35f : 0)
+				+ (c.caves.nearest(160) != null ? 0.25f : 0) + 0.3f * (c.lessons.sure("iron") - 0.3f) + 0.25f * (k.get(Skills.MINE) - 0.5f)
+				+ 0.15f * who.sin(Sins.GREED) + 0.1f * tries;                                  // (the longer it waits, the more iron presses)
+		s[Purpose.FOOD] = 0.2f + 0.5f * (1 - Math.min(meals, 8) / 8f) + (hunger < 14 ? 0.2f : 0)
+				+ (plan == Strategy.SETTLER || plan == Strategy.SURVIVOR ? 0.25f : 0) + 0.15f * who.sin(Sins.GLUTTONY) + 0.2f * (k.get(Skills.FARM) - 0.5f);
+		s[Purpose.BED] = 0.3f + (evening() ? 0.3f : 0) + (sheepNear() ? 0.2f : 0) + (plan == Strategy.SURVIVOR || plan == Strategy.SETTLER ? 0.25f : 0)
+				+ 0.2f * (who.cautionScale() - 1) + (who.believes("night_belongs_to_monsters") ? 0.2f : 0);
+		int wood = MindSense.count(c, n -> n.endsWith("_planks")) + 4 * items.getOrDefault("log", 0);
+		s[Purpose.HOME] = 0.25f + (plan == Strategy.BUILDER || plan == Strategy.SETTLER ? 0.5f : 0) + 0.25f * (k.get(Skills.BUILD) - 0.5f)
+				+ 0.15f * who.sin(Sins.PRIDE) + (wood >= 32 ? 0.1f : 0) - (plan == Strategy.SPEEDRUN ? 0.4f : 0) - (crowdedBy() != null ? 0.3f : 0);
+		boolean knowsLittle = c.caves.nearest(160) == null && c.places.find("village") == null;
+		s[Purpose.EXPLORE] = 0.1f + 0.45f * who.curiosity + (plan == Strategy.EXPLORER || plan == Strategy.TRADER ? 0.35f : 0)
+				+ (knowsLittle ? 0.15f : 0) + 0.15f * who.sin(Sins.LUST);
+		float[] lean = c.purpose.choiceLean();
+		for (int i = 0; i < Purpose.CHOICES; i++) s[i] += lean[i] - 0.3f * stoneTried[i] + 0.12f * (float) random.nextGaussian();
+		return s;
+	}
+
+	/** Why it went for this one, in a few words (what weighed most). */
+	private String reason(int choice) {
+		int plan = c.personality.plan;
+		Purpose.Style group = c.purpose.groupStyle();
+		float lean = c.purpose.choiceLean()[choice];
+		if (lean > 0.12f && group != null) return "its village wants it (" + group.word + " leader)";
+		return switch (choice) {
+			case Purpose.IRON -> plan == Strategy.MINER || plan == Strategy.SPEEDRUN || plan == Strategy.WARRIOR ? "its plan" : c.caves.nearest(160) != null
+					? "a cave it knows" : "the usual next step";
+			case Purpose.FOOD -> "running low";
+			case Purpose.BED -> evening() ? "night is coming" : "sheep about";
+			case Purpose.HOME -> plan == Strategy.BUILDER || plan == Strategy.SETTLER ? "its plan" : "somewhere to come back to";
+			default -> plan == Strategy.EXPLORER || plan == Strategy.TRADER ? "its plan" : "curious what's out there";
+		};
+	}
+
+	/** Sheep it can see or knows are close (within 48 blocks). */
+	private boolean sheepSeen() {
+		return !c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, c.player.getBoundingBox().inflate(48), x -> x.isAlive()).isEmpty();
 	}
 
 	private int why(int option, String why) {

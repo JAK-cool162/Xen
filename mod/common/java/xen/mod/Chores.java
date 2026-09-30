@@ -794,7 +794,7 @@ final class Chores {
 		}
 		int needs = 0;
 		for (int k : cats) needs = Math.max(needs, Crafter.tierFor(k));
-		if (needs > c.crafter.pickTier() && !c.crafter.canMake(needs)) {   // its pickaxe broke, or it never had one
+		if (needs > c.crafter.pickTier() && !c.crafter.canMakeAtLeast(needs)) {   // its pickaxe broke, or it never had one (and it can't make one)
 			finish("I can't mine " + what + " without " + Crafter.tierName(needs) + ".");
 			return null;
 		}

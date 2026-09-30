@@ -1,7 +1,69 @@
-XEN COMPANION 1.7.1: TECHNICAL NOTES
+XEN COMPANION 1.8.0: TECHNICAL NOTES
 ====================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 1.8.0
+===================
+
+Purpose (Purpose, Goals.bias, Laws). role(): the job Laws gave it ("miner of <tribe>"), else a noun for its Strategy
+plan; purpose(): Strategy.WORDS[plan]; goal: set whenever an option starts (the agenda's reason up to its bracket, or
+Mind.SAYS). Purpose.style(leader): BUILDER for a builder plan (or a proud settler), CAUTIOUS for survivor/settler,
+AMBITIOUS for speedrun/miner/explorer/warrior unless cautionScale > 1.35, else by caution (> 1.1) and pride.
+follows() = 0.25 + 0.5 loyalty + 0.35 max(0, trust in the leader), times (0.35 + 0.5 loyalty) when its plan clashes with
+the style (cautious vs speedrun/warrior/explorer, ambitious vs survivor/settler, builder vs speedrun/explorer), halved
+for a loner, 1 for the leader. lean(): per style, e.g. cautious SHELTER +0.2, SLEEP +0.1, FOOD +0.15, GUARD +0.1,
+EXPLORE -0.15, ADVENTURE -0.2 (ambitious MINE +0.2, EXPLORE +0.15, ADVENTURE +0.2, REST -0.1; builder HOUSE +0.25,
+WOOD +0.15, STONE +0.1, FARM +0.1), times follows(), added in Goals.bias. Laws: on a new day, when the leader's style
+changes it says it, and job fit gets +0.15..0.2 for the jobs the style needs (farmer/guard, miner, builder/woodcutter).
+
+After stone tools (Goals.afterStone, pickTier == 2). Candidates IRON, FOOD, BED, HOME, EXPLORE, each open only if it
+can be done (iron < 3 and MINE allowed; meals < 8; no bed, wool < 3, a sheep within 48; no home, not "a hole is
+enough"; EXPLORE allowed). Scores: iron 0.55 + 0.35 (miner/speedrun/warrior) + 0.25 (a cave within 160) + 0.3 (sure of
+iron - 0.3) + 0.25 (mine skill - 0.5) + 0.15 greed + 0.1 per earlier choice; food 0.2 + 0.5 (1 - meals/8) + 0.2 (hunger
+< 14) + 0.25 (settler/survivor) + 0.15 gluttony + 0.2 (farm skill - 0.5); bed 0.3 + 0.3 evening + 0.2 sheep in sight +
+0.25 (survivor/settler) + 0.2 (cautionScale - 1) + 0.2 ("night belongs to monsters"); home 0.25 + 0.5 (builder/settler)
++ 0.25 (build skill - 0.5) + 0.15 pride + 0.1 (32+ wood) - 0.4 speedrun - 0.3 (someone else's base here); explore 0.1 +
+0.45 curiosity + 0.35 (explorer/trader) + 0.15 (no cave or village known) + 0.15 lust. Each + the leader's lean for
+it (cautious food +0.25, bed +0.3, explore -0.2; ambitious iron +0.3, explore +0.2; builder home +0.35), times
+follows(), - 0.3 per time it was chosen before, + N(0, 0.12). It keeps the pick until done or 8000/3600/3600/12000/
+2400 ticks (food: done at 6 meals), then scores again. Logged as "stone tools, what next? ...". If the group's
+favourite differs, it may say so (once a day at most). The old opportunistic wool-for-a-bed step is skipped at tier 2.
+
+Lessons (Lessons). Per subject (iron 16 +-10, diamonds -58 +-7, coal 44 +-14): value, the prior it had before its own
+finds, source (BORN, EXPERIENCE, XEN, PLAYER), sure, teacher, confirmed, contradicted, the last 24 heights it found
+that ore at. Born: true + N(0, spread / (1 + 0.5 generation)), sure 0.3. found(ore, y) (Hands, on breaking an _ore):
+within 10 of the prior confirms it (twice: +0.03 trust in the teacher), more than 20 off contradicts it; value =
+(1 - w) prior + w mean(finds), w = n/(n + 3); sure = min(0.95, (1 - w) priorSure + w (0.4 + 0.5 n/(n + 4))); after 3
+finds far (> 12) from the prior the source becomes EXPERIENCE. told(subject, y, source, by, theirSure, trust): take =
+theirSure (0.3 + 0.7 trust) (1 - 0.6 sure), x0.3 once it has 3 finds of its own. Players: "<ore> ... y/level/at <n>"
+in a request. Xens: in a chat either one passes on a belief that differs from the other's by 8 or more: earned (2+
+finds, or confirmed) at its confidence, or hearsay (taught by a player or Xen, sure >= 0.55) at 0.7 of it. depth()
+feeds Goals, Nether, Adventure and the mine it digs. Saved with the Xen ("lessons").
+
+A first look around (Habits.scout, pickScout, glance, turnHead). On joining (and respawning) it picks among 8
+directions (its facing + k*45 +- 15): along the ray every 2 blocks to the reach (10-16; 10 after dying) the surface
+(MOTION_BLOCKING_NO_LEAVES) counts lava +10, water +1.2, a drop over 3 +2 + 0.3/block, a climb over 2 +0.6, an unloaded
+chunk +5; at the end animals within 12 (0.25 each, up to 4) and 6 sampled columns (leaves/logs +0.12, bare stone
++0.1); ahead +0.2, + U(0, 0.3). Under a roof, at night, or every way worse than -3: no walk. It walks there (the
+walker's stroll: no sprinting but gap jumps) for up to 15 s. Every 14-31 ticks its eyes go for 8-15 ticks to a living
+thing in sight within 24, or one of 8 sampled surface blocks within 16 (trees, water, stone, sand, lava), or (15%)
+over a shoulder (+-115 degrees). Only the head turns (yHeadRot = yRot + an offset eased 35% a tick, clamped to +-70;
+the pitch eases too), after the walker has set the body, so its path doesn't change. Then Goals.thinkNow().
+
+Pace (Pace). craftPrep(step, goal) before every crafting step (Crafter.step, and an order's final craft): a new step
+of the same thing 3-6 ticks; the first step of something it has made before 4-8, of something new 14-26 ("works out
+the recipe"); IDLE with its eyes down till then. Under pressure (fighting, health < 8, in water or lava, falling over 2
+blocks, a Monster within 8) no wait. crafted(): the step is done; a finished tool gets a 6-10 tick look. Its main hand
+is watched every tick: a damageable tool with 3 or fewer uses left gone from the same slot = broken: 8-16 ticks
+looking at its hands, a line (75%), then the crafter (before chores) makes another if it can. Known recipes are
+saved ("crafted"). An order counts its steps only when a step runs (the wait no longer used up its 12 tries).
+
+Fixes. Crafter.wanted(): with no pickaxe, cobblestone and sticks (and a table) but no planks, a stone pickaxe (before,
+nothing: it went for wood). Chores: a gather job gives up for want of a pickaxe only when it can't make one good
+enough (canMakeAtLeast). Hands.edgeAhead(): a plain step or strafe (not the walker, which has its own guard) toward a
+drop of 5 or more with no water stops at the edge.
 
 
 WHAT'S NEW IN 1.7.1

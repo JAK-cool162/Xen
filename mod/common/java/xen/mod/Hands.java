@@ -246,11 +246,37 @@ public final class Hands {
 			case EAT -> { if (!p.isUsingItem() && ticks > 2) limit = ticks; }
 			default -> {}
 		}
+		if ((p.zza != 0 || p.xxa != 0) && edgeAhead()) {                   // a real drop that way: it stops at the edge
+			p.xxa = p.zza = 0;
+			p.setJumping(false);
+			p.setSprinting(false);
+			limit = ticks;
+		}
 		if (current != Action.ATTACK) look();
 		if (!busy()) {
 			p.xxa = p.zza = 0;
 			p.setJumping(false);
 		}
+	}
+
+	/**
+	 * Would the keys it's holding take it over an edge with a real drop (more than 4 blocks, no water below)? A player
+	 * looks where they walk: it stops there. (The walker has its own guard; this is for plain steps and strafes.)
+	 */
+	private boolean edgeAhead() {
+		if (!p.onGround() || p.isInWater() || p.isCreative() || p.isSpectator()) return false;
+		double yaw = Math.toRadians(p.getYRot());
+		double dx = p.xxa * Math.cos(yaw) - p.zza * Math.sin(yaw), dz = p.zza * Math.cos(yaw) + p.xxa * Math.sin(yaw);
+		double len = Math.hypot(dx, dz);
+		if (len < 1e-3) return false;
+		var lv = p.level();
+		BlockPos.MutableBlockPos q = BlockPos.containing(p.getX() + dx / len * 0.8, p.getY() + 0.01, p.getZ() + dz / len * 0.8).mutable();
+		for (int k = 0; k < 6; k++) {
+			var st = lv.getBlockState(q);
+			if (!st.getFluidState().isEmpty() || !st.getCollisionShape(lv, q).isEmpty()) return false;
+			q.move(net.minecraft.core.Direction.DOWN);
+		}
+		return true;
 	}
 
 	void stop() {
@@ -315,7 +341,11 @@ public final class Hands {
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
 		if (progress >= 1f) {
-			if (p.companion != null && BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath().endsWith("_ore")) p.companion.skills.practice(Skills.MINE, 0.02f);
+			String broke = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+			if (p.companion != null && broke.endsWith("_ore")) {
+				p.companion.skills.practice(Skills.MINE, 0.02f);
+				p.companion.lessons.found(broke, digging.getY());                            // where it finds ore: what it comes to believe
+			}
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, face(),
 					level.getMaxY(), 0);
 			digging = null;

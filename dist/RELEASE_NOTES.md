@@ -1,7 +1,35 @@
-**Xen Companion 1.7.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 1.8.0**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 1.8.0: more like a person
+
+* **Why it does things**: every Xen has a role (its job in its village, or the kind of player its plan makes it), a
+  purpose (what that role is for), a goal right now, and the action it's on. Ask "what's your role?".
+* **The leader sets the village's priorities**: a cautious leader wants food, beds and walls first; an ambitious one
+  iron, diamonds and new land; a builder houses. It says so, jobs lean that way, and members follow as far as they're
+  loyal and trust the leader. One whose own plan pulls the other way mostly doesn't, and may say so ("Mira wants food
+  first. I need iron.").
+* **Stone tools are a decision, not a script**: iron, food, wool for a bed, a home, or a look around are weighed by how
+  it stands (food left, evening coming, sheep about, a cave it knows, how sure it is where iron is), its plan, nature
+  and skills, and its leader's wishes. It sticks with its pick until it's done, then weighs again. Three Xens with stone
+  tools can go three different ways (in a test: exploring, food, iron). What it weighed is in the journal.
+* **What it knows about ore**: each Xen is born with a rough idea of where iron, diamonds and coal are (a later
+  generation knows better), learns from what it actually finds, and changes its mind when the evidence disagrees. You
+  can tell it ("diamonds are at y -58") and it takes that in as far as it trusts you; Xens pass on what they've found or
+  heard when they chat, right or wrong ("Heard from Steve: iron at y 12."), and it gets corrected by experience. It
+  mines where it believes the ore is. Ask "where do you mine iron?": it says how sure it is and who told it.
+* **A first look around**: new in the world (or back after dying) it doesn't stand and spin. It walks 10 to 16 blocks
+  the safest-looking way (no water, lava or drops; animals, trees, stone), its head turning to what it sees and now and
+  then over its shoulder, and then decides what to do.
+* **A moment to get ready**: crafting something it has made before is quick; something new takes a moment to work
+  out; a new tool gets a look. When its tool breaks it notices, stops, looks at its hands ("Ah, my pickaxe broke."),
+  makes a new one if it can and carries on. Never in a fight, in water, at low health or with monsters close. All of it
+  counts game ticks; nothing waits or sleeps.
+* **Fixes**: with cobblestone and sticks but no planks it makes a stone pickaxe instead of going for wood first; a job
+  it was asked to do no longer gives up when its pickaxe breaks and it can make another; it stops at the edge instead
+  of stepping off a drop when it's just walking about (two Xens walked off a 30-block drop in a test).
 
 ### 1.7.1: fixes
 

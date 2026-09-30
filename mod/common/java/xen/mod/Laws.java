@@ -59,6 +59,8 @@ final class Laws {
 	/** How much each member worked today (its work choices), for "everyone works". */
 	final Map<Companion, Integer> worked = new HashMap<>();
 	private long nextThought, day = -1;
+	/** The leader's way, last said out loud (it says it again when it changes). */
+	private Purpose.Style style;
 
 	Laws(Tribe tribe) {
 		this.tribe = tribe;
@@ -127,6 +129,13 @@ final class Laws {
 		if (today != day) {                                                      // a new day: jobs, the tax, who worked
 			if (day >= 0) newDay(leader);
 			day = today;
+			Purpose.Style now_ = Purpose.style(leader);
+			if (now_ != style) {                                                 // the leader's way sets the village's priorities
+				style = now_;
+				leader.journal("thinks", "leads " + tribe.name + " its way: " + now_.says);
+				leader.chatter(leader.pick3("Here's how we do things: " + now_.says + ".", "Listen up: we " + now_.says + ".",
+						"My rule of thumb for " + tribe.name + ": " + now_.says + "."), false);
+			}
 			assignJobs(leader);
 		}
 		if (rules.size() < 4 && random.nextFloat() < 0.3f) {                    // the leader thinks of a rule
@@ -164,6 +173,20 @@ final class Laws {
 			fit.put(Job.BUILDER, p.diligence * 0.4f + (p.build.equals("fort") || p.build.equals("tower") ? 0.3f : 0.1f));
 			fit.put(Job.GUARD, p.power * 0.6f + p.bravery * 0.3f + (p.aggressive() ? 0.2f : 0));
 			fit.put(Job.TRADER, p.money * 0.7f + p.chattiness * 0.3f);
+			if (style != null) switch (style) {                                   // the jobs the leader's way needs most
+				case CAUTIOUS -> {
+					fit.merge(Job.FARMER, 0.15f, Float::sum);
+					fit.merge(Job.GUARD, 0.15f, Float::sum);
+				}
+				case AMBITIOUS -> {
+					fit.merge(Job.MINER, 0.2f, Float::sum);
+					fit.merge(Job.TRADER, 0.05f, Float::sum);
+				}
+				case BUILDER -> {
+					fit.merge(Job.BUILDER, 0.2f, Float::sum);
+					fit.merge(Job.WOODCUTTER, 0.1f, Float::sum);
+				}
+			}
 			Job best = null;
 			for (var e : fit.entrySet()) if (best == null || e.getValue() + random.nextFloat() * 0.1f > fit.get(best)) best = e.getKey();
 			Job had = jobs.put(m, best);

@@ -884,7 +884,7 @@ final class Walker {
 		boolean straight = !last && direction(path.get(index + 1)) == direction(m);
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
 		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || m.kind() == Kind.ASCEND)
-				&& (straight || smooth() || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 2;
+				&& (straight || smooth() || m.kind() == Kind.PARKOUR) && (!stroll || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 2;
 		p.setSprinting(sprint);
 		switch (m.kind()) {
 			case ASCEND -> {
@@ -1059,6 +1059,8 @@ final class Walker {
 	}
 
 	/** For developing the walking only (-Dxen.walkDebug=true): every step, every plan, every "no way" in the log. */
+	/** Taking its time (a first look around): it walks, it doesn't run (a gap it still jumps at a run). */
+	boolean stroll;
 	static final boolean WALK_DEBUG = Boolean.getBoolean("xen.walkDebug");
 
 	private void face(Vec3 at) {

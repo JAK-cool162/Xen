@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.7.1
+# Xen Companion (Fabric mod) 1.8.0
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.7.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.7.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.7.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.7.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-1.8.0+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.8.0+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-1.8.0+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-1.8.0+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.7.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-1.8.0+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,42 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## Why it does what it does (1.8.0)
+
+A Xen's choices come in layers, like a person's: its **role** (its job in its village, or else the kind of player its
+plan makes it: speedrunner, builder, settler, miner, explorer, trader, warrior, survivor), its **purpose** (what that
+role is for), its **goal** right now, and the **action** its hands are on. Ask it: "what's your role?", "why are you
+here?", "what's your village's way?".
+
+* **The leader's way**: a village's leader sets its priorities from its own plan and nature. A **cautious** leader
+  wants food, beds and walls first, an **ambitious** one iron, diamonds and new land, a **builder** good houses. It
+  says so when it takes the lead, the jobs it hands out lean that way, and every member leans the same way as far as it
+  goes along (its loyalty, its trust in the leader). A member whose own plan pulls the other way (a speedrunner under
+  a cautious leader) mostly goes its own way, and now and then says so.
+* **After stone tools**: the obvious next step isn't always iron. It weighs iron, food, wool for a bed, a home and a
+  look around, by how it stands (how much food it has, evening coming, sheep about, a cave it knows, how sure it is
+  where iron is), its plan, its nature and skills, and what its leader wants. It keeps at its choice until that's done
+  or a good while has passed (no dithering), then weighs again; the one it went for counts a little less next time and
+  iron presses more the longer it waits. The journal shows the scores ("stone tools, what next? iron 0.84, food 0.72,
+  a bed 0.38, a home -0.08, exploring 0.23 -> iron (its plan)").
+* **What it knows about ore** (lessons): each Xen believes iron, diamonds and coal are best at some height, with a
+  confidence, where it got that (born with it, its own finds, another Xen, a player) and who told it. A newborn has
+  a rough idea (a later generation a better one). Every ore it breaks moves its belief toward where it finds them; a
+  belief it was told that turns out right makes it trust whoever told it a little more. Tell it ("diamonds are at y
+  -58", "iron is best at y 16") and it takes it in as far as it trusts you. Xens pass on what they've found, or only
+  heard ("Heard from Steve: iron at y 12. Haven't tried it yet."), when they chat, so good and bad tips both spread,
+  and experience corrects them. It mines at the height it believes in. Ask "where do you mine iron?" or "how deep do
+  you find diamonds?".
+* **A first look around**: new in the world, or back after dying, it walks off 10 to 16 blocks the way that looks
+  safest (it weighs eight ways for water, lava, drops and steep climbs against animals, trees and bare stone), at a
+  walk, its head turning to the things it passes and now and then over its shoulder, and then decides. Under a roof or
+  at night it decides at once.
+* **A moment to get ready**: a recipe it has made before takes a moment (4 to 8 ticks), a new one longer while it
+  works it out (14 to 26), each step after a short pause, and a new tool gets a look. When a tool breaks in its hand
+  it stops, looks at its hands, says so, then makes another if it can and carries on. Under pressure (a fight, low
+  health, in water, falling, a monster within 8 blocks) there's no pause at all. Everything counts game ticks: nothing
+  ever waits on a clock.
 
 ## Talking on its own, and with other Xens
 

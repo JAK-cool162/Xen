@@ -201,7 +201,7 @@ final class Adventure {
 		if (iron >= 5 && !has("_chestplate") && !has("_helmet")) c.crafter.orderRecipe(iron >= 8 ? "iron_chestplate" : "iron_helmet", 1);
 		else if (iron >= 2 && !(has("iron_sword") || has("diamond_sword"))) c.crafter.orderRecipe("iron_sword", 1);
 		else if (count("raw_iron") >= 3) c.chores.smelt();
-		else if (c.crafter.pickTier() >= 2) c.chores.mine(16, "iron", 8);
+		else if (c.crafter.pickTier() >= 2) c.chores.mine(c.lessons.depth("iron", 16), "iron", 8);
 		else c.chores.gather("stone", 8);
 		c.chores.own = true;
 	}

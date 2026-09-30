@@ -66,6 +66,10 @@ final class Roster {
 		o.add("places", c.places.toJson());
 		o.add("chests", c.storage.toJson());
 		o.add("knows", c.knowledge.toJson());
+		o.add("lessons", c.lessons.toJson());
+		JsonArray crafted = new JsonArray();
+		for (String m : c.pace.made) crafted.add(m);
+		o.add("crafted", crafted);
 		o.add("taste", c.taste.toJson());
 		o.add("habits", c.habits.toJson());
 		if (c.loreVolume > 0) {

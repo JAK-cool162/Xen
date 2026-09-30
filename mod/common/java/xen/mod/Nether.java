@@ -319,7 +319,7 @@ final class Nether {
 			}
 			say("I need an iron ingot for a flint and steel.");
 			if (c.crafter.pickTier() >= 2) {
-				c.chores.mine(16, "iron", 3);
+				c.chores.mine(c.lessons.depth("iron", 16), "iron", 3);
 				c.chores.own = true;
 			} else finishTrip("I'm not ready for the Nether yet.");
 			return null;
@@ -343,7 +343,7 @@ final class Nether {
 		if (c.crafter.pickTier() < 4) {
 			say("I need a diamond pickaxe to mine obsidian.");
 			if (c.items().getOrDefault("diamond", 0) >= 3) return null;           // (the crafter makes it)
-			c.chores.mine(-54, "diamonds", 3);
+			c.chores.mine(c.lessons.depth("diamonds", -54), "diamonds", 3);
 			c.chores.own = true;
 			return null;
 		}
