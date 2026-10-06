@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 final class Teaching {
 	private final Companion c;
 	private final Random random = new Random();
-	private final Map<UUID, Long> taught = new HashMap<>();
+	private final Map<UUID, Long> taught = new HashMap<>(), toldNews = new HashMap<>();
 	private long nextLook = -1;
 	/** When any Xen last gave a lesson or a warning out loud (one at a time, not a chorus of tips). */
 	private static long lastLessonMs;
@@ -122,6 +122,16 @@ final class Teaching {
 		if (System.currentTimeMillis() - lastLessonMs < (Talker.FAST ? 5_000 : 45_000)) return;
 		for (Companion o : c.mod.companions) {
 			if (o == c || o.player == null || o.player.level() != p.level() || o.player.distanceTo(p) > 6 || o.fightingNow()) continue;
+			var fact = now() - toldNews.getOrDefault(o.player.getUUID(), -1_000_000L) < 20 * 60 * 2 ? null : c.memory.newTo(o.memory);   // news: something it was told that the other doesn't know
+			if (fact != null) {
+				toldNews.put(o.player.getUUID(), now());
+				lastLessonMs = System.currentTimeMillis();
+				o.memory.tell(new xen.mod.talk.Words.Memory.Fact(fact.subject(), fact.subjectText(), fact.plural(), fact.rel(), fact.negated(), fact.object(),
+						fact.objectText(), c.name, now()));
+				c.chatter(o.name + ", " + xen.mod.talk.Words.share(fact, random), false);
+				c.journal("tells", o.name + ": " + xen.mod.talk.Words.sentence(fact.subjectText(), fact.plural(), fact.rel(), fact.negated(), fact.objectText()));
+				return;
+			}
 			if (now() - taught.getOrDefault(o.player.getUUID(), -1_000_000L) < 20 * 60 * 10) continue;
 			for (var e : c.aversions.of.entrySet()) {                     // what hurt it: a warning
 				if (e.getValue() >= 0.5f && o.aversions.of(e.getKey()) < Aversions.KEEP_AWAY) {

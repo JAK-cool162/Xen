@@ -313,6 +313,7 @@ public final class Companion {
 		}
 		if (player.tickCount % 20 == 13) confusion.second();
 		if (player.tickCount % 1200 == 17) aversions.fade();
+		if (player.tickCount % 40 == 21) diamondsWatch();
 		teaching.watchCrouch();
 		if (player.tickCount % 20 == 3) teaching.tick();
 		if (hurtNow && !inArena) {                                      // its tribe may come to guard it
@@ -560,6 +561,32 @@ public final class Companion {
 				return null;
 			}
 		}
+	}
+
+	/**
+	 * Diamonds in sight that its pickaxe can't take yet (stone breaks them for nothing): like a player, it remembers
+	 * where, says so, and goes back for them once it has an iron pickaxe.
+	 */
+	private void diamondsWatch() {
+		if (inArena || player == null || minion || player.isSpectator()) return;
+		BlockPos known = places.get("diamonds");
+		if (crafter.pickTier() < 3) {
+			BlockPos d = eyes.nearest("diamond", 24, null);
+			if (d == null || known != null && known.closerThan(d, 12)) return;
+			places.remember("diamonds", d);
+			chatter(pick3("Diamonds! I need an iron pickaxe for those. I'll be back.", "ooh diamonds... can't mine them with this pickaxe. noted",
+					"Diamonds here! Iron pickaxe first, then they're mine."), false);
+			journal("notes", "diamonds at " + d.toShortString() + " (its pickaxe can't take them yet)");
+			return;
+		}
+		if (known == null || mode != Mode.FREE || chores.busy() || builder.busy() || fightingNow() || !known.closerThan(player.blockPosition(), 256)
+				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return;
+		String plan = chores.mineAt(known, 3);
+		if (!plan.startsWith("You will")) return;
+		chores.own = true;
+		places.forget("diamonds");
+		chatter(pick3("Got an iron pickaxe: back to those diamonds!", "ok, time for those diamonds I saw", "Iron pickaxe! Now for the diamonds."), false);
+		journal("does", plan);
 	}
 
 	/** A block right ahead to step up onto (with room to jump)? */
@@ -3026,6 +3053,24 @@ public final class Companion {
 		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
 		boolean aboutThem = words.toLowerCase(java.util.Locale.ROOT).matches("(?s)^\\s*i('m| am| really| just| also)? ?(love|like|hate|found|got|have|had|made|saw|think|mined|killed|built|am|was)\\b.*");
 		if ((told.news || told.feelMe || aboutThem) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!", "I love diamonds": talk, not "go mine diamonds"
+		xen.mod.talk.Words.Meaning grammar = said == null ? null : xen.mod.talk.Words.parse(said, name);
+		if (grammar != null && !r.intent().equals("chat") && xen.mod.talk.Words.awaiting(who) && grammar.act() != xen.mod.talk.Words.Act.COMMAND
+				&& (grammar.rel() == null || grammar.subject() != null && java.util.Set.of("it", "they", "them").contains(grammar.subject().key()))) {   // its question's answer ("fish", "yes", "it's a mob"), not a request
+			journal("thinks", "\"" + said + "\" answers what it asked: not a request (" + r.intent() + ")");
+			r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		}
+		if (grammar != null && r.intent().equals("chat") && xen.mod.talk.Words.awaiting(who) && grammar.act() != xen.mod.talk.Words.Act.COMMAND) {   // its answer first ("fish" isn't "go fishing" then)
+			String w = xen.mod.talk.Words.reply(said, wordsWith(who));
+			if (w != null) {
+				journal("thinks", "words: the answer to what it asked; knows " + memory.size() + " facts");
+				say(w);
+				return null;
+			}
+		}
+		if (grammar != null && !r.intent().equals("chat") && aboutAThing(grammar)) {   // its grammar: "cows drop leather", "diamonds are at y -58" tell it something, they aren't requests
+			journal("thinks", "\"" + said + "\" tells it something about " + grammar.subject().text() + ": not a request (" + r.intent() + ")");
+			r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		}
 		needs.heard(from, words);                                      // "I'm hungry", "I need wood": it may help (its choice)
 		if (!r.intent().equals("peace")) {
 			String heated = teaching.inFight(from, words);              // in a fight with them: it talks like it
@@ -3300,6 +3345,20 @@ public final class Companion {
 			boolean ownWords = !mod.chat.hasModel();                         // no chat model: it talks with its own words
 			xen.mod.talk.Voice.Heard heard = told;
 			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
+			if (straight == null && r.intent().equals("chat") && said != null && grammar != null) {   // Xen 2.0 beta 6: facts it's told, questions its memory (or the game) answers
+				String w = xen.mod.talk.Words.reply(said, wordsWith(who));
+				if (grammar.act() == xen.mod.talk.Words.Act.TELL && "at".equals(grammar.rel()) && grammar.object() != null && "coords".equals(grammar.object().kind())
+						&& grammar.subject() != null) {                             // "the village is at 120 64 -30": a place it knows now
+					String[] xyz = grammar.object().key().split(" ");
+					if (xyz.length >= 3) places.remember(grammar.subject().key(), new BlockPos(Integer.parseInt(xyz[0]), Integer.parseInt(xyz[1]), Integer.parseInt(xyz[2])));
+				}
+				if (w != null) {
+					journal("thinks", "words: " + grammar.act() + " (" + (grammar.subject() == null ? "-" : grammar.subject().key()) + " " + grammar.rel() + " "
+							+ (grammar.object() == null ? "-" : grammar.object().text()) + "); knows " + memory.size() + " facts");
+					say(w);
+					return null;
+				}
+			}
 			if (straight == null && r.intent().equals("chat") && xen.mod.talk.Voice.hard(heard)) {   // why, what next, how to make, which is better...: what it knows, its own words
 				String reply = voice.reply(from == null ? "you" : from.getName().getString(), said, null, true);
 				journal("thinks", "own words: " + voice.lastAct + " (heard: " + voice.lastHeard + ")");
@@ -3328,6 +3387,69 @@ public final class Companion {
 		if (!refused) lastThought = "Asked by " + who + ": " + plan;
 		say(voice.ack(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, "")));   // what it will do (or why not), right away, in its own tone
 		return null;
+	}
+
+	/** Xen 2.0 beta 6: what it was told and kept as facts ("cats like fish", "the village is at ..."), see {@link xen.mod.talk.Words}. */
+	final xen.mod.talk.Words.Memory memory = new xen.mod.talk.Words.Memory();
+
+	/** Its words' view of the world, talking with someone: its memory, and what the game itself knows. */
+	xen.mod.talk.Words.Context wordsWith(String who) {
+		return new xen.mod.talk.Words.Context() {
+			public String self() {
+				return name;
+			}
+
+			public String speaker() {
+				return who;
+			}
+
+			public xen.mod.talk.Words.Memory memory() {
+				return memory;
+			}
+
+			public String game(String subject, String rel) {
+				return gameKnows(subject, rel);
+			}
+
+			public java.util.Random random() {
+				return random;
+			}
+
+			public long now() {
+				return player == null ? 0 : player.level().getGameTime();
+			}
+		};
+	}
+
+	/** What the game itself knows about a thing, for a question (what it drops, what it is, where a place it knows is), as the rest of a sentence; null if nothing. */
+	String gameKnows(String subject, String rel) {
+		if (player == null) return null;
+		String id = subject.replace(' ', '_');
+		return switch (rel) {
+			case "drop", "give" -> Facts.dropsSaid(id, player);
+			case "be" -> {
+				String w = Facts.what(id);
+				yield w != null ? w : switch (id) {                               // (a kind of tool: "pickaxe" is wooden_pickaxe, stone_pickaxe...)
+					case "pickaxe", "axe", "shovel", "hoe", "shears", "fishing_rod" -> "a tool";
+					case "sword", "bow", "crossbow", "trident", "mace", "spear" -> "a weapon";
+					case "helmet", "chestplate", "leggings", "boots" -> "armor";
+					default -> null;
+				};
+			}
+			case "at" -> {
+				BlockPos p = places.get(subject);
+				if (p == null) p = places.nearest(subject);
+				yield p == null ? null : "at " + p.getX() + " " + p.getY() + " " + p.getZ();
+			}
+			default -> null;
+		};
+	}
+
+	/** Something said about a thing (not to it, not about it or them): told, not a request ("cows drop leather", "diamonds are at y -58"). */
+	private boolean aboutAThing(xen.mod.talk.Words.Meaning g) {
+		if (g.subject() == null || !(g.act() == xen.mod.talk.Words.Act.TELL || g.act() == xen.mod.talk.Words.Act.ASK || g.act() == xen.mod.talk.Words.Act.ASK_WH)) return false;
+		String k = g.subject().key();
+		return !java.util.Set.of("you", "i", "we", "me", "us", "it", "this", "that").contains(k) && !k.equals(name.toLowerCase(java.util.Locale.ROOT));
 	}
 
 	/** Talking on its own: remarks, questions and chats with other Xens. */

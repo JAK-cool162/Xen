@@ -136,6 +136,53 @@ final class Facts {
 		return BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
 	}
 
+	// ------------------------------------------------------------------------------------- for questions
+	/** A creature kind by its name ("zombie", "iron_golem"), if the game has one. */
+	private static java.util.Optional<net.minecraft.world.entity.EntityType<?>> entityType(String id) {
+		try {
+			return BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.withDefaultNamespace(id));
+		} catch (RuntimeException e) {
+			return java.util.Optional.empty();                                  // (not a name the game takes)
+		}
+	}
+
+	/** What a creature drops, in words ("beef and leather"): one close by is asked (its loot table), else the table here; null if it doesn't know. */
+	static String dropsSaid(String id, ServerPlayer near) {
+		var type = entityType(id);
+		if (type.isEmpty()) return null;
+		Drops d = null;
+		if (near != null) for (LivingEntity e : near.level().getEntitiesOfClass(LivingEntity.class, near.getBoundingBox().inflate(48), e -> e.getType() == type.get())) {
+			d = drops(e, near);
+			break;
+		}
+		if (d == null) d = ROLLED.containsKey(id) ? ROLLED.get(id) : table(id);
+		List<String> items = new ArrayList<>();
+		for (var e : d.items.entrySet()) if (e.getValue()[1] >= 0.2f && items.size() < 4) items.add(e.getKey().replace('_', ' '));
+		if (items.isEmpty()) return null;
+		return items.size() == 1 ? items.get(0) : String.join(", ", items.subList(0, items.size() - 1)) + " and " + items.get(items.size() - 1);
+	}
+
+	/** What a thing is, from the game ("a hostile mob", "an animal", "food (fills 5 hunger)", "a block"); null if it isn't one. */
+	static String what(String id) {
+		var type = entityType(id);
+		if (type.isPresent()) {
+			var cat = type.get().getCategory();
+			if (cat == net.minecraft.world.entity.MobCategory.MONSTER) return "a hostile mob";
+			if (cat == net.minecraft.world.entity.MobCategory.CREATURE) return "an animal";
+			if (cat == net.minecraft.world.entity.MobCategory.WATER_CREATURE || cat == net.minecraft.world.entity.MobCategory.UNDERGROUND_WATER_CREATURE) return "a sea creature";
+			if (cat != net.minecraft.world.entity.MobCategory.MISC) return "a harmless mob";
+		}
+		int food = fills(id);
+		if (food > 0) return "food (fills " + food + " hunger)";
+		try {
+			if (BuiltInRegistries.BLOCK.getOptional(Identifier.withDefaultNamespace(id)).isPresent()) return "a block";
+			if (BuiltInRegistries.ITEM.getOptional(Identifier.withDefaultNamespace(id)).isPresent()) return "an item";
+		} catch (RuntimeException | LinkageError ignored) {
+			// not a name the game takes
+		}
+		return null;
+	}
+
 	// ------------------------------------------------------------------------------------- food
 	/** What a raw food becomes in a furnace (the same name if it doesn't cook). */
 	static String cooked(String raw) {

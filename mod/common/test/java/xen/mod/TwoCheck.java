@@ -119,6 +119,50 @@ public final class TwoCheck {
 		check("lava".equals(Teaching.thing("lava")) && "magma_block".equals(Teaching.thing("magma")) && "sweet_berry_bush".equals(Teaching.thing("berry bush"))
 				&& Teaching.thing("dirt") == null, "what players warn about");
 		check(Confusion.scale("off") == 0f && Confusion.scale("high") > 1f && Reflexes.scale("instant") == 0f, "settings");
+		// beta 6: words, grammar and a memory of facts
+		xen.mod.talk.Words.reset();
+		var W = xen.mod.talk.Words.Act.class;
+		check(xen.mod.talk.Words.parse("hw r u", "Pip").act() == xen.mod.talk.Words.Act.ASK_WH, "shorthand read out: hw r u = how are you");
+		check(xen.mod.talk.Words.parse("hello Pip!", "Pip").act() == xen.mod.talk.Words.Act.GREET, "a greeting");
+		var told = xen.mod.talk.Words.parse("cats like fish", "Pip");
+		check(told.act() == xen.mod.talk.Words.Act.TELL && told.subject().key().equals("cat") && told.rel().equals("like") && told.object().key().equals("fish") && told.subject().plural(),
+				"cats like fish: subject cat (many), like, fish");
+		var place = xen.mod.talk.Words.parse("the village is at 120 64 -30", "Pip");
+		check(place.rel().equals("at") && place.object().key().equals("120 64 -30"), "a place: the village is at 120 64 -30");
+		check(xen.mod.talk.Words.parse("mine diamonds", "Pip").act() == xen.mod.talk.Words.Act.COMMAND, "mine diamonds: a request");
+		check(xen.mod.talk.Words.parse("creepers don't like cats", "Pip").negated(), "don't: negated");
+		var wolves = xen.mod.talk.Words.parse("do wolves eat bones?", "Pip");
+		check(wolves.act() == xen.mod.talk.Words.Act.ASK && wolves.subject().key().equals("wolf") && wolves.object().key().equals("bone"), "wolves are a wolf, bones a bone");
+		check(xen.mod.talk.Words.sentence("a cat", false, "like", false, "fish").equals("a cat likes fish") && xen.mod.talk.Words.sentence("cats", true, "like", true, "dogs").equals("cats don't like dogs")
+				&& xen.mod.talk.Words.sentence("the village", false, "at", false, "at 1 2 3").equals("the village is at 1 2 3") && xen.mod.talk.Words.sentence("creepers", true, "be", true, "friendly").equals("creepers aren't friendly")
+				&& xen.mod.talk.Words.sentence("a fox", false, "catch", false, "chickens").equals("a fox catches chickens") && xen.mod.talk.Words.sentence("pigs", true, "can fly", true, "").equals("pigs can't fly"),
+				"sentences with the grammar right");
+		check(xen.mod.talk.Words.a("apple").equals("an") && xen.mod.talk.Words.a("creeper").equals("a"), "a / an");
+		var mem = new xen.mod.talk.Words.Memory();
+		Random wr = new Random(5);
+		long[] clock = {0};
+		xen.mod.talk.Words.Context ctx = new xen.mod.talk.Words.Context() {
+			public String self() { return "Pip"; }
+			public String speaker() { return "Steve"; }
+			public xen.mod.talk.Words.Memory memory() { return mem; }
+			public String game(String sub, String rel) { return sub.equals("cow") && rel.equals("drop") ? "beef and leather" : null; }
+			public Random random() { return wr; }
+			public long now() { return clock[0] += 20; }
+		};
+		check(xen.mod.talk.Words.reply("cats like fish", ctx) != null && mem.size() == 1, "a fact it's told, kept");
+		check(xen.mod.talk.Words.reply("do cats like fish?", ctx).contains("cats like fish"), "and answered from memory");
+		check(xen.mod.talk.Words.reply("what do cows drop?", ctx).equals("cows drop beef and leather"), "the game's own knowledge (retrieval)");
+		String unknown = xen.mod.talk.Words.reply("what do wolves eat?", ctx);
+		check(unknown != null && unknown.contains("?") && mem.recall("wolf", null, null).isEmpty(), "what it doesn't know, it doesn't make up (it asks): " + unknown);
+		check(xen.mod.talk.Words.reply("bones", ctx).contains("wolves eat bones") && !mem.recall("wolf", "eat", "bone").isEmpty(), "it asked, and learns the answer");
+		xen.mod.talk.Words.reply("what is a blorp?", ctx);
+		xen.mod.talk.Words.reply("it is a mob", ctx);
+		check(!mem.recall("blorp", "be", "mob").isEmpty() && xen.mod.talk.Words.knows("blorp"), "a new word, and what it is");
+		check(xen.mod.talk.Words.reply("cats don't like fish", ctx).contains("thought") && mem.recall("cat", "like", "fish").get(0).negated(), "told the other way round: it changes its mind");
+		var copy = new xen.mod.talk.Words.Memory();
+		copy.load(mem.toJson());
+		check(copy.size() == mem.size(), "facts are saved");
+		xen.mod.talk.Words.reset();
 		System.out.printf(java.util.Locale.ROOT, "xen 2.0: pig %.0f hunger (%s), sheep %.0f, %.1f catches in 5 min; reactions %.0f ms (unseen %.0f, confused %.0f); %s%n",
 				Facts.hunger(pig), pig.says(), Facts.hunger(sheep), dry, ms, median(unseen), median(confused), failures == 0 ? "all good" : failures + " failed");
 		return failures == 0;

@@ -1,7 +1,76 @@
-XEN COMPANION 2.0.0-beta.5: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.6: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.6
+==========================
+
+talk/Words.java (no game in it; TwoCheck tests it):
+- Vocabulary: assets/xen/vocab.json has pron, det, prep, wh, neg, conj, adj and adv; aux (be, do, have, can, will,
+  should, must, may); intj (greet, bye, thanks, laugh, yes, no, wow); verbs (root -> s, past, ing, past participle);
+  plurals; nouns by kind (animal, mob, person, place, food, thing); and normalize (shorthand and typos to words).
+  - XenMod.started adds every ENTITY_TYPE (mob, animal or thing by MobCategory) and ITEM (food when Facts.fills > 0) name
+    as a noun. That makes 4153 words in all on 1.21.11.
+  - Words it doesn't know get a guessed kind: -ly an adverb; -ing/-ed a verb; after a/the/an adjective/a preposition a
+    noun; after a subject with no verb yet a verb; else a noun. They are kept in <world>/xen/words-learned.json (up to
+    3000).
+- Reading: lower case; its own name taken out; shorthand expanded; two- and three-word nouns joined ("iron golem").
+  Each word is tagged by what it can be and the word before it ("mine" after "a" is a noun, after "I" a verb; "like"
+  after a subject is a verb, else a preposition).
+- parse() gives a Meaning: act (GREET, BYE, THANKS, LAUGH, YES, NO, WOW, ASK, ASK_WH, TELL, COMMAND, OTHER), wh,
+  subject, rel, negated and object.
+  - A phrase is [det/possessive] [adjectives] noun+, or a pronoun.
+  - rel is the verb's root, "be", "at" (be + a place or coordinates), "can X", "adjective + preposition" ("scared
+    of"), or "do" ("what do zombies do").
+  - The object is a phrase, an adjective, a place ("in the forest", "at 120 64 -30", "at y -58"), "fish and chicken",
+    "to swim", or nothing ("pigs can't fly").
+- Memory: Fact(subject, subjectText, plural, rel, negated, object, objectText, source, time), at most 400.
+  - tell() gives NEW, KNOWN, or CHANGED (told the other way round: the new one replaces the old).
+  - recall(subject, rel, object) matches by root (cats = cat), newest first. newTo(other) picks one to share.
+- sentence() builds a sentence with agreement:
+  - I am / you are / it is / they are; likes vs like; doesn't / don't; isn't / aren't; can / can't;
+  - irregular third persons from the verb forms;
+  - es/ies otherwise; a/an.
+- reply(text, Context):
+  - An answer to what it asked: yes/no, or the missing thing ("fish"; "it is a mob"; "it" resolved to the last
+    topic).
+  - TELL: kept. Its answer depends on whether the fact is NEW, KNOWN, CHANGED, or one the game already knows. About the
+    speaker ("I like diamonds"): kept, but the rest of it answers, as before.
+  - ASK: from memory, in the asker's words, with who told it. If it knows the subject with another object: "not sure
+    about bread, but cats like fish". From the game. Else it asks back ("do they?").
+  - ASK_WH: the objects it knows, up to 3, joined with "and"; "what do X do" gives all it knows about X. Then the game.
+    Else it asks back and waits 2 minutes for the answer.
+  - Anything else (greetings, requests, questions about the Xen itself): null, and the existing parts answer.
+- Context.game(subject, rel), in Companion.gameKnows:
+  - drop/give: Facts.dropsSaid, from one close by (its loot table), else what's been rolled, else the table;
+  - be: Facts.what ("a hostile mob", "an animal", "a sea creature", "food (fills N hunger)", "a block", "an item");
+  - at: Places.
+Companion.request:
+- Words.parse first. A TELL/ASK/ASK_WH whose subject is a thing (not you, I, we, it, this, that, or the Xen) is chat,
+  not a request: "cows drop leather" was intent food, "diamonds are at y -58" mine, "wolves eat bones" eat.
+- After talker.answer: Words.reply. A TELL "<place> is at x y z" also goes into Places.
+- memory is saved in companions.json ("facts").
+- Teaching.tick passes on news (a fact the other Xen doesn't know). There is one piece of news per pair every 2
+  minutes, on its own timer apart from skill lessons, and the 45 s spacing still holds. Checked: Steve told one Xen
+  "zombies burn in the sun", and 45 s later the other Xen answered "what do zombies do?" with it.
+Mining:
+- Companion.diamondsWatch (every 2 s): with a pickaxe below iron, diamonds seen within 24 go into Places "diamonds"
+  (journal "notes", one line said).
+  - With an iron pickaxe, free, not busy, within 256 and not out at night: Chores.mineAt(spot). That is
+    mine(spot y, diamonds, 3), going to the spot first in cave mode.
+  - Checked: a sealed room with deepslate diamond ore and a stone pickaxe gave "notes diamonds at ...". After an iron
+    pickaxe it went back and mined them.
+- Staircase: the goal is min(down, 3) steps ahead and down. It used to be one point "down" blocks away, which the
+  walker could reach by odd digging.
+- The stone it digs into when no ore shows reads "digging into the stone to look for ore" (it read "mining stone ore").
+Ex1: stays v3.
+- v4 (8 recordings, 34254 frames) on the same held-out frames: danger .844 (v3 .819), attack .948 (.932), but sprint
+  .720 (.758) and pitch 7.3 (6.9).
+- On the spear session alone, sprint was .377 (v3 .61): a practice session, mostly standing and swinging.
+- The session: 16 min, 91 swings (45 with a diamond spear). 55 were followed by a hotbar swap within 0.6 s: spear to
+  hoe 17, spear to axe 14, axe to spear 5. The fastest came 1 tick later.
 
 
 WHAT'S NEW IN 2.0.0-beta.5

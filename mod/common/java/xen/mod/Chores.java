@@ -969,6 +969,20 @@ final class Chores {
 	}
 
 	/**
+	 * Back to diamonds it saw before and couldn't mine then (its pickaxe was too weak): there first, and it mines them
+	 * as it sees them; none left there: tunnels at that depth. An answer like mine()'s.
+	 */
+	String mineAt(BlockPos spot, int amount) {
+		String plan = mine(spot.getY(), "diamonds", amount);
+		if (!plan.startsWith("You will")) return plan;
+		caveMode = true;                                                      // (a place it knows, not its own staircase: it isn't kept as "the mine")
+		caveTarget = null;
+		toMine = spot;
+		mineY = spot.getY();
+		return "You will go back to the diamonds at " + spot.getX() + " " + spot.getY() + " " + spot.getZ() + ".";
+	}
+
+	/**
 	 * A way down that doesn't go under water (a staircase under a lake or a river floods and drowns you): of the four,
 	 * the first with no water on or over its first steps (what it can see from up here), or null.
 	 */
@@ -1103,7 +1117,8 @@ final class Chores {
 		}
 		int[] ore = glance(cats);                                            // ore showing in the walls (the tunnel shows it)
 		if (ore != null && ore[1] <= c.player.getBlockY() + 4) {
-			doing = String.format(java.util.Locale.ROOT, "mining %s, %d of %d %s so far", Blocks.NAMES[ore[4]].replace(" ore", "") + " ore", got, want, what);
+			doing = ore[4] == Blocks.STONE ? String.format(java.util.Locale.ROOT, "digging into the stone to look for ore, %d of %d %s so far", got, want, what)   // (no ore in sight: deep stone has some)
+					: String.format(java.util.Locale.ROOT, "mining %s, %d of %d %s so far", Blocks.NAMES[ore[4]].replace(" ore", "") + " ore", got, want, what);
 			BlockPos t = new BlockPos(ore[0], ore[1], ore[2]);
 			if (!t.equals(target)) {
 				target = t;
@@ -1153,8 +1168,8 @@ final class Chores {
 				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
 				return null;
 			}
-			int down = feet.getY() - mineY;
-			goal = feet.relative(mineDir, down).below(down);
+			int down = feet.getY() - mineY, step = Math.min(down, 3);        // (a few steps ahead at a time: a straight staircase, not a far point it digs about for)
+			goal = feet.relative(mineDir, step).below(step);
 			doing = "digging a staircase down (y " + feet.getY() + ")";
 		} else {                                                             // branch tunnels: 24 long, 3 apart, back and forth
 			int k = mineLeg;

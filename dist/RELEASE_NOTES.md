@@ -1,7 +1,49 @@
-**Xen Companion 2.0.0-beta.5**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.6**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.6: Xen's own words, grammar and memory; mining fixes
+
+* **Words, grammar and a memory (no AI model needed)**:
+  * **Vocabulary**: about 900 words of its own (with their verb forms and plurals, and chat shorthand: "hw r u" is "how
+    are you"), plus every creature, item and block in the game: over 4,000 words. Words it hears and doesn't know, it
+    learns: it guesses what kind of word each is from where it stands ("a blorp" is a thing).
+  * **Grammar**: it reads what you say as a sentence: a greeting, a question (yes or no, or what, where, who), something
+    you tell it, or a request.
+  * **Memory (RAG)**: what you tell it, it keeps as facts, with who said them. Questions are answered by finding the
+    facts that fit, and from what the game itself knows (what a creature drops, what something is, where a place it
+    knows is).
+  * **Its own sentences**, word by word, with the grammar right ("a cat likes", "cats don't", "is", "aren't").
+  * What it doesn't know, it asks back, and learns your answer. Xens pass on what they were told ("did you know cats
+    like fish?").
+* From a test in the game:
+
+  | You say | Xen says |
+  |---|---|
+  | cats like fish | oh, cats like fish? good to know |
+  | do cats like fish? | yep, cats like fish (you told me) |
+  | what do cows drop? | cows drop beef and leather |
+  | what is a creeper? | a creeper is a hostile mob |
+  | what do wolves eat? | not sure what wolves eat. what? |
+  | bones | ok so wolves eat bones. good to know |
+  | the village is at 120 64 -30 | really? the village is at 120 64 -30? cool |
+  | where is the village? | the village is at 120 64 -30 (you told me) |
+  | what is a blorp? | never heard of a blorp. what is it? |
+  | it is a mob | ahh a blorp is a mob! thanks |
+  | can pigs fly? / no | not sure... can they? / got it: pigs can't fly |
+
+* **Telling isn't asking**: before, "cows drop leather" and "pigs can't fly" were read as asking for food, and
+  "diamonds are at y -58" as "go mining". Now a sentence about a thing is something it's told. A place you tell it
+  ("the village is at ...") it remembers, so "take me to the village" works.
+* **Diamonds it can't mine yet**: with a stone pickaxe it can't take diamonds. Now, like a player, it remembers where
+  they are and says so. It goes back for them once it has an iron pickaxe; this was tested in the game, and it went
+  back and mined them.
+* **Staircases go straight down**: it plans its mine's staircase a few steps at a time. It used to plan toward one far
+  point and could wander off sideways like a tunnel.
+* **Xen Ex1 stays v3.** A v4 trained with the spear-practice session too felt danger a little better (0.84 vs 0.82) but
+  sprinted worse (72% vs 76%): that session is mostly standing and swinging. The recording is kept for fight learning:
+  55 of 91 swings were followed by a swap, mostly spear to hoe or axe, the fastest one tick later.
 
 ### 2.0.0-beta.5: fixes from a real play-test (and Ex1 v3)
 

@@ -204,6 +204,22 @@ public class XenMod implements ModInitializer {
 
 	private void started(MinecraftServer s) {
 		server = s;
+		try {                                                                   // Xen's words: every creature, item and block of this game is a noun it knows
+			xen.mod.talk.Words.load();
+			for (var t : net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE) {
+				var cat = t.getCategory();
+				xen.mod.talk.Words.noun(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(t).getPath(),
+						cat == net.minecraft.world.entity.MobCategory.MONSTER ? "mob" : cat == net.minecraft.world.entity.MobCategory.MISC ? "thing" : "animal");
+			}
+			for (var i : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
+				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(i).getPath();
+				xen.mod.talk.Words.noun(n, Facts.fills(n) > 0 ? "food" : "thing");
+			}
+			xen.mod.talk.Words.loadLearned(s.getWorldPath(LevelResource.ROOT).resolve("xen").resolve("words-learned.json"));
+			LOG.info("Xen's words: {} it knows ({} learned in this world)", xen.mod.talk.Words.vocabularySize(), xen.mod.talk.Words.learnedCount());
+		} catch (RuntimeException e) {
+			LOG.warn("Xen's words couldn't take in the game's names: {}", e.toString());
+		}
 		roster.load(brainFile().resolveSibling("companions.json"));
 		lore.load(brainFile().resolveSibling("lore.json"));
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
@@ -359,6 +375,11 @@ public class XenMod implements ModInitializer {
 
 	private void save() {
 		solverMind.save();
+		try {
+			xen.mod.talk.Words.saveLearned(brainFile().resolveSibling("words-learned.json"));
+		} catch (IOException e) {
+			LOG.warn("Couldn't keep the words Xens learned: {}", e.toString());
+		}
 		try {
 			Path f = brainFile().resolveSibling("strategies.txt");
 			Files.createDirectories(f.getParent());
@@ -1180,6 +1201,7 @@ public class XenMod implements ModInitializer {
 			part.accept("knowledge", () -> { if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows")); });
 			part.accept("lessons", () -> { if (known.has("lessons")) c.lessons.load(known.getAsJsonObject("lessons")); });
 			part.accept("aversions", () -> { if (known.has("aversions")) c.aversions.load(known.getAsJsonObject("aversions")); });
+			part.accept("facts", () -> { if (known.has("facts")) c.memory.load(known.getAsJsonArray("facts")); });
 			part.accept("crafted", () -> { if (known.has("crafted")) for (var m : known.getAsJsonArray("crafted")) c.pace.made.add(m.getAsString()); });
 			part.accept("portal math", () -> { if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT); });
 			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });
