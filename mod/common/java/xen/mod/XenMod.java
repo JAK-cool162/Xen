@@ -217,7 +217,10 @@ public class XenMod implements ModInitializer {
 		if (ex1 != null) {
 			Path learned = brainFile().resolveSibling("ex1-learned.json");
 			try {
-				if (Files.exists(learned)) ex1.restore(new com.google.gson.Gson().fromJson(Files.readString(learned), com.google.gson.JsonObject.class));
+				if (Files.exists(learned) && !ex1.restore(new com.google.gson.Gson().fromJson(Files.readString(learned), com.google.gson.JsonObject.class))) {
+					LOG.info("What Xen Ex1 learned in this world was for an older Ex1: kept as ex1-learned.json.old, the new one starts fresh");
+					keepOld(learned);
+				}
 			} catch (IOException | RuntimeException e) {
 				LOG.warn("What Xen Ex1 learned in this world couldn't be read ({}): starting from the one that ships", e.toString());
 			}

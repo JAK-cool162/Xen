@@ -1,7 +1,30 @@
-**Xen Companion 2.0.0-beta.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.3**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.3: Xen Ex1 v2, trained on an hour more play
+
+* **Xen Ex1 v2**, trained again on everything recorded: the first 22 minutes plus the new hour with a friend (mining,
+  chopping, fights with mobs, a bit of PvP). That's 15,036 moments, 322 of them just before a hurt.
+  * Tested on minutes of play it never saw, the same minutes for v1 and v2:
+
+    | | v1 | v2 |
+    |---|---|---|
+    | Sprint key right | 74% | 77% |
+    | Jump right | 90% | 92% |
+    | Where it looks | within 8.1° | within 5.9° |
+    | Danger AUC | 0.74 | 0.79 |
+
+  * Those minutes are harder now (arrows, a creeper, PvP), so the scores sit below beta.2's own test.
+* **Reaction time, measured**: in the recorded fights a player turned to whoever hit them in a median 251 ms. A Xen
+  hit by something it didn't see now reacts in about 280 to 380 ms (beta.2: 380 to 530).
+* **The new recorder format (1.2)** works for training:
+  * state frames 4 times a second, 20 in fights;
+  * events for hits, damage, blocks and chat;
+  * moments with a screen open (inventory, chests) are left out.
+* **A world keeps what it learned for the right Ex1**: what Xens learned in a world on top of Ex1 v1 isn't put onto
+  v2, which would undo the new training. It's kept as `ex1-learned.json.old`, and v2 starts fresh.
 
 ### 2.0.0-beta.2: Xen Ex1, trained on recorded play; learning instead of rules
 

@@ -85,7 +85,7 @@ public final class TwoCheck {
 		}
 		float ms = median(seen);
 		check(ms >= 200 && ms <= 260, "a reaction is about a quarter second: " + ms);
-		check(median(unseen) - ms >= 150 && median(unseen) - ms <= 320, "what it didn't see coming: slower");
+		check(median(unseen) - ms >= 50 && median(unseen) - ms <= 160, "what it didn't see coming: slower");
 		check(median(fast) < ms && median(confused) > ms + 120, "fast is faster, confused is slower");
 		check(Arrays.stream(seen).min().getAsInt() >= 120 && Arrays.stream(unseen).max().getAsInt() <= 750, "no superhuman or frozen reactions");
 		// typing like a player

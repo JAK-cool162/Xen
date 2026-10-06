@@ -159,9 +159,15 @@ public final class Ex1 {
 		else learnedCalm++;
 	}
 
+	/** Which Ex1 this is (its trained weights): what a world learned on one doesn't fit another. */
+	public String fingerprint() {
+		return hidden + ":" + java.util.Arrays.hashCode(b1) + ":" + java.util.Arrays.hashCode(b2);
+	}
+
 	/** Its danger head as learned in this world (for xen/ex1-learned.json). */
 	public synchronized JsonObject learned() {
 		JsonObject o = new JsonObject();
+		o.addProperty("base", fingerprint());
 		JsonArray w = new JsonArray();
 		for (float[] row : wDanger) w.add(row[0]);
 		o.add("w", w);
@@ -171,14 +177,15 @@ public final class Ex1 {
 		return o;
 	}
 
-	/** What a world's Xens taught it before (ignored if it doesn't fit). */
-	public synchronized void restore(JsonObject o) {
+	/** What a world's Xens taught it before; false (and nothing changed) if that was learned on another Ex1. */
+	public synchronized boolean restore(JsonObject o) {
 		JsonArray w = o.getAsJsonArray("w");
-		if (w == null || w.size() != hidden) return;
+		if (w == null || w.size() != hidden || !o.has("base") || !o.get("base").getAsString().equals(fingerprint())) return false;
 		for (int j = 0; j < hidden; j++) wDanger[j][0] = w.get(j).getAsFloat();
 		bDanger[0] = o.get("b").getAsFloat();
 		learnedHurts = o.has("hurts") ? o.get("hurts").getAsLong() : 0;
 		learnedCalm = o.has("calm") ? o.get("calm").getAsLong() : 0;
+		return true;
 	}
 
 	public void save(Path file) throws IOException {

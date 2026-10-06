@@ -43,7 +43,7 @@ final class Reflexes {
 	 */
 	static int sampleMs(Random r, boolean unseen, boolean focused, boolean tired, float confusion, float scale) {
 		double ms = Math.exp(Math.log(230) + 0.22 * r.nextGaussian());
-		if (unseen) ms += 150 + 150 * r.nextDouble();
+		if (unseen) ms += 50 + 100 * r.nextDouble();                       // (recorded fights: a player turns to whoever hit them in a median 251 ms)
 		if (tired) ms += 40;
 		ms += 180 * Math.max(0, Math.min(1, confusion));
 		if (focused) ms -= 50;

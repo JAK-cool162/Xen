@@ -161,22 +161,62 @@ def yaw_bin(d):
     return len(YAW_BINS)
 
 
-def frames(records, horizon=8):
-    """(features, keys, yaw bin, next pitch, hurt soon) for each frame but the last."""
+def frames(records, horizon_ms=2000, step_ms=250, gap_ms=200):
+    """(features, keys, yaw bin, next pitch, hurt soon) for the frames of a recording.
+
+    Works with both recorder formats: the first (every record a frame, 4 a second) and 1.2+ (type "state" frames, 4 a
+    second, 20 a second in fights, and type "event" records: damage_taken, block_break, chat...). Frames come at most
+    every gap_ms (so fights don't drown everything else), not while a screen is open (the keys mean nothing then).
+    The turn and the next pitch are a quarter second on; hurt is a damage event or lost health within two seconds.
+    """
+    states, hurts = [], []
+    for r in records:
+        t = r.get("type")
+        if t == "event":
+            if r.get("kind") == "damage_taken":
+                hurts.append(r.get("t_ms", 0))
+            continue
+        if "player" in r:
+            states.append(r)
+    for a, b in zip(states, states[1:]):
+        if b["player"].get("health", 20) < a["player"].get("health", 20) - 0.5:
+            hurts.append(b.get("t_ms", 0))
+    hurts.sort()
     out = []
     vision = None
-    n = len(records)
+    last_kept = None
+    n = len(states)
+    j = 0
     for i in range(n - 1):
-        r = records[i]
+        r = states[i]
         if r.get("vision"):
             vision = r["vision"]
+        t = r.get("t_ms", 0)
+        if r.get("screen"):
+            continue
+        if last_kept is not None and t - last_kept < gap_ms:
+            continue
+        while j < n - 1 and (states[j].get("t_ms", 0) - t < step_ms or j <= i):
+            j += 1
+        nxt = states[min(j, n - 1)]["player"]
+        last_kept = t
         x = features(r, vision)
         inp = r.get("input", {})
         keys = [1.0 if inp.get(k) else 0.0 for k in KEYS]
-        nxt = records[i + 1]["player"]
         yb = yaw_bin(wrap(nxt.get("yaw", 0) - r["player"].get("yaw", 0)))
         pitch = clip(nxt.get("pitch", 0) / 90.0, -1, 1)
-        hurt = any(records[j]["player"].get("health", 20) < records[j - 1]["player"].get("health", 20) - 0.5
-                   for j in range(i + 1, min(n, i + 1 + horizon)))
+        hurt = any(t < h <= t + horizon_ms for h in hurts[_first(hurts, t):_first(hurts, t) + 8])
         out.append((x, keys, yb, pitch, 1.0 if hurt else 0.0))
     return out
+
+
+def _first(sorted_list, t):
+    """Index of the first value above t (binary search)."""
+    lo, hi = 0, len(sorted_list)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if sorted_list[mid] <= t:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo

@@ -1,7 +1,37 @@
-XEN COMPANION 2.0.0-beta.2: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.3: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.3
+==========================
+
+Xen Ex1 v2:
+- Data: 6 recordings. The first is 22 min in the first recorder format. The other 5 sessions are 56 min in recorder
+  1.2.0, with a friend, vein mining and tree felling mods, mob fights and some PvP. 15036 frames, 322 of them hurt;
+  held out 3764 (112 hurt).
+- features.frames() reads both formats.
+  - 1.2 records: type "state" (4 Hz, 20 Hz in fights) and type "event" (damage_taken, swing, block_break, block_place,
+    slot_changes, chat_in, chat_out, game_message, session_start).
+  - A frame at most every 200 ms; none while a screen is open.
+  - The turn and the next pitch come from the first state at least 250 ms on.
+  - Hurt: a damage_taken event or a health drop over .5 within 2000 ms.
+- Held out (the last fifth of each recording), v2 then v1 on the same frames:
+  - sprint .773 (.735; always the same .657), jump .918 (.904; .862), forward .926 (always the same .625);
+  - pitch error 5.9 degrees (8.1; guess 15.6);
+  - danger AUC .787 (.739);
+  - yaw .711 (always the same .712: still no better).
+- Ex1.fingerprint() = hidden:hash(b1):hash(b2). learned() writes it as "base". restore() refuses a file without the
+  same base, and XenMod then keeps that file as ex1-learned.json.old: a danger head learned on v1 would undo v2.
+
+From the recordings:
+- Reflexes: unseen +50..150 (was +150..300). A player turned to whoever hit them a median 251 ms after the hit (n 15);
+  hitting back took a median 1.2 s (n 7).
+- Not copied: against players, the player mostly spam-clicked (charge at a hit: median .08, 5% at .9 or more). Xens keep
+  charged hits; their fight genes decide.
+- Not learned: x-ray, which the session's chat talks about. The recorder saw no ore through walls, so Ex1 can't learn
+  to find ore that way.
 
 
 WHAT'S NEW IN 2.0.0-beta.2
@@ -165,7 +195,7 @@ after it's noticed:
 
 Reflexes.java:
 - sampleMs: log-normal around 230 ms (sigma .22).
-  - Unseen: +150..300.
+  - Unseen: +50..150 (beta.2: +150..300).
   - Tired (night, 15+ min awake): +40.
   - Confusion: +180 * level.
   - Focused (in a fight): -50.
@@ -228,7 +258,7 @@ Settings (Xen 2.0 tab): reaction (human), confusion (human), talkAmount (normal)
 Checks: TwoCheck (in crossCheck) covers:
 - the facts and the weighing of choices;
 - the mining shape and pickaxe tiers;
-- reaction times (median 230 ms, unseen +150..320, fast and confused);
+- reaction times (median 230 ms, unseen +50..160, fast and confused);
 - typing (decimals, careful vs casual, coordinates kept, slang praise);
 - hidden stats (born, saved, inherited, given to old Xens, never described).
 
