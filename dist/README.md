@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 1.9.3
+# Xen Companion (Fabric mod) 2.0.0-beta.1
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-1.9.3+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.3+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-1.9.3+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-1.9.3+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-1.9.3+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.1+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -633,6 +633,29 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## Xen 2.0 (2.0.0-beta.1): three brains, reaction time, confusion, hidden stats
+
+A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
+
+* **Do it, don't, or later**: a Xen weighs everything it could do with a tool, a block or an animal with three brains.
+  The Doer asks what it gets, the Doubter what could go wrong, the Gut what happens next. With a fishing rod by water
+  it's looking at, it fishes. When it's dark or there's a monster about, it fishes later (up to 30 minutes on).
+* **Mining like a player**: feet and head, a tunnel two high, never straight down into a drop, never a block with lava
+  behind it. A pickaxe too weak: later. Copper is left in the wall.
+* **Facts from the game**: what an animal drops (rolled from the game's own loot tables) and how much food it is. It
+  shears a sheep when it has shears, spares the last two of a kind and animals in a pen, and waits when it isn't
+  hungry.
+* **Its gut takes over to survive**: a step back from lava, into water when on fire, backing off when badly hurt.
+* **Reaction time and confusion**: about a quarter second to notice something, more when it didn't see it coming. A
+  confused Xen hesitates, looks around, sometimes changes its mind.
+* **Hidden stats**: reflexes, composure, humor, typing, appetite, pickiness, love of fishing, night owl, stubbornness.
+  Never shown, they shape who it is and pass to its children.
+* **Talks like a player**: "gonna", "ngl", short replies ("lol", "fr"), banter, "this is peak". At most a line every
+  45 seconds on its own, notes on signs when nobody's around ("I died here (skeleton). Careful.").
+* **Blob skins** (new default: simple flat-colour skins) and **real names** (name style "real": the names you list in
+  config/xen/real_names.txt, with their real skins).
+* Settings: the new **Xen 2.0** tab (reaction time, confusion, how much it says, signs).
 
 ## No standing about, building that works, chat that remembers (1.9.3)
 

@@ -228,7 +228,7 @@ final class Critters {
 	}
 
 	/** Right-click it with what's in that slot (like a player), then see what came of it. */
-	private Action use(int slot, LivingEntity e, Runnable after) {
+	Action use(int slot, LivingEntity e, Runnable after) {
 		var p = c.player;
 		p.getInventory().setSelectedSlot(slot);
 		c.hands.face(e.getEyePosition());

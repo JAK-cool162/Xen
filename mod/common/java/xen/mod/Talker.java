@@ -84,6 +84,7 @@ final class Talker {
 
 	/** Say something to whoever is close enough to hear (48 blocks), not the whole server. */
 	void sayNear(String text) {
+		text = c.typed(text);                                                   // (Xen 2.0: typed its own way, like a player)
 		Component line = Component.literal("<" + c.name + "> " + text);
 		double range = c.mod.config.localChat ? Math.min(48, c.mod.config.chatRange) : 48;
 		for (ServerPlayer p : listeners(range)) p.sendSystemMessage(line);
@@ -163,14 +164,18 @@ final class Talker {
 				"I don't feel so good...", "Just a scratch. Mostly.", "I'm leaking hearts!"));
 		if (goals.dream != null) {
 			float pr = goals.progress();
-			if (pr > 0.1f && pr < 0.97f) options.put("dream", String.format(Locale.ROOT, pick("I'm %2$.0f%% of the way to my dream: to %1$s!",
-					"My dream is to %s. I'm about %.0f%% there.", "I still want to %s. Only %.0f%% done.", "I'd like to %s someday... I'm %.0f%% there.",
-					"I will %s. I'm %.0f%% there already.", "Dream check: %s, %.0f%% done!"), goals.dream.what, 100 * pr));
-			else if (pr <= 0.1f) options.put("dream", pick("Someday I want to ", "I've been thinking: I'd like to ", "What I really want is to ",
-					"Can I tell you something? I want to ", "Mark my words: I will ", "Big plans: I'm going to ") + goals.dream.what + ".");
+			String how = pr >= 0.75f ? "almost there" : pr >= 0.4f ? "getting there" : "still a long way to go";   // (a person says how far, not a percentage)
+			if (pr > 0.1f && pr < 0.97f) options.put("dream", pick("Gonna " + goals.dream.what + " one day, " + how + "!", "Still want to " + goals.dream.what + ". " + how,
+					"I still want to " + goals.dream.what + ", " + how + ".", "someday I'll " + goals.dream.what + "... " + how,
+					"I will " + goals.dream.what + ". " + how + ".", "Dream: " + goals.dream.what + ". " + how + "!"));
+			else if (pr <= 0.1f) options.put("dream", pick("Someday I wanna ", "ngl I'd love to ", "What I really want is to ",
+					"one day I'll ", "Mark my words: I will ", "Big plans: I'm gonna ") + goals.dream.what + "."); 
 		}
 		if (goals.current != null) {
-			options.put("goal " + goals.current, "I want to " + goals.current.what + ", " + xen.mod.talk.Chat.firstPerson("because " + goals.current.why) + ".");
+			String what = goals.current.what;
+			options.put("goal " + goals.current, random.nextFloat() < 0.3f ? "Gonna " + what + ", " + xen.mod.talk.Chat.firstPerson(goals.current.why) + "."
+					: pick("Gonna " + what + "!", what.substring(0, 1).toUpperCase(Locale.ROOT) + what.substring(1) + " first.", "Need to " + what + ".",
+							"gotta " + what + "...", "Time to " + what + ".", what + " time!"));
 		}
 		if (c.crafter.pickTier() == 0 && items.getOrDefault("log", 0) < 3 && !c.player.isCreative()) {
 			options.put("pickaxe", pick("I need some wood to make a pickaxe.", "First thing: wood, for a pickaxe.", "No pickaxe. I need wood.",
@@ -442,10 +447,23 @@ final class Talker {
 		return doing.replaceAll("\\bitself\\b", "myself").replaceAll("\\bits\\b", "my");
 	}
 
+	/**
+	 * What it's doing, said the way a person would: "no animals in sight, looking around" becomes "looking around, no
+	 * animals in sight" (so "I'm ..." reads right); something that isn't a doing ("a farm by the house") says so.
+	 */
+	static String saidDoing(String doing) {
+		String now = doing.trim();
+		int comma = now.indexOf(", ");
+		if (comma > 0 && !now.split("[ ,]")[0].endsWith("ing") && now.substring(comma + 2).split(" ")[0].endsWith("ing")) {
+			now = now.substring(comma + 2) + ", " + now.substring(0, comma);
+		}
+		return now.split("[ ,]")[0].endsWith("ing") ? "I'm " + now : "Right now: " + now;
+	}
+
 	String answer(String words) {
 		if (DOING.matcher(words).lookingAt()) {
 			String now = c.goals.instant.isEmpty() ? "looking around" : c.goals.instant;
-			return "I'm " + mine(xen.mod.talk.Chat.firstPerson(now)) + (c.goals.current != null ? ", because I want to " + c.goals.current.what : "") + ".";
+			return saidDoing(mine(xen.mod.talk.Chat.firstPerson(now))) + (c.goals.current != null ? ", because I want to " + c.goals.current.what : "") + ".";
 		}
 		if (HOW.matcher(words).lookingAt()) {
 			float h = c.player.getHealth();

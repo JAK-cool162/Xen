@@ -121,6 +121,7 @@ public class XenMod implements ModInitializer {
 			default -> config.chatModelSize;
 		};
 		skins.prepare(configDir, config.skins);
+		if (config.nameStyle.equals("real")) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		try {
@@ -1061,7 +1062,16 @@ public class XenMod implements ModInitializer {
 		if (wanted == null) taken.addAll(roster.names());                 // a new Xen gets a new name
 		Personality born = nature != null ? nature : config.personalities ? Personality.random(random) : Personality.plain();
 		String name = wanted;
-		if (name == null && config.randomNames) name = Names.fresh(config.nameStyle, born.tone, taken, random);   // fits its nature
+		String real = null;
+		if (name == null && config.randomNames && config.nameStyle.equals("real")) {   // a real account's name (one listed in real_names.txt), and its real skin
+			for (String n : Skins.realNames(FabricLoader.getInstance().getConfigDir())) {
+				if (!taken.contains(n.toLowerCase(Locale.ROOT))) {
+					name = real = n;
+					break;
+				}
+			}
+		}
+		if (name == null && config.randomNames) name = Names.fresh(config.nameStyle.equals("real") ? "player" : config.nameStyle, born.tone, taken, random);   // fits its nature
 		if (name == null) name = Looks.freshName(false, taken, random);
 		com.google.gson.JsonObject known = roster.get(name);
 		Personality p = nature != null ? nature
@@ -1075,6 +1085,8 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : skins.pick(config.skins, random);
+		if (config.nameStyle.equals("real") && skins.player(name) != null) skin = skins.player(name);   // (real names: the account's own skin)
+		else if (real != null) skins.prepareReal(List.of(real));
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (config.ownLife && config.wants) c.mode = Companion.Mode.FREE;   // its own life: it plays its own game
@@ -1088,6 +1100,7 @@ public class XenMod implements ModInitializer {
 		if (known == null) {                                                    // a new Xen: its own talents, its hobby
 			c.skills.born();
 			c.life.born();
+			c.journal("is", "hidden: " + c.personality.hiddenInWords());       // (Xen 2.0: its hidden stats, for the log only)
 		}
 		if (known != null) {
 			try {

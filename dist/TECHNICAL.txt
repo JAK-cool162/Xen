@@ -1,7 +1,158 @@
-XEN COMPANION 1.9.3: TECHNICAL NOTES
-====================================
+XEN COMPANION 2.0.0-beta.1: TECHNICAL NOTES
+===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.1 (XEN 2.0)
+====================================
+
+Three brains (Choices.java):
+- Every choice is a Weigh filled in by the three brains, then decide():
+  - the Doer: want, with a reason;
+  - the Doubter: risk, each with a reason; "passing" risks set when to think again;
+  - the Gut: the outcome it pictures.
+- decide() rules:
+  - a hard no: NOT;
+  - want >= 0.05 and want - caution * risk > 0.05: DO;
+  - a passing risk with want >= 0.15, or wantLater >= 0.3: LATER, until now + later (at most 30 minutes, MAX_LATER);
+  - otherwise NOT.
+- Caution is Personality.cautionScale() (0.4 for the bravest to 1.6 for the most timid).
+- A close call (|score| < 0.08) adds confusion. A confused Xen may flip DO to a 5 s LATER, or LATER to DO; never a
+  hard no.
+- A LATER is held until its time, unless it's starving.
+- Changes of answer go to the journal: "chooses fish: later (in 8 min) | doer: ... | doubter: ... | gut: ...".
+- fish(): rod (or 2 string), water (Fisher.waterNear), and its line of sight on water (16 blocks, a source block).
+  - Not looking yet: it faces the water and decides 1.5 s later.
+  - want = hunger (1, 0.55, 0.25 or 0.05) + liking (0.3 with the fish/kindness beliefs, else 0.12)
+    + 0.35 * (angler - 0.3) + rain.
+  - Risks: night or dusk (0.6, until morning; less for night owls); monsters within 16; busy (8 min); hurt.
+  - Plenty of food: later, in 15 min.
+  - Used by Fisher.fancies(), starving() (no animal within 16), Goals.food() (no animal close: anyone fishes), and
+    choices.moment() (every 5 s when free with nothing on).
+  - While fishing, keepFishing() every 3 s stops it at dark or with a monster within 10 ("I'll fish later").
+- mine(pos), for every block around it:
+  - Hard no:
+    - air or fluid;
+    - unbreakable;
+    - built, chest, spawner or crop;
+    - unsafeToBreak: Chores.lavaBehind, or the block under its feet with fluid or 3+ air under it.
+  - worth(): diamond/debris 1, emerald .6, iron .8 (under 24), coal .6 (under 16), gold .4, lapis .3, redstone .25,
+    copper .08, logs .5, stone .35 (under 32 cobble), dirt .05, leaves 0.
+  - Times the hidden pickiness: ore 0.85..1.15x, the rest 1.3..0.5x.
+  - Times shape(dy, side), from the recorded game (95 blocks broken):
+    - feet or head level 1, one down .7, two up .5, more .25;
+    - farther than one block to the side .6x;
+    - straight down .3x.
+  - Risks:
+    - pickaxe tier too low: LATER 10 min (tierNeeded: coal 1; iron, copper, lapis 2; gold, redstone, diamond,
+      emerald 3; debris, obsidian 4);
+    - water beside it .3;
+    - gravel or sand above .15;
+    - a monster within 6 .25;
+    - over 6 s to break .2.
+  - Used by Chores.oreWithinReach and Chores.whileItSmelts.
+  - bestToMine(r) ranks every visible block within r.
+  - Hands.startMining refuses any dig unsafeToBreak calls a hard no (cantMine).
+- animal(e):
+  - Hard no: a baby, a named animal or one on a lead.
+  - Facts.drops (the loot table rolled 48 times) gives the hunger cooked. want = hunger need * hunger/12 + wool need.
+  - Wool need: .7 with no bed and under 3 wool. Shearable with shears: shear instead. A sheared sheep holds none.
+  - Risks:
+    - the last 1 or 2 of its kind within 16 (.5, unless starving);
+    - fences on 2+ sides (.6);
+    - a monster next to it (.3, 30 s).
+  - Not hungry and no wool need: later, 10 min.
+  - Chores.nearestAnimal takes only a yes (or anything at food 6 or less) and journals the pick. huntNext shears when
+    choices.shearInstead().
+- eat(): later (5 s) with a monster within 4 while health >= 10 and food > 6; the instinct eats only on a yes.
+
+Facts.java (the RAG store):
+- drops(entity): LivingEntity.dropFromLootTable(level, playerAttack(xen), false, key, consumer), 48 rolls.
+  - Gives item -> {mean, chance}; wool colours are merged; empty stacks are skipped.
+  - Cached per kind (a sheared sheep is its own kind).
+  - Falls back to a vanilla table.
+- fills(item): the item's FOOD component (nutrition); cooked(raw) names; hunger(drops).
+- Fishing: about 17.5 s a bite (0.8x in rain); 85% fish (60% cod, 25% salmon); catchesIn(minutes), fishHunger().
+- TIPS: one-line lessons, found by about(topic).
+
+Gut.java (survival override): Companion.instinct() calls gut.override() first. Each case starts a reaction time
+after it's noticed:
+- in lava: faces the nearest standable block within 5, sprints, Action.JUMP;
+- lava beside its feet (same level, or an edge down to lava it's moving toward): faces the lava, Action.BACK;
+- on fire, not in water: walks into water within 6;
+- health 6 or less with a monster (not a creeper) within 5: 4 s backing off (6 blocks away, sprinting), at most every
+  30 s, then eats if it can.
+- Says so once (30 s) when it breaks off something it was asked. Journal: "gut takes over: ...".
+
+Reflexes.java:
+- sampleMs: log-normal around 230 ms (sigma .22).
+  - Unseen: +150..300.
+  - Tired (night, 15+ min awake): +40.
+  - Confusion: +180 * level.
+  - Focused (in a fight): -50.
+  - Clamped to 120..750, then times the setting (fast .7, slow 1.4, instant 0) and the hidden reflexes
+    (1.25 - .5 * reflexes).
+- ready(key, unseen): true once the reaction time since it first saw key has passed. Keys are forgotten after 10 s.
+- Used by:
+  - fightBack: a new foe that hasn't hurt it yet;
+  - Fisher: the bite;
+  - the Gut.
+- Hands.turnToward eases like a mouse: a step of min(max, 0.6 * left + 1.5) degrees, times turnScale().
+
+Confusion.java:
+- level 0..1.
+- Goes up with:
+  - closeCall +.05;
+  - surprise: a hit from out of view .12, respawn .3;
+  - each second: dark +.012 (less for night owls), 3+ monsters +.02, health 6 or less +.015.
+- Everything is times the setting (off 0, low .5, high 1.5) and 1.5 - composure.
+- Settles .02 a second (.01 in a fight).
+- flips(): from level .3, up to 1 in 5, less when stubborn.
+- step(), between chores, never in a fight: from .35 a look around (0.5 to 2 s). From .6, now and then a question
+  ("wait... which way?", once every 2 minutes).
+
+Hidden stats (Personality.hidden):
+- reflexes, composure, humor, typing, appetite, pickiness, angler, night owl, stubborn.
+- Each N(0.5, 0.22) clipped to 0..1. Given in bornWith() (an older Xen: from its name), mixed and mutated in
+  child(), saved as "hidden".
+- Never in its status or its talk. The journal notes them once at birth ("hidden: quick reflexes, a joker, ...").
+- Appetite shifts eatAt (+-2) and its sense of hunger (+-2 food).
+
+Talk:
+- talk/Texting.casual(line, casual, random), applied to every line said (Companion.say, Talker.sayNear):
+  - always: decimals with units rounded; contractions;
+  - by casualness (the hidden typing stat; cheerful and silly more, calm less): gonna, wanna, gotta, ok, tbh, idk,
+    rn, cuz, prob, thx, u;
+  - no final period, no capital, now and then "lol" or "ngl".
+- Voice.reply:
+  - banter (an insult in capitals or with lol, lmao, jk, haha, xd) gets a joke back, chance .35 + humor;
+  - short reactions ("lol", "true", "damn", "fr"...) get a short one back;
+  - Texting.slangPraise ("peak", "fire", "W build", "goated"...) counts as praise.
+- Remarks: no percentages and no "Can I tell you something?". The remark openers are now ngl, honestly, ok so,
+  lowkey, tbh.
+- "What are you doing?" reads right (Talker.saidDoing: "I'm looking around, no animals in sight").
+- chatter(): unprompted lines at least talkGapMillis apart (talkAmount: quiet 120 s, normal 45 s, chatty 20 s, or
+  the personality's own gap if longer). "Always" lines at least 8 s apart outside a conversation.
+- Signs:
+  - note() at most every 2.5 min (was 5);
+  - with no sign it orders one sign recipe (6 planks + a stick = 3 signs), once every 10 min;
+  - back at where it died: "I died here (<what>). Careful.".
+
+Skins and names:
+- "blob" (the default; config version 9 moves "modern" to "blob"): 24 simple flat-colour skins from
+  scripts/make_blob_skins.py, signed through mineskin.org, in assets/xen/skins/blob.json.
+- nameStyle "real": the first untaken name in config/xen/real_names.txt (created with notes on first use); that
+  account's skin from Mojang's profile API (fetched at start for every listed name).
+
+Settings (Xen 2.0 tab): reaction (human), confusion (human), talkAmount (normal), signs.
+
+Checks: TwoCheck (in crossCheck) covers:
+- the facts and the weighing of choices;
+- the mining shape and pickaxe tiers;
+- reaction times (median 230 ms, unseen +150..320, fast and confused);
+- typing (decimals, careful vs casual, coordinates kept, slang praise);
+- hidden stats (born, saved, inherited, given to old Xens, never described).
 
 
 WHAT'S NEW IN 1.9.3

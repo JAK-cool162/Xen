@@ -55,6 +55,15 @@ public final class XenConfig {
 	public boolean ownLife = true;
 	/** Xens say things on their own: what they see, want and feel, greetings, and questions you can answer. */
 	public boolean talk = true;
+	/**
+	 * Xen 2.0: how much Xens say on their own (answers always come): "quiet" (a line every two minutes at most),
+	 * "normal" (one every 45 seconds at most) or "chatty" (every 20 seconds).
+	 */
+	public String talkAmount = "normal";
+	/** Xen 2.0: reaction time: "human" (about a quarter second, slower for what it didn't see coming), "fast", "slow" or "instant". */
+	public String reaction = "human";
+	/** Xen 2.0: how confused Xens get (hesitating, looking around, a second-best choice now and then): "human", "low", "high" or "off". */
+	public String confusion = "human";
 	/** Xens near each other talk, and tell each other where things are. */
 	public boolean talkToXens = true;
 	/** Xens trade: with villagers (the real trading screen) and with players (they bargain). */
@@ -129,10 +138,12 @@ public final class XenConfig {
 	/** The generation (of evolution) from which Xens know the Nether portal math (and triangulate strongholds). */
 	public int smartsAtGeneration = 4;
 	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
-	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("modern"));
+	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("blob"));
 	/**
 	 * How new Xens are named: "player" (like real players' names now: luvhi, MeeroSG, cold_lemon, Solen2009; made up,
-	 * never someone's), "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax) or "classic" (Pip).
+	 * never someone's), "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax), "classic" (Pip), or
+	 * "real": real Minecraft accounts you list in config/xen/real_names.txt, with their real skins (like the Carpet
+	 * mod's fake players; only the names you put there).
 	 */
 	public String nameStyle = "player";
 
@@ -168,7 +179,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 8;
+	public int version = 9;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -203,7 +214,10 @@ public final class XenConfig {
 				}
 				if ((!j.has("version") || j.get("version").getAsInt() < 7) && config.teams == 1) config.teams = -1;   // 1.3: teams on their own (SMP)
 				if ((!j.has("version") || j.get("version").getAsInt() < 8) && "mob".equals(config.pathMode)) config.pathMode = "xen";   // 1.4: its own planner again
-				config.version = 8;
+				if ((!j.has("version") || j.get("version").getAsInt() < 9) && config.skins.equals(java.util.List.of("modern"))) {   // 2.0: the blob look
+					config.skins = new java.util.ArrayList<>(java.util.List.of("blob"));
+				}
+				config.version = 9;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

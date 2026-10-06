@@ -187,6 +187,9 @@ public final class CrossCheck {
 		// Finding a way on foot through what it knows.
 		check(pathTest(), "path finding failed");
 
+		// Xen 2.0: the facts, how a choice is weighed (do, don't, later), the mining shape, reaction times.
+		check(xen.mod.TwoCheck.run(), "xen 2.0's choices failed");
+
 		// Learning works in Java too: fear conditioning in a tiny lava room.
 		check(learnsToFearLava(), "Java brain did not learn to fear lava");
 

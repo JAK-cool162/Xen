@@ -165,12 +165,15 @@ public final class Hands {
 		Vec3 d = at.subtract(p.getEyePosition());
 		float toY = (float) Math.toDegrees(Math.atan2(-d.x, d.z)), toX = (float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)));
 		float dy = net.minecraft.util.Mth.wrapDegrees(toY - p.getYRot()), dx = toX - p.getXRot();
-		float y = p.getYRot() + net.minecraft.util.Mth.clamp(dy, -maxYaw, maxYaw), x = p.getXRot() + net.minecraft.util.Mth.clamp(dx, -maxPitch, maxPitch);
+		float scale = p.companion == null ? 1f : p.companion.reflexes.turnScale();
+		// a hand on a mouse (Xen 2.0): quick through the middle of a turn, slowing into the target
+		float sy = Math.min(maxYaw * scale, Math.abs(dy) * 0.6f + 1.5f), sx = Math.min(maxPitch * scale, Math.abs(dx) * 0.6f + 1.5f);
+		float y = p.getYRot() + net.minecraft.util.Mth.clamp(dy, -sy, sy), x = p.getXRot() + net.minecraft.util.Mth.clamp(dx, -sx, sx);
 		p.setYRot(y);
 		p.setYHeadRot(y);
 		p.setXRot(x);
 		yaw = Math.floorMod(Math.round((y + 180f) / 90f), 4);
-		return Math.abs(dy) <= maxYaw && Math.abs(dx) <= maxPitch;
+		return Math.abs(dy) <= sy && Math.abs(dx) <= sx;
 	}
 
 	/**
@@ -394,6 +397,13 @@ public final class Hands {
 		if (state.isAir() || c == Blocks.AIR && state.getShape(level, pos).isEmpty() || c == Blocks.LAVA || c == Blocks.WATER || c == Blocks.BEDROCK
 				|| state.getDestroySpeed(level, pos) < 0) {                   // (grass and flowers it can break: they have a shape)
 			limit = 2;                                                // nothing to mine there
+			return;
+		}
+		String unsafe = p.companion == null ? null : p.companion.choices.unsafeToBreak(pos);
+		if (unsafe != null) {                                         // Xen 2.0's doubter: a hard no (lava behind it, a drop under its feet)
+			if (!pos.equals(cantMine)) p.companion.journal("chooses", "mine " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + ": no | doubter: " + unsafe);
+			cantMine = pos.immutable();
+			limit = 2;
 			return;
 		}
 		selectBestTool(state);

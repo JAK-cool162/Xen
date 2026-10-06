@@ -1423,16 +1423,18 @@ final class Chores {
 		if (c.crafter.pickTier() < 1) return null;
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition(), best = null;
-		int bestRank = 0;
+		float bestRank = 0;
 		double reach = c.player.blockInteractionRange() - 0.5;
 		for (BlockPos p : BlockPos.betweenClosed(feet.offset(-4, 0, -4), feet.offset(4, 2, 4))) {   // (at its level and up: it doesn't dig out its own floor)
 			if (p.equals(furnace) || furnace != null && p.equals(furnace.below())) continue;
 			String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p).getBlock()).getPath();
-			int rank = id.endsWith("_ore") ? 3 : id.equals("stone") || id.equals("deepslate") || id.equals("cobblestone") ? 2 : id.endsWith("_log") ? 1 : 0;
-			if (rank == 0 || rank <= bestRank || c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) > reach || p.equals(c.hands.cantMine)) continue;
+			boolean worth = id.endsWith("_ore") || id.equals("stone") || id.equals("deepslate") || id.equals("cobblestone") || id.endsWith("_log");
+			if (!worth || c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) > reach || p.equals(c.hands.cantMine)) continue;
 			if (c.hands.seePoint(level, p) == null) continue;
+			Choices.Choice ch = c.choices.mine(p.immutable());            // Xen 2.0: mine it, or not, or later (and how much it's worth)
+			if (!ch.yes() || ch.want <= bestRank) continue;
 			best = p.immutable();
-			bestRank = rank;
+			bestRank = ch.want;
 		}
 		if (best == null || !c.hands.mine(best)) return null;
 		c.acted = true;
@@ -1612,6 +1614,7 @@ final class Chores {
 	BlockPos oreWithinReach() {
 		BlockPos o = oreInReach();
 		if (o == null || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ())) || lavaBehind((ServerLevel) c.player.level(), o)) return null;
+		if (!c.choices.mine(o).yes()) return null;                            // Xen 2.0: its own yes (copper, a weak pickaxe, a monster close: no, or later)
 		return c.player.getEyePosition().distanceTo(Vec3.atCenterOf(o)) <= c.player.blockInteractionRange() - 0.3 ? o : null;
 	}
 
@@ -1945,14 +1948,19 @@ final class Chores {
 	LivingEntity nearestAnimal() {
 		LivingEntity best = null;
 		double bestD = Double.MAX_VALUE;
+		Choices.Choice pick = null;
 		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(48),
 				x -> x.isAlive() && !x.isBaby() && food(x))) {
 			double d = c.player.distanceTo(a) - (forWool && a instanceof net.minecraft.world.entity.animal.sheep.Sheep ? 40 : 0);   // (sheep first, for a bed)
 			if (d < bestD && WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, a)) {
+				Choices.Choice ch = c.choices.animal(a);                    // Xen 2.0: kill it (or shear it), or not, or later: what it drops against why not
+				if (!ch.yes() && c.player.getFoodData().getFoodLevel() > 6) continue;   // (starving: any animal will do)
 				bestD = d;
 				best = a;
+				pick = ch;
 			}
 		}
+		if (best != null) c.choices.picked(best, pick);
 		return best;
 	}
 
@@ -1980,6 +1988,12 @@ final class Chores {
 		if (prey != null) {
 			doing = String.format(java.util.Locale.ROOT, "hunting a %s %.1f blocks away",
 					prey.getType().getDescription().getString().toLowerCase(java.util.Locale.ROOT), c.player.distanceTo(prey));
+			if (c.player.distanceTo(prey) <= c.player.entityInteractionRange() && c.choices.shearInstead(prey)) {
+				doing = "shearing a sheep";                                   // (the sheep lives, and grows its wool back)
+				int shears = c.hands.hotbar(s -> s.getItem() == net.minecraft.world.item.Items.SHEARS);
+				return c.critters.use(shears, (Animal) prey, () -> c.critters.sheared++);
+			}
+			if (c.choices.shearInstead(prey)) return c.walkTo(prey.position());
 			if (c.player.distanceTo(prey) <= c.player.entityInteractionRange()) {
 				if (c.player.getAttackStrengthScale(0.5f) < 0.9f) return Action.IDLE;
 				c.hands.hit(prey);

@@ -534,7 +534,9 @@ final class Goals {
 	private String food() {
 		Personality p = c.personality;
 		boolean kind = p.believes("animals_kindness");
-		if ((kind || p.believes("fish_free_food")) && c.fisher.fancies()) {
+		var prey = c.chores.nearestAnimal();
+		boolean noAnimals = prey == null || prey.distanceTo(c.player) > 16;
+		if ((kind || p.believes("fish_free_food") || noAnimals) && c.fisher.fancies()) {   // (Xen 2.0: a rod and water and no animal close: anyone fishes)
 			String f = c.fisher.start();
 			if (f.startsWith("You will")) return f;
 		}

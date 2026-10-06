@@ -125,6 +125,9 @@ final class SmallTalk {
 			String now = Talker.mine(!g.instant.isEmpty() ? g.instant : g.current != null ? g.current.what : "");
 			because = g.optionHow == null ? "" : g.optionHow.replace("the plan: ", "");
 			if (now.isEmpty()) return c.pick3("Not much. Looking around.", "Taking a breather.", "Just thinking about what's next.");
+			String said = Talker.saidDoing(now);                                   // ("no animals in sight, looking around": "I'm looking around, no animals in sight")
+			if (!said.startsWith("I'm ")) return c.pick3("Right now? " + cap(now) + ".", cap(now) + ".", "Oh, " + now + ".");
+			now = said.substring(4);
 			return c.pick3("I'm " + now + ".", "Right now? " + cap(now) + ".", cap(now) + ". Busy busy.");
 		}
 		if (WHY.matcher(w).find()) {

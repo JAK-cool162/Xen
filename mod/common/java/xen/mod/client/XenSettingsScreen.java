@@ -23,7 +23,7 @@ import java.util.List;
  * phone the launcher's scroll gesture) when they don't all fit, with arrows on the right showing there's more.
  */
 public class XenSettingsScreen extends Screen {
-	private static final String[] TABS = {"Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Experimental"};
+	private static final String[] TABS = {"Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Xen 2.0", "Experimental"};
 	private static final String[] ABOUT = {
 			"How Xen talks: answering, talking on its own, with other Xens, trading, saying no.",
 			"Who the Xens are: how many, their names, natures and skins.",
@@ -31,6 +31,7 @@ public class XenSettingsScreen extends Screen {
 			"Teams and fighting players.",
 			"Building: redstone circuits and notes on signs.",
 			"For slower computers and phones.",
+			"How Xen 2.0 thinks: its three brains, its reaction time, its confusion, how much it says.",
 			"Tell Xens who they are, and write your own rules for them.",
 	};
 	private static final String SCRIPT_HELP = "One rule per line: when <something happens>: <what to do>. Lines starting with # are notes.\n"
@@ -122,11 +123,11 @@ public class XenSettingsScreen extends Screen {
 				choice("Xens per player", "maxPerPlayer", List.of(1, 2, 3, 5, 10, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens one player may summon.");
 				choice("Xens in the world", "maxXens", List.of(50, 5, 10, 20, 100, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all.");
 				onOff("Random names", "randomNames", "New Xens get names that fit their nature (off: Xen, Xen2, Xen3...).");
-				choice("Name style", "nameStyle", List.of("player", "mixed", "fun", "gamer", "fantasy", "classic"), s -> s,
-						"player: like real players' names now (luvhi, MeeroSG, cold_lemon, Solen2009), made up, never someone's. mixed: all kinds. fun: SneakyWaffle, GrumpyBadger. gamer: Pickle_42, xXWaffleXx. fantasy: Zorbax, Lumika. classic: Pip, Bramble.");
+				choice("Name style", "nameStyle", List.of("player", "mixed", "fun", "gamer", "fantasy", "classic", "real"), s -> s.equals("real") ? "real (your list)" : s,
+						"real: real Minecraft accounts you list in config/xen/real_names.txt, each with that account's real skin (like the Carpet mod's fake players; only names you put there). player: like real players' names now (luvhi, MeeroSG, cold_lemon, Solen2009), made up, never someone's. mixed: all kinds. fun: SneakyWaffle, GrumpyBadger. gamer: Pickle_42, xXWaffleXx. fantasy: Zorbax, Lumika. classic: Pip, Bramble.");
 				onOff("Personalities", "personalities", "Each Xen is braver or more timid, curious, chatty or quiet, patient, and has its own tone.");
 				choice("Skins", "skins", skinChoices(), s -> s,
-						"modern: the mod's skins in today's style (shaded hair, hoodies, jackets; many slim). random: all the mod's skins and Minecraft's 18. pack: the modern and the fun ones. fun: the funny 61 of earlier versions. folder: your own PNG skins in config/xen/skins (from NameMC, Planet Minecraft or drawn yourself; signed once through mineskin.org, so everyone sees them). mineskin: random skins from mineskin.org's gallery (online). Or a player's skin: /xen set skins player:Name.");
+						"blob: Xen 2.0's look, simple skins: flat colours, two plain eyes. modern: the mod's skins in today's style (shaded hair, hoodies, jackets; many slim). random: all the mod's skins and Minecraft's 18. pack: the modern and the fun ones. fun: the funny 61 of earlier versions. folder: your own PNG skins in config/xen/skins (from NameMC, Planet Minecraft or drawn yourself; signed once through mineskin.org, so everyone sees them). mineskin: random skins from mineskin.org's gallery (online). Or a player's skin: /xen set skins player:Name.");
 			}
 			case 2 -> {
 				onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, trading, exploring) and a dream to work toward, and learn which they like.");
@@ -165,6 +166,15 @@ public class XenSettingsScreen extends Screen {
 						"Fewer decisions for slower computers and phones.");
 				choice("Chat threads", "chatThreads", List.of(1, 2, 3, 4, 6, 8), n -> n + (n == 1 ? " thread" : " threads"),
 						"How many processor cores the chat model may use (applies the next time it loads).");
+			}
+			case 6 -> {
+				choice("Reaction time", "reaction", List.of("human", "fast", "slow", "instant"), s -> s.equals("human") ? "human (~0.23 s)" : s,
+						"How long a Xen takes to react to something new: a monster in view, a bobber going under, lava at its feet. human: about a quarter second, slower for what it didn't see coming (it has to turn first), when tired or confused, quicker when it's focused in a fight. Its turns are a hand on a mouse: quick in the middle, slowing into the target.");
+				choice("Confusion", "confusion", List.of("human", "low", "high", "off"), s -> s,
+						"Xens get confused like players: close calls, the dark, a crowd of monsters, a hit from behind, coming back from death. Confused, they hesitate, look around, sometimes go with their second choice, and may ask out loud. Their survival plan never waits on it.");
+				choice("Says on its own", "talkAmount", List.of("normal", "quiet", "chatty"), s -> s.equals("normal") ? "normal (45 s apart)" : s.equals("quiet") ? "quiet (2 min apart)" : "chatty (20 s apart)",
+						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");
+				onOff("Notes on signs", "signs", "Xens leave notes on signs (where they died and why, lava, diamonds, where they went) when nobody's around to hear, and make signs from planks for it.");
 			}
 			default -> experimental();
 		}
@@ -283,7 +293,7 @@ public class XenSettingsScreen extends Screen {
 	}
 
 	private List<String> skinChoices() {
-		List<String> out = new ArrayList<>(List.of("modern", "random", "pack", "fun", "default", "folder", "modern,folder", "mineskin", "random,mineskin",
+		List<String> out = new ArrayList<>(List.of("blob", "modern", "random", "pack", "fun", "default", "folder", "blob,folder", "modern,folder", "mineskin", "random,mineskin",
 				"steve", "alex", "ari", "efe", "kai", "makena", "noor", "sunny", "zuri"));
 		String now = String.join(",", settings.skins());
 		if (!out.contains(now)) out.add(0, now);

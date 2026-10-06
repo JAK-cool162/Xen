@@ -16,7 +16,7 @@ final class Fisher {
 	private final Companion c;
 	boolean on;
 	private BlockPos water, shore;
-	private long until, castAt, reeledAt;
+	private long until, castAt, reeledAt, biteAt, checkAt;
 	private int caught, casts;
 
 	Fisher(Companion c) {
@@ -54,6 +54,11 @@ final class Fisher {
 		if (on && c.player != null && c.player.fishing != null) reel();
 		on = false;
 		water = shore = null;
+	}
+
+	/** Water to fish in close by (for its choice: fish, don't, later), or null. */
+	BlockPos waterNear() {
+		return findWater();
 	}
 
 	/** Open water it can see within 14 blocks (a source with air above, not a puddle), and a dry spot next to it to stand on. */
@@ -105,6 +110,14 @@ final class Fisher {
 			return null;
 		}
 		if (!hasRod()) return null;                                                   // (making the rod first)
+		if (now() >= checkAt) {                                                       // Xen 2.0: still worth it? (dark, a monster: fish later)
+			checkAt = now() + 60;
+			if (!c.choices.keepFishing()) {
+				stop();
+				c.chatter(c.pick3("I'll fish later.", "Not now. Later.", "Fishing can wait."), false);
+				return null;
+			}
+		}
 		c.goals.instant = "fishing";
 		if (p.blockPosition().distSqr(shore) > 2) {
 			if (p.fishing != null) reel();
@@ -129,8 +142,12 @@ final class Fisher {
 			return Action.IDLE;
 		}
 		c.hands.face(hook.position());                                                  // eyes on the bobber
-		boolean dipped = hook.isInWater() && hook.getDeltaMovement().y < -0.15 && now() - castAt > 30;
+		if (biteAt == 0 && hook.isInWater() && hook.getDeltaMovement().y < -0.15 && now() - castAt > 30) {
+			biteAt = now() + c.reflexes.sampleTicks(false);                            // the bobber went under: it reels in a reaction time later
+		}
+		boolean dipped = biteAt > 0 && now() >= biteAt;
 		if (dipped || now() - castAt > 20 * 40 || !hook.isAlive() || hook.distanceTo(p) > 30) {   // a bite! (or it gives up on this cast)
+			biteAt = 0;
 			int before = c.items().getOrDefault("food", 0) + treasure();
 			reel();
 			if (dipped) c.mod.later(10, () -> {
@@ -164,6 +181,9 @@ final class Fisher {
 
 	/** Water close by and a rod: a good moment for it (hungry, or a quiet day and it likes fishing). */
 	boolean fancies() {
-		return !on && hasRod() && c.player != null && !c.player.level().isDarkOutside() && findWater() != null;
+		if (on || !hasRod() || c.player == null || c.player.level().isDarkOutside() || findWater() == null) return false;
+		Choices.Choice ch = c.choices.fish();                                          // Xen 2.0: fish, don't, or later
+		if (ch.verdict == Choices.Verdict.LATER && ch.until - c.player.level().getGameTime() <= 40) ch = c.choices.fish();   // (it just looked over at the water: now it decides)
+		return ch.yes();
 	}
 }

@@ -308,6 +308,10 @@ public final class Companion {
 		if (hurtNow && player.getLastHurtByMob() != null) learnFromHurt(player.getLastHurtByMob());
 		dontStareAtEndermen();
 		hurtNow = player.getHealth() < tickHealth;
+		if (hurtNow && player.getLastHurtByMob() != null && !WorldSenses.sees(player, hands.yaw, hands.pitch, player.getLastHurtByMob())) {
+			confusion.surprise(0.12f);                                  // a hit from out of view: a moment's "what was that?"
+		}
+		if (player.tickCount % 20 == 13) confusion.second();
 		if (hurtNow && !inArena) {                                      // its tribe may come to guard it
 			Tribe hurtTribe = tribe();
 			if (hurtTribe != null) hurtTribe.attackedAt.put(this, player.level().getGameTime());
@@ -819,6 +823,8 @@ public final class Companion {
 			player.setShiftKeyDown(false);
 			diving = false;
 		}
+		Action survive = gut.override();                              // Xen 2.0's gut first: lava, fire, badly hurt with a monster on it
+		if (survive != null) return survive;
 		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
 			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) {
 				walker.stop();                                        // (its way led under: air first)
@@ -833,7 +839,8 @@ public final class Companion {
 		}
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
-		if (player.getFoodData().getFoodLevel() <= personality.eatAt() && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()) {
+		if (player.getFoodData().getFoodLevel() <= personality.eatAt() && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()
+				&& choices.eat().yes()) {                                 // (a monster right on it: it fights first, eats after)
 			goals.instant = "eating";
 			return Action.EAT;
 		}
@@ -922,6 +929,8 @@ public final class Companion {
 			Action roof = chores.busy() ? chores.next() : null;
 			if (roof != null) return roof;
 		}
+		Action unsure = confusion.step();                             // Xen 2.0: confused, a look around, a moment, a question
+		if (unsure != null) return unsure;
 		Action habit = habits.next();                                 // a look around, a detour, a breather, boredom, a full bag
 		if (habit != null) return habit;
 		if (chores.busy()) {
@@ -964,6 +973,8 @@ public final class Companion {
 		if (drill != null) return drill;
 		Action need = needs();                                         // starving, or night coming with no bed: that first
 		if (need != null) return need;
+		Action tool = choices.moment();                                // Xen 2.0: a tool it could use here (its rod, by the water: fish, don't, later)
+		if (tool != null) return tool;
 		if (mode == Mode.FREE && !minion && !chores.busy() && !builder.busy()) {
 			Action animals = critters.chores();                          // its animals: breeding, shearing, a cat
 			if (animals != null) return animals;
@@ -1275,6 +1286,11 @@ public final class Companion {
 		}
 		if (builder.busy()) builder.cancel();
 		neededAt = now;
+		var prey = chores.nearestAnimal();
+		if ((prey == null || prey.distanceTo(player) > 16) && fisher.fancies() && fisher.start().startsWith("You will")) {   // Xen 2.0: a rod, water, no animal close: it fishes
+			chatter(pick3("Starving. Fishing for dinner.", "No animals around... fish it is.", "Fish, please bite."), true);
+			return Action.IDLE;
+		}
 		chores.forWool = false;
 		String plan = chores.hunt(2);
 		chores.own = true;
@@ -1575,6 +1591,8 @@ public final class Companion {
 
 	/** Of its things lying where it died, the one it's picking up now. */
 	private UUID lostItem, lostItemNext;
+	/** What killed it last ("skeleton", "lava"), for the sign it leaves there. */
+	private String diedOf = "";
 
 	private Action backForMyThings() {
 		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
@@ -1615,6 +1633,7 @@ public final class Companion {
 				lostAt = null;
 				saidGoingBack = false;
 				chatter("Got my things back!", true);
+				note(diedOf.isEmpty() ? "I died here. Careful." : "I died here (" + diedOf + "). Careful.");   // (a sign for whoever comes by)
 				return null;
 			}
 		}
@@ -2094,6 +2113,10 @@ public final class Companion {
 			fighter.reset();
 			return null;
 		}
+		if (!hurtNow && !reflexes.ready(foe.getUUID(), !WorldSenses.sees(player, hands.yaw, hands.pitch, foe))) {   // Xen 2.0: it notices a reaction time later
+			fighting = false;
+			return null;
+		}
 		fightingWhat = foe.getName().getString();
 		if (!(foe instanceof ServerPlayer)) fightingWhat = fightingWhat.toLowerCase(java.util.Locale.ROOT);
 		if (!(foe instanceof ServerPlayer sp && skills.sparringWith(sp.getUUID()))) diplomacy.during(foe);   // it may talk (truce, give up); not in a spar
@@ -2122,6 +2145,11 @@ public final class Companion {
 	final Structures structures = new Structures(this);
 	/** Fishing, with a rod, like a player. */
 	final Fisher fisher = new Fisher(this);
+	/** Xen 2.0: a do, don't or later for every tool, block and animal (its three brains), its reaction time, its confusion, its gut. */
+	final Choices choices = new Choices(this);
+	final Reflexes reflexes = new Reflexes(this);
+	final Confusion confusion = new Confusion(this);
+	final Gut gut = new Gut(this);
 	/** Everyday conversation, in character (no chat model needed). */
 	final SmallTalk smallTalk = new SmallTalk(this);
 	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
@@ -2547,7 +2575,11 @@ public final class Companion {
 	void note(String text) {
 		if (!mod.config.signs || player == null || inArena || someoneListening(mod.config.chatWakeDistance)) return;
 		long now = player.level().getGameTime();
-		if (now - lastNote < 6000) return;                            // at most one note every five minutes
+		if (now - lastNote < 3000) return;                            // at most one note every two and a half minutes
+		if (hands.hotbar(s -> { String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath(); return n.endsWith("_sign") && !n.contains("hanging"); }) < 0) {
+			makeSigns();                                              // Xen 2.0: no sign on it: it makes some (planks and a stick), for the next note
+			return;
+		}
 		long day = now / 24000 + 1;
 		if (hands.placeSign("Day " + day + ": " + text + " -" + name)) {
 			lastNote = now;
@@ -2574,9 +2606,34 @@ public final class Companion {
 		}
 	}
 
+	/** Signs to write notes on: three, from six planks and a stick, once in a while (Xen 2.0: more notes, less chat). */
+	private void makeSigns() {
+		long now = player.level().getGameTime();
+		if (now < signsAt || crafter.hasOrder()) return;
+		signsAt = now + 20 * 60 * 10;
+		String planks = null;
+		for (var e : items().entrySet()) if (e.getKey().endsWith("_planks") && e.getValue() >= 6 && !e.getKey().contains("bamboo")) planks = e.getKey();
+		if (planks == null || items().getOrDefault("stick", 0) < 1) return;
+		crafter.orderRecipe(planks.replace("_planks", "_sign"), 1);
+	}
+
+	private long signsAt;
+
+	/** The least time between two things it says on its own (the talkAmount setting): it doesn't narrate. */
+	private long talkGapMillis() {
+		long floor = switch (mod.config.talkAmount) {
+			case "quiet" -> 120_000L;
+			case "chatty" -> 20_000L;
+			default -> 45_000L;
+		};
+		return Math.max(floor, personality.chatterGapMillis());
+	}
+
 	void chatter(String text, boolean always) {
 		long now = System.currentTimeMillis();
-		if (!mod.config.chat || inArena || (!always && now - lastChatter < personality.chatterGapMillis())) return;
+		if (!mod.config.chat || inArena || (!always && now - lastChatter < talkGapMillis())) return;
+		boolean talking = talkingWith != null && player != null && player.level().getGameTime() < talkingUntil;
+		if (always && !talking && now - lastChatter < 8_000) return;  // (Xen 2.0: two lines in a row only in a conversation)
 		if (!always && !fresh(text)) return;                           // someone just said that: no need to say it again
 		lastChatter = now;
 		say(text);
@@ -2597,7 +2654,25 @@ public final class Companion {
 		return true;
 	}
 
+	/** How casually this Xen types (0: like a book, 1: like a player on a phone), the same all its life. */
+	float casual() {
+		float base = personality.hidden(Personality.TYPING);                    // (its hidden way of typing)
+		return switch (personality.tone) {
+			case "silly", "cheerful" -> Math.min(1f, base * 0.8f + 0.25f);
+			case "calm" -> base * 0.6f;
+			default -> base * 0.85f;
+		};
+	}
+
+	private final java.util.Random typing = new java.util.Random();
+
+	/** A line as this Xen types it (Xen 2.0: like a player: "gonna", "ngl", no full stop; never "2.7 blocks"). */
+	String typed(String text) {
+		return xen.mod.talk.Texting.casual(text, casual(), typing);
+	}
+
 	public void say(String text) {
+		text = typed(text);
 		Component line = Component.literal("<" + name + "> " + text);
 		if (mod.config.localChat && player != null) {                     // local chat: only those close by hear it
 			for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer) && mod.inRange(p, player)) p.sendSystemMessage(line);
@@ -2716,6 +2791,8 @@ public final class Companion {
 		lifeReward = 0;
 		emotions.reset();
 		String how = source.type().msgId();
+		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
+		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
 		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
 				|| how.contains("drown") || player.isUnderWater();                   // (under water: not worth drowning again for)
 		BlockPos here = player.blockPosition().immutable();
@@ -2766,7 +2843,10 @@ public final class Companion {
 				personality.style(), goals.likes(), player.getHealth(), player.getFoodData().getFoodLevel(),
 				emotions.mood(), emotions.fear * 100, mode.name().toLowerCase(), goals.status(),
 				senses.describe() + (mimic.skill.isEmpty() ? "" : " " + mimic.describe()) + " " + skills.describe()
-						+ (personality.loner ? " (a loner)" : ""), lastThought);
+						+ (personality.loner ? " (a loner)" : ""), lastThought)
+				+ String.format(java.util.Locale.ROOT, " Xen 2.0: %s, reactions %d ms on average; choices %d (%d yes, %d no, %d later)%s%s",
+						confusion.says(), reflexes.averageMs(), choices.made, choices.yes, choices.no, choices.later,
+						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */
@@ -3209,6 +3289,10 @@ public final class Companion {
 
 		@Override public String temper() {
 			return personality.temper;
+		}
+
+		@Override public float humor() {
+			return personality.hidden(Personality.HUMOR);
 		}
 
 		@Override public float chattiness() {

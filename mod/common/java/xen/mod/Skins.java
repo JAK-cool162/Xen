@@ -29,7 +29,9 @@ import java.util.concurrent.Executors;
 /**
  * Where Xens' skins come from (the {@code skins} setting, any mix of these):
  * <ul>
- *   <li>{@code "modern"} (the default): the mod's skins in today's style: shaded hair with volume, hoodies, jackets,
+ *   <li>{@code "blob"} (the default since Xen 2.0): simple skins: flat colour (any colour), two plain eyes, at most a
+ *   shirt, a belly, shoes or a blush; drawn for the mod and signed so everyone sees them;</li>
+ *   <li>{@code "modern"}: the mod's skins in today's style: shaded hair with volume, hoodies, jackets,
  *   sneakers, muted and pastel colours, many with slim arms (original, free to use, signed so everyone sees them);</li>
  *   <li>{@code "fun"}: the funny 61 of earlier versions; {@code "pack"}: both;</li>
  *   <li>{@code "random"}: any skin that comes with the mod: both packs and Minecraft's 18 default skins;</li>
@@ -61,10 +63,13 @@ final class Skins {
 
 	/** The modern pack (today's style), and the fun pack of earlier versions ({@link #pack}). */
 	private final List<String> modern = new ArrayList<>();
+	/** Xen 2.0's blob pack (simple skins). */
+	private final List<String> blob = new ArrayList<>();
 
 	Skins() {
 		read("/assets/xen/skins/pack.json", pack);
 		read("/assets/xen/skins/modern.json", modern);
+		read("/assets/xen/skins/blob.json", blob);
 	}
 
 	private static void read(String resource, List<String> into) {
@@ -81,7 +86,38 @@ final class Skins {
 	}
 
 	int packSize() {
-		return pack.size() + modern.size();
+		return pack.size() + modern.size() + blob.size();
+	}
+
+	/** The real names in config/xen/real_names.txt (one a line, # for notes): only accounts someone chose to list. */
+	static List<String> realNames(Path configDir) {
+		List<String> out = new ArrayList<>();
+		try {
+			Path f = configDir.resolve("xen").resolve("real_names.txt");
+			if (!Files.exists(f)) {
+				Files.createDirectories(f.getParent());
+				Files.writeString(f, "# Real Minecraft names for Xens, one a line (with the \"real\" name style: /xen set nameStyle real).\n"
+						+ "# Each Xen gets one of these names and that account's real skin, like the Carpet mod's fake players.\n"
+						+ "# Only put names here you're allowed to use (yours, your friends').\n");
+			}
+			for (String line : Files.readAllLines(f)) {
+				String n = line.trim();
+				if (!n.startsWith("#") && n.matches("[A-Za-z0-9_]{3,16}")) out.add(n);
+			}
+		} catch (Exception e) {
+			XenMod.LOG.warn("Xen's real names: {}", e.toString());
+		}
+		return out;
+	}
+
+	/** Fetch these accounts' skins (in the background), for Xens named after them. */
+	void prepareReal(List<String> names) {
+		for (String n : names) if (!players.containsKey(n.toLowerCase(Locale.ROOT))) net.submit(() -> fetchPlayer(n));
+	}
+
+	/** A real account's skin, if it came (null: not yet, or no such account). */
+	String player(String name) {
+		return players.get(name.toLowerCase(Locale.ROOT));
 	}
 
 	/** Get ready for the setting: sign new skins in the folder, fetch gallery skins and players' skins (in the background). */
@@ -115,11 +151,13 @@ final class Skins {
 			String k = s.trim(), low = k.toLowerCase(Locale.ROOT);
 			switch (low) {
 				case "random" -> {
+					out.addAll(blob);
 					out.addAll(modern);
 					out.addAll(pack);
 					for (String d : Looks.SKINS) out.add(d);
 				}
 				case "modern" -> out.addAll(modern);
+				case "blob" -> out.addAll(blob);
 				case "fun" -> out.addAll(pack);
 				case "pack" -> {
 					out.addAll(modern);
@@ -143,7 +181,7 @@ final class Skins {
 				}
 			}
 		}
-		if (out.isEmpty()) out.addAll(!modern.isEmpty() ? modern : pack.isEmpty() ? List.of(Looks.SKINS) : pack);   // nothing ready yet
+		if (out.isEmpty()) out.addAll(!blob.isEmpty() ? blob : !modern.isEmpty() ? modern : pack.isEmpty() ? List.of(Looks.SKINS) : pack);   // nothing ready yet
 		return out.get(r.nextInt(out.size()));
 	}
 

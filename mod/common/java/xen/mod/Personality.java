@@ -106,14 +106,51 @@ public final class Personality {
 	public List<String> beliefs = new ArrayList<>();
 	/** Its own plan (see {@link Strategy}; -1: not worked out yet). It changes its plan when it isn't working. */
 	public int plan = -1;
+	/**
+	 * Xen 2.0: hidden stats, given at birth (an older Xen: from its name), passed on to children, never shown. Each 0 to
+	 * 1 (0.5 is anyone): how quick its reflexes are, how well it keeps its head, how much it jokes, how casually it
+	 * types, how soon it gets hungry, how picky a miner it is, how much it likes fishing, whether it's a night owl, and
+	 * how stubborn it is once it has made up its mind.
+	 */
+	public float[] hidden;
+	static final String[] HIDDEN = {"reflexes", "composure", "humor", "typing", "appetite", "pickiness", "angler", "night owl", "stubborn"};
+	static final int REFLEXES = 0, COMPOSURE = 1, HUMOR = 2, TYPING = 3, APPETITE = 4, PICKINESS = 5, ANGLER = 6, NIGHT_OWL = 7, STUBBORN = 8;
+
+	/** A hidden stat (0.5 for anyone without them). */
+	float hidden(int i) {
+		return hidden == null || i >= hidden.length ? 0.5f : hidden[i];
+	}
+
+	/** Hidden stats for a newborn: most near the middle, a few far out (like people). */
+	static float[] hiddenStats(Random r) {
+		float[] h = new float[HIDDEN.length];
+		for (int i = 0; i < h.length; i++) h[i] = Math.max(0f, Math.min(1f, 0.5f + (float) r.nextGaussian() * 0.22f));
+		return h;
+	}
+
+	/** Its hidden stats in words, for the log only ("quick reflexes, easily rattled, ..."): never said, never shown. */
+	String hiddenInWords() {
+		String[][] words = {{"slow reflexes", "quick reflexes"}, {"easily rattled", "keeps a cool head"}, {"serious", "a joker"},
+				{"types properly", "types like on a phone"}, {"rarely hungry", "always hungry"}, {"mines anything", "a picky miner"},
+				{"no patience for fishing", "loves fishing"}, {"an early bird", "a night owl"}, {"easily swayed", "stubborn"}};
+		List<String> out = new ArrayList<>();
+		for (int i = 0; i < HIDDEN.length; i++) {
+			float v = hidden(i);
+			if (v < 0.3f) out.add(words[i][0]);
+			else if (v > 0.7f) out.add(words[i][1]);
+		}
+		return out.isEmpty() ? "nothing out of the ordinary" : String.join(", ", out);
+	}
 	private transient Beliefs.Knobs knobs;
 
 	/** Its sins and beliefs, if it has none yet (a newborn; an older Xen: from its name, so it's always the same one). */
 	void bornWith(Random r) {
-		if (sins != null) return;
-		sins = Sins.random(r);
-		beliefs = Beliefs.pick(sins, r, 4 + r.nextInt(3));
-		knobs = null;
+		if (sins == null) {
+			sins = Sins.random(r);
+			beliefs = Beliefs.pick(sins, r, 4 + r.nextInt(3));
+			knobs = null;
+		}
+		if (hidden == null) hidden = hiddenStats(r);                     // (after its sins: an older Xen's sins stay the ones it had)
 	}
 
 	float sin(int i) {
@@ -221,6 +258,10 @@ public final class Personality {
 		c.money = mutate(r.nextBoolean() ? money : other.money, r);
 		c.temper = pick(temper, other.temper, TEMPERS, r);
 		c.loner = r.nextFloat() < 0.1f ? !(r.nextBoolean() ? loner : other.loner) : r.nextBoolean() ? loner : other.loner;
+		if (hidden != null && other.hidden != null) {                           // its hidden stats: each from one parent, a little changed
+			c.hidden = new float[HIDDEN.length];
+			for (int i = 0; i < HIDDEN.length; i++) c.hidden[i] = mutate(r.nextBoolean() ? hidden(i) : other.hidden(i), r);
+		}
 		if (sins != null && other.sins != null) {                               // born with a mix of its parents' sins and beliefs
 			c.sins = Sins.mix(sins, other.sins, r);
 			c.beliefs = Beliefs.mix(beliefs, other.beliefs, c.sins, r);
@@ -275,7 +316,7 @@ public final class Personality {
 
 	/** When it eats: at this food level or below (10 for most; a glutton or "food is life" sooner, "hunger keeps you sharp" later). */
 	int eatAt() {
-		return Math.max(6, Math.min(17, Math.round(10 + 6 * sin(Sins.GLUTTONY) + 8 * knobs().hunger)));
+		return Math.max(6, Math.min(18, Math.round(10 + 6 * sin(Sins.GLUTTONY) + 8 * knobs().hunger + 4 * (hidden(APPETITE) - 0.5f))));   // (always hungry: eats sooner)
 	}
 
 	/**
@@ -430,6 +471,11 @@ public final class Personality {
 			o.add("beliefs", bl);
 		}
 		if (plan >= 0) o.addProperty("plan", Strategy.NAMES[plan]);
+		if (hidden != null) {
+			com.google.gson.JsonObject hd = new com.google.gson.JsonObject();
+			for (int i = 0; i < HIDDEN.length; i++) hd.addProperty(HIDDEN[i], hidden[i]);
+			o.add("hidden", hd);
+		}
 		return o;
 	}
 
@@ -464,6 +510,11 @@ public final class Personality {
 			}
 		}
 		if (o.has("plan")) p.plan = Strategy.index(o.get("plan").getAsString());
+		if (o.has("hidden") && o.get("hidden").isJsonObject()) {
+			var hd = o.getAsJsonObject("hidden");
+			p.hidden = new float[HIDDEN.length];
+			for (int i = 0; i < HIDDEN.length; i++) p.hidden[i] = hd.has(HIDDEN[i]) ? Math.max(0f, Math.min(1f, hd.get(HIDDEN[i]).getAsFloat())) : 0.5f;
+		}
 		return p;
 	}
 

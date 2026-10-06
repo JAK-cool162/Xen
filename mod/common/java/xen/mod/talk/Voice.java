@@ -30,6 +30,11 @@ public final class Voice {
 		/** cheerful, calm, grumpy, shy, bold or silly. */
 		String tone();
 
+		/** Xen 2.0: how much it jokes (a hidden stat, 0 to 1): a joker banters back, a serious one may take it to heart. */
+		default float humor() {
+			return 0.5f;
+		}
+
 		/** friendly, passive or aggressive. */
 		String temper();
 
@@ -271,7 +276,8 @@ public final class Voice {
 		insultWord |= s.contains(" shut up ") || s.contains(" go away ");
 		h.insult = (h.aboutYou && h.polarity < 0 && !h.question && !h.feelMe) || insultWord && !s.contains(" not ");
 		h.praise = !h.insult && (h.aboutYou && h.polarity > 0 && !h.question && !h.likeQ) || s.contains(" good job ") || s.contains(" nice job ")
-				|| s.contains(" well done ") || s.contains(" good game ") || s.contains(" great job ");
+				|| s.contains(" well done ") || s.contains(" good game ") || s.contains(" great job ")
+				|| !h.insult && !h.question && !s.contains(" on fire ") && !s.contains(" fire at ") && Texting.slangPraise(s);   // (Xen 2.0: "this is peak", "fire bro", "W build")
 		if (h.praise && h.thanks) h.praise = false;
 		for (String x : w) {                                                          // what it's about: the first thing it knows a word for
 			if (x.equals("mine") || x.equals("end") && !s.contains(" the end ")) continue;   // ("mine" is also "my"; "end" is usually the verb)
@@ -661,6 +667,18 @@ public final class Voice {
 		if (h.words.isEmpty()) {                                                      // just its name: "yes?"
 			lastAct = "listen";
 			out.add(new Sent(w("listen"), true));
+			return write(out);
+		}
+		String flat = h.flat.trim();
+		if (h.insult && random.nextFloat() < 0.35f + me.humor() && Texting.banter(text.replaceAll("(?i)\\b" + java.util.regex.Pattern.quote(me.name()) + "\\b[,:]?", "").trim())) {                                         // Xen 2.0: friends joke-insult each other ("I HATE YOU", "ur so bad lol"): banter back
+			lastAct = "banter";
+			out.add(new Sent(Texting.BANTER[random.nextInt(Texting.BANTER.length)], false));
+			return write(out);
+		}
+		if (h.words.size() <= 3 && !h.question && (h.laugh || Texting.SHORT_REACTIONS.contains(flat))) {   // "lol", "true", "damn": players answer that short
+			lastAct = "react short";
+			String[] pool = h.laugh || flat.startsWith("lm") ? Texting.LAUGHS : Texting.AGREES;
+			out.add(new Sent(pool[random.nextInt(pool.length)], false));
 			return write(out);
 		}
 		if (h.name && h.question) {

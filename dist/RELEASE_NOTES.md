@@ -1,7 +1,74 @@
-**Xen Companion 1.9.3**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.1: Xen 2.0 (first beta, to test while gameplay is recorded for training)
+
+* **Three brains in one**: everything a Xen could do with a tool, a block or an animal is a choice: **do it, don't,
+  or later** (and when, at most 30 minutes on). Each choice goes through three brains:
+  * the **Doer**: what it would get, and how much it needs that now;
+  * the **Doubter**: what could go wrong (dark coming, monsters, lava behind the block, a drop under it, a pickaxe
+    too weak, the last two of a kind);
+  * the **Gut**: what happens next if it does it.
+  A close call makes it a little confused; a timid Xen waits where a brave one goes ahead.
+* **Fishing rod**: it fishes when there's water close by and it's looking at it (it looks over at the pond first),
+  doesn't when there's no water or rod, and fishes later when it's dark, a monster is about, it's busy, or it has
+  plenty of food. Starving by a pond with no animal close, it fishes for dinner. It reels in a reaction time after the
+  bobber goes under.
+* **Every block around it**: mine, don't, or later, the way a player mines. From a recorded game: feet and head, right
+  next to it (a tunnel two high), hardly ever straight down, copper left in the wall. Never with lava behind the
+  block, or the block under its feet with a drop, water or lava under it. Later with a pickaxe that's too weak. Never
+  what someone built.
+* **Animals: facts, not guesses**: what an animal drops comes from the game's own loot tables, rolled many times.
+  "Kill the cow: it drops 2.2 beef (always), 0.9 leather (71%)". "A pig is about 16 hunger cooked".
+  * A sheep with shears in its bag is sheared, not killed: about 2 wool, and it lives.
+  * Not hungry: later.
+  * The last two of a kind: they could breed.
+  * Fenced in, named or on a lead: someone keeps it.
+* **The Gut takes over to survive**, before anything it was asked, and says so once:
+  * lava beside its feet: it steps back, looking at it;
+  * in lava: it jumps for the nearest safe block;
+  * on fire: into the water close by;
+  * three hearts or less with a monster on it: it backs off out of reach, then eats.
+* **Reaction time**: it notices new things about a quarter second later (slower for what it didn't see coming, when
+  tired or confused; quicker when it's focused in a fight). Its turns are a hand on a mouse: quick through the middle,
+  slowing into the target.
+* **Confusion**: it builds up from close calls, the dark, a crowd of monsters, a hit from behind, or coming back from
+  death. A confused Xen hesitates, looks around, sometimes goes with its other answer, and may ask "wait... which way?"
+  It never slows its survival plan.
+* **Hidden stats**: each Xen is born with stats nobody sees, which shape it. Children get them from their parents.
+  * reflexes;
+  * composure;
+  * humor;
+  * how casually it types;
+  * appetite;
+  * how picky a miner it is;
+  * love of fishing;
+  * night owl;
+  * stubbornness.
+* **Talks like a player, less often**:
+  * Typing: "gonna", "wanna", "ngl", "idk", no full stop, no capital, each Xen in its own way.
+  * No more "2.7 blocks away", "Fun fact," or "I'm 11% there".
+  * Short replies to short lines: "lol" gets "LMAO", "true" gets "fr".
+  * It knows "this is peak", "fire bro" and "W build" are praise.
+  * A friend's "I HATE YOU" in capitals or with a "lol" is banter, not a fight.
+  * On its own it says at most one line every 45 seconds (the "Says on its own" setting: quiet, normal, chatty), and
+    in a conversation it talks.
+* **More signs**:
+  * It makes signs from planks and leaves notes when nobody's around.
+  * Where it died, with what killed it: "I died here (skeleton). Careful."
+* **Blob skins** (the new default): simple skins in flat colours with two plain eyes, 24 of them, signed so every
+  player sees them. Older settings move to them unless you picked other skins.
+* **Real names** (name style "real"): Xens take real Minecraft names you list in `config/xen/real_names.txt`, with
+  those accounts' real skins (like the Carpet mod's fake players). Only names you put there.
+* **Settings**: a new "Xen 2.0" tab with these options:
+  * reaction time (human, fast, slow, instant);
+  * confusion (human, low, high, off);
+  * how much it says on its own;
+  * notes on signs.
+* **Beta**: the brains use what the game says plus the brains Xen already had. They'll be retrained on the gameplay
+  you record. Tell us what feels off.
 
 ### 1.9.3: no more standing about, building that works, chat that remembers
 
