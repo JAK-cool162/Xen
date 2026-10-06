@@ -27,7 +27,9 @@ final class Teaching {
 	private final Companion c;
 	private final Random random = new Random();
 	private final Map<UUID, Long> taught = new HashMap<>();
-	private long nextLook;
+	private long nextLook = -1;
+	/** When any Xen last gave a lesson or a warning out loud (one at a time, not a chorus of tips). */
+	private static long lastLessonMs;
 	/** The one who hit it last: their crouches since, to read a sorry. */
 	private UUID crouchFrom;
 	private boolean crouched;
@@ -113,14 +115,18 @@ final class Teaching {
 	/** Now and then, with another Xen close by: a lesson (a skill it's much better at), a warning (what hurt it). */
 	void tick() {
 		var p = c.player;
-		if (p == null || c.inArena || c.fightingNow() || now() < nextLook) return;
+		if (p == null || c.inArena || c.fightingNow()) return;
+		if (nextLook < 0) nextLook = now() + (Talker.FAST ? 200 : 20 * (120 + random.nextInt(240)));   // (just came: a few minutes before it teaches anyone)
+		if (now() < nextLook) return;
 		nextLook = now() + 20 * 20;
+		if (System.currentTimeMillis() - lastLessonMs < (Talker.FAST ? 5_000 : 45_000)) return;
 		for (Companion o : c.mod.companions) {
 			if (o == c || o.player == null || o.player.level() != p.level() || o.player.distanceTo(p) > 6 || o.fightingNow()) continue;
 			if (now() - taught.getOrDefault(o.player.getUUID(), -1_000_000L) < 20 * 60 * 10) continue;
 			for (var e : c.aversions.of.entrySet()) {                     // what hurt it: a warning
 				if (e.getValue() >= 0.5f && o.aversions.of(e.getKey()) < Aversions.KEEP_AWAY) {
 					taught.put(o.player.getUUID(), now());
+					lastLessonMs = System.currentTimeMillis();
 					o.aversions.learn(e.getKey(), 0.35f, "told by " + c.name);
 					c.chatter(c.pick3("careful with " + Aversions.said(e.getKey()) + ", " + o.name + ". trust me", o.name + ", stay away from " + Aversions.said(e.getKey()) + ". learned that the hard way",
 							"Heads up " + o.name + ": " + Aversions.said(e.getKey()) + " hurts."), false);
@@ -132,6 +138,7 @@ final class Teaching {
 				float gap = c.skills.get(s) - o.skills.get(s);
 				if (gap < 0.25f) continue;
 				taught.put(o.player.getUUID(), now());
+				lastLessonMs = System.currentTimeMillis();
 				float gain = 0.08f * gap * (0.6f + 0.8f * o.personality.diligence);
 				o.skills.level[s] = Math.min(1f, o.skills.level[s] + gain);
 				lessonsGiven++;

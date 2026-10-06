@@ -35,7 +35,7 @@ final class Talker {
 	private final Random random = new Random();
 	/** -Dxen.fastTalk=true: talk every ten seconds (for testing). */
 	static final boolean FAST = Boolean.getBoolean("xen.fastTalk");
-	private long nextRemark = -1, nextXenTalk;
+	private long nextRemark = -1, nextXenTalk, arrivedAt;
 	/** A question it asked, waiting for a yes or no: what it's about, from whom, until when. */
 	private String asked, askedThing;
 	private UUID askedWho;
@@ -96,6 +96,7 @@ final class Talker {
 		if (c.player == null || c.inArena || !c.mod.config.chat) return;
 		long now = now();
 		if (nextRemark < 0) {                                          // just arrived: a minute before it says much
+			arrivedAt = now;
 			nextRemark = now + (FAST ? 200 : 1200);
 			nextXenTalk = now + (FAST ? 100 : 600);
 		}
@@ -133,12 +134,14 @@ final class Talker {
 			if (!c.known.contains(u)) continue;
 			close.add(u);
 			if (near.contains(u) || now - greeted.getOrDefault(u, -1_000_000L) < 12_000) continue;
+			boolean metBefore = greeted.containsKey(u);
 			greeted.put(u, now);
+			if (now - arrivedAt < 1200) continue;                            // (it just came and said hi already: no rush of hellos)
 			String n = p.getName().getString();
 			if (c.trust(u) >= 0.3f) c.antics.wave(p);
 			boolean friend = c.trust(u) >= 0.5f;
 			sayNear(c.trust(u) < -0.2f ? pick("Oh. It's you.", "Hello, " + n + ".", "You again.", "...", "Stay back, " + n + ".", "Oh no, it's " + n + "!")
-					: friend ? pick("Hi " + n + "! I missed you!", "Hello, " + n + ". Good to see you.", "Oh, it's you, " + n + ".",
+					: friend ? pick(metBefore ? "Hi " + n + "! I missed you!" : "Hi " + n + "!", "Hello, " + n + ". Good to see you.", "Oh, it's you, " + n + ".",
 							"H-hi " + n + "...", "There you are, " + n + "!", "Hiii " + n + "!")
 					: pick("Hi " + n + "!", "Hello, " + n + ".", "Hey.", "Oh, h-hi.", "Hey " + n + "!", "Howdy, " + n + "!"));
 		}

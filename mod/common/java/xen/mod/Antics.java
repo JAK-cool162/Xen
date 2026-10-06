@@ -100,7 +100,9 @@ final class Antics {
 
 	// ------------------------------------------------------------------------------ each tick
 	/** When it last greeted each player back (a crouch greeting once a while, not every crouch). */
-	private final Map<UUID, Long> greetedAt = new HashMap<>();
+	private final Map<UUID, Long> greetedAt = new HashMap<>(), saidHiAt = new HashMap<>();
+	/** When it may dance again, and when it last said something about a dance (no dance-party loops). */
+	private long danceAgain, danceLineAt = -100_000;
 
 	/**
 	 * Someone crouched at it a few times quickly: the players' way of saying "hi, I'm friendly". It trusts them a
@@ -114,7 +116,9 @@ final class Antics {
 		c.hands.watching = p;
 		c.lookAt(p, 60);
 		c.crouchWave(2 + random.nextInt(3));                                  // crouch, crouch (a few): right away, like a player
-		if (!(p instanceof XenPlayer)) c.talker.sayNear(pick("Hi hi! *crouches back*", "Hey. *crouches back*", "Hm. Hi.", "O-oh, hi! *crouches*",
+		boolean said = now - saidHiAt.getOrDefault(p.getUUID(), -100_000L) < 2400;   // (it crouches back every time; says hi once in two minutes)
+		if (!said && !(p instanceof XenPlayer)) saidHiAt.put(p.getUUID(), now);
+		if (!said && !(p instanceof XenPlayer)) c.talker.sayNear(pick("Hi hi! *crouches back*", "Hey. *crouches back*", "Hm. Hi.", "O-oh, hi! *crouches*",
 				"Yo! *crouch crouch*", "*crouch crouch crouch* Hiii!"));
 		if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} greeted {} back (trust now {})", c.name, p.getName().getString(), c.trust(p.getUUID()));
 	}
@@ -137,9 +141,13 @@ final class Antics {
 			if (seen[0] == 4 && !isXenDancing && c.player.hasLineOfSight(p)) greeted(p, now);   // a crouch greeting (always, like players)
 			if (!c.mod.config.antics) continue;
 			boolean trusted = c.known.contains(p.getUUID()) || isXenDancing || c.trust(p.getUUID()) >= 0.3f;
-			if (seen[0] >= 10 && trusted && !busy() && random.nextFloat() < 0.4f + 0.6f * playful()) {   // it keeps going: a dance
+			if (seen[0] >= 10 && trusted && !busy() && now >= danceAgain && random.nextFloat() < 0.4f + 0.6f * playful()) {   // it keeps going: a dance
 				partner = p;
+				seen[0] = 0;                                                       // (another dance takes another round of crouches)
+				danceAgain = now + 600 + random.nextInt(600);                      // (and a while: two dancing Xens don't set each other off for ever)
 				start("dance", 60 + random.nextInt(40));
+				if (now - danceLineAt < 2400) continue;                            // (dancing again soon: no need to say so again)
+				danceLineAt = now;
 				c.talker.sayNear(pick("Dance party!", "Alright, alright.", "Ugh... fine. One dance.", "O-okay, I'll dance too...",
 						"LET'S GOOO!", "Wheee! Dance party!"));
 			}

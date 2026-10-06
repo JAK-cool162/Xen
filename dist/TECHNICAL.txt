@@ -1,8 +1,33 @@
-XEN COMPANION 2.0.0-beta.4.2: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.5: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.5
+==========================
+
+Fixes from a recorded play-test (50 min, a player and a friend, 15 Xens):
+- Antics.watch(): a dance needs seen >= 10 crouches.
+  - seen resets to 0 when a dance starts.
+  - danceAgain = now + 600..1200 ticks.
+  - The dance line is said at most once in 2400 ticks.
+  - Before, two dancing Xens (each other's crouches count) restarted it every tick, each time with a line.
+- Antics.greeted(): it crouches back as before (every 600 ticks per person). The hello is said at most once in 2400
+  ticks per person (saidHiAt).
+- Talker.greet(): no greeting in the first 1200 ticks after it arrives (arrivedAt; it has just introduced itself).
+  "I missed you!" only when it has greeted that person before.
+- Teaching.tick():
+  - the first look comes 120..360 s after it arrives (200 ticks with -Dxen.fastTalk);
+  - a lesson or a warning is said only 45 s after the last one by any Xen (static lastLessonMs; 5 s with fastTalk).
+- Checked: two Xens with 30 s of crouching at them gave 2 dance lines and 2 hellos (before: about 25 lines in 6 s).
+- Xen Ex1 v3: 7 recordings, 24496 frames (575 hurt), held out 6129 (160 hurt), 25 epochs (train.py's default now).
+  - Same held-out frames, v2 then v3:
+    - sprint .758 -> .775, jump .902 -> .910, forward .922 -> .927;
+    - pitch error 7.5 -> 7.3 degrees;
+    - danger AUC .765 -> .802.
+  - The new session's last fifth: sprint .734 -> .715, danger .712 -> .751.
+  - 15 epochs gave danger .804 but sprint .751 and pitch 7.8, so 25 it is.
 
 WHAT'S NEW IN 2.0.0-beta.4.2
 ============================

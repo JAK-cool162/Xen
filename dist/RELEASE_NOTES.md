@@ -1,7 +1,38 @@
-**Xen Companion 2.0.0-beta.4.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.5**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.5: fixes from a real play-test (and Ex1 v3)
+
+From 50 minutes of play with a friend and 15 Xens:
+
+* **No more dance-party loops.** Two Xens (or a player crouching at them) set each other off, and "LET'S GOOO!" came
+  about 25 times in 6 seconds. Now:
+  * a dance takes a new round of crouches;
+  * a Xen waits 30 to 60 seconds before it dances again;
+  * it says something about dancing at most once in 2 minutes.
+
+  In a test with 30 seconds of crouching next to two Xens, each said one dance line.
+* **Crouch hellos**: it still crouches back every time, but says hi to the same person at most once in 2 minutes.
+* **Just summoned**:
+  * no rush of hellos: a Xen introduces itself, and greets you later;
+  * "I missed you!" only to someone it has met before.
+* **Tips, one at a time**:
+  * a new Xen starts teaching a few minutes after it arrives;
+  * only one lesson is said at a time, 45 seconds apart, so 8 new Xens don't all give a "Pro tip" in the same second.
+* **Xen Ex1 v3**, trained on that session too: 7 recordings, 24,496 moments, 575 of them just before a hurt. Tested
+  on minutes of play neither version saw:
+
+  | | v2 | v3 |
+  |---|---|---|
+  | Sprint key right | 75.8% | 77.5% |
+  | Jump right | 90.2% | 91.0% |
+  | Where it looks | within 7.5° | within 7.3° |
+  | Danger AUC | 0.77 | 0.80 |
+
+  On the new session's own last minutes it senses danger better (0.75 vs 0.71). Its sprint key there is a little
+  worse (71.5% vs 73.4%). A world's learned danger from Ex1 v2 is kept aside, as before.
 
 ### 2.0.0-beta.4.2: save gameplay logs anywhere
 

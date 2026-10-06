@@ -59,7 +59,7 @@ def forward(net, X):
     return h1, h2, out
 
 
-def train(paths, out, epochs=15, seed=7, lr=2e-3, wd=1e-2, with_xen=False):
+def train(paths, out, epochs=25, seed=7, lr=2e-3, wd=1e-2, with_xen=False):
     tr, te = load(paths, with_xen)
     X, K, Y, P, D = arrays(tr)
     Xt, Kt, Yt, Pt, Dt = arrays(te)
@@ -175,7 +175,7 @@ def main(argv=None):
     ap.add_argument("recordings", nargs="+")
     ap.add_argument("--out", default="mod/common/resources/assets/xen/ex1.json")
     ap.add_argument("--fixture", default="mod/common/test/fixtures/ex1.json")
-    ap.add_argument("--epochs", type=int, default=15)
+    ap.add_argument("--epochs", type=int, default=25)
     ap.add_argument("--with-xen", action="store_true", help="also learn from Xens' own gameplay logs")
     a = ap.parse_args(argv)
     model, net, mean, std = train(a.recordings, a.out, a.epochs, with_xen=a.with_xen)
