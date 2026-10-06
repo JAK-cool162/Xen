@@ -1,7 +1,85 @@
-XEN COMPANION 2.0.0-beta.1: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.2: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.2
+==========================
+
+Xen Ex1 (xen/ex1/, core/Ex1.java, Ex1Senses.java):
+- Senses (119), the same in xen/ex1/features.py and Ex1Senses:
+  - body: on ground, in water, sprinting, sneaking, health, food, speed, vertical speed, pitch, light, rain, dimension;
+  - the blocks below, at the feet and at the head, as air/solid/water/lava/small/other;
+  - what it looks at (none/block/entity, distance, block kind, hostile);
+  - the nearest monster (closeness, sin/cos of its bearing, height), monsters within 8 and 16, the nearest other
+    creature;
+  - hand kind and shield, using an item;
+  - 7x8 sight lines: rows 2i+1 and columns 3j+1 of the recorder's 14x24 over 90 x 130.6 degrees. Each gives its
+    distance over 64; a miss within 64 is 1;
+  - lava in view, water share, open share (misses within 192).
+- Network: 119 -> 64 -> 64 (tanh). Heads:
+  - keys: 9 sigmoids;
+  - yaw: 5 bins of the next quarter second's turn (-30, -8, 8, 30);
+  - pitch: tanh;
+  - danger: a sigmoid for health lost in the next 8 frames.
+- Training (numpy, Adam, 15 epochs, weight decay 1e-2, hurt frames weighted to balance) holds out the last fifth of
+  each recording. On 4308 frames (141 hurt), held out 1078:
+  - sprint .84 (vs .72 always the same), jump .86 (vs .81);
+  - pitch error 6.4 degrees (vs 14.0);
+  - danger AUC .936;
+  - yaw .774 (vs .773: no better yet).
+- The weights ship in assets/xen/ex1.json; the fixture test/fixtures/ex1.json checks Java against Python (max
+  difference 1e-5).
+- In the game, Companion.ex1Step runs every second decision (about 2 a second) and stores ex1Out.
+  - A hurt (once a second at most) teaches the danger head the last 5 moments (rate .006).
+  - A moment 2.5 s old with no hurt since teaches it "safe" (rate .004).
+  - Only the danger head learns; the rest stays as trained. Shared by all Xens; saved as xen/ex1-learned.json.
+- Walker:
+  - no sprint where Ex1's sprint key is under .25;
+  - sprint-jumps on straight walks when Ex1 would jump (with headroom and 4+ moves to go);
+  - pitch half the path gaze, half Ex1's pitch.
+- Setting: ex1 (on).
+
+Gut.java, learned:
+- The amygdala's fear for IDLE, FORWARD, BACK, LEFT, RIGHT, JUMP, and Ex1's danger.
+- weigh(): keep = max(fear stay, fear on). It takes the least-feared move when keep >= .15 and
+  (keep - least) * caution >= .12, or when danger >= .8 and relief >= .04.
+- keepAway(): blocks within 3 that it has an aversion to push it away (1/d^2). It takes the step (forward, back,
+  left, right) best aligned with the push, never into a wall or onto one, with fear as a tie-break.
+- Each comes a reaction time after it's felt; -Dxen.gutDebug=true writes what it feels every second.
+- Removed: the lava, fire and badly-hurt rules of beta.1.
+
+Aversions.java:
+- XenPlayer.hurtServer -> aversions.hurt(source).
+- Causes:
+  - a creature: "mob:<type>";
+  - lava;
+  - the fire or campfire block under or at it, else "fire";
+  - hotFloor -> magma_block, cactus, sweetBerryBush -> sweet_berry_bush, freeze -> powder_snow;
+  - falls, hunger and drowning teach nothing here.
+- Each hurt adds .3 + .04 * damage (max 1). From .3 it keeps away; it fades x.997 a minute. Saved in companions.json.
+- Lava school (3 fresh Xens, 20 rounds, a barrier corridor, lava 2 blocks off flowing toward it): each learned lava
+  from its first burn. Hurt in 6% of rounds after that, against 22-33% before aversions.
+
+Teaching.java:
+- Xen to Xen (every 20 s, another Xen within 6, once per pair per 10 min):
+  - an aversion >= .5 the other lacks: the other learns it (.35, "told by");
+  - else a skill 0.25 or more better: the other gains 0.08 * gap * (0.6 + 0.8 * diligence).
+- Player to Xen:
+  - "stay away from/avoid/don't touch X" or "X burns/hurts/is dangerous" -> aversions (.4);
+  - "teach me", "tips", "advice", "how do I get better" -> a tip for the named skill (else its best one); under .35
+    it says it's bad at it.
+- Fights:
+  - the one who hit it (within a minute), within 8 blocks, crouching twice -> judge();
+  - chance = .25 + .5 kindness - .4 wrath + .25 trust + .2 composure - .12 (hits - 1) - .15 if aggressive, clamped
+    .03 to .95;
+  - forgiven: makePeace and +.1 trust; not forgiven: -.05 trust;
+  - chat from someone it's fighting (not a truce) gets fight talk.
+
+Sight: Hands.clearTo, Hands.inTheWay, Chores.hitFromHere, Life.visible and Choices.lookingAtWater clip with
+COLLIDER (not OUTLINE). Blocks with no collision (leaf litter, glow lichen, grass, flowers, torches) don't block
+sight.
 
 
 WHAT'S NEW IN 2.0.0-beta.1 (XEN 2.0)

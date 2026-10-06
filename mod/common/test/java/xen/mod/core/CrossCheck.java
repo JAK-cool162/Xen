@@ -190,6 +190,41 @@ public final class CrossCheck {
 		// Xen 2.0: the facts, how a choice is weighed (do, don't, later), the mining shape, reaction times.
 		check(xen.mod.TwoCheck.run(), "xen 2.0's choices failed");
 
+		// Xen Ex1: the Java network says what Python's does, on frames of the recording; the block and hand kinds agree.
+		JsonObject exf = gson.fromJson(Files.readString(dir.resolve("ex1.json")), JsonObject.class);
+		Ex1 ex1 = Ex1.bundled();
+		check(ex1 != null, "Xen Ex1 doesn't load");
+		if (ex1 != null) {
+			float worstEx = 0;
+			for (JsonElement e : exf.getAsJsonArray("cases")) {
+				JsonObject o = e.getAsJsonObject();
+				float[] x = new float[Ex1.N];
+				for (int i = 0; i < Ex1.N; i++) x[i] = o.getAsJsonArray("x").get(i).getAsFloat();
+				Ex1.Out out = ex1.run(x);
+				worstEx = Math.max(worstEx, maxDiff(out.keys, o.getAsJsonArray("keys")));
+				worstEx = Math.max(worstEx, Math.abs(out.danger - o.get("danger").getAsFloat()));
+				worstEx = Math.max(worstEx, Math.abs(out.pitch - o.get("pitch").getAsFloat()));
+			}
+			int kinds = 0, kindsOk = 0;
+			for (var e : exf.getAsJsonObject("category").entrySet()) {
+				kinds++;
+				if (Ex1.category(e.getKey()) == e.getValue().getAsInt()) kindsOk++;
+			}
+			for (var e : exf.getAsJsonObject("hand").entrySet()) {
+				kinds++;
+				if (Ex1.hand(e.getKey()) == e.getValue().getAsInt()) kindsOk++;
+			}
+			check(worstEx < 1e-3f, "Xen Ex1 differs from Python by " + worstEx);
+			check(kindsOk == kinds, "Xen Ex1's block and hand kinds: " + kindsOk + "/" + kinds);
+			Ex1.Out calm = ex1.run(new float[Ex1.N]);
+			float before = calm.danger;
+			for (int i = 0; i < 40; i++) ex1.learn(calm, true, 0.05f);
+			float after = ex1.run(new float[Ex1.N]).danger;
+			check(after > before, "Xen Ex1 doesn't learn from a hurt");
+			System.out.printf(java.util.Locale.ROOT, "xen ex1: %d frames like Python (max difference %.1e), kinds %d/%d, a hurt raises danger %.2f -> %.2f; held out: danger AUC %s%n",
+					exf.getAsJsonArray("cases").size(), worstEx, kindsOk, kinds, before, after, ex1.report.has("danger_auc") ? ex1.report.get("danger_auc").getAsString() : "?");
+		}
+
 		// Learning works in Java too: fear conditioning in a tiny lava room.
 		check(learnsToFearLava(), "Java brain did not learn to fear lava");
 

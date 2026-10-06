@@ -1758,8 +1758,8 @@ final class Chores {
 		Vec3 eye = c.player.getEyePosition(), center = Vec3.atCenterOf(t);
 		double reach = c.player.blockInteractionRange() - 0.3;
 		if (eye.distanceTo(center) > reach) return null;
-		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, center, net.minecraft.world.level.ClipContext.Block.OUTLINE,
-				net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));                  // (what the mouse picks: grass and flowers too)
+		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, center, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));                  // (past small things: grass, leaf litter, glow lichen)
 		if (hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.getBlockPos().equals(t)) return t;
 		BlockPos in = hit.getBlockPos();
 		if (level.getBlockState(in).is(net.minecraft.tags.BlockTags.LEAVES) && eye.distanceTo(Vec3.atCenterOf(in)) <= reach) return in;

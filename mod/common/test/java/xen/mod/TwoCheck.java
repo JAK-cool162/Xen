@@ -111,6 +111,13 @@ public final class TwoCheck {
 		old.bornWith(new Random(14));
 		check(old.hidden != null && old.sins != null, "an older Xen gets hidden stats from its name");
 		check(!a.hiddenInWords().isEmpty() && !a.describe().contains(a.hiddenInWords()), "hidden stats stay hidden");
+		// the gut: a feeling from what it learned (no rules about lava)
+		check(Gut.weigh(new float[6], 0.1f, 1f) == null, "calm: the gut stays out of it");
+		check(Gut.weigh(new float[] {0.4f, 0.9f, 0.05f, 0.5f, 0.5f, 0.6f}, 0.2f, 1f) == xen.mod.core.Action.BACK, "walking on hurts, stepping back doesn't: back");
+		check(Gut.weigh(new float[] {0.05f, 0.06f, 0.05f, 0.05f, 0.05f, 0.05f}, 0.95f, 1f) == null, "dread but no move is better: nothing to do");
+		check(Gut.weigh(new float[] {0.2f, 0.3f, 0.25f, 0.1f, 0.4f, 0.3f}, 0.3f, 1.5f) == xen.mod.core.Action.LEFT, "the least feared move");
+		check("lava".equals(Teaching.thing("lava")) && "magma_block".equals(Teaching.thing("magma")) && "sweet_berry_bush".equals(Teaching.thing("berry bush"))
+				&& Teaching.thing("dirt") == null, "what players warn about");
 		check(Confusion.scale("off") == 0f && Confusion.scale("high") > 1f && Reflexes.scale("instant") == 0f, "settings");
 		System.out.printf(java.util.Locale.ROOT, "xen 2.0: pig %.0f hunger (%s), sheep %.0f, %.1f catches in 5 min; reactions %.0f ms (unseen %.0f, confused %.0f); %s%n",
 				Facts.hunger(pig), pig.says(), Facts.hunger(sheep), dry, ms, median(unseen), median(confused), failures == 0 ? "all good" : failures + " failed");

@@ -73,6 +73,8 @@ public class XenMod implements ModInitializer {
 
 	XenConfig config;
 	Brain brain;
+	/** Xen Ex1, shared by every Xen (each one's hurts teach it, for all of them). */
+	xen.mod.core.Ex1 ex1;
 	/** Xen 2.0's mind (what to do next: one for all main Xens, it keeps learning); null: the old way. */
 	xen.mod.core.Mind mind;
 	/** How many of its choices Xen 2.0 has seen turn out (in this world), and learned from. */
@@ -211,6 +213,18 @@ public class XenMod implements ModInitializer {
 				brain = new Brain(Perception.OBS_DIM);
 			}
 		}
+		ex1 = xen.mod.core.Ex1.bundled();                                       // Xen Ex1: trained on recorded play
+		if (ex1 != null) {
+			Path learned = brainFile().resolveSibling("ex1-learned.json");
+			try {
+				if (Files.exists(learned)) ex1.restore(new com.google.gson.Gson().fromJson(Files.readString(learned), com.google.gson.JsonObject.class));
+			} catch (IOException | RuntimeException e) {
+				LOG.warn("What Xen Ex1 learned in this world couldn't be read ({}): starting from the one that ships", e.toString());
+			}
+			LOG.info("Xen Ex1 loaded (learned from {} hurts and {} calm moments in this world)", ex1.learnedHurts, ex1.learnedCalm);
+		} else {
+			LOG.warn("No Xen Ex1: Xens move the old way");
+		}
 		Path mindFile = brainFile().resolveSibling("mind.bin");
 		probe = xen.mod.core.SimLife.probe(64, 17);
 		xen.mod.core.Mind shipped = null, own = null;
@@ -348,6 +362,13 @@ public class XenMod implements ModInitializer {
 			}
 		} catch (IOException e) {
 			LOG.warn("Could not save Xen's brain: {}", e.toString());
+		}
+		if (ex1 != null) {
+			try {
+				ex1.save(file.resolveSibling("ex1-learned.json"));
+			} catch (IOException e) {
+				LOG.warn("Could not save what Xen Ex1 learned: {}", e.toString());
+			}
 		}
 		for (Companion c : companions) roster.remember(c, teamOf(c));
 		roster.save();
@@ -1134,6 +1155,7 @@ public class XenMod implements ModInitializer {
 			part.accept("chests", () -> { if (known.has("chests")) c.storage.load(known.getAsJsonObject("chests")); });
 			part.accept("knowledge", () -> { if (known.has("knows")) c.knowledge.load(known.getAsJsonObject("knows")); });
 			part.accept("lessons", () -> { if (known.has("lessons")) c.lessons.load(known.getAsJsonObject("lessons")); });
+			part.accept("aversions", () -> { if (known.has("aversions")) c.aversions.load(known.getAsJsonObject("aversions")); });
 			part.accept("crafted", () -> { if (known.has("crafted")) for (var m : known.getAsJsonArray("crafted")) c.pace.made.add(m.getAsString()); });
 			part.accept("portal math", () -> { if (known.has("portalMath") && known.get("portalMath").getAsBoolean()) c.knowledge.known.put("portal_math", Knowledge.How.TAUGHT); });
 			part.accept("farm", () -> { if (known.has("crops")) c.farmer.load(known.getAsJsonObject("crops")); });

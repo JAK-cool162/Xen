@@ -216,7 +216,7 @@ final class Life {
 	/** Can it see that block from where it stands (nothing solid in between)? */
 	private boolean visible(BlockPos q) {
 		var hit = c.player.level().clip(new net.minecraft.world.level.ClipContext(c.player.getEyePosition(), Vec3.atCenterOf(q),
-				net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));
+				net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, c.player));   // (past small things)
 		return hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS || hit.getBlockPos().equals(q);
 	}
 

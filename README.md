@@ -39,6 +39,7 @@ pip install -r requirements.txt
 python -m xen train --lives 50      # grow up in SimCraft (built-in Minecraft-like world)
 python -m xen watch                 # watch it live, with its inner monologue
 python -m xen evaluate --baseline   # what it learned, compared with a newborn
+python -m xen.ex1.train recordings/*.jsonl   # Xen Ex1: train on recorded play (the gameplay recorder's JSONL)
 ```
 
 ---
@@ -218,8 +219,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.1+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.2+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.2+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its

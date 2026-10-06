@@ -1,200 +1,136 @@
 package xen.mod;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Creeper;
-import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.phys.Vec3;
 import xen.mod.core.Action;
 
 /**
- * Xen 2.0's third brain, the gut: what happens next if nothing changes, and the plan that takes over when the answer
- * is "I get hurt". It runs before anything else it does, asked or not (a command waits while it survives), each time
- * a reaction time after it notices ({@link Reflexes}):
- * <ol>
- *   <li>in lava: out, to the nearest safe block;</li>
- *   <li>lava right next to its feet: a step away from it;</li>
- *   <li>on fire with water close by: into the water;</li>
- *   <li>badly hurt (3 hearts or less) with a monster on it: back off out of reach for a few seconds, then eat if it
- *   can (a creeper's hiss is the fight brain's: it runs).</li>
- * </ol>
- * It says so once ("Hold on, lava!") when it breaks off something it was asked to do.
+ * Xen 2.0's third brain, the gut: a feeling, not a rulebook. Every moment it asks what it has learned:
+ * <ul>
+ *   <li>its amygdala (the fear critic of its brain): what each move is expected to cost in harm from here, learned in
+ *   SimLife and from every hurt in this world since;</li>
+ *   <li>Xen Ex1: how likely it is to be hurt in the next two seconds, learned from a person's recorded play and from
+ *   every Xen's own hurts.</li>
+ * </ul>
+ * When what it's doing (standing, walking on) is expected to hurt clearly more than some other move, it takes that
+ * move, a reaction time after it feels it, before anything it was asked. Nothing about lava, fire, drops or monsters
+ * is written here: it steps back from lava because stepping into lava hurt (in SimLife, or here). A Xen that has
+ * never been burnt may go too close the first time; the hurt teaches it (and every Xen with it).
  */
 final class Gut {
+	static final Action[] MOVES = {Action.IDLE, Action.FORWARD, Action.BACK, Action.LEFT, Action.RIGHT, Action.JUMP};
+	/** How much less a move must be expected to hurt before the gut takes it (times its caution), the least worry that counts, and dread. */
+	static final float RELIEF = 0.12f, WORRY = 0.15f, DREAD = 0.8f;
+	/** -Dxen.gutDebug=true: what it feels, every second, in the journal. */
+	static final boolean DEBUG = Boolean.getBoolean("xen.gutDebug");
+
 	private final Companion c;
-	private long saidAt, backingUntil, backedOffAt;
-	/** What it's doing to survive right now (for its thoughts), or empty. */
+	private long saidAt;
+	/** What it's doing to keep safe right now (for its thoughts), or empty. */
 	String doing = "";
 	int overrides;
+	private Action last;
 
 	Gut(Companion c) {
 		this.c = c;
 	}
 
-	private long now() {
-		return c.player.level().getGameTime();
+	/**
+	 * The weighing, with no game in it (the tests run it): the fear of each of MOVES (in that order), Ex1's danger and
+	 * its caution. The move to take instead, or null: what it's doing is fine.
+	 */
+	static Action weigh(float[] fear, float danger, float caution) {
+		float keep = Math.max(fear[0], fear[1]);                            // standing, or walking on
+		int best = 0;
+		for (int i = 1; i < MOVES.length; i++) if (fear[i] < fear[best]) best = i;
+		float relief = keep - fear[best];
+		boolean worried = keep >= WORRY && relief * caution >= RELIEF || danger >= DREAD && relief >= 0.04f;
+		return worried && best != 1 ? MOVES[best] : null;
+	}
+
+	/**
+	 * Things that hurt it before (Aversions) close to its feet: the step that best takes it away from all of them (not
+	 * into a wall, not onto one of them), or null. A push away from each, the closer the stronger.
+	 */
+	private Action keepAway(float[] fear) {
+		var p = c.player;
+		var level = p.level();
+		BlockPos nearest = c.aversions.near(2);
+		if (nearest == null) return null;
+		Vec3 at = p.position();
+		double nx = at.x - (nearest.getX() + 0.5), nz = at.z - (nearest.getZ() + 0.5);
+		if (Math.hypot(nx, nz) > 2.2) return null;
+		double px = 0, pz = 0;
+		BlockPos feet = p.blockPosition();
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -1, -3), feet.offset(3, 1, 3))) {
+			String n = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath();
+			if (n.equals("air") || c.aversions.of(n) < Aversions.KEEP_AWAY) continue;
+			double dx = at.x - (q.getX() + 0.5), dz = at.z - (q.getZ() + 0.5), d = Math.max(0.3, Math.hypot(dx, dz));
+			px += dx / (d * d * d);
+			pz += dz / (d * d * d);
+		}
+		double len = Math.hypot(px, pz);
+		if (len < 1e-6) return null;
+		px /= len;
+		pz /= len;
+		Vec3 look = Vec3.directionFromRotation(0, p.getYRot());
+		Vec3 right = new Vec3(-look.z, 0, look.x);
+		Vec3[] step = {Vec3.ZERO, look, look.scale(-1), right.scale(-1), right};      // (MOVES order: stay, forward, back, left, right)
+		int best = -1;
+		double bestScore = 0.25;
+		for (int i = 1; i < step.length; i++) {
+			Vec3 to = at.add(step[i].scale(0.9));
+			BlockPos t = BlockPos.containing(to);
+			if (!level.getBlockState(t).getCollisionShape(level, t).isEmpty() || !level.getBlockState(t.above()).getCollisionShape(level, t.above()).isEmpty()) continue;
+			String under = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(t).getBlock()).getPath();
+			if (c.aversions.of(under) >= Aversions.KEEP_AWAY) continue;              // (not onto it)
+			double score = step[i].x * px + step[i].z * pz - 0.5 * fear[i];
+			if (score > bestScore) {
+				bestScore = score;
+				best = i;
+			}
+		}
+		return best < 0 ? null : MOVES[best];
 	}
 
 	Action override() {
 		var p = c.player;
-		if (p == null || c.inArena || p.isCreative() || p.isSpectator()) return null;
-		ServerLevel level = (ServerLevel) p.level();
-		Action a = null;
-		String why = null;
-		if (p.isInLava()) {
-			if (!c.reflexes.ready("gut:inlava", false)) return null;
-			BlockPos safe = safeSpot(level, p.blockPosition(), 5);
-			why = "lava";
-			doing = "getting out of the lava";
-			c.walker.stop();
-			if (safe != null) c.hands.face(Vec3.atBottomCenterOf(safe).add(0, 1.2, 0));   // (eyes on the way out, and jump for it: no path finding in lava)
-			p.setSprinting(true);
-			a = Action.JUMP;
-		} else if (p.onGround() && headingInto(level, p.blockPosition())) {
-			BlockPos lava = lavaAtFeet(level, p.blockPosition());
-			if (!c.reflexes.ready("gut:lava@" + lava.asLong(), false)) return null;
-			BlockPos safe = awayFrom(level, p.blockPosition(), lava);
-			if (safe == null) return null;
-			why = "lava";
-			doing = "stepping back from lava";
-			c.walker.stop();
-			c.hands.face(Vec3.atCenterOf(lava));                              // eyes on the lava, and a step back from it, like a player
-			p.setSprinting(false);
-			a = Action.BACK;
-		} else if (p.isOnFire() && !p.isInWater()) {
-			BlockPos water = waterWithin(level, p.blockPosition(), 6);
-			if (water == null || !c.reflexes.ready("gut:fire", false)) return null;
-			why = "fire";
-			doing = "running into the water to put the fire out";
-			a = c.walkTo(Vec3.atBottomCenterOf(water));
-		} else {
-			a = backOff(p.getHealth());
-			if (a != null) why = "hurt";
+		if (p == null || c.inArena || p.isCreative() || p.isSpectator() || c.perceived == null || c.mod.brain == null) return null;
+		float[] all = c.mod.brain.fears(c.perceived);
+		float[] fear = new float[MOVES.length];
+		for (int i = 0; i < MOVES.length; i++) fear[i] = all[MOVES[i].ordinal()];
+		float danger = c.ex1Out == null ? 0f : c.ex1Out.danger;
+		Action move = weigh(fear, danger, c.personality.cautionScale());
+		if (DEBUG && p.tickCount % 20 == 0) {
+			c.journal("gut", String.format(java.util.Locale.ROOT, "feels: stay %.2f on %.2f back %.2f left %.2f right %.2f jump %.2f, danger %.0f%% -> %s",
+					fear[0], fear[1], fear[2], fear[3], fear[4], fear[5], 100 * danger, move == null ? "fine" : move.verb));
 		}
-		if (a == null) {
+		if (move == null) move = keepAway(fear);                                 // what hurt it before: it keeps away from it
+		if (move == null) {
 			doing = "";
+			last = null;
 			return null;
 		}
+		if (!c.reflexes.ready("gut", false)) return null;                       // (it feels it a reaction time later)
 		overrides++;
+		doing = switch (move) {
+			case BACK -> "stepping back, that feels wrong";
+			case LEFT, RIGHT -> "stepping aside, that feels wrong";
+			case JUMP -> "jumping clear";
+			default -> "holding still, that feels wrong";
+		};
 		c.goals.instant = doing;
-		boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
-		if (asked && now() - saidAt > 600) {
-			saidAt = now();
-			c.chatter(switch (why) {
-				case "lava" -> c.pick3("Hold on, lava!", "Whoa, lava. One sec.", "Lava! Wait.");
-				case "fire" -> c.pick3("I'm on fire! Water!", "Hot hot hot!", "Fire! One sec.");
-				default -> c.pick3("Hold on, I'm hurt!", "Wait, I need a moment!", "Back off, back off!");
-			}, true);
-		}
-		if (overrides % 10 == 1) c.journal("gut", "takes over: " + doing);
-		return a;
-	}
-
-	/** Badly hurt with a monster on it: a few seconds out of reach (once every half minute), then food. */
-	private Action backOff(float health) {
-		var p = c.player;
-		long now = now();
-		if (health > 6 && now >= backingUntil) return null;
-		LivingEntity mob = null;
-		double best = 5;
-		for (Monster m : p.level().getEntitiesOfClass(Monster.class, p.getBoundingBox().inflate(5), LivingEntity::isAlive)) {
-			if (m instanceof Creeper) continue;                            // (a creeper: the fight brain runs from it)
-			double d = m.distanceTo(p);
-			if (d < best) {
-				best = d;
-				mob = m;
+		if (move != last) {
+			c.journal("gut", String.format(java.util.Locale.ROOT, "takes over: %s (fear: stay %.2f, on %.2f, %s %.2f; danger %.0f%%)", move.verb,
+					fear[0], fear[1], move.verb, all[move.ordinal()], 100 * danger));
+			boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
+			if (asked && p.level().getGameTime() - saidAt > 600) {
+				saidAt = p.level().getGameTime();
+				c.chatter(c.pick3("Hold on!", "Whoa, wait.", "Nope, not there."), true);
 			}
 		}
-		if (mob == null) {
-			if (now < backingUntil && c.items().getOrDefault("food", 0) > 0 && p.getFoodData().needsFood()) {
-				doing = "eating, out of reach";
-				return Action.EAT;
-			}
-			return null;
-		}
-		if (now >= backingUntil) {
-			if (now - backedOffAt < 600 || !c.reflexes.ready("gut:hurt@" + mob.getUUID(), false)) return null;
-			backedOffAt = now;
-			backingUntil = now + 80;                                        // four seconds of backing off, then it fights again if it must
-		}
-		Vec3 away = p.position().subtract(mob.position());
-		away = new Vec3(away.x, 0, away.z);
-		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
-		doing = "backing off from the " + Facts.kind(mob).replace('_', ' ') + ", badly hurt";
-		p.setSprinting(true);
-		return c.walkTo(p.position().add(away.normalize().scale(6)));
-	}
-
-	/** Lava beside its feet (it'll flow in), or an edge down to lava it's walking toward. */
-	private boolean headingInto(ServerLevel level, BlockPos feet) {
-		BlockPos lava = lavaAtFeet(level, feet);
-		if (lava == null) return false;
-		if (lava.getY() == feet.getY()) return true;
-		Vec3 v = c.player.getDeltaMovement(), to = Vec3.atCenterOf(lava).subtract(c.player.position());
-		return v.x * to.x + v.z * to.z > 0.02;
-	}
-
-	/** Lava next to its feet (or under the block next to it, an edge), or null. */
-	static BlockPos lavaAtFeet(ServerLevel level, BlockPos feet) {
-		for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-			BlockPos n = feet.relative(d);
-			if (level.getFluidState(n).is(FluidTags.LAVA)) return n;
-			if (level.getBlockState(n).getCollisionShape(level, n).isEmpty() && level.getFluidState(n.below()).is(FluidTags.LAVA)) return n.below();
-		}
-		return null;
-	}
-
-	/** A block it can stand on farther from that lava (within 3 blocks of it: the farther from the lava the better), or null. */
-	private static BlockPos awayFrom(ServerLevel level, BlockPos feet, BlockPos lava) {
-		BlockPos best = null;
-		double bestScore = -1e9, now = feet.distSqr(lava);
-		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -1, -3), feet.offset(3, 1, 3))) {
-			double away = q.distSqr(lava);
-			if (away <= now || !standable(level, q)) continue;
-			double score = Math.sqrt(away) - 0.5 * Math.sqrt(q.distSqr(feet));
-			if (score > bestScore) {
-				bestScore = score;
-				best = q.immutable();
-			}
-		}
-		return best;
-	}
-
-	private static BlockPos safeSpot(ServerLevel level, BlockPos from, int r) {
-		BlockPos best = null;
-		double bestD = 1e9;
-		for (BlockPos q : BlockPos.betweenClosed(from.offset(-r, -1, -r), from.offset(r, 2, r))) {
-			if (!standable(level, q)) continue;
-			double d = q.distSqr(from);
-			if (d < bestD) {
-				bestD = d;
-				best = q.immutable();
-			}
-		}
-		return best;
-	}
-
-	/** Solid under it, room for its body, no lava in or next to it. */
-	static boolean standable(ServerLevel level, BlockPos q) {
-		if (!level.getBlockState(q.below()).isFaceSturdy(level, q.below(), net.minecraft.core.Direction.UP)) return false;
-		if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() || !level.getBlockState(q.above()).getCollisionShape(level, q.above()).isEmpty()) return false;
-		if (level.getFluidState(q).is(FluidTags.LAVA) || level.getFluidState(q.above()).is(FluidTags.LAVA)) return false;
-		return lavaAtFeet(level, q) == null;
-	}
-
-	private static BlockPos waterWithin(ServerLevel level, BlockPos from, int r) {
-		BlockPos best = null;
-		double bestD = 1e9;
-		for (BlockPos q : BlockPos.betweenClosed(from.offset(-r, -2, -r), from.offset(r, 1, r))) {
-			if (!level.getFluidState(q).is(FluidTags.WATER)) continue;
-			double d = q.distSqr(from);
-			if (d < bestD) {
-				bestD = d;
-				best = q.immutable();
-			}
-		}
-		return best;
+		last = move;
+		c.walker.stop();
+		return move;
 	}
 }

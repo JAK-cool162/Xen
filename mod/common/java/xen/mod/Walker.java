@@ -885,7 +885,13 @@ final class Walker {
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
 		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || m.kind() == Kind.ASCEND)
 				&& (straight || smooth() || m.kind() == Kind.PARKOUR) && (!stroll || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 2;
+		var ex = c.mod.config.ex1 ? c.ex1Out : null;                              // Xen Ex1: how the player it learned from moved
+		if (ex != null && sprint && m.kind() != Kind.PARKOUR && ex.keys[xen.mod.core.Ex1.SPRINT] < 0.25f) sprint = false;   // (they walked here)
 		p.setSprinting(sprint);
+		if (ex != null && sprint && straight && (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL) && p.onGround() && remaining() > 4
+				&& ex.presses(xen.mod.core.Ex1.JUMP) && p.level().getBlockState(p.blockPosition().above(2)).getCollisionShape(p.level(), p.blockPosition().above(2)).isEmpty()) {
+			p.setJumping(true);                                                     // sprint-jumping, the way they travelled
+		}
 		switch (m.kind()) {
 			case ASCEND -> {
 				doing = "going up";
@@ -1054,6 +1060,8 @@ final class Walker {
 		Vec3 gaze = Vec3.atBottomCenterOf(path.get(Math.min(path.size() - 1, index + 3)).to()).add(0, 1.5, 0);
 		Vec3 d = gaze.subtract(p.getEyePosition());
 		float want = (float) -Math.toDegrees(Math.atan2(d.y, Math.max(2.0, Math.hypot(d.x, d.z))));   // (never closer than 2 blocks: no staring down)
+		var ex = c.mod.config.ex1 ? c.ex1Out : null;
+		if (ex != null) want = 0.5f * want + 0.5f * Math.max(-30f, Math.min(45f, ex.pitchDegrees()));   // (where Ex1 would look: the player it learned from)
 		want = Math.max(-30, Math.min(35, want));
 		p.setXRot(p.getXRot() + (want - p.getXRot()) * 0.3f);
 	}

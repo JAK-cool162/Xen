@@ -65,7 +65,9 @@ public class XenPlayer extends ServerPlayer {
 		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && source.getDirectEntity() == by) {
 			companion.struckBy(by, amount);
 		}
-		return super.hurtServer(level, source, amount);
+		boolean hurt = super.hurtServer(level, source, amount);
+		if (hurt && companion != null && !isCreative()) companion.aversions.hurt(source, amount);   // (what hurt it: it remembers)
+		return hurt;
 	}
 
 	@Override

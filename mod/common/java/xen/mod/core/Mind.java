@@ -58,7 +58,7 @@ public final class Mind {
 	/** The inputs Xen 5.2 had (a 5.2 mind is carried over: the new inputs start with no say, then it learns them). */
 	static final int F52 = 58;
 	/** Its version, for the log and "who are you". */
-	public static final String VERSION = "Xen 2.0 beta (mind 6)";
+	public static final String VERSION = "Xen 2.0 beta 2 (mind 6, Ex1)";
 	/** How a count becomes a feature: count / scale, at most 1. */
 	public static float count(int n, float scale) {
 		return Math.min(1f, n / scale);

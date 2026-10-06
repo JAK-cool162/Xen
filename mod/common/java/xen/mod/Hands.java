@@ -193,7 +193,7 @@ public final class Hands {
 	}
 
 	private boolean clearTo(ServerLevel level, Vec3 eye, Vec3 to, BlockPos pos) {
-		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.COLLIDER,   // (Xen 2.0: it sees past small things: leaf litter, glow lichen, grass, torches)
 				net.minecraft.world.level.ClipContext.Fluid.NONE, p));
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
 	}
@@ -201,7 +201,7 @@ public final class Hands {
 	/** The first thing between its eyes and that block, or null. */
 	private BlockHitResult inTheWay(ServerLevel level, BlockPos pos) {
 		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), Vec3.atCenterOf(pos),
-				net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+				net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p));   // (small things don't count)
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !r.getBlockPos().equals(pos) ? r : null;
 	}
 

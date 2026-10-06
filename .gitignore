@@ -13,3 +13,4 @@ mod/*/build/
 mod/*/run/
 *.gguf
 *.part
+/recordings/

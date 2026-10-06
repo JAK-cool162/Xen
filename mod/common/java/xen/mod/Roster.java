@@ -67,6 +67,7 @@ final class Roster {
 		o.add("chests", c.storage.toJson());
 		o.add("knows", c.knowledge.toJson());
 		o.add("lessons", c.lessons.toJson());
+		o.add("aversions", c.aversions.toJson());
 		JsonArray crafted = new JsonArray();
 		for (String m : c.pace.made) crafted.add(m);
 		o.add("crafted", crafted);

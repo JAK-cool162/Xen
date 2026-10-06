@@ -168,6 +168,7 @@ public class XenSettingsScreen extends Screen {
 						"How many processor cores the chat model may use (applies the next time it loads).");
 			}
 			case 6 -> {
+				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
 				choice("Reaction time", "reaction", List.of("human", "fast", "slow", "instant"), s -> s.equals("human") ? "human (~0.23 s)" : s,
 						"How long a Xen takes to react to something new: a monster in view, a bobber going under, lava at its feet. human: about a quarter second, slower for what it didn't see coming (it has to turn first), when tired or confused, quicker when it's focused in a fight. Its turns are a hand on a mouse: quick in the middle, slowing into the target.");
 				choice("Confusion", "confusion", List.of("human", "low", "high", "off"), s -> s,

@@ -209,7 +209,7 @@ final class Choices {
 	boolean lookingAtWater() {
 		var p = c.player;
 		Vec3 eye = p.getEyePosition(), to = eye.add(p.getLookAngle().scale(16));
-		var hit = p.level().clip(new ClipContext(eye, to, ClipContext.Block.OUTLINE, ClipContext.Fluid.SOURCE_ONLY, p));
+		var hit = p.level().clip(new ClipContext(eye, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.SOURCE_ONLY, p));   // (past lily pads' edges, grass, reeds)
 		return hit.getType() == HitResult.Type.BLOCK && p.level().getFluidState(hit.getBlockPos()).isSource()
 				&& p.level().getBlockState(hit.getBlockPos()).is(net.minecraft.world.level.block.Blocks.WATER);
 	}

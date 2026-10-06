@@ -1,7 +1,43 @@
-**Xen Companion 2.0.0-beta.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.2: Xen Ex1, trained on recorded play; learning instead of rules
+
+* **Xen Ex1**: the first Xen brain trained on a person's recorded game (22 minutes of survival from the gameplay
+  recorder).
+  * It sees what the recorder saw: 119 senses, from its body and the blocks at its feet to 56 sight lines across its
+    view.
+  * It learned how that player sprints, sprint-jumps and looks while walking. Xens move that way now.
+  * It also learned a feeling of danger: will I get hurt in the next two seconds?
+  * On minutes of play it never saw: the sprint key right 84% of the time (vs 72% by always guessing the same), jump
+    86% (vs 81%), where it looks within 6° (vs 14°), and danger AUC 0.94 (0.5 would be no better than chance).
+  * In the game its danger keeps learning from every Xen's own hurts (they share one Ex1).
+  * Train it again on more recordings: `python -m xen.ex1.train recordings/*.jsonl`.
+* **No rules for danger: it learns.** The gut's hand-written lava, fire and badly-hurt rules are gone. Now the gut
+  goes by what Xen learned:
+  * the fear its brain learned for each move;
+  * Ex1's danger;
+  * **once burnt, twice shy**: what hurt it (lava, fire, magma, cactus, a berry bush, a creature), it remembers, and
+    from then on keeps away from it.
+
+  A newborn Xen doesn't fear lava. In a lava school (lava flowing toward a Xen in a corridor), new Xens learned from
+  their first burn, and after that only 6% of meetings with lava hurt them (22–33% without it).
+* **Teaching**:
+  * Xens born with different skills teach each other ("hey Miren, lemme show you something about moving"), and the
+    other gets better.
+  * A Xen that was hurt by something warns the others ("careful with lava, trust me"). They keep away without being
+    hurt first.
+  * Ask it: "teach me mining", "any tips for fighting?". One that's bad at it says so ("idk, I'm still learning mining
+    myself").
+  * Tell it: "lava burns", "stay away from cactus". It minds that from then on.
+* **Fights talk like fights**: hit it, and it says "bro what", "you started it", "ez? we'll see". Crouch at it after
+  hitting it (a player's sorry), and it decides for itself, from its kindness, its temper, trust and how many times
+  you hit it: "fine. don't do that again", or "you ain't my friend after attacking me".
+* **It sees past small things**: leaf litter, glow lichen on cave walls, grass, flowers and torches no longer block
+  what it can see or aim at.
+* **Settings**: "Xen Ex1" on or off, in the Xen 2.0 tab.
 
 ### 2.0.0-beta.1: Xen 2.0 (first beta, to test while gameplay is recorded for training)
 

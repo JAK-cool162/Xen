@@ -312,6 +312,9 @@ public final class Companion {
 			confusion.surprise(0.12f);                                  // a hit from out of view: a moment's "what was that?"
 		}
 		if (player.tickCount % 20 == 13) confusion.second();
+		if (player.tickCount % 1200 == 17) aversions.fade();
+		teaching.watchCrouch();
+		if (player.tickCount % 20 == 3) teaching.tick();
 		if (hurtNow && !inArena) {                                      // its tribe may come to guard it
 			Tribe hurtTribe = tribe();
 			if (hurtTribe != null) hurtTribe.attackedAt.put(this, player.level().getGameTime());
@@ -385,6 +388,34 @@ public final class Companion {
 				: n.equals("iron_ore") ? "raw_iron" : n.equals("gold_ore") ? "raw_gold" : n;
 	}
 
+	private float lastHealthBefore = 20;
+
+	/**
+	 * Xen Ex1, twice a second: what it senses (the recorder's 119 senses), what it makes of it, and what it learns. A
+	 * hurt teaches it that the last two seconds were dangerous; a calm moment now and then, that the moment before was
+	 * safe. It learns what hurts by itself (lava, falls, monsters): nothing is written in about any of them.
+	 */
+	private void ex1Step(float hurt) {
+		var ex1 = mod.ex1;
+		if (ex1 == null || !mod.config.ex1 || inArena) {
+			ex1Out = null;
+			return;
+		}
+		long now = player.level().getGameTime();
+		if (hurt > 0.5f && mod.config.learn && now - ex1HurtAt >= 20) {         // (a hurt teaches once a second at most: a long burn isn't fifty lessons)
+			ex1HurtAt = now;
+			for (var o : ex1Recent) ex1.learn(o, true, 0.006f);
+			ex1Recent.clear();
+		}
+		if (++ex1Ticks % 2 != 0) return;
+		ex1Out = ex1.run(Ex1Senses.sense(this));
+		ex1Recent.addLast(ex1Out);
+		if (ex1Recent.size() > 5) {
+			var old = ex1Recent.removeFirst();                              // (two and a half seconds on, nothing hurt: that moment was safe)
+			if (now - ex1HurtAt > 60 && mod.config.learn) ex1.learn(old, false, 0.004f);
+		}
+	}
+
 	private void decide() {
 		Perception.Body body = body();
 		Perception.Sight sight = WorldSenses.sense(player, hands.yaw, hands.pitch, decisions, body);
@@ -410,6 +441,7 @@ public final class Companion {
 				note("Diamonds here!");
 			}
 		}
+		lastHealthBefore = lastHealth;
 		lastHealth = player.getHealth();
 		lastFood = player.getFoodData().getFoodLevel();
 		lastItems = items;
@@ -417,6 +449,8 @@ public final class Companion {
 		walker.touched = false;
 		goals.instant = "";
 		if (!inArena) goals.everyDecision();
+		perceived = next;
+		ex1Step(Math.max(0f, lastHealthBefore - player.getHealth()));
 		Action instinct = instinct();
 		Brain.Thought thought = mod.brain.decide(next, emotions, mod.config.learn);
 		Action sensible = instinct == null ? sensible(Action.values()[thought.action]) : null;
@@ -2145,11 +2179,21 @@ public final class Companion {
 	final Structures structures = new Structures(this);
 	/** Fishing, with a rod, like a player. */
 	final Fisher fisher = new Fisher(this);
+	/** Xen Ex1: what it made of the last moment (keys, turn, look, danger), the moments before (for learning), and what it perceived last. */
+	xen.mod.core.Ex1.Out ex1Out;
+	private final java.util.ArrayDeque<xen.mod.core.Ex1.Out> ex1Recent = new java.util.ArrayDeque<>();
+	private int ex1Ticks;
+	private long ex1HurtAt = -1000;
+	float[] perceived;
 	/** Xen 2.0: a do, don't or later for every tool, block and animal (its three brains), its reaction time, its confusion, its gut. */
 	final Choices choices = new Choices(this);
 	final Reflexes reflexes = new Reflexes(this);
 	final Confusion confusion = new Confusion(this);
 	final Gut gut = new Gut(this);
+	/** What hurt it, remembered (once burnt, twice shy). */
+	final Aversions aversions = new Aversions(this);
+	/** Teaching (Xens and players), and the talk of a fight (a crouch after a hit: a sorry it may take or not). */
+	final Teaching teaching = new Teaching(this);
 	/** Everyday conversation, in character (no chat model needed). */
 	final SmallTalk smallTalk = new SmallTalk(this);
 	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
@@ -2397,8 +2441,8 @@ public final class Companion {
 	}
 
 	/** The last hit by a player, as it happened: who, when, a crit (falling), crouching, how hard. */
-	private UUID struckBy;
-	private int struckAt = -100;
+	UUID struckBy;
+	int struckAt = -100;
 	private boolean struckCrit, struckSneaking;
 
 	void struckBy(ServerPlayer by, float amount) {
@@ -2981,6 +3025,18 @@ public final class Companion {
 		boolean aboutThem = words.toLowerCase(java.util.Locale.ROOT).matches("(?s)^\\s*i('m| am| really| just| also)? ?(love|like|hate|found|got|have|had|made|saw|think|mined|killed|built|am|was)\\b.*");
 		if ((told.news || told.feelMe || aboutThem) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!", "I love diamonds": talk, not "go mine diamonds"
 		needs.heard(from, words);                                      // "I'm hungry", "I need wood": it may help (its choice)
+		if (!r.intent().equals("peace")) {
+			String heated = teaching.inFight(from, words);              // in a fight with them: it talks like it
+			if (heated != null) {
+				say(heated);
+				return null;
+			}
+		}
+		String lesson = teaching.heard(from, words);                    // "lava burns", "teach me mining", "any tips?"
+		if (lesson != null) {
+			say(lesson);
+			return null;
+		}
 		Tribe village = tribe();
 		if (village != null && village.members.size() >= 2) {             // "new rule: no fighting in the village": they vote
 			String vote = village.laws.propose(words, from, who);

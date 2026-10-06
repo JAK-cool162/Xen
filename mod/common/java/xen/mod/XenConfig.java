@@ -60,6 +60,8 @@ public final class XenConfig {
 	 * "normal" (one every 45 seconds at most) or "chatty" (every 20 seconds).
 	 */
 	public String talkAmount = "normal";
+	/** Xen Ex1: the brain trained on recorded play: how it sprints, jumps and looks, and the danger it feels (it keeps learning what hurts). */
+	public boolean ex1 = true;
 	/** Xen 2.0: reaction time: "human" (about a quarter second, slower for what it didn't see coming), "fast", "slow" or "instant". */
 	public String reaction = "human";
 	/** Xen 2.0: how confused Xens get (hesitating, looking around, a second-best choice now and then): "human", "low", "high" or "off". */
