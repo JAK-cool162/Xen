@@ -1,7 +1,14 @@
-XEN COMPANION 2.0.0-beta.3: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.4: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.4
+==========================
+
+- The notes on the recordings are corrected: the x-ray in the chat was the other player's, not the recording
+  player's (see beta.3 below). Ex1 is the same as in beta.3.
 
 
 WHAT'S NEW IN 2.0.0-beta.3
@@ -30,8 +37,8 @@ From the recordings:
   hitting back took a median 1.2 s (n 7).
 - Not copied: against players, the player mostly spam-clicked (charge at a hit: median .08, 5% at .9 or more). Xens keep
   charged hits; their fight genes decide.
-- Not learned: x-ray, which the session's chat talks about. The recorder saw no ore through walls, so Ex1 can't learn
-  to find ore that way.
+- No x-ray in the data: the x-ray the chat talks about was the other player's. The recordings are from the recording
+  player's own view, so every ore in them was found fairly.
 
 
 WHAT'S NEW IN 2.0.0-beta.2

@@ -1,7 +1,12 @@
-**Xen Companion 2.0.0-beta.3**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.4**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.4: corrected notes
+
+* The x-ray talked about in the recorded chat was the friend's, not the recording player's. The recordings are from
+  the recording player's own view, so every ore in them was found fairly. Ex1 is the same as in beta.3.
 
 ### 2.0.0-beta.3: Xen Ex1 v2, trained on an hour more play
 
