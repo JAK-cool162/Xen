@@ -2725,6 +2725,8 @@ public final class Companion {
 			server.getPlayerList().broadcastSystemMessage(line, false);
 		}
 		if (player != null) mod.overheardBy(player, name, text);          // and the Xens close by
+		String said = text;
+		if (player != null) mod.gameplayLog.quietly(() -> mod.gameplayLog.chat(player, said));
 		life.said(text);                                                // a nod, a shake of the head, a wave
 		journal("says", text);
 		if (talkingWith != null && player != null && player.level().getGameTime() < talkingUntil) {

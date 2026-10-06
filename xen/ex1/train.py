@@ -18,11 +18,16 @@ H = 64
 HEADS = {"keys": len(F.KEYS), "yaw": len(F.YAW_BINS) + 1, "pitch": 1, "danger": 1}
 
 
-def load(paths):
+def load(paths, with_xen=False):
+    """Frames from every log (the last fifth of each held out). A Xen's own log is left out unless with_xen: Ex1 learns
+    how people play, not how Xens do."""
     train, test = [], []
     for path in paths:
         with open(path) as fh:
             records = [json.loads(line) for line in fh if line.strip()]
+        if F.source(records) == "xen" and not with_xen:
+            print(f"(left out {path}: a Xen's own play; --with-xen to use it)", file=sys.stderr)
+            continue
         fr = F.frames(records)
         cut = int(len(fr) * 0.8)
         train += fr[:cut]
@@ -54,8 +59,8 @@ def forward(net, X):
     return h1, h2, out
 
 
-def train(paths, out, epochs=15, seed=7, lr=2e-3, wd=1e-2):
-    tr, te = load(paths)
+def train(paths, out, epochs=15, seed=7, lr=2e-3, wd=1e-2, with_xen=False):
+    tr, te = load(paths, with_xen)
     X, K, Y, P, D = arrays(tr)
     Xt, Kt, Yt, Pt, Dt = arrays(te)
     mean, std = X.mean(0), X.std(0) + 1e-3
@@ -171,8 +176,9 @@ def main(argv=None):
     ap.add_argument("--out", default="mod/common/resources/assets/xen/ex1.json")
     ap.add_argument("--fixture", default="mod/common/test/fixtures/ex1.json")
     ap.add_argument("--epochs", type=int, default=15)
+    ap.add_argument("--with-xen", action="store_true", help="also learn from Xens' own gameplay logs")
     a = ap.parse_args(argv)
-    model, net, mean, std = train(a.recordings, a.out, a.epochs)
+    model, net, mean, std = train(a.recordings, a.out, a.epochs, with_xen=a.with_xen)
     fixture(net, mean, std, a.recordings, a.fixture)
     print(json.dumps({"trained_on": model["trained_on"], "report": model["report"]}, indent=1))
 

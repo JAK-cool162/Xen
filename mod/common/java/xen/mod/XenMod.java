@@ -95,6 +95,8 @@ public class XenMod implements ModInitializer {
 	private final Random mindRandom = new Random();
 	Chat chat;
 	MinecraftServer server;
+	/** Gameplay logs (the gameplayLog setting), for training Xen Ex1. */
+	GameplayLog gameplayLog;
 
 	MinecraftServer server() {
 		return server;
@@ -126,6 +128,7 @@ public class XenMod implements ModInitializer {
 		if (config.nameStyle.equals("real")) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
+		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
 		} catch (RuntimeException e) {
@@ -156,7 +159,22 @@ public class XenMod implements ModInitializer {
 		ServerMessageEvents.ALLOW_GAME_MESSAGE.register((srv, message, overlay) ->   // a Xen respawning isn't "joining"
 				!(quietJoin && message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t && t.getKey().startsWith("multiplayer.player.joined")));
 		ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
-			if (entity instanceof ServerPlayer victim && server != null) died(victim, source);
+			if (entity instanceof ServerPlayer victim && server != null) {
+				gameplayLog.quietly(() -> gameplayLog.died(victim, source));
+				died(victim, source);
+			}
+		});
+		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, base, taken, blocked) -> {   // (gameplay logs: what hurt whom)
+			if (entity instanceof ServerPlayer && !blocked) gameplayLog.quietly(() -> gameplayLog.damaged(entity, source, taken));
+		});
+		net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, be) -> gameplayLog.quietly(() -> gameplayLog.broke(player, pos, state)));
+		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.swing(player, entity));
+			return InteractionResult.PASS;
+		});
+		net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> {
+			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.digging(player, pos));
+			return InteractionResult.PASS;
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> ownerLeft(handler.getPlayer()));
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> ownerJoined(handler.getPlayer()));
@@ -380,6 +398,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private void stopping(MinecraftServer s) {
+		gameplayLog.quietly(gameplayLog::closeAll);
 		arena.stop("the server is stopping.");
 		avatar.stopping();
 		for (Companion c : companions) if (c.player() != null && !c.inArena) rememberAway(c);   // they come back next time
@@ -420,6 +439,7 @@ public class XenMod implements ModInitializer {
 		if (s.getTickCount() % 20 == 0) avatar.tick();
 		arena.tick();
 		runLater();
+		gameplayLog.quietly(() -> gameplayLog.tick(s));
 		List<Companion> order = new ArrayList<>(companions);
 		java.util.Collections.shuffle(order, random);                  // nobody always gets to act first
 		for (Companion c : order) {
@@ -728,6 +748,7 @@ public class XenMod implements ModInitializer {
 
 	private void heard(ServerPlayer sender, String text) {
 		try {
+			gameplayLog.quietly(() -> gameplayLog.chat(sender, text));
 			hear(sender, text);
 		} catch (RuntimeException e) {                                        // (a chat problem never stops the chat, or the game)
 			LOG.warn("Xen couldn't take in what {} said: {}", sender.getName().getString(), e.toString(), e);

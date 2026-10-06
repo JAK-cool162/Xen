@@ -1,7 +1,56 @@
-XEN COMPANION 2.0.0-beta.4: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.4.1: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.4.1
+============================
+
+Gameplay logs (GameplayLog.java; setting gameplayLog: off, xens, players, both; default off):
+- One JSONL file for each logged Xen and player in config/xen/gameplay_logs: xen_<name>_<time>.jsonl and
+  player_<name>_<time>.jsonl. A new file after 200 MB, a new one each time the server starts or the player comes back.
+- The gameplay recorder's format 1.2.0, so xen/ex1 reads both the same way.
+  - session_start: mod_version 1.2.0, written_by (Mind.VERSION), source (xen or player), who, interval_ticks 5,
+    fight_interval_ticks 1.
+  - state every 5 ticks, every tick for 3 s after a hurt or a hit. It holds dimension, raining, thundering, day_time,
+    screen (a container menu's type, else null), biome and light. The player part has pos, velocity, yaw, pitch,
+    look_dir, on_ground, sprinting, sneaking, in_water, health, food, air and xp. Then come input, selected_slot,
+    main_hand, off_hand, armor and using_item.
+  - inventory every 10 s.
+  - looking_at uses its block and entity reach, like a client. Then blocks (below, feet, head) and nearby (16 nearest
+    within 24: type, dist, rel, hostile, health, holding).
+  - vision every 10 ticks: 14 x 24 rays over 90 x 130.626 degrees to 192 blocks; dist floor or -1; idx a palette
+    index, -2 past 64, -1 for a miss; open_frac.
+  - Keys:
+    - a player's come from ServerPlayer.getLastClientInput() (the input packet game clients send since 1.21.2);
+    - a Xen's come from its zza/xxa, jump key, sneak and sprint;
+    - attack is "swinging" and use is "using an item".
+  - Events:
+    - damage_taken: after armor, from ServerLivingEntityEvents.AFTER_DAMAGE. A killing hit has no damage event of its
+      own, so died() writes one with "fatal": true before the death.
+    - death.
+    - swing: AttackEntityCallback for players; Hands for Xens, which have no game client and so no attack packet. The
+      cooldown is taken before the hit; target is the type id, as in the recorder.
+    - swing at a block: AttackBlockCallback.
+    - block_break: PlayerBlockBreakEvents.AFTER, with ticks since the first swing at that block.
+    - chat_out and chat_in: heard() and Companion.say; with local chat, only those in range get chat_in.
+- A logged player gets one line in chat when their log starts.
+- About 30 MB an hour each, more in long fights.
+- xen/ex1:
+  - features.source(records) reads who played a log.
+  - train.load() leaves Xens' own logs out unless --with-xen.
+  - compare.py lists side by side (Xens and players, or --each log):
+    - moving, sprinting while moving, jumps a minute, sneaking;
+    - hits a minute, charge at a hit, fully charged hits, sprint hits, ms to turn to a creature that hit it;
+    - damage a minute and from what, deaths;
+    - blocks a minute, which blocks, ticks a block;
+    - Ex1's forward, sprint and jump accuracy, pitch error and danger AUC on that play.
+- Checked on the 1.21.11 test server (a player and a Xen):
+  - every event type was written;
+  - states came 4 a second, 20 in a fight;
+  - train.py and compare.py read the files.
+  - The test player (mineflayer) sends no input packet, so its keys read false; a real client sends them.
 
 
 WHAT'S NEW IN 2.0.0-beta.4
@@ -260,7 +309,7 @@ Skins and names:
 - nameStyle "real": the first untaken name in config/xen/real_names.txt (created with notes on first use); that
   account's skin from Mojang's profile API (fetched at start for every listed name).
 
-Settings (Xen 2.0 tab): reaction (human), confusion (human), talkAmount (normal), signs.
+Settings (Xen 2.0 tab): reaction (human), confusion (human), talkAmount (normal), signs, gameplayLog (off; beta.4.1).
 
 Checks: TwoCheck (in crossCheck) covers:
 - the facts and the weighing of choices;

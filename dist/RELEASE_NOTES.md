@@ -1,7 +1,23 @@
-**Xen Companion 2.0.0-beta.4**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.4.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.4.1: gameplay logs for Xens and players
+
+* **Gameplay logs, built in**: the mod writes play in the gameplay recorder's own format (JSONL), one file for each
+  Xen and one for each player, in `config/xen/gameplay_logs/`. No separate recorder mod is needed.
+  * 4 moments a second, 20 in a fight: where it is, how it moves, health and food, the keys held, hands and armor, what
+    it looks at, the blocks at its feet, creatures nearby, and twice a second its view (the recorder's 14 × 24 sight
+    lines).
+  * Events: damage taken (and from what), deaths, hits, blocks broken (and how long they took), chat.
+  * Setting **Gameplay logs** (`gameplayLog`, in the Xen 2.0 tab): off (default), xens, players or both. A player whose
+    play is logged is told so in chat.
+* **Train on them**: `python -m xen.ex1.train recordings/*.jsonl config/xen/gameplay_logs/*.jsonl`. Xens' own logs
+  are left out unless you add `--with-xen`, so Ex1 keeps learning how people play, not how Xens do.
+* **Compare a Xen with a player**: `python -m xen.ex1.compare config/xen/gameplay_logs/*.jsonl` puts them side by side:
+  how much they move and sprint, jumps a minute, hits and the charge they hit with, how fast they turn to a hit, damage
+  and from what, blocks mined, and how well Ex1 predicts their keys (for a Xen: how much it plays like a person).
 
 ### 2.0.0-beta.4: corrected notes
 

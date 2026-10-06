@@ -62,6 +62,11 @@ public final class XenConfig {
 	public String talkAmount = "normal";
 	/** Xen Ex1: the brain trained on recorded play: how it sprints, jumps and looks, and the danger it feels (it keeps learning what hurts). */
 	public boolean ex1 = true;
+	/**
+	 * Gameplay logs in the gameplay recorder's format (config/xen/gameplay_logs), to train Xen Ex1 and to put a Xen's
+	 * play next to a player's: "off", "xens" (each Xen's play), "players" (each player's; they're told) or "both".
+	 */
+	public String gameplayLog = "off";
 	/** Xen 2.0: reaction time: "human" (about a quarter second, slower for what it didn't see coming), "fast", "slow" or "instant". */
 	public String reaction = "human";
 	/** Xen 2.0: how confused Xens get (hesitating, looking around, a second-best choice now and then): "human", "low", "high" or "off". */

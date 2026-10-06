@@ -691,6 +691,8 @@ public final class Hands {
 			Vec3 d = best.getEyePosition().subtract(eye);
 			p.setYRot((float) Math.toDegrees(Math.atan2(-d.x, d.z)));
 			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
+			LivingEntity target = best;
+			XenMod.INSTANCE.gameplayLog.quietly(() -> XenMod.INSTANCE.gameplayLog.swing(p, target));
 			p.attack(best);                                            // attack, then swing: a swing resets the charge
 			Compat.swing(p);
 		}                                                              // nothing there: no swinging at the air
@@ -1072,6 +1074,7 @@ public final class Hands {
 		ready();
 		if (p.fallDistance > 1.5 && e.getY() < p.getY()) readyMace();            // falling onto it: a mace smash, if it has one
 		face(e.getEyePosition());
+		XenMod.INSTANCE.gameplayLog.quietly(() -> XenMod.INSTANCE.gameplayLog.swing(p, e));
 		p.attack(e);                                                   // attack, then swing: a swing resets the charge
 		Compat.swing(p);
 		current = Action.ATTACK;
@@ -1259,6 +1262,7 @@ public final class Hands {
 		lowerShield();
 		ready();
 		face(at);
+		XenMod.INSTANCE.gameplayLog.quietly(() -> XenMod.INSTANCE.gameplayLog.swing(p, e));
 		p.attack(e);
 		Compat.swing(p);
 		current = Action.ATTACK;

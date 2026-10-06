@@ -210,6 +210,14 @@ def frames(records, horizon_ms=2000, step_ms=250, gap_ms=200):
     return out
 
 
+def source(records):
+    """Who played a log: "player" (the recorder, or Xen's gameplay log of a player) or "xen" (a Xen's own log)."""
+    for r in records[:5]:
+        if r.get("kind") == "session_start":
+            return r.get("source", "player")
+    return "player"
+
+
 def _first(sorted_list, t):
     """Index of the first value above t (binary search)."""
     lo, hi = 0, len(sorted_list)

@@ -70,6 +70,11 @@ public class XenPlayer extends ServerPlayer {
 		return hurt;
 	}
 
+	/** Its jump key, for the gameplay log (a game client would send it). */
+	boolean jumpKey() {
+		return jumping;
+	}
+
 	@Override
 	public void die(DamageSource source) {
 		super.die(source);
