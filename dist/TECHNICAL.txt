@@ -1,7 +1,22 @@
-XEN COMPANION 2.0.0-beta.4.1: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.4.2: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.4.2
+============================
+
+- gameplayLogFolder (empty): where gameplay logs are saved.
+  - Empty or "default": config/xen/gameplay_logs.
+  - A relative path is resolved in the game folder ("gameplay_logs", next to the recorder's).
+  - An absolute path is used as is.
+- GameplayLog.folder() creates the folder and checks that it can write there. If it can't, it uses the default and
+  warns once per value.
+- When the setting changes, the open logs close and the next ones start in the new folder.
+- Settings screen: "Logs go to" (config/xen/gameplay_logs or gameplay_logs). Any other folder: /xen set.
+- Checked on the 1.21.11 test server: a full path with a space, and a folder it can't create (/proc/...), which fell
+  back to the default.
 
 
 WHAT'S NEW IN 2.0.0-beta.4.1

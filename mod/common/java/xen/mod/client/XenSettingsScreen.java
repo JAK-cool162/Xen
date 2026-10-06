@@ -177,6 +177,8 @@ public class XenSettingsScreen extends Screen {
 						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");
 				choice("Gameplay logs", "gameplayLog", List.of("off", "xens", "players", "both"), s -> s,
 						"Logs of play in the gameplay recorder's format, in config/xen/gameplay_logs: each Xen's, each player's (they're told), or both. What Xen Ex1 trains on (python -m xen.ex1.train), and a Xen's play next to a player's (python -m xen.ex1.compare). About 30 MB an hour each.");
+				choice("Logs go to", "gameplayLogFolder", List.of("", "gameplay_logs"), s -> s.isEmpty() ? "config/xen/gameplay_logs" : s,
+						"Where gameplay logs are saved (as .jsonl files). config/xen/gameplay_logs, or gameplay_logs in the game folder (next to the gameplay recorder's). Any other folder: /xen set gameplayLogFolder <folder> (a full path for a shared or synced folder). If it can't be written to, they go to config/xen/gameplay_logs.");
 				onOff("Notes on signs", "signs", "Xens leave notes on signs (where they died and why, lava, diamonds, where they went) when nobody's around to hear, and make signs from planks for it.");
 			}
 			default -> experimental();

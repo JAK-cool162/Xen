@@ -67,6 +67,12 @@ public final class XenConfig {
 	 * play next to a player's: "off", "xens" (each Xen's play), "players" (each player's; they're told) or "both".
 	 */
 	public String gameplayLog = "off";
+	/**
+	 * Where gameplay logs go: empty for config/xen/gameplay_logs, a folder in the game folder ("gameplay_logs", next to
+	 * the recorder's) or any folder on the computer (a full path: a shared or synced folder). One it can't write to:
+	 * the default instead.
+	 */
+	public String gameplayLogFolder = "";
 	/** Xen 2.0: reaction time: "human" (about a quarter second, slower for what it didn't see coming), "fast", "slow" or "instant". */
 	public String reaction = "human";
 	/** Xen 2.0: how confused Xens get (hesitating, looking around, a second-best choice now and then): "human", "low", "high" or "off". */

@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.4.1
+# Xen Companion (Fabric mod) 2.0.0-beta.4.2
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.4.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.4.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.4.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.4.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.4.2+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.4.2+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.4.2+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.4.2+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.4.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.4.2+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -638,7 +638,9 @@ Your requests always come first. Turn short goals off with **Own goals**
 
 Turn on **Gameplay logs** (`gameplayLog` in the Xen 2.0 tab, or `/xen set gameplayLog both`). The mod then writes each
 Xen's play and each player's play in the gameplay recorder's format, into `config/xen/gameplay_logs/`. Players are
-told when their play is logged. Off by default; about 30 MB an hour each.
+told when their play is logged. Off by default; about 30 MB an hour each. **Logs go to** (`gameplayLogFolder`)
+picks the folder: `config/xen/gameplay_logs`, `gameplay_logs` in the game folder, or any folder with
+`/xen set gameplayLogFolder <folder>` (a full path for a shared or synced folder).
 
 * Train Xen Ex1 on them: `python -m xen.ex1.train recordings/*.jsonl config/xen/gameplay_logs/*.jsonl` (Xens' own
   logs are left out unless you add `--with-xen`).

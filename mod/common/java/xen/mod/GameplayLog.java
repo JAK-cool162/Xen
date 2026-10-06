@@ -62,7 +62,9 @@ final class GameplayLog {
 	static final long MAX_BYTES = 200L << 20;
 
 	private final XenMod mod;
+	/** The default folder (config/xen/gameplay_logs); the gameplayLogFolder setting can name another. */
 	private final Path dir;
+	private String badFolder = "", lastFolder;
 	private final Map<UUID, Log> logs = new HashMap<>();
 	private long troubleAt;
 
@@ -98,6 +100,11 @@ final class GameplayLog {
 	/** Every server tick: a state for each one it logs when it's time, and new and finished files. */
 	void tick(MinecraftServer s) {
 		if (mod.config.gameplayLog.equals("off") && logs.isEmpty()) return;
+		String folder = String.valueOf(mod.config.gameplayLogFolder);
+		if (!folder.equals(lastFolder)) {                                   // (another folder: new files there from now on)
+			if (lastFolder != null) closeAll();
+			lastFolder = folder;
+		}
 		Set<UUID> here = new HashSet<>();
 		for (ServerPlayer p : s.getPlayerList().getPlayers()) {
 			if (!wants(p)) continue;
@@ -132,10 +139,34 @@ final class GameplayLog {
 		logs.clear();
 	}
 
+	/**
+	 * Where the logs go now: the gameplayLogFolder setting (in the game folder, or a full path), or the default when
+	 * it's empty or can't be written to.
+	 */
+	Path folder() {
+		String want = mod.config.gameplayLogFolder == null ? "" : mod.config.gameplayLogFolder.trim();
+		if (want.isEmpty() || want.equalsIgnoreCase("default")) return dir;
+		try {
+			Path p = Path.of(want);
+			if (!p.isAbsolute()) p = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve(p);
+			p = p.normalize();
+			Files.createDirectories(p);
+			if (!Files.isWritable(p)) throw new IOException("not writable");
+			return p;
+		} catch (IOException | RuntimeException e) {
+			if (!want.equals(badFolder)) {
+				badFolder = want;
+				XenMod.LOG.warn("Gameplay logs can't go to {} ({}): they go to {}", want, e.toString(), dir);
+			}
+			return dir;
+		}
+	}
+
 	private Log open(ServerPlayer p) {
 		boolean isXen = p instanceof XenPlayer;
 		Log log = new Log(isXen, p.getName().getString());
 		try {
+			Path dir = folder();
 			Files.createDirectories(dir);
 			String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
 			log.file = dir.resolve((isXen ? "xen_" : "player_") + log.name.replaceAll("[^A-Za-z0-9_.-]", "_") + "_" + stamp + ".jsonl");
@@ -157,7 +188,7 @@ final class GameplayLog {
 		JsonObject m = event(log, "game_message");
 		m.addProperty("text", "Xen gameplay log: recording ON [" + (isXen ? "xen" : "player") + "]");
 		write(log, m);
-		XenMod.LOG.info("Gameplay log for {}: {}", log.name, log.file.getFileName());
+		XenMod.LOG.info("Gameplay log for {}: {}", log.name, log.file);
 		if (!isXen) p.sendSystemMessage(Component.literal("[Xen] Your gameplay is being logged on this server, to train Xen (setting gameplayLog).").withStyle(ChatFormatting.GRAY));
 		return log;
 	}

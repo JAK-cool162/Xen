@@ -1,7 +1,17 @@
-**Xen Companion 2.0.0-beta.4.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.4.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.4.2: save gameplay logs anywhere
+
+* **Logs go to** (`gameplayLogFolder`), where the .jsonl files are saved:
+  * empty: `config/xen/gameplay_logs` (the default);
+  * `gameplay_logs`: in the game folder, next to the gameplay recorder's;
+  * any other folder: `/xen set gameplayLogFolder <folder>`. A full path works for a shared or synced folder, spaces
+    included.
+* A folder it can't write to: the logs go to the default, and the server log says why.
+* Changing it mid-game starts new files in the new folder.
 
 ### 2.0.0-beta.4.1: gameplay logs for Xens and players
 
