@@ -345,12 +345,26 @@ final class Talker {
 				line(o, (o.goals.dream == c.goals.dream ? "Me too! " : "Cool! ") + "I want to " + o.goals.dream.what + ".", t += 50, null);
 			}
 		}
-		if (random.nextFloat() < 0.85f) {                                      // a little chat in their own words: one starts, the other answers
-			String opener = c.voice.opener(o.name);
-			line(c, opener, t += 60, null);
-			String answer = o.voice.reply(c.name, opener, null, false);
-			line(o, answer, t += 55, null);
-			if (random.nextFloat() < 0.4f + 0.5f * c.personality.chattiness) line(c, c.voice.reply(o.name, answer, null, false), t += 55, null);
+		if (random.nextFloat() < 0.85f) {                                      // a chat in their own words, as long as they both have something to say
+			Companion a = c, b = o;
+			String last = null;
+			Set<String> saidHere = new HashSet<>();
+			float keen = 0.7f + 0.3f * (c.personality.chattiness + o.personality.chattiness) / 2;
+			for (int turns = 0; turns < 60; turns++) {                           // (60: only a safety net; they stop long before)
+				String text = last == null ? a.voice.opener(b.name) : a.voice.reply(b.name, last, null, false);
+				if (text == null || text.isBlank() || !saidHere.add(text.toLowerCase(java.util.Locale.ROOT))) break;   // (nothing new to say)
+				line(a, text, t += 45 + random.nextInt(25), null);
+				last = text;
+				Companion tmp = a;
+				a = b;
+				b = tmp;
+				keen *= 0.76f + 0.18f * a.personality.chattiness;               // each line, a little less to say
+				if (random.nextFloat() > keen) {                                 // one of them has had enough: it winds it up
+					line(a, pick("Anyway, I should get going.", "Okay, back to work for me.", "Well, that's enough talk for me.",
+							"Anyway... I've got things to do.", "Alright, gotta go.", "Okay, I'm off."), t += 50, null);
+					break;
+				}
+			}
 		}
 		String[] tip = tip(o);
 		if (tip != null) {
@@ -383,7 +397,11 @@ final class Talker {
 		}
 		String rumor = c.rumors.gossip();                                   // gossip: that's how rumors get around
 		if (rumor != null) {
-			line(c, rumor, t += 60, () -> o.rumors.overheard(c.name, me, rumor));
+			// someone else in earshot: a discreet Xen whispers it (/msg), so only the other one hears; a chatty one just says it
+			boolean others = c.server.getPlayerList().getPlayers().stream().anyMatch(p -> p != o.player() && p != c.player && p.level() == c.player.level()
+					&& p.distanceTo(c.player) <= c.mod.config.chatRange);                   // (players and Xens: anyone who'd overhear it)
+			boolean whisper = others && random.nextFloat() < 0.35f + 0.5f * (1 - c.personality.chattiness);
+			line(c, rumor, t += 60, () -> o.rumors.overheard(c.name, me, rumor), whisper ? o : null);
 			line(o, pick("Really? Good to know.", "No way!", "Huh. I'll keep that in mind.", "Seriously?", "I heard that too."), t += 50, null);
 		}
 		line(c, pick("See you around!", "Bye for now.", "Later.", "Bye...", "See you!", "Toodles!"), t + 60, () -> {
@@ -394,14 +412,23 @@ final class Talker {
 	}
 
 	private void line(Companion who, String text, long at, Runnable then) {
-		lines.add(new Object[] {who, text, at, then});
+		line(who, text, at, then, null);
+	}
+
+	/** A line of a chat, said out loud, or whispered to one (/msg) when to isn't null. */
+	private void line(Companion who, String text, long at, Runnable then, Companion to) {
+		lines.add(new Object[] {who, text, at, then, to});
 	}
 
 	private void playLines(long now) {
 		while (!lines.isEmpty() && (long) lines.peek()[2] <= now) {
 			Object[] l = lines.poll();
 			Companion who = (Companion) l[0];
-			if (who.player() != null && !who.inArena) who.talker.sayNear((String) l[1]);
+			Companion to = (Companion) l[4];
+			if (who.player() != null && !who.inArena) {
+				if (to != null && to.player() != null) who.whisper(to.player(), (String) l[1]);
+				else who.talker.sayNear((String) l[1]);
+			}
 			if (l[3] != null) ((Runnable) l[3]).run();
 			if (lines.isEmpty()) conversations = Math.max(0, conversations - 1);
 		}

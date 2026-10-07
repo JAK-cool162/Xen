@@ -760,6 +760,19 @@ public class XenMod implements ModInitializer {
 		return c.player() != null && (!config.localChat || inRange(c.player(), sender));
 	}
 
+	/**
+	 * A player whispered to a Xen (/msg): the Xen alone hears it, wherever it is, and whispers back (a request it
+	 * takes on, it answers in a whisper too). Nobody else hears a word of it.
+	 */
+	void whisperFrom(ServerPlayer sender, Companion c, String text) {
+		if (!config.chat || c.player() == null) return;
+		if (config.journal && journal != null) journal.add(sender.getName().getString(), "whispers to " + c.name, text);
+		lastChatNeed = System.currentTimeMillis();
+		chat.warmUp();
+		chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.privately(sender, () -> c.request(request, sender, text))),
+				reply -> server.execute(() -> c.whisper(sender, reply)));
+	}
+
 	/** Something said out loud by a player or a Xen: the Xens close by overhear it (rumors, plots: spies). */
 	void overheardBy(ServerPlayer speaker, String name, String text) {
 		if (speaker == null) return;
@@ -1289,6 +1302,7 @@ public class XenMod implements ModInitializer {
 				c.loreVolume = known.getAsJsonObject("chronicle").get("volume").getAsInt();
 			});
 			part.accept("home", () -> { if (known.has("homeBuild")) c.builder.loadHome(known.getAsJsonObject("homeBuild")); });
+			part.accept("unfinished house", () -> { if (known.has("unfinishedBuild")) c.builder.loadUnfinished(known.getAsJsonObject("unfinishedBuild")); });
 			part.accept("mine", () -> {
 				if (!known.has("mine")) return;
 				com.google.gson.JsonObject mine = known.getAsJsonObject("mine");

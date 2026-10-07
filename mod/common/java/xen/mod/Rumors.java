@@ -163,7 +163,7 @@ final class Rumors {
 				UUID byId = null;
 				for (ServerPlayer q : c.server.getPlayerList().getPlayers()) if (q.getName().getString().equalsIgnoreCase(plot.by())) byId = q.getUUID();
 				if (c.trust(id) < c.trust(byId) && c.personality.loyalty > 0.3f) continue;   // it keeps the secret for its friend
-				c.say(c.pick3("Psst, " + name + ". I heard " + plot.by() + " say: \"" + plot.words() + "\"",
+				c.whisper(p, c.pick3("Psst, " + name + ". I heard " + plot.by() + " say: \"" + plot.words() + "\"",   // (a secret: whispered, so the plotter doesn't hear)
 						name + ", watch out. " + plot.by() + " said: \"" + plot.words() + "\"", "Hey " + name + "... " + plot.by() + " is up to something: \"" + plot.words() + "\""));
 				c.trust(id, 0.05f);
 			}

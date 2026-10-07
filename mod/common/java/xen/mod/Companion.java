@@ -2778,7 +2778,58 @@ public final class Companion {
 		return xen.mod.talk.Texting.casual(text, casual(), typing);
 	}
 
+	/** Whom it's answering in a whisper right now (null: out loud): what it says goes to them alone. */
+	private ServerPlayer privateTo;
+
+	/** Do this answering someone's whisper: what it says meanwhile is whispered back to them. */
+	<T> T privately(ServerPlayer to, java.util.function.Supplier<T> r) {
+		ServerPlayer was = privateTo;
+		privateTo = to;
+		try {
+			return r.get();
+		} finally {
+			privateTo = was;
+		}
+	}
+
+	/**
+	 * A whisper to one person, with the game's own /msg, the way a player whispers: only they see it (nobody standing
+	 * by overhears it, Xens included).
+	 */
+	void whisper(ServerPlayer to, String text) {
+		if (player == null || to == null || !mod.config.chat || inArena) return;
+		String line = typed(text).replace('\n', ' ').trim();
+		if (line.isEmpty()) return;
+		if (line.length() > 240) line = line.substring(0, 240);
+		try {
+			server.getCommands().performPrefixedCommand(player.createCommandSourceStack().withSuppressedOutput(), "msg " + to.getGameProfile().name() + " " + line);
+		} catch (RuntimeException e) {
+			XenMod.LOG.debug("{} couldn't whisper: {}", name, e.toString());
+			return;
+		}
+		XenMod.LOG.info("{} whispers to {}: {}", name, to.getName().getString(), line);
+		journal("whispers", to.getName().getString() + ": " + line);
+		life.said(line);
+	}
+
+	/** Someone whispered to it (/msg): a player is answered in a whisper; a Xen's secret is taken in, as if told. */
+	void whispered(String fromName, String text) {
+		if (player == null || inArena) return;
+		ServerPlayer from = server.getPlayerList().getPlayerByName(fromName);
+		journal("hears", fromName + " whispers: " + text);
+		if (from == null) return;
+		if (from instanceof XenPlayer xp) {
+			rumors.overheard(fromName, xp.getUUID(), text);                // (gossip, a plot: it takes it in, told in confidence)
+			return;
+		}
+		mod.whisperFrom(from, this, text);
+	}
+
 	public void say(String text) {
+		if (privateTo != null && player != null && privateTo.isAlive()) {   // answering a whisper: whispered back
+			whisper(privateTo, text);
+			return;
+		}
 		text = typed(text);
 		Component line = Component.literal("<" + name + "> " + text);
 		if (mod.config.localChat && player != null) {                     // local chat: only those close by hear it
@@ -2796,6 +2847,36 @@ public final class Companion {
 			Talk t = talks.get(talkingWith);
 			if (t != null) t.reply = text;                                  // (what it answered them: a follow-up is read with it)
 		}
+	}
+
+	/** Chit-chat with each person: how keen it is still (0 to 1), when they last said something, until when it's had enough. */
+	private final Map<UUID, double[]> chatMood = new HashMap<>();
+
+	/**
+	 * Chit-chat (not a request): it answers as long as it feels like it, not always. Each line of a long chat tires it a
+	 * little (less a chatty one, and with someone it likes; more when it's busy), and a while without talking brings it
+	 * back. A question is harder to leave unanswered. When it's had enough it winds the chat up, once, and leaves idle
+	 * chat be for a minute or three (a request still gets done).
+	 */
+	private boolean wantsToAnswer(UUID u, String words) {
+		long now = player.level().getGameTime();
+		double[] m = chatMood.computeIfAbsent(u, k -> new double[] {1, now, -1});
+		if (now < m[2]) return false;                                         // (it said it had to go)
+		if (now - m[1] > 600) m[0] = Math.min(1, m[0] + (now - m[1] - 600) / 2400.0 * 0.6);   // a real pause (half a minute or more): keen again
+		m[1] = now;
+		boolean question = words.trim().endsWith("?") || words.matches("(?i)^(what|where|why|how|who|when|do|does|did|are|is|can|will|would)\\b.*");
+		boolean filler = words.trim().split("\\s+").length <= 3 && !question;   // "lol", "ok", "cool": not much to answer
+		boolean busy = fightingNow() || builder.busy() || chores.busy();
+		m[0] -= (question ? 0.08 : filler ? 0.2 : 0.14) * (1.3 - personality.chattiness) * (1 - 0.4 * Math.max(0, trust(u))) + (busy ? 0.1 : 0);
+		if (m[0] < 0.15) {                                                   // enough: it winds it up
+			m[2] = now + 1200 + (long) (2400 * (1 - personality.chattiness));
+			m[0] = 0.6;
+			chatter(pick3(busy ? "Sorry, gotta focus. Talk later!" : "Anyway, I've got stuff to do. Talk later!", "Okay, I'm gonna get back to it. See ya!",
+					"Alright, enough chatting for me. Later!"), true);
+			if (u.equals(talkingWith)) talkingWith = null;
+			return false;
+		}
+		return question || m[0] > 0.4 || random().nextFloat() < 0.5f + m[0];   // (a little tired of it: now and then it lets one go)
 	}
 
 	private static String clip(String s, int n) {
@@ -3229,6 +3310,7 @@ public final class Companion {
 		talkingWith = u;                                              // a conversation: for the next half minute, no name needed
 		talkingUntil = player.level().getGameTime() + 600;
 		if (talker.answered(from, words)) return null;               // a yes or no to something it asked
+		if (r.intent().equals("chat") && !wantsToAnswer(u, words)) return null;   // (it's had enough of chit-chat for now)
 		java.util.regex.Matcher rem = REMEMBER.matcher(words);
 		if (rem.find() && (owner == null || owner.equals(u) || trust(u) >= 0.3f)) {
 			String fact = rem.group(4).trim().replaceAll("[.!]+$", "");

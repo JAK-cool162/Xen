@@ -1,7 +1,25 @@
-XEN COMPANION 2.0.0-beta.11: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.12: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.12
+===========================
+
+Whispers: XenPlayer.sendChatMessage catches msg_command_incoming (someone's /msg to it) -> Companion.whispered: from a
+Xen, rumors.overheard (told in confidence); from a player, XenMod.whisperFrom: chat.ask as usual, the request run in
+Companion.privately (say() whispers back meanwhile), the reply whispered. Companion.whisper runs "msg <name> <text>"
+as the Xen (the game's own command: only the target sees it; nobody overhears). Rumors.look: plot warnings are
+whispered. Talker: gossip whispered when anyone else (player or Xen) is within chatRange, with chance 0.35 + 0.5 (1 -
+chattiness); Xen-Xen chats: lines in turn while keen (from 0.7 + 0.3 x their chattiness, times 0.76 + 0.18 x chattiness
+each line), until a line repeats or one winds it up (a safety net at 60 lines).
+Unfinished houses: Builder.cancel keeps an Unfinished (corner, front, dimension, its design Home or the village
+house's file, its wood) when a house of its own stops with steps left; startNear("...house") resumes one in this
+dimension within 96 blocks: the same plan at the same spot (designed() with the corner's seed, or the same village
+file), keepWhatsThere. Saved with the Xen ("unfinishedBuild"). Finishing a house clears it.
+Companion.wantsToAnswer (chit-chat keenness per person) is in, but in testing a player's long chit-chat was still
+answered every line: not working yet.
 
 
 WHAT'S NEW IN 2.0.0-beta.11

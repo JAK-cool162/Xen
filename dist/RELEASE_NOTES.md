@@ -1,7 +1,22 @@
-**Xen Companion 2.0.0-beta.11**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.12**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.12: whispers, and it finishes the house it started
+
+* **Whispers.** Xens use the game's own `/msg`, like a player: only the one it's for sees it. `/msg` a Xen and it hears
+  you alone and whispers back (a request too: "can you follow me?" gets a whispered "sure!"). A Xen warning you about a
+  plot it overheard whispers it, so the plotter doesn't hear; gossip between two Xens is whispered when someone else is
+  in earshot and the Xen is the discreet kind.
+* **Chats between Xens go on as long as they have something to say** (no set length): each line a little less to say,
+  and one of them winds it up ("Anyway, I should get going.").
+* **It finishes the house it started.** Stopped half way (asked to stop, called away, hungry, a restart), a Xen
+  remembers its unfinished house; asked for a house again near it, it goes back and finishes that one (what's built
+  counts) instead of starting another somewhere else. Kept with the Xen.
+* Tested in the game: `/msg` to a Xen: whispered answers, and the other player nearby saw none of it; stopped house,
+  asked again from elsewhere: it went back to the same spot and carried on. Not working yet: winding up a long chat
+  with a player (it still answers every line).
 
 ### 2.0.0-beta.11: hardcore Xens, who Xen is, village houses, and lessons from a run that beat the game
 

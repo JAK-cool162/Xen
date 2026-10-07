@@ -70,6 +70,23 @@ public class XenPlayer extends ServerPlayer {
 		return hurt;
 	}
 
+	/**
+	 * A message only for it: someone's /msg (a whisper). It hears it, and nobody else did (the game sends a whisper to
+	 * the one it's for alone).
+	 */
+	@Override
+	public void sendChatMessage(net.minecraft.network.chat.OutgoingChatMessage message, boolean filtered, net.minecraft.network.chat.ChatType.Bound bound) {
+		super.sendChatMessage(message, filtered, bound);
+		if (companion == null) return;
+		try {
+			if (!bound.chatType().is(net.minecraft.network.chat.ChatType.MSG_COMMAND_INCOMING)) return;
+			String from = bound.name().getString(), text = message.content().getString();
+			level().getServer().execute(() -> companion.whispered(from, text));
+		} catch (RuntimeException e) {
+			XenMod.LOG.debug("whisper: {}", e.toString());
+		}
+	}
+
 	/** Its jump key, for the gameplay log (a game client would send it). */
 	boolean jumpKey() {
 		return jumping;

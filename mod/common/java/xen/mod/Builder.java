@@ -44,6 +44,17 @@ final class Builder {
 	private VillageHouses.House copied;
 
 	/**
+	 * A house it started and didn't finish (stopped, called away, hungry, a restart): where, which way, and what (its own
+	 * design, or the village house it was copying, and its wood). Asked for a house again near there, it finishes that
+	 * one instead of starting another (what's built already counts). Kept with the Xen.
+	 */
+	record Unfinished(BlockPos corner, Direction front, String dimension, Home home, String village, String wood) {}
+	Unfinished unfinished;
+	private BlockPos startedCorner;
+	private Direction startedFront;
+	private String startedWood;
+
+	/**
 	 * Its home, as it designed and built it: where (the front left corner), which way the door faces, the design, the
 	 * blocks, and how far it has taken it (Architect.STAGES: basic, simple, good, perfect). A house gets better the way a
 	 * player's does: the same spot and shape, one stage at a time (depth, then details, then polish).
@@ -303,6 +314,12 @@ final class Builder {
 	}
 
 	void cancel() {
+		if (plan != null && helping == null && plan.name().endsWith("house") && startedCorner != null && c.player != null && !left.isEmpty()
+				&& (building != null || copied != null)) {                     // a house of its own, not done: it remembers it
+			unfinished = new Unfinished(startedCorner, startedFront, Places.dim(c.player.level()), copied == null ? building : null,
+					copied == null ? null : copied.id(), startedWood);
+			c.journal("build", "stops building its house at " + startedCorner.toShortString() + " (" + left.size() + " steps to go): it'll finish it later");
+		}
 		if (c.player != null) PROJECTS.remove(c.player.getUUID());
 		helping = null;
 		plan = null;
@@ -377,6 +394,8 @@ final class Builder {
 			boolean starter = !creative && c.goals.home == null;            // its first house: what a few trees give
 			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
+			String resumed = resume(level, near != null ? near : feet);           // a house it started and didn't finish: that one first
+			if (resumed != null) return resumed;
 			// a village house it saw (asked for one, or its taste for copying says so: not for its very first house, which is what a few trees give)
 			boolean village = what.contains("village");
 			VillageHouses.House copy = village || !starter && asked == null && c.taste.copies()
@@ -391,6 +410,7 @@ final class Builder {
 				c.journal("build", "copies a village house it saw: a " + copy.name());
 				String planned = begin(made, (creative ? "" : " out of " + wood + " wood and cobblestone") + " (a copy of a " + copy.name() + " from a village)", wood);
 				copied = copy;
+				started(corner, front, wood);
 				return planned;
 			}
 			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked, area(level, feet));
@@ -405,10 +425,97 @@ final class Builder {
 			c.journal("build", "designs a house: " + ds.describe() + " (" + Architect.STAGES[stage] + ")");
 			String planned = begin(made, of + " (your own design: " + ds.describe() + "; " + Architect.STAGES[stage] + " for now)", p.name());
 			building = new Home(corner, front, ds, p, stage);
+			started(corner, front, null);
 			return planned;
 		}
 		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
 		return begin(made, of, p.name());
+	}
+
+	private void started(BlockPos corner, Direction front, String wood) {
+		startedCorner = corner;
+		startedFront = front;
+		startedWood = wood;
+		unfinished = null;                                                      // (this one is the house now)
+	}
+
+	/**
+	 * The house it started and didn't finish, if it's in this world and near: the same plan at the same spot (its own
+	 * design is drawn again the same way; a village copy from the same file), what's built already kept. Null: none.
+	 */
+	private String resume(ServerLevel level, BlockPos near) {
+		Unfinished u = unfinished;
+		if (u == null || !u.dimension().equals(Places.dim(level)) || !u.corner().closerThan(near, 96)) return null;
+		Architect.Plan made;
+		String of;
+		if (u.village() != null) {
+			String kind = u.village().split("/").length > 1 ? u.village().split("/")[1] : "plains";
+			VillageHouses.House h = null;
+			for (VillageHouses.House x : VillageHouses.of(level.getServer(), kind)) if (x.id().equals(u.village())) h = x;
+			if (h == null) {
+				unfinished = null;
+				return null;
+			}
+			String wood = u.wood() != null ? u.wood() : woodType();
+			made = keepWhatsThere(VillageHouses.plan(h, u.corner(), u.front(), creative, wood));
+			of = " (a copy of a " + h.name() + ")";
+			String planned = begin(made, of, wood);
+			copied = h;
+			started(u.corner(), u.front(), wood);
+			c.journal("build", "goes back to finish its house at " + u.corner().toShortString());
+			return planned.replaceFirst("^You will build an? [a-z ]+ here", "You will finish your unfinished house at " + u.corner().getX() + " " + u.corner().getZ());
+		}
+		Home hm = u.home();
+		if (hm == null) {
+			unfinished = null;
+			return null;
+		}
+		made = keepWhatsThere(Architect.designed(hm.corner(), hm.front(), hm.design(), hm.palette(), new Random(hm.corner().asLong()), hm.stage()));
+		String planned = begin(made, " (" + hm.design().describe() + ")", hm.palette().name());
+		design = hm.design();
+		building = hm;
+		started(hm.corner(), hm.front(), null);
+		c.journal("build", "goes back to finish its house at " + hm.corner().toShortString());
+		return planned.replaceFirst("^You will build an? [a-z ]+ here", "You will finish your unfinished house at " + hm.corner().getX() + " " + hm.corner().getZ());
+	}
+
+	/** Kept with the world: the house it didn't finish (null: none). */
+	com.google.gson.JsonObject unfinishedJson() {
+		Unfinished u = unfinished;
+		if (u == null) return null;
+		com.google.gson.JsonObject o = new com.google.gson.JsonObject();
+		o.addProperty("at", u.corner().getX() + "," + u.corner().getY() + "," + u.corner().getZ());
+		o.addProperty("front", u.front().getName());
+		o.addProperty("dimension", u.dimension());
+		if (u.village() != null) o.addProperty("village", u.village());
+		if (u.wood() != null) o.addProperty("wood", u.wood());
+		if (u.home() != null) {
+			Home was = home;
+			home = u.home();
+			o.add("home", homeJson());
+			home = was;
+		}
+		return o;
+	}
+
+	void loadUnfinished(com.google.gson.JsonObject o) {
+		try {
+			String[] at = o.get("at").getAsString().split(",");
+			BlockPos corner = new BlockPos(Integer.parseInt(at[0]), Integer.parseInt(at[1]), Integer.parseInt(at[2]));
+			Direction front = Direction.byName(o.get("front").getAsString());
+			if (front == null) return;
+			Home hm = null;
+			if (o.has("home")) {
+				Home was = home;
+				loadHome(o.getAsJsonObject("home"));
+				hm = home;
+				home = was;
+			}
+			unfinished = new Unfinished(corner, front, o.get("dimension").getAsString(), hm,
+					o.has("village") ? o.get("village").getAsString() : null, o.has("wood") ? o.get("wood").getAsString() : null);
+		} catch (RuntimeException e) {
+			unfinished = null;
+		}
 	}
 
 	/** Start on a plan someone else made (a stretch of highway...). */
@@ -707,6 +814,10 @@ final class Builder {
 			c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;
 			plan = null;
 			return Action.IDLE;
+		}
+		if (what.endsWith("house")) {
+			unfinished = null;
+			startedCorner = null;
 		}
 		if (building != null && what.endsWith("house")) {                     // its home, as it stands now (the next upgrade starts from it)
 			home = building;
