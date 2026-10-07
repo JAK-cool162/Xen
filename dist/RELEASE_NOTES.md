@@ -1,7 +1,19 @@
-**Xen Companion 2.0.0-beta.13**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.14**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.14: the Build Axe (training data)
+
+* **Build Axe**, a developer's tool for cheats only. `/xen BuildAxe` gives an enchanted wooden axe (`/xen BuildAxe
+  tree` or `cave` to mark those instead of a build). Hit a block for one corner, right-click a block for the other,
+  then `/xen BuildAxe save <name>`: the box is saved, under its name, as one line of JSON in
+  `config/xen/buildaxe/build.jsonl` (or `tree.jsonl`, `cave.jsonl`). Every block in it is there (a palette of block
+  states, one index per block, air too), with the dimension, the biome, and how dark and how deep it is. Up to 64 a
+  side. It never breaks or strips the blocks you click, and keeps nothing about you or where it was.
+* What it's for: builds, trees and caves to train Xens on. They don't learn from it in the game by themselves.
+* Tested in the game: a 4 x 4 x 4 hut marked (corners on logs: not broken, not stripped), saving without a name
+  refused, saved with one: 64 blocks in the line, 56 solid and 8 air inside.
 
 ### 2.0.0-beta.13: mining like a player (and nobody falls in the lava)
 

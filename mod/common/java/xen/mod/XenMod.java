@@ -188,6 +188,7 @@ public class XenMod implements ModInitializer {
 					Component.literal(xen.companion.name + "'s bag")));
 			return InteractionResult.SUCCESS;
 		});
+		BuildAxe.register();                                                    // (a developer's tool: boxes of the world into training data)
 		LOG.info("Xen is ready: /xen summon");
 	}
 
@@ -1112,6 +1113,8 @@ public class XenMod implements ModInitializer {
 					}
 					return 1;
 				}))
+				.then(BuildAxe.command("BuildAxe"))
+				.then(BuildAxe.command("buildaxe"))
 				.then(Commands.literal("save").executes(ctx -> {
 					save();
 					ctx.getSource().sendSuccess(() -> Component.literal("Xen's brain saved (" + brain.steps + " steps lived)."), false);

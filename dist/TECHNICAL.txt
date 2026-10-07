@@ -1,7 +1,21 @@
-XEN COMPANION 2.0.0-beta.13: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.14: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.14
+===========================
+
+BuildAxe (cheats: Permissions.COMMANDS_GAMEMASTER): /xen BuildAxe [build|tree|cave] gives a wooden_axe with
+CUSTOM_NAME, ENCHANTMENT_GLINT_OVERRIDE and CUSTOM_DATA {xen_build_axe: kind}; /xen BuildAxe save <name> (the name
+is required). Hooks: AttackBlockCallback (corner 1), UseBlockCallback (corner 2), UseItemCallback, all SUCCESS while
+it's held (nothing broken, no stripping), PlayerBlockBreakEvents.BEFORE false while it's held. One box per player
+(corners and level), 64 a side at most. A line of config/xen/buildaxe/<kind>.jsonl:
+{"kind", "name", "dim", "biome", "size": [sx, sy, sz], "order": "index = (y * sz + z) * sx + x",
+ "features": {"solid", "open", "sky_light", "block_light" (medians over the air blocks), "below_surface" (the
+ heightmap over its middle minus its bottom)}, "palette": ["oak_stairs[facing=north,...]", ...], "blocks": [index per
+ block]}. Block ids without "minecraft:" (another mod's with its namespace). No player names, no coordinates.
 
 
 WHAT'S NEW IN 2.0.0-beta.13
