@@ -3,16 +3,20 @@ own houses, farm, trade, form villages with their own rules, make friends and en
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
 
-### 2.0.0-beta.15: the Build Axe's screen
+### 2.0.0-beta.15: the Build Axe's screen, leaving blocks out, your own types
 
-* **A screen instead of a command.** Mark the second corner with the Build Axe and a screen comes up: the size of the
-  box, what it is (tap to switch Build, Tree, Cave), its name, and Save (only once it has a name) or Cancel. No typing
-  commands, easier on a phone. Cancel keeps the corners; right-click into the air with the axe to bring it back. The
-  last name you typed is filled in for the next one ("oak 1", then change it to "oak 2").
-* Fixed: with Xen in your game too, the axe's clicks never reached the server (nothing was marked). The game now sends
-  the corners itself. With Xen only on the server, the clicks go as before and `/xen BuildAxe save <name>` still works.
-* Tested in a real game client: corners marked, the screen came up (4 x 3 x 3), switched to Tree, typed "test tree 1",
-  Save: the line was in `tree.jsonl`.
+* **A screen instead of a command.** Hit a block for one corner and another for the other corner, and a screen comes
+  up: the size of the box and what's left out, its type, its name, and Save (once it has a type and a name) or
+  Cancel. No typing commands, easier on a phone. The last type and name are filled in for the next one.
+* **Leave blocks out.** Right-click a block with the axe and it's saved as air (the grass round a tree, a torch you
+  put there); right-click it again to put it back. Crouch and right-click to leave out every block of that kind in the
+  box. Right-click the air to bring the screen back.
+* **Your own types.** Tap Build, Tree or Cave, or type your own (house, farm, bridge...): each type goes in its own
+  file, `config/xen/buildaxe/<type>.jsonl`. Without the screen: `/xen BuildAxe type <your type>`.
+* Fixed: with Xen in your game too, the axe's clicks never reached the server (nothing was marked).
+* Tested in a real game client: two hits marked a 5 x 4 x 4 hut, a right-click left out the glowstone in its wall (the
+  screen said "left out: 1 block"), typed "house" and "glow hut", Save: the line was in `house.jsonl` with the
+  glowstone saved as air. Without Xen in the game: the same with `/xen BuildAxe type shed` and `save my shed`.
 
 ### 2.0.0-beta.14: the Build Axe (training data)
 

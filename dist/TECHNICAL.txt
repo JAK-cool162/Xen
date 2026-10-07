@@ -7,14 +7,17 @@ Everything about how Xens work, what changed, the settings and the commands. The
 WHAT'S NEW IN 2.0.0-beta.15
 ===========================
 
-Build Axe screen: payloads xen:build_axe_open (S2C: sx, sy, sz, kind), xen:build_axe_save (C2S: kind, name),
-xen:build_axe_corner (C2S: pos, which: 1 hit, 2 right-click, 0 the screen again). Registered through Compat.toClient /
-toServer (Fabric's PayloadTypeRegistry.playS2C/playC2S on 1.21.11, clientboundPlay/serverboundPlay on 26.x). The
-server's Attack/UseBlock/UseItem callbacks act only server side; XenClient's send the corner and return SUCCESS (with
-Fabric, a SUCCESS on the client held the attack back: nothing reached the server). Both corners marked:
-ServerPlayNetworking.canSend(Open) ? send Open : the chat line. client.BuildAxeScreen: StringWidget, CycleButton (build,
-tree, cave), EditBox (64, the last name kept), Save (active with a name) sends Save; BuildAxe.save writes the line and
-answers in chat.
+Build Axe: hits are the corners in turn (a hit after a whole box starts a new one and forgets what was left out);
+a right-click on a block toggles it in Box.out (crouching: its block id in Box.outKinds), saved as "air" and counted
+in features.left_out; a right-click into the air sends the screen again. Types are free: BuildAxe.kind() makes a file
+name of it (lowercase letters, digits, - and _, up to 32); /xen BuildAxe type <type> without the screen. Payloads:
+xen:build_axe_open (S2C: sx, sy, sz, kind, left, leftKinds), xen:build_axe_save (C2S: kind, name),
+xen:build_axe_corner (C2S: pos, which: 1 hit, 2 right-click on a block, 0 into the air). Registered through
+Compat.toClient / toServer (Fabric's PayloadTypeRegistry.playS2C/playC2S on 1.21.11, clientboundPlay/serverboundPlay
+on 26.x). The server's Attack/UseBlock/UseItem callbacks act only server side (a game without Xen); XenClient's send
+the Corner and hold the click back: SUCCESS for a hit (it sends nothing more), FAIL for a right-click (with SUCCESS
+Fabric still sends the use, and the server took it again: left out, then put back). client.BuildAxeScreen:
+StringWidget, three preset buttons, EditBox type (32) and name (64), the last ones kept, Save (active with both).
 
 
 WHAT'S NEW IN 2.0.0-beta.14

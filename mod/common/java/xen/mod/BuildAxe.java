@@ -54,11 +54,12 @@ import java.util.UUID;
 
 /**
  * The Build Axe, a developer's tool (cheats only): an enchanted wooden axe that turns a box of the world into data for
- * training Xen. /xen BuildAxe [build|tree|cave] gives one; with it, hit a block for one corner and use (right-click) a
- * block for the other. Then a screen comes up (with Xen on the game too: {@link xen.mod.client.BuildAxeScreen}): what
- * it is (a build, a tree, a cave), its name (a must), Save. Without the screen, /xen BuildAxe save &lt;name&gt;. The box
- * goes as one line of JSON to config/xen/buildaxe/&lt;kind&gt;.jsonl. The axe never breaks or strips anything. Only
- * blocks are kept: no player names, no coordinates.
+ * training Xen. /xen BuildAxe [build|tree|cave] gives one; with it, hit a block for one corner and another for the
+ * other; right-click blocks to leave them out (saved as air: the grass round a tree). Then a screen comes up (with Xen
+ * on the game too: {@link xen.mod.client.BuildAxeScreen}): what it is (a build, a tree, a cave, or a kind of the
+ * player's own), its name (a must), Save. Without the screen, /xen BuildAxe save &lt;name&gt;. The box goes as one line
+ * of JSON to config/xen/buildaxe/&lt;kind&gt;.jsonl. The axe never breaks or strips anything. Only blocks are kept: no
+ * player names, no coordinates.
  */
 public final class BuildAxe {
 	private BuildAxe() {}
@@ -68,21 +69,27 @@ public final class BuildAxe {
 	static final int MAX_SIDE = 64;
 	private static final String TAG = "xen_build_axe";
 
-	/** Each player's box so far (two corners and a world) and what it's marked as. */
+	/** Each player's box so far (two corners and a world), what it's marked as, and the blocks it leaves out (saved as air). */
 	private static final class Box {
 		BlockPos a, b;
 		ServerLevel level;
 		String kind = "build";
+		final java.util.Set<Long> out = new java.util.HashSet<>();
+		final java.util.Set<String> outKinds = new java.util.TreeSet<>();
+
+		boolean left(BlockPos p, BlockState s) {
+			return out.contains(p.asLong()) || outKinds.contains(BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath());
+		}
 	}
 
 	private static final Map<UUID, Box> boxes = new HashMap<>();
 
 	// ------------------------------------------------------------------------------ the screen, and what it sends back
-	/** To the game: the box is marked, show the screen (its size, what it's marked as). */
-	public record Open(int sx, int sy, int sz, String kind) implements CustomPacketPayload {
+	/** To the game: the box is marked, show the screen (its size, what it's marked as, how many blocks it leaves out and of what kinds all). */
+	public record Open(int sx, int sy, int sz, String kind, int left, String leftKinds) implements CustomPacketPayload {
 		public static final CustomPacketPayload.Type<Open> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_open"));
 		public static final StreamCodec<ByteBuf, Open> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, Open::sx, ByteBufCodecs.VAR_INT, Open::sy,
-				ByteBufCodecs.VAR_INT, Open::sz, ByteBufCodecs.STRING_UTF8, Open::kind, Open::new);
+				ByteBufCodecs.VAR_INT, Open::sz, ByteBufCodecs.STRING_UTF8, Open::kind, ByteBufCodecs.VAR_INT, Open::left, ByteBufCodecs.STRING_UTF8, Open::leftKinds, Open::new);
 
 		@Override
 		public CustomPacketPayload.Type<Open> type() {
@@ -90,7 +97,7 @@ public final class BuildAxe {
 		}
 	}
 
-	/** From the game (with Xen on it too): a corner it clicked (1 hit, 2 right-click), or 0: show the screen again. */
+	/** From the game (with Xen on it too): a block it hit (1: a corner) or right-clicked (2: leave it out), or 0: the screen again. */
 	public record Corner(BlockPos pos, int which) implements CustomPacketPayload {
 		public static final CustomPacketPayload.Type<Corner> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_corner"));
 		public static final StreamCodec<ByteBuf, Corner> CODEC = StreamCodec.composite(BlockPos.STREAM_CODEC, Corner::pos, ByteBufCodecs.VAR_INT, Corner::which, Corner::new);
@@ -101,7 +108,7 @@ public final class BuildAxe {
 		}
 	}
 
-	/** From the screen: save it as this kind, under this name. */
+	/** From the screen: save it as this kind (one of its own too: "house", "farm"), under this name. */
 	public record Save(String kind, String name) implements CustomPacketPayload {
 		public static final CustomPacketPayload.Type<Save> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_save"));
 		public static final StreamCodec<ByteBuf, Save> CODEC = StreamCodec.composite(ByteBufCodecs.STRING_UTF8, Save::kind, ByteBufCodecs.STRING_UTF8, Save::name, Save::new);
@@ -142,19 +149,20 @@ public final class BuildAxe {
 	}
 
 	/**
-	 * The hooks: hitting a block with it (a corner), using it on a block (the other corner); it never breaks or strips
-	 * anything. These are the server's side (a game without Xen sends the clicks as usual); a game with Xen sends the
-	 * corners itself ({@link Corner}: it holds the click back, so nothing else would reach the server).
+	 * The hooks: hitting a block with it (a corner, then the other), using it on a block (leave that block out: it's
+	 * saved as air; crouching, every block of its kind in the box), using it in the air (the screen again). It never
+	 * breaks or strips anything. These are the server's side (a game without Xen sends the clicks as usual); a game with
+	 * Xen sends them itself ({@link Corner}: it holds the click back, so nothing else would reach the server).
 	 */
 	static void register() {
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> {
 			if (level.isClientSide() || !holding(player)) return InteractionResult.PASS;
-			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) corner(sp, sl, pos, true);
+			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) corner(sp, sl, pos);
 			return InteractionResult.SUCCESS;
 		});
 		UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
 			if (level.isClientSide() || !holding(player)) return InteractionResult.PASS;
-			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) corner(sp, sl, hit.getBlockPos(), false);
+			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) leaveOut(sp, sl, hit.getBlockPos());
 			return InteractionResult.SUCCESS;
 		});
 		UseItemCallback.EVENT.register((player, level, hand) -> {
@@ -167,7 +175,9 @@ public final class BuildAxe {
 			ServerPlayer p = context.player();
 			if (!holding(p)) return;
 			if (payload.which() == 0) reopen(p);
-			else if (p.blockPosition().closerThan(payload.pos(), 12) && p.level() instanceof ServerLevel sl) corner(p, sl, payload.pos(), payload.which() == 1);
+			else if (!p.blockPosition().closerThan(payload.pos(), 12) || !(p.level() instanceof ServerLevel sl)) return;
+			else if (payload.which() == 1) corner(p, sl, payload.pos());
+			else leaveOut(p, sl, payload.pos());
 		});
 		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, be) -> !holding(player));
 		Compat.toClient(Open.TYPE, Open.CODEC);
@@ -183,11 +193,18 @@ public final class BuildAxe {
 	/** Both corners marked: the screen (with Xen on the game), or how to name it in chat. */
 	private static void ask(ServerPlayer p, Box box) {
 		int sx = Math.abs(box.a.getX() - box.b.getX()) + 1, sy = Math.abs(box.a.getY() - box.b.getY()) + 1, sz = Math.abs(box.a.getZ() - box.b.getZ()) + 1;
+		int left = 0;
+		for (long k : box.out) if (inside(box, BlockPos.of(k))) left++;
 		if (ServerPlayNetworking.canSend(p, Open.TYPE)) {
-			ServerPlayNetworking.send(p, new Open(sx, sy, sz, box.kind));
+			ServerPlayNetworking.send(p, new Open(sx, sy, sz, box.kind, left, String.join(", ", box.outKinds)));
 			return;
 		}
 		p.sendSystemMessage(Component.literal("[Xen] " + size(box) + " marked. Now name it: /xen BuildAxe save <name>").withStyle(ChatFormatting.GOLD));
+	}
+
+	private static boolean inside(Box b, BlockPos p) {
+		return p.getX() >= Math.min(b.a.getX(), b.b.getX()) && p.getX() <= Math.max(b.a.getX(), b.b.getX()) && p.getY() >= Math.min(b.a.getY(), b.b.getY())
+				&& p.getY() <= Math.max(b.a.getY(), b.b.getY()) && p.getZ() >= Math.min(b.a.getZ(), b.b.getZ()) && p.getZ() <= Math.max(b.a.getZ(), b.b.getZ());
 	}
 
 	private static void reopen(ServerPlayer p) {
@@ -195,25 +212,55 @@ public final class BuildAxe {
 		if (box != null && box.a != null && box.b != null && fits(box) && cheats(p.createCommandSourceStack())) ask(p, box);
 	}
 
-	private static void corner(ServerPlayer p, ServerLevel level, BlockPos pos, boolean first) {
+	/** A hit: the first corner, then the other (and the screen); after a whole box, a new one starts. */
+	private static void corner(ServerPlayer p, ServerLevel level, BlockPos pos) {
 		if (!cheats(p.createCommandSourceStack())) {
 			p.sendSystemMessage(Component.literal("[Xen] The Build Axe needs cheats on.").withStyle(ChatFormatting.GRAY));
 			return;
 		}
 		Box box = boxes.computeIfAbsent(p.getUUID(), k -> new Box());
 		BlockPos at = pos.immutable();
-		if (at.equals(first ? box.a : box.b) && box.level == level) return;      // (the same corner again: holding the button)
-		if (box.level != level) {
-			box.a = null;
-			box.b = null;
+		if (box.level == level && (at.equals(box.b) || box.b == null && at.equals(box.a))) return;   // (the same block again: holding the button)
+		boolean first = box.a == null || box.b != null || box.level != level;
+		if (first && (box.b != null || box.level != level)) {                       // (a box done: a new one, nothing left out yet)
+			box.out.clear();
+			box.outKinds.clear();
 		}
 		box.level = level;
-		if (first) box.a = at;
-		else box.b = at;
-		boolean both = box.a != null && box.b != null;
-		String size = both ? ": " + size(box) + (fits(box) ? "" : " (too big: " + MAX_SIDE + " a side at most)") : "";
-		p.sendSystemMessage(Component.literal("[Xen] Corner " + (first ? 1 : 2) + " (" + box.kind + ")" + size).withStyle(ChatFormatting.GOLD));
-		if (both && fits(box)) ask(p, box);
+		if (first) {
+			box.a = at;
+			box.b = null;
+		} else {
+			box.b = at;
+		}
+		String size = first ? ". Hit another block for the other corner." : ": " + size(box) + (fits(box) ? "" : " (too big: " + MAX_SIDE + " a side at most)");
+		p.sendSystemMessage(Component.literal("[Xen] Corner " + (first ? 1 : 2) + size).withStyle(ChatFormatting.GOLD));
+		if (!first && fits(box)) ask(p, box);
+	}
+
+	/** A right-click on a block: leave it out (saved as air), or put it back; crouching, every block of its kind in the box. */
+	private static void leaveOut(ServerPlayer p, ServerLevel level, BlockPos pos) {
+		if (!cheats(p.createCommandSourceStack())) return;
+		Box box = boxes.computeIfAbsent(p.getUUID(), k -> new Box());
+		if (box.level != level) {
+			box.level = level;
+			box.a = null;
+			box.b = null;
+			box.out.clear();
+			box.outKinds.clear();
+		}
+		String n = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getPath();
+		if (level.getBlockState(pos).isAir()) return;
+		String said;
+		if (p.isShiftKeyDown()) {
+			said = box.outKinds.remove(n) ? "Putting back every " + n + "." : box.outKinds.add(n) ? "Leaving out every " + n + " (saved as air)." : "";
+		} else {
+			long k = pos.asLong();
+			said = box.out.remove(k) ? "Putting back that " + n + "." : box.out.add(k) ? "Leaving out that " + n + " (saved as air)." : "";
+		}
+		int blocks = box.out.size();
+		String all = box.outKinds.isEmpty() ? "" : "; every " + String.join(", ", box.outKinds);
+		p.sendSystemMessage(Component.literal("[Xen] " + said + " Left out: " + blocks + (blocks == 1 ? " block" : " blocks") + all + ".").withStyle(ChatFormatting.GOLD));
 	}
 
 	private static String size(Box b) {
@@ -225,9 +272,17 @@ public final class BuildAxe {
 	}
 
 	// ------------------------------------------------------------------------------ the command
+	/** A kind as a file name: "Big House" is "big_house" (letters, digits, - and _, up to 32), or null if nothing's left. */
+	static String kind(String k) {
+		String n = k == null ? "" : k.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_-]+", "_").replaceAll("^_+|_+$", "");
+		return n.isEmpty() ? null : n.length() > 32 ? n.substring(0, 32) : n;
+	}
+
 	static LiteralArgumentBuilder<CommandSourceStack> command(String name) {
 		LiteralArgumentBuilder<CommandSourceStack> c = Commands.literal(name).requires(BuildAxe::cheats).executes(ctx -> give(ctx, "build"));
 		for (String k : KINDS) c.then(Commands.literal(k).executes(ctx -> give(ctx, k)));
+		c.then(Commands.literal("type").then(Commands.argument("kind", StringArgumentType.greedyString())   // (one of its own, without the screen)
+				.executes(ctx -> kind(StringArgumentType.getString(ctx, "kind")) == null ? 0 : give(ctx, kind(StringArgumentType.getString(ctx, "kind"))))));
 		c.then(Commands.literal("save").then(Commands.argument("name", StringArgumentType.greedyString()).executes(BuildAxe::saveCommand))
 				.executes(ctx -> {
 					ctx.getSource().sendFailure(Component.literal("Give it a name: /xen BuildAxe save <name>"));
@@ -245,7 +300,8 @@ public final class BuildAxe {
 		box.kind = kind;
 		if (!holding(p) && !p.getInventory().add(make(kind))) Compat.drop(p, make(kind));
 		else if (holding(p)) p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, make(kind));
-		ctx.getSource().sendSuccess(() -> Component.literal("[Xen] Build Axe (" + kind + "): hit a block for one corner, right-click a block for the other, then name it. Saved to config/xen/buildaxe/" + kind + ".jsonl."), false);
+		ctx.getSource().sendSuccess(() -> Component.literal("[Xen] Build Axe (" + kind + "): hit a block for one corner, then another for the other corner. Right-click a block to leave it out "
+				+ "(saved as air; crouch to leave out all of that kind), right-click the air for the screen. Saved to config/xen/buildaxe/" + kind + ".jsonl."), false);
 		return 1;
 	}
 
@@ -268,12 +324,12 @@ public final class BuildAxe {
 	static String save(ServerPlayer p, String kind, String name) {
 		name = name == null ? "" : name.trim();
 		Box box = boxes.get(p.getUUID());
-		if (box == null || box.a == null || box.b == null) return "Mark the box first: hit one corner and right-click the other with the Build Axe.";
+		if (box == null || box.a == null || box.b == null) return "Mark the box first: hit one corner, then the other, with the Build Axe.";
 		if (!fits(box)) return "Too big (" + size(box) + "): " + MAX_SIDE + " a side at most.";
 		if (name.isEmpty() || name.length() > 64) return "Give it a name (1 to 64 letters).";
-		if (!Arrays.asList(KINDS).contains(kind)) kind = box.kind;
+		kind = kind(kind) != null ? kind(kind) : box.kind;
 		try {
-			JsonObject line = capture(box.level, box.a, box.b, kind, name);
+			JsonObject line = capture(box, kind, name);
 			Path f = dir().resolve(kind + ".jsonl");
 			Files.createDirectories(f.getParent());
 			Files.writeString(f, line + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
@@ -287,6 +343,8 @@ public final class BuildAxe {
 			box.kind = kind;
 			box.a = null;
 			box.b = null;
+			box.out.clear();
+			box.outKinds.clear();
 			return "[Xen] Saved " + kind + " \"" + name + "\" (" + sz + ", " + solid + " blocks) to config/xen/buildaxe/" + kind + ".jsonl (" + lines + " in it).";
 		} catch (IOException e) {
 			return "Couldn't save it: " + e.getMessage();
@@ -299,20 +357,27 @@ public final class BuildAxe {
 	 * fastest: index = (y * sz + z) * sx + x. With it, where it was (the dimension and biome), and for a cave what the
 	 * blocks alone don't tell: how dark it is and how far under the surface.
 	 */
-	static JsonObject capture(ServerLevel level, BlockPos a, BlockPos b, String kind, String name) {
+	private static JsonObject capture(Box box, String kind, String name) {
+		ServerLevel level = box.level;
+		BlockPos a = box.a, b = box.b;
 		BlockPos lo = new BlockPos(Math.min(a.getX(), b.getX()), Math.min(a.getY(), b.getY()), Math.min(a.getZ(), b.getZ()));
 		BlockPos hi = new BlockPos(Math.max(a.getX(), b.getX()), Math.max(a.getY(), b.getY()), Math.max(a.getZ(), b.getZ()));
 		int sx = hi.getX() - lo.getX() + 1, sy = hi.getY() - lo.getY() + 1, sz = hi.getZ() - lo.getZ() + 1;
 		Map<String, Integer> index = new LinkedHashMap<>();
 		int[] cells = new int[sx * sy * sz];
 		List<Integer> sky = new ArrayList<>(), lamp = new ArrayList<>();
-		int solid = 0;
+		int solid = 0, left = 0;
 		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 		for (int y = 0; y < sy; y++) {
 			for (int z = 0; z < sz; z++) {
 				for (int x = 0; x < sx; x++) {
 					m.set(lo.getX() + x, lo.getY() + y, lo.getZ() + z);
 					BlockState s = level.getBlockState(m);
+					if (!s.isAir() && box.left(m, s)) {                                // (left out: saved as air)
+						left++;
+						cells[(y * sz + z) * sx + x] = index.computeIfAbsent("air", k -> index.size());
+						continue;
+					}
 					if (s.isAir()) {
 						sky.add(level.getBrightness(LightLayer.SKY, m));
 						lamp.add(level.getBrightness(LightLayer.BLOCK, m));
@@ -337,6 +402,7 @@ public final class BuildAxe {
 		JsonObject f = new JsonObject();
 		f.addProperty("solid", solid);
 		f.addProperty("open", sky.size());
+		f.addProperty("left_out", left);                                         // (blocks the player left out: air in "blocks")
 		if (!sky.isEmpty()) {
 			f.addProperty("sky_light", median(sky));                             // (0 dark to 15 open sky, the middle of the open blocks)
 			f.addProperty("block_light", median(lamp));                          // (torches, lava)

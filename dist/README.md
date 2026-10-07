@@ -638,15 +638,20 @@ Your requests always come first. Turn short goals off with **Own goals**
 
 ## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15)
 
-A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe. Hit a block with it for one corner of
-a box, right-click a block for the other corner, and a screen comes up: the box's size, what it is (tap to switch
-Build, Tree, Cave), its name (a must), and Save or Cancel. Cancel keeps the corners: move one, or right-click into the
-air with the axe, and the screen comes back. (With Xen only on the server and not in your game, there's no screen:
-name it with `/xen BuildAxe save <name>`.) The box goes into `config/xen/buildaxe/<kind>.jsonl`, one line each:
-its kind and name, the dimension and biome, its size, a palette of the blocks in it (with their states) and one
-palette index per block (air too), and how dark it is and how far under the surface. Up to 64 blocks a side. The axe
-never breaks or strips anything, and nothing about you or where it was is kept. Xens don't learn from it in the game:
-it's data for training them.
+A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe:
+
+* **Hit** a block: one corner of the box. Hit another: the other corner, and a screen comes up.
+* **Right-click** a block: leave it out (it's saved as air: the grass round a tree, a torch you placed). Right-click it
+  again to put it back. **Crouch and right-click**: leave out every block of that kind in the box.
+* **Right-click the air**: the screen again.
+
+The screen shows the box's size and what's left out, its type (tap Build, Tree or Cave, or type your own: house, farm,
+bridge...), its name (a must), and Save or Cancel. (With Xen only on the server and not in your game, there's no
+screen: `/xen BuildAxe type <your type>`, then `/xen BuildAxe save <name>`.) Each type has its own file,
+`config/xen/buildaxe/<type>.jsonl`, one line per thing you save: its type and name, the dimension and biome, its size,
+a palette of the blocks in it (with their states) and one palette index per block (air too), how many you left out,
+and how dark it is and how far under the surface. Up to 64 blocks a side. The axe never breaks or strips anything, and
+nothing about you or where it was is kept. Xens don't learn from it in the game: it's data for training them.
 
 ## Mining like a player (2.0.0-beta.13)
 

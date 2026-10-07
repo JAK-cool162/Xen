@@ -33,7 +33,9 @@ public class XenClient implements ClientModInitializer {
 		if (!level.isClientSide() || !xen.mod.BuildAxe.holding(player)
 				|| !net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(xen.mod.BuildAxe.Corner.TYPE)) return net.minecraft.world.InteractionResult.PASS;
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new xen.mod.BuildAxe.Corner(pos.immutable(), which));
-		return net.minecraft.world.InteractionResult.SUCCESS;
+		// (a hit held back with SUCCESS sends nothing more; a right-click with SUCCESS still goes to the server as a use,
+		// and the server would take it again: a block left out, then put back. FAIL holds it back and sends nothing.)
+		return which == 1 ? net.minecraft.world.InteractionResult.SUCCESS : net.minecraft.world.InteractionResult.FAIL;
 	}
 
 	@Override
