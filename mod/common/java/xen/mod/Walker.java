@@ -624,6 +624,11 @@ final class Walker {
 	private final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet way = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
 	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> wayIn;
 
+	/** Has it been here (on the way it came: the map of where it's been, in its head)? */
+	boolean beenAt(BlockPos p) {
+		return c.player != null && c.player.level().dimension() == wayIn && way.contains(p.asLong());
+	}
+
 	private void remember() {
 		var p = c.player;
 		if (p == null) return;

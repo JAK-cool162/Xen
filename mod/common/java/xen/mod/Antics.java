@@ -202,6 +202,11 @@ final class Antics {
 		return Action.TURN_LEFT;
 	}
 
+	/** A dance step at a party (anyone's). */
+	Action danceNow() {
+		return dance(c.player.level().getGameTime());
+	}
+
 	private Action dance(long now) {
 		step++;
 		if (partner != null && partner.isAlive() && partner.level() == c.player.level()) c.hands.watching = partner;

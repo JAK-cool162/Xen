@@ -86,7 +86,8 @@ final class Needs {
 	/** Does it have some of it to give? */
 	boolean canHelp() {
 		Need n = need;
-		return n != null && c.items().getOrDefault(n.item, 0) > 0;
+		return n != null && c.items().getOrDefault(n.item, 0) > 0
+				&& c.trust(n.who) >= 0.35f - 0.3f * c.personality.kindness;          // (someone it doesn't trust: it keeps its things)
 	}
 
 	/** Help: hand it over (what it can spare). The plan in words, or null. */

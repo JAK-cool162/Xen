@@ -21,7 +21,7 @@ import xen.mod.core.Action;
  */
 final class Tactics {
 	private final Companion c;
-	private long nextLook, nextSpawner;
+	private long nextLook, nextSpawner, nextWall;
 
 	Tactics(Companion c) {
 		this.c = c;
@@ -71,10 +71,46 @@ final class Tactics {
 				return Action.PLACE;
 			}
 		}
+		if (under && now >= nextWall && c.knowledge.knows("trial_walls") && c.places.get("trial chamber") == null) {
+			nextWall = now + 100;
+			BlockPos wall = flatWall(level);
+			if (wall != null) {
+				c.places.remember("trial chamber", wall);
+				c.journal("notes", "a dead-flat wall at " + wall.toShortString() + ": a trial chamber behind it, most likely");
+				c.chatter(c.pick3("This wall is way too flat... a trial chamber must be behind it!", "A perfectly flat wall down here? Trial chamber!",
+						"Flat wall. That means a trial chamber, I know it."), false);
+			}
+		}
 		if (now >= nextSpawner && c.knowledge.knows("spawner_torch")) {
 			nextSpawner = now + 40;
 			Action t = lightSpawner(level, feet);
 			if (t != null) return t;
+		}
+		return null;
+	}
+
+	/**
+	 * A wall it's looking at in a cave that's dead flat: 5 wide and 4 high of rock with open air all along in front.
+	 * Caves are rough; a trial chamber's shell isn't, and caves that run into one end in a flat wall. Null if none.
+	 */
+	private BlockPos flatWall(ServerLevel level) {
+		BlockPos eye = BlockPos.containing(c.player.getEyePosition());
+		for (Direction d : Direction.Plane.HORIZONTAL) {
+			for (int k = 2; k <= 16; k++) {
+				BlockPos q = eye.relative(d, k);
+				if (level.getBlockState(q).isAir()) continue;
+				if (c.walker.beenAt(q.relative(d.getOpposite()))) break;           // (a room it dug itself: its own flat walls)
+				Direction side = d.getClockWise();
+				int flat = 0;
+				for (int a = -2; a <= 2; a++) {
+					for (int y = -1; y <= 2; y++) {
+						BlockPos w = q.relative(side, a).above(y);
+						if (level.getBlockState(w).is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) && level.getBlockState(w.relative(d.getOpposite())).isAir()) flat++;
+					}
+				}
+				if (flat == 20) return q.relative(d, 6);                       // (the chamber: behind the wall)
+				break;
+			}
 		}
 		return null;
 	}

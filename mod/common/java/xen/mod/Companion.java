@@ -941,6 +941,8 @@ public final class Companion {
 		if (met != null) return met;
 		Action about = standingAbout();                                // a minute standing about with nothing to show: it moves on
 		if (about != null) return about;
+		Action whim = whims.next();                                   // bored stiff: a plan out loud, a party, a needless choice; a friend's party
+		if (whim != null) return whim;
 		Action fun = antics.next(false);                              // dancing, showing off
 		if (fun != null) return fun;
 		Action grudge = mode == Mode.FREE ? uses.grudge() : null;      // someone hurt it badly: their house (the grief setting)
@@ -1959,6 +1961,7 @@ public final class Companion {
 	/** The mobs and animals around it: arrows, drowned, poison, breeding, shearing, cats (see {@link Critters}). */
 	final Critters critters = new Critters(this);
 	final Tactics tactics = new Tactics(this);
+	final Whims whims = new Whims(this);
 
 	/** Who it's chasing, since when, and the closest it got (and when). */
 	private LivingEntity chasing;
@@ -3010,6 +3013,9 @@ public final class Companion {
 		float t = trust(from.getUUID());
 		if (t < -0.2f) return "No, you won't, because " + who + " hurt you (a sorry would help).";
 		if (PLEASE.matcher(words).find()) return null;
+		if (owner == null && t < 0.3f && !r.intent().equals("peace") && random().nextFloat() < (0.3f - t) * 2 + 0.3f * (1 - personality.kindness)) {
+			return "No, you won't: you don't know " + who + " well enough yet.";   // (like anyone: a stranger asks, it may not feel like it)
+		}
 		String intent = r.intent();
 		float health = player.getHealth() / player.getMaxHealth();
 		if (OUT.contains(intent) && health < 0.3f) return "No, not now: you are badly hurt and need to heal first.";

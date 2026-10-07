@@ -1,7 +1,44 @@
-**Xen Companion 2.0.0-beta.8.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.9**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.9: boredom and whims, trust, trial chamber walls, simpler settings, no cheats needed
+
+* **Bored? It does something nobody needs.** Boredom fills while a Xen does the same thing, or nothing much. When it's
+  full, it gets a whim, picked by its nature:
+  * it **makes a plan** out loud ("a castle with a moat, after I beat the dragon"), which it may never do;
+  * it **throws a party**, and Xens nearby that like it come over and dance;
+  * it **sorts its bag**, or **picks a favourite block** and tells you.
+* **...unless it has to keep going.** When what it's doing is needed, a bored Xen holds out:
+  * always, when someone asked it, or it's in danger;
+  * almost always, when it's starving and getting food, or sheltering at night;
+  * often, with no tools, or no stone tools yet;
+  * sometimes, on its way to iron.
+
+  A diligent, patient Xen holds out more often than a lazy one, and it says so ("Ugh, this is so boring. But I have no
+  tools yet."). The old "bored of this, on to something else" doesn't drop needed work either now.
+* **Trust, like a person.** A Xen of its own (with no owner) may say no to someone it hardly knows ("No, I won't: idk
+  Steve well enough yet"). It only gives help, like food to someone who says they're hungry, to people it trusts
+  enough; a kind Xen trusts more easily.
+* **A flat wall in a cave means a trial chamber.** The world builds a solid shell around a trial chamber, so a cave
+  that runs into one ends in a dead-flat wall. A Xen that knows this (3 in 10 start knowing; tell one "flat walls in a
+  cave mean a trial chamber") notices such a wall. It remembers a trial chamber behind it, and goes there when it's
+  ready for one.
+* **A map in its head**: exploring a cave, it goes where it hasn't been (the exact blocks it walked, for 20 minutes),
+  so it doesn't go round in circles in a maze of tunnels.
+* **No cheats needed**: in single player, or on a world you opened to LAN, you can use every /xen command on your own
+  world with cheats off. On a server, the commands that change things still need an operator.
+* **Simpler settings**: the settings open on **Basics**: chat, talking on its own, Xens per player, own goals, PvP,
+  names, skins and AI chat. **More settings** shows every category, as before.
+* Tested in the game:
+
+  | Test | Result |
+  |---|---|
+  | A room carved 25 blocks down, a Xen told about flat walls | it noted "a dead-flat wall: a trial chamber behind it" |
+  | 5 Xens of their own, asked by a stranger to follow | 1 said no ("idk Steve well enough yet"), 4 went |
+  | Bored Xens (boredom sped up for the test) | plans, a party with a guest who came over, sorting, a favourite block |
+  | Bored Xens with no tools yet | "bored stiff, but keeps at it: it has no tools yet" |
 
 ### 2.0.0-beta.8.1: proven in the game (and the fixes that took)
 

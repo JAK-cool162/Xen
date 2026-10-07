@@ -1,7 +1,51 @@
-XEN COMPANION 2.0.0-beta.8.1: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.9: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.9
+==========================
+
+Whims.java (Companion.instinct, right before Antics; free Xens with wants on):
+- boredom 0 to 1. Each decision it rises by decisionTicks / (20 * 60 * (6 + 8 * patience)), so it is full after 6 to
+  14 minutes. It rises twice as fast with no option or while "looking around". Each new option takes off 0.25.
+  -Dxen.boredFast=true multiplies the rise by 200 (tests only).
+- Full: resists()? Else a whim. A chore of its own is cancelled first; one it was asked to do counts as necessity 1.
+  - The whims, weighted 0.2 + chattiness + 0.5 kindness (party), 0.2 + curiosity + 0.5 diligence (plan), 0.5 (needless).
+  - Plan: one of 8 big things and one of 5 whens, said out loud, journal "plans" (nothing more: it may never happen).
+  - Party (one in the world at a time): Whims.party = (host, here, 1 minute). Another free Xen within 48 joins with
+    chance 0.4 + 0.6 chattiness, if it trusts the host 0.25 or more and isn't fighting or busy. It walks there and
+    Antics.danceNow() within 4 of it till the party ends.
+  - Needless: sort slots 9 to 35 by item name, or name a favourite from the blocks within 6 (not grass, dirt, stone).
+- necessity(): 1 if asked (chores not own) or fighting/in danger. 0.9 for FOOD/EAT at food 6 or less (0.6 at 12 or
+  less), and for SHELTER/SLEEP after sunDown. 0.8 for WOOD/CRAFT with no pickaxe, 0.6 for STONE/CRAFT under stone tools,
+  0.4 for MINE/SMELT under iron. Else 0.
+- willpower(): 0.25 + 0.4 diligence + 0.3 patience - 0.4 sloth, from 0.05 to 1.
+- resists(): need 1, or a roll under need * (0.6 + willpower). Holding out sets boredom to 0.9. Journal "bored stiff,
+  but keeps at it: <why>", at most every 2 minutes, and a line said. Habits.bored() (drop the same work after 5 to 15
+  minutes) is now also false when resists().
+Trust:
+- Companion.refusal: no owner, trust under 0.3, not "peace". A roll under (0.3 - trust) * 2 + 0.3 (1 - kindness) gives
+  "No, you won't: you don't know <who> well enough yet." This is under the refuse setting, as the other refusals.
+- Needs.canHelp also needs trust(who) >= 0.35 - 0.3 kindness.
+Trial chamber walls:
+- Knowledge "trial_walls" (share 0.3; told with flat/straight/smooth ... wall(s) ... trial).
+- Tactics, under the sky only, every 100 ticks, until it knows a trial chamber: look 2 to 16 blocks in each of the 4
+  directions to the first solid block. Count the 5 wide x 4 high patch around it on that plane: base stone with air in
+  front of every block (20 of 20) counts. Not when the air in front is on the way it walked (a room it dug). Then Places
+  "trial chamber" 6 blocks behind the wall, which Goals' TRIALS short goal uses. Journal "notes a dead-flat wall".
+  - Why: trial chambers use terrain adaptation "encapsulate", a solid shell, and caves stop at it.
+  - Checked: a room carved in stone 25 blocks down gave "a dead-flat wall at 1300, 61, -714: a trial chamber behind it".
+Map in its head: Walker.beenAt(pos) is the way memory (beta 7). Caves.sample counts a spot as seen when it's on the
+way, or when its 4x4 cell was visited within 24000 ticks (it was 6000). A seen spot scores 30 less, so it goes on into
+new tunnels.
+Commands: XenMod.mayRun(source) checks for an operator, or the player whose name is the singleplayer profile's on a
+world that isn't a dedicated server (single player, or the host of a LAN world). spawn, set, arena and the op()
+checks use it. It can't be tested on a dedicated server: there it is operators only, as before.
+Settings screen: a Basics tab first (chat, talk, maxPerPlayer, wants, pvp, nameStyle, skins, chatModel), with a "More
+settings" / "Fewer settings" button. Opened on another tab, all of them show. The screenshot walk still goes through
+every tab.
 
 
 WHAT'S NEW IN 2.0.0-beta.8.1

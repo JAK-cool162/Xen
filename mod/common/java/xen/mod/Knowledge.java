@@ -69,7 +69,9 @@ final class Knowledge {
 					"\\bspawners?\\b.*\\btorch"),
 			t("spear_reach", "a spear's jab reaches 2 to 4.5 blocks, further than a sword: keep out of the sword's reach",
 					"\\bspears?\\b.*\\b(reach|far|distance|range)"),
-			t("combo_shield", "hit three times in a row: put your shield up", "\\bshield\\b.*\\b(combo|three|3) (hits|times)"));
+			t("combo_shield", "hit three times in a row: put your shield up", "\\bshield\\b.*\\b(combo|three|3) (hits|times)"),
+			new Mechanic("trial_walls", "a big, dead-flat wall in a cave means a trial chamber is behind it (the world makes its walls flat)", false,
+					Pattern.compile("\\b(flat|straight|smooth)\\b.*\\bwalls?\\b.*\\btrial|\\btrial\\b.*\\b(flat|straight|smooth)\\b.*\\bwalls?"), 0.3f));
 
 	private static Mechanic m(String id, String fact, boolean born, String taught) {
 		return new Mechanic(id, fact, born, taught == null ? null : Pattern.compile(taught), born ? 1 : 0);

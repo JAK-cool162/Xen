@@ -148,8 +148,8 @@ final class Caves {
 			var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, Vec3.atCenterOf(q), net.minecraft.world.level.ClipContext.Block.COLLIDER,
 					net.minecraft.world.level.ClipContext.Fluid.ANY, c.player));
 			if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) continue;                  // it has to see it
-			double score = inside ? 2 * (at.getY() - q.getY()) - (been.containsKey(q.asLong() >> 2 << 2) && now() - been.get(q.asLong() >> 2 << 2) < 6000 ? 30 : 0)
-					- 0.1 * Math.sqrt(q.distSqr(at)) : -q.distSqr(at);
+			boolean seen = been.containsKey(q.asLong() >> 2 << 2) && now() - been.get(q.asLong() >> 2 << 2) < 24000 || c.walker.beenAt(q);   // (the map in its head: where it has been)
+			double score = inside ? 2 * (at.getY() - q.getY()) - (seen ? 30 : 0) - 0.1 * Math.sqrt(q.distSqr(at)) : -q.distSqr(at);
 			if (lavaNear(level, q)) score -= 50;
 			if (score > bestScore) {
 				bestScore = score;

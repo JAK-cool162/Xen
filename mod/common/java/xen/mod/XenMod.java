@@ -945,7 +945,7 @@ public class XenMod implements ModInitializer {
 								.executes(ctx -> summon(ctx, StringArgumentType.getString(ctx, "name")))
 								.then(Commands.argument("count", IntegerArgumentType.integer(1, 100))
 										.executes(ctx -> summonMany(ctx, StringArgumentType.getString(ctx, "name"), IntegerArgumentType.getInteger(ctx, "count"))))))
-				.then(Commands.literal("spawn").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+				.then(Commands.literal("spawn").requires(XenMod::mayRun)
 						.then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
 								.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), 300))
 								.then(Commands.argument("radius", IntegerArgumentType.integer(0, 30000))
@@ -984,7 +984,7 @@ public class XenMod implements ModInitializer {
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
 				.then(Commands.literal("settings").executes(this::showSettings))
-				.then(Commands.literal("set").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+				.then(Commands.literal("set").requires(XenMod::mayRun)
 						.then(Commands.argument("setting", StringArgumentType.word()).suggests((ctx, b) -> {
 									for (var f : XenConfig.class.getFields()) b.suggest(f.getName());
 									return b.buildFuture();
@@ -1022,7 +1022,7 @@ public class XenMod implements ModInitializer {
 												})
 												.executes(ctx -> style(ctx, StringArgumentType.getString(ctx, "xen"),
 														StringArgumentType.getString(ctx, "trait"), StringArgumentType.getString(ctx, "value")))))))
-				.then(Commands.literal("arena").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+				.then(Commands.literal("arena").requires(XenMod::mayRun)
 						.then(Commands.literal("start").executes(ctx -> arenaStart(ctx, 4, 10, "sword"))
 								.then(Commands.argument("xens", IntegerArgumentType.integer(1, 16))
 										.executes(ctx -> arenaStart(ctx, IntegerArgumentType.getInteger(ctx, "xens"), 10, "sword"))
@@ -1112,7 +1112,19 @@ public class XenMod implements ModInitializer {
 	}
 
 	private boolean op(CommandContext<CommandSourceStack> ctx) {
-		return ctx.getSource().permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+		return mayRun(ctx.getSource());
+	}
+
+	/**
+	 * Who may use the /xen commands that change things: an operator, or the world's own player (single player, or the
+	 * one who opened it to LAN) even with cheats off: it's their world. On a server, operators only.
+	 */
+	static boolean mayRun(CommandSourceStack src) {
+		if (src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) return true;
+		var server = src.getServer();
+		if (server == null || server.isDedicatedServer() || !(src.getEntity() instanceof ServerPlayer p)) return false;
+		var owner = server.getSingleplayerProfile();
+		return owner != null && owner.name().equalsIgnoreCase(p.getGameProfile().name());
 	}
 
 	// ------------------------------------------------------------------- who they are

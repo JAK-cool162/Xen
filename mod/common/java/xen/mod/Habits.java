@@ -111,7 +111,7 @@ final class Habits {
 		if (o == Mind.REST || o == Mind.SLEEP || o == Mind.SHELTER || o == Mind.FIGHT || o == Mind.FLEE || o == Mind.EAT || o == Mind.HELP) return false;
 		float patience = c.personality.patience() * (1f - 0.5f * c.personality.sin(xen.mod.core.Sins.SLOTH));
 		long limit = (long) (20 * 60 * (5 + 10 * patience));                        // 5 to 15 minutes of the same thing
-		return now() - workingSince > limit;
+		return now() - workingSince > limit && !c.whims.resists();                // (sick of it, unless it has to be done and it has the will)
 	}
 
 	/** What it usually does at this time of day, in words (for its status), or "". */
