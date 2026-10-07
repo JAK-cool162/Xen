@@ -1,7 +1,24 @@
-XEN COMPANION 2.0.0-beta.16: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.17: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.17
+===========================
+
+Taught (assets/xen/taught: index.txt, build.jsonl, decoration.jsonl, the Build Axe's lines): pieces with the ground
+left off (per column, the run of grass_block/dirt/coarse_dirt/podzol/rooted_dirt/mycelium/mud/sand/gravel from the
+bottom; short_grass, tall_grass, fern anywhere), air kept (dug out inside). A piece with a door, or "house" in its
+name, is a house: VillageHouses.of("taught") (VillageHouses.pick adds "taught" to the kinds it has seen). Any piece by
+name: Taught.find (aliases: sofa -> couch, staircase/stairs -> stair case; "crouch" read as couch), built with
+VillageHouses.plan (VillageHouses.house: no door, the middle of the front edge). Chat.understand: build/make/put/place/
+set up/add + a piece's name (not a plain one: house, home, base, farm, tower, hut, shelter) is a build, before the
+other rules; details gives "taught:<name>". Builder: buildShown (a site with room, the plan named after the piece; a
+house is kept if it stops half way), not a home unless a house. Finishing a house (inside known): Taught.furnish,
+furniture (kind decoration, or table/bar/couch/sofa/chair/bench/counter/shelf/desk/bed in its name, 4 high at most,
+no water) on the floor inside, either way round, all in the air there, nothing within 2 of the door; built when
+creative or it has half the blocks (INSIDE, decor).
 
 
 WHAT'S NEW IN 2.0.0-beta.16

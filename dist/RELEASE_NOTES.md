@@ -1,7 +1,20 @@
-**Xen Companion 2.0.0-beta.16**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.17**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.17: Xens know what they were shown
+
+* **Trained on Build Axe data:** 14 builds marked with the Build Axe (two houses, six pieces of furniture, a pool, a
+  road, an entrance, walls, a staircase). They're in the mod; every Xen knows them.
+* **Ask for any of them by name:** "build a pool", "build the bar", "make a couch", "build a 2 story house". (A plain
+  "build a house" is still the Xen's own choice.)
+* **Its own choice too:** the two houses are among the houses a Xen may build when it likes copying.
+* **Furniture in its house:** when a Xen finishes a house, it puts in a couch, a table, a bar or a counter that fits
+  inside (in survival when it has most of the blocks).
+* The ground they were marked on (grass and dirt under them) is left off: they're built on the ground where they go.
+* Tested in the game (a Xen in creative): "build a pool" started the pool it was shown (547 blocks); "build a 2 story
+  house" built it (271 blocks in 268 s), then it found room for a couch inside and built that (12 blocks, 12 s).
 
 ### 2.0.0-beta.16: a bigger Build Axe
 

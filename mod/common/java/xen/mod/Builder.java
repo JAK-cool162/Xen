@@ -364,6 +364,8 @@ final class Builder {
 		copied = null;
 		Direction front = facing != null ? facing : c.player.getDirection().getOpposite();   // the door faces where it stood looking from
 		BlockPos feet = c.player.blockPosition();
+		VillageHouses.House shown = Taught.find(what);                          // something it was shown, asked for by name
+		if (shown != null) return buildShown(level, shown, near, front, feet);
 		boolean base = what.contains("base") || what.contains("underground") || what.contains("bunker");
 		boolean mobs = what.contains("mob") || what.contains("grinder") || what.contains("xp");
 		boolean farm = !mobs && (what.contains("farm") || what.contains("crop") || what.contains("wheat"));
@@ -407,8 +409,10 @@ final class Builder {
 				if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 				String wood = woodType();
 				made = VillageHouses.plan(copy, corner, front, creative, wood);
-				c.journal("build", "copies a village house it saw: a " + copy.name());
-				String planned = begin(made, (creative ? "" : " out of " + wood + " wood and cobblestone") + " (a copy of a " + copy.name() + " from a village)", wood);
+				boolean taught = copy.kind().equals("taught");
+				c.journal("build", taught ? "builds the " + copy.name() + " it was shown" : "copies a village house it saw: a " + copy.name());
+				String planned = begin(made, (creative ? "" : " out of " + wood + " wood and cobblestone")
+						+ (taught ? " (the " + copy.name() + " it was shown)" : " (a copy of a " + copy.name() + " from a village)"), wood);
 				copied = copy;
 				started(corner, front, wood);
 				return planned;
@@ -432,6 +436,41 @@ final class Builder {
 		return begin(made, of, p.name());
 	}
 
+	/** One of the things it was shown (see Taught): a pool, a bar, a road, a house, built where there's room for it. */
+	private String buildShown(ServerLevel level, VillageHouses.House h, BlockPos near, Direction front, BlockPos feet) {
+		int[] fp = VillageHouses.footprint(h, front);
+		BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, fp[0] + 1, fp[1] + 1);
+		if (corner == null) return "You can't build the " + h.name() + " here: there isn't flat dry ground enough for it. Somewhere more open would work.";
+		String wood = woodType();
+		Architect.Plan made = VillageHouses.plan(h, corner, front, creative, wood);
+		c.journal("build", "builds the " + h.name() + " it was shown");
+		String planned = begin(made, (creative ? "" : " out of what you have and can make") + " (the " + h.name() + " it was shown)", wood);
+		copied = h;
+		if (h.name().matches(".*\\bhouse\\b.*")) started(corner, front, wood);       // (a house: kept if it stops half way)
+		return planned;
+	}
+
+	/** Furniture going into a house it finished (see Taught.furnish): when that's done, it isn't a home. */
+	private boolean furnishing;
+
+	/** Does it have most of what the furniture takes (in survival what it hasn't got stays out: not a bare try)? */
+	private boolean hasMost(Architect.Plan f) {
+		if (creative) return true;
+		Map<net.minecraft.world.item.Item, Integer> need = new HashMap<>(), have = new HashMap<>();
+		for (Architect.Step st : f.steps()) if (!st.dig()) need.merge(st.state().getBlock().asItem(), 1, Integer::sum);
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			var it = inv.getItem(i);
+			if (!it.isEmpty()) have.merge(it.getItem(), it.getCount(), Integer::sum);
+		}
+		int total = 0, got = 0;
+		for (var e : need.entrySet()) {
+			total += e.getValue();
+			got += Math.min(e.getValue(), have.getOrDefault(e.getKey(), 0));
+		}
+		return total > 0 && got * 2 >= total;
+	}
+
 	private void started(BlockPos corner, Direction front, String wood) {
 		startedCorner = corner;
 		startedFront = front;
@@ -449,7 +488,7 @@ final class Builder {
 		Architect.Plan made;
 		String of;
 		if (u.village() != null) {
-			String kind = u.village().split("/").length > 1 ? u.village().split("/")[1] : "plains";
+			String kind = u.village().startsWith("taught/") ? "taught" : u.village().split("/").length > 1 ? u.village().split("/")[1] : "plains";
 			VillageHouses.House h = null;
 			for (VillageHouses.House x : VillageHouses.of(level.getServer(), kind)) if (x.id().equals(u.village())) h = x;
 			if (h == null) {
@@ -458,7 +497,7 @@ final class Builder {
 			}
 			String wood = u.wood() != null ? u.wood() : woodType();
 			made = keepWhatsThere(VillageHouses.plan(h, u.corner(), u.front(), creative, wood));
-			of = " (a copy of a " + h.name() + ")";
+			of = h.kind().equals("taught") ? " (the " + h.name() + " it was shown)" : " (a copy of a " + h.name() + ")";
 			String planned = begin(made, of, wood);
 			copied = h;
 			started(u.corner(), u.front(), wood);
@@ -815,6 +854,11 @@ final class Builder {
 			plan = null;
 			return Action.IDLE;
 		}
+		boolean extra = furnishing;                                                // (the furniture in a house: not a home)
+		furnishing = false;
+		boolean shownThing = copied != null && copied.kind().equals("taught") && !what.matches(".*\\bhouse\\b.*");   // (a pool, a bar, a road it was shown)
+		boolean houseDone = !extra && !shownThing && plan.inside() != null
+				&& (what.matches(".*\\bhouse\\b.*") || what.equals("cottage") || what.contains("tower") || design != null);
 		if (what.endsWith("house")) {
 			unfinished = null;
 			startedCorner = null;
@@ -849,13 +893,26 @@ final class Builder {
 			case "highway" -> c.highway.built(plan.middle());
 			case "mine entrance" -> c.places.remember("mine hut", plan.middle());
 			default -> {
-				if (!plan.name().startsWith("statue")) c.goals.home = plan.middle();   // a house or a base: home
+				if (!plan.name().startsWith("statue") && !extra && !shownThing) c.goals.home = plan.middle();   // a house or a base: home
 			}
 		}
 		c.antics.celebrate();
 		c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;   // its own house: back to its life
 		c.anchor = plan.middle();
+		Architect.Plan done = plan;
+		Companion.Mode after = c.mode;
 		plan = null;
+		copied = null;
+		if (houseDone) {                                                           // a house: a piece of the furniture it was shown, if one fits
+			Architect.Plan f = Taught.furnish((ServerLevel) c.player.level(), done, new Random());
+			XenMod.LOG.info("{} looks for furniture for its {}: {}", c.name, what, f == null ? "none fits" : f.name() + (hasMost(f) ? "" : " (hasn't the blocks)"));
+			if (f != null && hasMost(f)) {
+				begin(f, "", "furniture");
+				furnishing = true;
+				modeBefore = after;
+				c.journal("build", "puts a " + f.name() + " in its house");
+			}
+		}
 		return Action.IDLE;
 	}
 

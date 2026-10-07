@@ -245,7 +245,8 @@ public final class Chat {
 			String asked = led && !notAsked ? lead.group("rest").replaceAll("[?!.\\s]+$", "") : null;
 			if (!notAsked && (asked != null || !QUESTION.matcher(words).lookingAt())) {
 				String look = asked != null ? asked : words;
-				for (int i = 0; i < RULE.length; i++) {
+				if (BUILD_IT.matcher(look).find() && xen.mod.Taught.nameIn(look) != null) intent = "build";   // ("build a pool": one it was shown, first)
+				else for (int i = 0; i < RULE.length; i++) {
 					if (RULE[i].matcher(look).find()) {
 						intent = RULES[i][0];
 						break;
@@ -255,6 +256,8 @@ public final class Chat {
 		}
 		return details(intent, words);
 	}
+
+	private static final Pattern BUILD_IT = Pattern.compile("\\b(build|make|put|place|set up|add)\\b");
 
 	/** Starts with a verb that orders something ("go", "get", "build"...). */
 	private static final Pattern ORDER = Pattern.compile("^(go|get|come|follow|build|make|mine|dig|craft|explore|stay|stop|give|bring|find|hunt|chop|collect|gather|"
@@ -305,7 +308,8 @@ public final class Chat {
 					: Pattern.compile("\\b(mob|mobs|xp|grinder)\\b").matcher(words).find() ? "mob farm"
 					: Pattern.compile("\\bfarm\\b").matcher(words).find() ? "farm"
 					: Pattern.compile("\\b(pen|barn|animal)\\b").matcher(words).find() ? "pen"
-					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base" : houseStyle(words);
+					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base"
+					: xen.mod.Taught.nameIn(words) != null ? "taught:" + xen.mod.Taught.nameIn(words) : houseStyle(words);
 			amount = 0;
 		}
 		if (intent.equals("craft")) {                                         // "craft 4 torches" is (craft, torch, 4)

@@ -40,6 +40,7 @@ final class VillageHouses {
 	/** A house: which file, the kind of village, its blocks, its size, its door (and which side it opens to), its design. */
 	record House(String id, String kind, List<Block> blocks, int sx, int sy, int sz, BlockPos door, Direction out, Taste.Design design, int loose) {
 		String name() {
+			if (kind.equals("taught")) return id.substring(id.indexOf('/') + 1);   // (one of the builds it was shown: its own name)
 			String n = id.substring(id.lastIndexOf('/') + 1).replace(kind + "_", "").replaceAll("_\\d+$", "").replace('_', ' ');
 			return kind + " " + n;
 		}
@@ -64,6 +65,7 @@ final class VillageHouses {
 
 	/** The homes of a kind of village (the small, medium and big houses; not the smithies and farms), loaded once. */
 	static synchronized List<House> of(MinecraftServer server, String kind) {
+		if (kind.equals("taught")) return Taught.houses();                        // (the houses it was shown: see Taught)
 		if (cachedFor != server) {
 			CACHE.clear();
 			cachedFor = server;
@@ -111,7 +113,6 @@ final class VillageHouses {
 			props[i] = sb.toString();
 		}
 		List<Block> list = new ArrayList<>();
-		BlockPos door = null;
 		for (Object o : blocks) {
 			Map<String, Object> b = (Map<String, Object>) o;
 			List<Object> pos = (List<Object>) b.get("pos");
@@ -120,12 +121,25 @@ final class VillageHouses {
 			if (n.equals("jigsaw") || n.equals("structure_void") || n.equals("structure_block")) continue;
 			Block blk = new Block(((Number) pos.get(0)).intValue(), ((Number) pos.get(1)).intValue(), ((Number) pos.get(2)).intValue(), n, props[s]);
 			list.add(blk);
-			if (n.endsWith("_door") && props[s].contains("half=lower") && (door == null || blk.y() < door.getY())) door = new BlockPos(blk.x(), blk.y(), blk.z());
 		}
-		if (door == null) return null;
-		int sx = ((Number) size.get(0)).intValue(), sy = ((Number) size.get(1)).intValue(), sz = ((Number) size.get(2)).intValue();
-		// the side the door opens to: the edge of the house it's nearest
-		int[] gap = {door.getZ(), sz - 1 - door.getZ(), door.getX(), sx - 1 - door.getX()};
+		return house(id, kind, list, ((Number) size.get(0)).intValue(), ((Number) size.get(1)).intValue(), ((Number) size.get(2)).intValue(), false);
+	}
+
+	/**
+	 * Blocks into a house: its door (the lowest door's lower half) and the side it opens to (the edge it's nearest).
+	 * Without a door: null, or with anyDoor (a build it was shown: a pool, a bar) the middle of its front edge, a block
+	 * above its lowest layer.
+	 */
+	static House house(String id, String kind, List<Block> list, int sx, int sy, int sz, boolean anyDoor) {
+		BlockPos door = null;
+		int lowest = Integer.MAX_VALUE;
+		for (Block b : list) {
+			if (b.name().endsWith("_door") && b.props().contains("half=lower") && (door == null || b.y() < door.getY())) door = new BlockPos(b.x(), b.y(), b.z());
+			if (!b.name().equals("air") && !b.name().equals("cave_air")) lowest = Math.min(lowest, b.y());
+		}
+		if (lowest == Integer.MAX_VALUE || door == null && !anyDoor) return null;
+		if (door == null) door = new BlockPos(sx / 2, lowest + 1, 0);
+		int[] gap = {door.getZ(), sz - 1 - door.getZ(), door.getX(), sx - 1 - door.getX()};   // (the side the door opens to)
 		Direction[] side = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
 		int best = 0;
 		for (int i = 1; i < 4; i++) if (gap[i] < gap[best]) best = i;
@@ -272,7 +286,8 @@ final class VillageHouses {
 
 	/** A house of a kind it has seen that it could build here (in survival, one on flat ground, mostly of what it can make), or null. */
 	static House pick(Companion c, MinecraftServer server, String kind, boolean creative, Random r) {
-		List<String> kinds = kind != null ? List.of(kind) : seen(c);
+		List<String> kinds = new ArrayList<>(kind != null ? List.of(kind) : seen(c));
+		if (kind == null) kinds.add("taught");                                   // (and the houses it was shown)
 		List<House> fit = new ArrayList<>();
 		for (String k : kinds) {
 			for (House h : of(server, k)) {
@@ -394,7 +409,7 @@ final class VillageHouses {
 				: s1.phase() == Architect.DIG ? Integer.compare(s2.pos().getY(), s1.pos().getY()) : Integer.compare(s1.pos().getY(), s2.pos().getY()));
 		BlockPos middle = new BlockPos(bx + wx / 2, corner.getY() + 1, bz + wz / 2);
 		AABB inside = new AABB(bx + 1, corner.getY() + 1, bz + 1, bx + wx - 1, corner.getY() + 3, bz + wz - 1);
-		return new Architect.Plan("village house", steps, door == null ? middle : door, middle, front, inside);
+		return new Architect.Plan(h.kind().equals("taught") ? h.name() : "village house", steps, door == null ? middle : door, middle, front, inside);
 	}
 
 	/** Its width and depth when it faces front (for finding a site). */
