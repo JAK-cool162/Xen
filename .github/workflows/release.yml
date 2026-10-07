@@ -19,6 +19,12 @@ on:
         description: "Optional: an older commit to release (its dist/ jars and notes) instead of this one"
         required: false
         default: ""
+      public:
+        description: "yes: a full public release (marked Latest), even for an alpha or beta tag; for a tag already released, it's made public"
+        required: false
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
 
 permissions:
   contents: write
@@ -63,8 +69,13 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.+-]*$ ]] || { echo "not a version tag: $TAG"; exit 1; }
+          if [ "${{ inputs.public }}" = "yes" ] && gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease=false --latest   # (already out as a pre-release: now a public one)
+            exit 0
+          fi
           prerelease=""
           case "$TAG" in *alpha*|*beta*|*rc*|v0.*) prerelease="--prerelease" ;; esac
+          [ "${{ inputs.public }}" = "yes" ] && prerelease=""
           latest=""
           if [ -n "${{ inputs.commit }}" ]; then
             # (the workflow's token can't tag an old commit with other workflow files, so the tag goes on this one)
