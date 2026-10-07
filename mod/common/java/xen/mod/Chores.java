@@ -221,10 +221,10 @@ final class Chores {
 		want = Math.max(1, amount);
 		had = count(items);
 		int[] known = c.senses.nearestKnown(cats, 0.25, skip, 4);
-		for (int tries = 0; known != null && known[4] == Blocks.LOG && tries < 8; tries++) {   // a tree, not someone's house
+		for (int tries = 0; known != null && tries < 12; tries++) {             // a tree or rock, not someone's house (nor its own build)
 			BlockPos k = new BlockPos(known[0], known[1], known[2]);
 			ServerLevel level = (ServerLevel) c.player.level();
-			if (!level.isLoaded(k) || WorldSenses.treeLog(level, k)) break;
+			if (!c.builder.onSite(k) && (known[4] != Blocks.LOG || !level.isLoaded(k) || WorldSenses.treeLog(level, k))) break;
 			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
 			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
 		}
@@ -857,12 +857,16 @@ final class Chores {
 			return reach(bonus);
 		}
 		int[] known = glance(cats);                                    // what it can see around it (14 blocks)...
+		if (known != null && c.builder.onSite(new BlockPos(known[0], known[1], known[2]))) {   // (not out of its own build)
+			skip.add(Perception.Beliefs.key(known[0], known[1], known[2]));
+			known = null;
+		}
 		for (int tries = 0; known == null && tries < 12; tries++) {       // ...or saw earlier, further away
 			known = c.senses.nearestKnown(cats, 0.25, skip, 4);
 			if (known == null || known[4] != Blocks.STONE && known[4] != Blocks.LOG) break;
 			BlockPos k = new BlockPos(known[0], known[1], known[2]);       // what it saw: real stone, not a mushroom cap or a wall
 			ServerLevel level = (ServerLevel) c.player.level();         // (and a tree, not someone's house)
-			if (!level.isLoaded(k) || (known[4] == Blocks.LOG ? WorldSenses.treeLog(level, k)
+			if (!level.isLoaded(k) || !c.builder.onSite(k) && (known[4] == Blocks.LOG ? WorldSenses.treeLog(level, k)
 					: WorldSenses.isNaturalStone(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(k).getBlock()).getPath()))) break;
 			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
 			known = null;

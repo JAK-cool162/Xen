@@ -148,6 +148,17 @@ public final class XenConfig {
 	public int chatRange = 32;
 	/** Death messages reach only those within chatRange blocks of where it happened (this turns the show_death_messages game rule off). */
 	public boolean localDeaths = true;
+	/**
+	 * Hardcore: "auto" (the default: as the world is: a hardcore world, hardcore Xens), "on" or "off". A hardcore Xen has
+	 * one life: when it dies it's gone for good (it doesn't come back, the others remember it), and it lives like it:
+	 * it minds danger more, backs off sooner, and won't go off on a risky errand hurt, whoever asks and however nicely.
+	 */
+	public String hardcore = "auto";
+
+	/** Is it hardcore for Xens in this world? */
+	public boolean hardcore(net.minecraft.server.MinecraftServer server) {
+		return hardcore.equals("on") || hardcore.equals("auto") && server != null && server.isHardcore();
+	}
 	/** The generation (of evolution) from which Xens know the Nether portal math (and triangulate strongholds). */
 	public int smartsAtGeneration = 4;
 	/**

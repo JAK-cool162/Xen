@@ -26,9 +26,13 @@ import java.util.Set;
  * the normal cooldown and reach, and eats food it has. Nothing a player couldn't do.
  */
 public final class Hands {
-	static final Set<String> PLACEABLE = Set.of("cobblestone", "cobbled_deepslate", "dirt");
-	/** The order it spares them in (to climb on, to bridge, to block a gap): dirt, then deepslate, the cobblestone it makes things of last. */
-	private static final String[] SPARE_FIRST = {"dirt", "cobbled_deepslate", "cobblestone"};
+	static final Set<String> PLACEABLE = Set.of("cobblestone", "cobbled_deepslate", "dirt", "netherrack", "end_stone");
+	/**
+	 * The order it spares them in (to climb on, to bridge, to block a gap): dirt, netherrack and end stone (what's
+	 * everywhere in the Nether and the End: a tower up to a caged crystal takes 30 to 40), then deepslate, the
+	 * cobblestone it makes things of last.
+	 */
+	private static final String[] SPARE_FIRST = {"dirt", "netherrack", "end_stone", "cobbled_deepslate", "cobblestone"};
 
 	/** The block it can best spare that it carries, or null. */
 	String spareBlock() {
@@ -178,22 +182,46 @@ public final class Hands {
 	}
 
 	/**
-	 * Turn its view toward a point, at most this many degrees a tick (a quick flick of the mouse, never a jump). True
-	 * once it's looking right at it.
+	 * How hard a hand speeds a mouse turn up and slows it down (degrees a tick, each tick), as players turn: fitted to
+	 * 600 recorded runs of people walking to a point and chopping trees (OpenBlock-Team/Minecraft-Navigation and
+	 * Minecraft-ChopTree on Hugging Face, CC BY 4.0). There a turn of 9 degrees took 5 ticks, 40 degrees 8, 80 degrees 11
+	 * and 160 degrees 16, its speed rising and falling (barely any of it in the first tick): about the square root of the
+	 * turn, which a steady 2.2 degrees a tick, each tick, up to the middle and down after, gives.
+	 */
+	static final float TURN_ACCEL = 2.2f;
+	/** Its view's speed of turning now (degrees a tick), and the tick it last turned (a turn that stopped starts from still). */
+	private float turnVy, turnVx;
+	private int turnTick = -100;
+
+	/** The next speed toward an angle e away: up (or down) by accel, no faster than it can still stop in, or cap. */
+	private static float follow(float v, float e, float accel, float cap) {
+		float want = Math.signum(e) * Math.min(cap, (float) Math.sqrt(2 * accel * Math.abs(e)));
+		return v + net.minecraft.util.Mth.clamp(want - v, -accel, accel);
+	}
+
+	/**
+	 * Turn its view toward a point the way a hand moves a mouse: speeding up into the turn and slowing into the target
+	 * (at most this many degrees a tick). True once it's looking right at it.
 	 */
 	private boolean turnToward(Vec3 at, float maxYaw, float maxPitch) {
 		Vec3 d = at.subtract(p.getEyePosition());
 		float toY = (float) Math.toDegrees(Math.atan2(-d.x, d.z)), toX = (float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z)));
 		float dy = net.minecraft.util.Mth.wrapDegrees(toY - p.getYRot()), dx = toX - p.getXRot();
 		float scale = p.companion == null ? 1f : p.companion.reflexes.turnScale();
-		// a hand on a mouse (Xen 2.0): quick through the middle of a turn, slowing into the target
-		float sy = Math.min(maxYaw * scale, Math.abs(dy) * 0.6f + 1.5f), sx = Math.min(maxPitch * scale, Math.abs(dx) * 0.6f + 1.5f);
-		float y = p.getYRot() + net.minecraft.util.Mth.clamp(dy, -sy, sy), x = p.getXRot() + net.minecraft.util.Mth.clamp(dx, -sx, sx);
+		if (p.tickCount - turnTick > 1) turnVy = turnVx = 0;
+		turnTick = p.tickCount;
+		float accel = TURN_ACCEL * scale;
+		turnVy = follow(turnVy, dy, accel, maxYaw * scale);
+		turnVx = follow(turnVx, dx, accel, maxPitch * scale);
+		boolean doneY = Math.abs(dy) <= Math.max(1.5f, Math.abs(turnVy)), doneX = Math.abs(dx) <= Math.max(1.5f, Math.abs(turnVx));
+		float y = doneY ? p.getYRot() + dy : p.getYRot() + turnVy, x = doneX ? toX : p.getXRot() + turnVx;
+		if (doneY) turnVy = 0;
+		if (doneX) turnVx = 0;
 		p.setYRot(y);
 		p.setYHeadRot(y);
 		p.setXRot(x);
 		yaw = Math.floorMod(Math.round((y + 180f) / 90f), 4);
-		return Math.abs(dy) <= sy && Math.abs(dx) <= sx;
+		return doneY && doneX;
 	}
 
 	/**
@@ -267,6 +295,10 @@ public final class Hands {
 			return;
 		}
 		if (watching != null && watching.isAlive() && watching.level() == p.level()) {
+			if (p.companion != null && !p.companion.fightingNow()) {               // someone it notices: its head turns there (in a fight, eyes on them)
+				turnToward(watching.getEyePosition(), 30f, 25f);
+				return;
+			}
 			Vec3 d = watching.getEyePosition().subtract(p.getEyePosition());
 			float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
 			p.setYRot(yRot);
@@ -661,7 +693,7 @@ public final class Hands {
 			startMining();
 		} else {                                                           // it turns to it first (a few ticks), then digs
 			turning = true;
-			limit = 16;
+			limit = 24;
 		}
 		return true;
 	}

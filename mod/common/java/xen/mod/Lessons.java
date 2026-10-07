@@ -165,6 +165,27 @@ final class Lessons {
 	}
 
 	/**
+	 * It watched a player break ore (seen with its own eyes, not told): a little nearer that height, as far as it trusts
+	 * them; seeing it again and again makes it surer (a player who keeps finding diamonds at y -56 teaches it more than
+	 * one lucky find). Learning by watching, the way a new player copies someone who knows.
+	 */
+	void watched(String ore, int y, String who, float trust) {
+		String subject = ore.contains("diamond") ? "diamonds" : ore.contains("iron") ? "iron" : ore.contains("coal") ? "coal" : null;
+		if (subject == null) return;
+		Lesson l = lessons.computeIfAbsent(subject, s -> new Lesson(s, y, Source.PLAYER, 0.2f, who));
+		double t = Math.max(0, Math.min(1, (trust + 1) / 2));
+		double take = 0.15 * (0.4 + 0.6 * t) * (l.finds.size() >= 3 ? 0.4 : 1);       // (its own finds count for more)
+		double before = l.value;
+		l.value = l.prior = clampY(subject, l.value + Math.max(-4, Math.min(4, take * (y - l.value))));   // (one sighting: a few blocks at most)
+		l.priorSure = l.sure = Math.min(0.85f, l.sure + 0.04f);
+		if (l.finds.size() < 3 && Math.abs(before - l.value) > 0.5) {
+			l.source = Source.PLAYER;
+			l.teacher = who;
+		}
+		c.journal("learns", "watched " + who + " mine " + ore.replace('_', ' ') + " at y " + y + ": now thinks " + subject + " around y " + l.y());
+	}
+
+	/**
 	 * Something worth passing on to this Xen (a belief it holds for a reason: its own finds, or borne out, that the other
 	 * sees quite differently): {words, subject, y, sure}, or null.
 	 */

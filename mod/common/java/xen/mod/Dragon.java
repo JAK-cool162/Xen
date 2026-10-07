@@ -29,6 +29,13 @@ import java.util.List;
  *   <li>When it dies: into the portal in the middle, back home.</li>
  * </ol>
  * Without a bow it can't reach the crystals, so it fights only when the dragon lands (slower: it heals between).
+ * <p>What a recorded run that beat the game showed (aibengineering/beat-the-game-minecraft on Hugging Face, CC BY 4.0):
+ * eight open crystals went to arrows and the two caged ones to a tower of end stone (36 blocks each, mined there);
+ * four arrows at her in the air all missed, and thirteen landings with sword hits on her head killed her; down to half
+ * a heart, the player got away from the portal, ate, healed and came back. So: end stone from the island whenever its
+ * blocks run low (it brings only enough to bridge over),
+ * its own count of what its arrows at her do in the air, waiting out her breath where it means to stand, and a retreat
+ * to heal when it's low (a Xen that knows to; one that doesn't learns it there, the hard way).
  */
 final class Dragon {
 	private final Companion c;
@@ -40,6 +47,11 @@ final class Dragon {
 	private boolean saidStart, saidWon, saidNoBow;
 	private float dragonHealth = Float.NaN;
 	private long lastLine;
+	/** Arrows at her while she flew, and how many of those hit (her health fell): whether it's worth it, by its own count. */
+	private int flyShots, flyHits, arrowsWas = -1;
+	private boolean shootingHer;
+	/** Off healing (low on health), or mining end stone for a tower. */
+	private boolean healing, mining;
 
 	Dragon(Companion c) {
 		this.c = c;
@@ -94,6 +106,12 @@ final class Dragon {
 		}
 		Action away = outOfBreath(level);
 		if (away != null) return away;
+		Action heal = heal(level, dragon, top);
+		if (heal != null) return heal;
+		if (mining) {
+			if (c.chores.busy()) return null;                                   // (getting end stone: the chore has it)
+			mining = false;
+		}
 		if (caged != null) {
 			Action a = cage(level);
 			if (a != null) return a;
@@ -107,11 +125,16 @@ final class Dragon {
 		if (!Float.isNaN(dragonHealth) && dragon.getHealth() > dragonHealth + 0.5f && dragon.nearestCrystal != null) {
 			c.knowledge.learn("crystals_heal", Knowledge.How.SEEN);          // she healed from a crystal: those go first
 		}
-		dragonHealth = dragon.getHealth();
 		EnderDragonPhase<?> phase = dragon.getPhaseManager().getCurrentPhase().getPhase();
 		// Only once she sits: landing and taking off, her wings throw anyone close far away (that's what flung them).
 		boolean perched = phase == EnderDragonPhase.SITTING_SCANNING || phase == EnderDragonPhase.SITTING_ATTACKING
 				|| phase == EnderDragonPhase.SITTING_FLAMING;
+		int arrows = c.hands.arrows();                                          // its arrows at her in the air: did they do anything?
+		if (shootingHer && arrowsWas > arrows) flyShots += arrowsWas - arrows;
+		if (shootingHer && !perched && !Float.isNaN(dragonHealth) && dragon.getHealth() < dragonHealth - 0.5f) flyHits++;
+		arrowsWas = arrows;
+		shootingHer = false;
+		dragonHealth = dragon.getHealth();
 		if (perched) return headHit(dragon);
 		if ((phase == EnderDragonPhase.LANDING || phase == EnderDragonPhase.TAKEOFF || phase == EnderDragonPhase.LANDING_APPROACH)
 				&& c.player.distanceTo(dragon) < 16) {
@@ -119,6 +142,13 @@ final class Dragon {
 			Vec3 clear = c.player.position().subtract(dragon.position()).multiply(1, 0, 1);
 			if (clear.lengthSqr() < 1e-4) clear = new Vec3(1, 0, 0);
 			return c.walkTo(c.player.position().add(clear.normalize().scale(10)));
+		}
+		if (c.walker.blocks() < 32 && !c.chores.busy() && c.crafter.pickTier() >= 1) {   // low on blocks: the island is all end stone
+			line(c.pick3("Running low on blocks. Mining some end stone.", "Need more blocks. End stone's everywhere here.", "Topping up on end stone."));
+			c.chores.mineFor("end_stone", "end_stone", 48, "end stone to climb and bridge with");
+			c.chores.own = true;
+			mining = true;
+			return null;
 		}
 		if (c.hands.hasBow()) {                                                // (every player knows: the crystals heal her, they go first)
 			List<EndCrystal> left = crystals(level);
@@ -130,24 +160,26 @@ final class Dragon {
 			}
 			for (EndCrystal e : left) {
 				if (!isCaged(level, e)) continue;
-				if (c.walker.hasBlocks()) {
+				int need = towerBlocks(level, e);
+				if (c.walker.blocks() >= need) {
 					startCage(level, e);
 					return Action.IDLE;
 				}
+				if (!c.chores.busy()) {                                         // short of blocks: end stone, from the island
+					line(c.pick3("That one's caged. I need more blocks to climb up there.", "Caged crystal. Time to mine some end stone.",
+							"I'll need a tall tower for that one. End stone it is."));
+					c.journal("fight", "mining end stone for a tower to a caged crystal (" + c.walker.blocks() + " of " + need + " blocks)");
+					c.chores.mineFor("end_stone", "end_stone", need - c.walker.blocks() + 8, "end stone to climb with");
+					c.chores.own = true;
+					mining = true;
+					return null;
+				}
 			}
-			Vec3 head = dragon.head.position().add(0, 0.5, 0);
-			if (c.player.distanceTo(dragon) < 70 && c.player.hasLineOfSight(dragon)) {
-				c.goals.instant = "shooting at the dragon";
-				Action shot = c.shoot(head, dragon.getDeltaMovement());
-				if (shot != null) return shot;
-			}
+			Action shot = shootHer(dragon);
+			if (shot != null) return shot;
 		} else if (c.hands.hasBow()) {                                         // (not knowing about the crystals: at her)
-			Vec3 head = dragon.head.position().add(0, 0.5, 0);
-			if (c.player.distanceTo(dragon) < 70 && c.player.hasLineOfSight(dragon)) {
-				c.goals.instant = "shooting at the dragon";
-				Action shot = c.shoot(head, dragon.getDeltaMovement());
-				if (shot != null) return shot;
-			}
+			Action shot = shootHer(dragon);
+			if (shot != null) return shot;
 		} else if (!saidNoBow) {
 			saidNoBow = true;
 			line("No bow... I'll wait for her to land.");
@@ -186,6 +218,16 @@ final class Dragon {
 		Vec3 out = head.subtract(dragon.position()).multiply(1, 0, 1);
 		if (out.lengthSqr() < 1e-4) out = new Vec3(1, 0, 0);
 		Vec3 spot = new Vec3(head.x, c.player.getY(), head.z).add(out.normalize().scale(3));
+		AreaEffectCloud breath = breathAt((ServerLevel) c.player.level(), spot, 1.5);
+		if (breath != null) {                                                 // her breath where it would stand: it waits it out, close by
+			c.goals.instant = "waiting for the dragon's breath to clear";
+			Vec3 back = spot.subtract(breath.position()).multiply(1, 0, 1);
+			if (back.lengthSqr() < 1e-4) back = out;
+			Vec3 wait = breath.position().add(back.normalize().scale(breath.getRadius() + 3));
+			if (c.player.position().distanceTo(wait) > 2) return c.walkTo(new Vec3(wait.x, c.player.getY(), wait.z));
+			glance(dragon);
+			return Action.IDLE;
+		}
 		if (d > c.player.entityInteractionRange() + 0.5 || c.player.position().distanceTo(spot) > 2.5) return c.walkTo(spot);
 		if (c.player.getAttackStrengthScale(0.5f) < 0.9f) {
 			c.hands.face(head);
@@ -196,6 +238,76 @@ final class Dragon {
 		c.hands.hitEntity(dragon.head, head);
 		c.acted = true;
 		return Action.ATTACK;
+	}
+
+	/** A cloud of her breath over a spot (within its radius and some), or null. */
+	private static AreaEffectCloud breathAt(ServerLevel level, Vec3 at, double margin) {
+		for (AreaEffectCloud cloud : level.getEntitiesOfClass(AreaEffectCloud.class, new AABB(at, at).inflate(10))) {
+			if (Math.hypot(at.x - cloud.getX(), at.z - cloud.getZ()) <= cloud.getRadius() + margin && Math.abs(at.y - cloud.getY()) < 4) return cloud;
+		}
+		return null;
+	}
+
+	/**
+	 * Arrows at her while she flies: only while they're worth it, by its own count of hits for arrows (and what it was
+	 * told, if it knows: in the recorded run four arrows at her in the air all missed). Not knowing, it tries, and when
+	 * its arrows keep missing it finds that out for itself: then it waits for her to land.
+	 */
+	private Action shootHer(EnderDragon dragon) {
+		int told = c.knowledge.knows("dragon_perch") ? 4 : 0;
+		if (flyShots >= 3 && flyHits == 0 && c.knowledge.learn("dragon_perch", Knowledge.How.TRIED)) {
+			line(c.pick3("My arrows keep missing her up there. I'll wait for her to land.", "Can't hit her while she flies. I'll get her when she lands.",
+					"Waste of arrows. Waiting for her to land."));
+		}
+		if ((flyHits + 1f) / (flyShots + told + 2f) < 0.3f) return null;
+		Vec3 head = dragon.head.position().add(0, 0.5, 0);
+		if (c.player.distanceTo(dragon) >= 70 || !c.player.hasLineOfSight(dragon)) return null;
+		c.goals.instant = "shooting at the dragon";
+		Action shot = c.shoot(head, dragon.getDeltaMovement());
+		if (shot != null) shootingHer = true;
+		return shot;
+	}
+
+	/**
+	 * Low on health: away from the portal (where she lands and breathes) to the far side of the island from her, eating,
+	 * until it's healed (a timid Xen goes sooner). In the recorded run the player was down to half a heart at the portal,
+	 * got forty blocks away, and came back with full health. A Xen that doesn't know to, keeps at it, and learns it when
+	 * it nearly dies.
+	 */
+	private Action heal(ServerLevel level, EnderDragon dragon, int top) {
+		float hp = c.player.getHealth();
+		if (!healing) {
+			boolean knows = c.knowledge.knows("end_retreat");
+			if (!knows && hp <= 4 && c.knowledge.learn("end_retreat", Knowledge.How.TRIED)) knows = true;   // (that close: it learns)
+			if (!knows || hp > 6 + 4 * (1 - c.personality.bravery) + (c.hardcore() ? 4 : 0)) return null;   // (one life: sooner)
+			healing = true;
+			caged = null;
+			line(c.pick3("I'm almost dead. Backing off to heal.", "Too hurt. I need a minute away from her.", "Low health! Getting out of here to heal."));
+			c.journal("fight", String.format(java.util.Locale.ROOT, "backs off from the dragon to heal (%.0f health)", hp));
+		}
+		if (hp >= c.player.getMaxHealth() - 2) {
+			healing = false;
+			line(c.pick3("Healed up. Back to it!", "Okay, I'm good. Round two.", "All better. Here I come, dragon."));
+			return null;
+		}
+		c.goals.instant = "healing away from the dragon";
+		var food = c.player.getFoodData();
+		if (food.getFoodLevel() < 20 && c.items().getOrDefault("food", 0) > 0) return Action.EAT;   // (full food heals fast)
+		Vec3 from = new Vec3(dragon.getX() - 0.5, 0, dragon.getZ() - 0.5);
+		Vec3 away = from.lengthSqr() < 1 ? new Vec3(-c.player.getX(), 0, -c.player.getZ()) : from.scale(-1);
+		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
+		away = away.normalize();
+		Vec3 spot = XenMod.surface(level, (int) Math.floor(away.x * 40), (int) Math.floor(away.z * 40));
+		if (spot != null && c.player.position().distanceTo(spot) > 4) return c.walkTo(spot);
+		glance(dragon);
+		return Action.IDLE;
+	}
+
+	/** Blocks for a tower up to a caged crystal (from the ground beside its pillar to the pillar's top) and a bridge back out. */
+	private int towerBlocks(ServerLevel level, EndCrystal e) {
+		Vec3 ground = XenMod.surface(level, (int) Math.floor(e.getX()) + 4, (int) Math.floor(e.getZ()));
+		int from = ground == null ? 62 : (int) ground.y;
+		return Math.max(8, (int) Math.floor(e.getY()) - 1 - from) + 14;
 	}
 
 	/** Out of the dragon's purple breath (it hurts a lot): the nearest spot it isn't. */
@@ -342,7 +454,7 @@ final class Dragon {
 			tower = null;                                                            // down again
 			return false;
 		}
-		return (under.equals("cobblestone") || under.equals("dirt") || under.equals("cobbled_deepslate")) && feet.getY() >= ground;
+		return Hands.PLACEABLE.contains(under) && feet.getY() >= ground;
 	}
 
 	private Action climbDown(ServerLevel level) {

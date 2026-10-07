@@ -129,6 +129,8 @@ public class XenSettingsScreen extends Screen {
 						"accurate: a real account's own skin for a Xen with a real name; otherwise skins real players made (mineskin.org's gallery, online; the modern ones until then). blob: Xen 2.0's look, simple skins: flat colours, two plain eyes. modern: the mod's skins in today's style (shaded hair, hoodies, jackets; many slim). random: all the mod's skins and Minecraft's 18. pack: the modern and the fun ones. fun: the funny 61 of earlier versions. folder: your own PNG skins in config/xen/skins (from NameMC, Planet Minecraft or drawn yourself; signed once through mineskin.org, so everyone sees them). mineskin: random skins from mineskin.org's gallery (online). Or a player's skin: /xen set skins player:Name.");
 				choice("AI chat (on this device)", "chatModel", List.of("auto", "on", "off"), s -> s.equals("off") ? "off (own words)" : s,
 						"The small AI chat model runs on your own device (your computer or phone), never online: a 400 MB download once, and some memory and power while it talks. auto = only when the game has about 3 GB of memory. off = it never runs: Xens talk with their own words instead (light: a word library and a tiny network, nothing to download), each in its own tone, and still do what you ask. It only wakes when someone a Xen knows is near or talks.");
+				choice("Hardcore", "hardcore", List.of("auto", "on", "off"), s -> s.equals("auto") ? "auto (as the world)" : s,
+						"One life each. A hardcore Xen that dies is gone for good: it doesn't come back, and those who knew it remember it. It lives like it, too: it minds danger more, backs off from a fight sooner, and won't go off on a risky errand while hurt, however nicely it's asked. auto: hardcore in a hardcore world.");
 			}
 			case 1 -> {
 				onOff("Chat", "chat", "Xen answers and understands chat.");
@@ -156,6 +158,8 @@ public class XenSettingsScreen extends Screen {
 			}
 			case 3 -> {
 				onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, trading, exploring) and a dream to work toward, and learn which they like.");
+				choice("Hardcore", "hardcore", List.of("auto", "on", "off"), s -> s.equals("auto") ? "auto (as the world)" : s,
+						"One life each. A hardcore Xen that dies is gone for good: it doesn't come back, and those who knew it remember it. It lives like it, too: it minds danger more, backs off from a fight sooner, and won't go off on a risky errand while hurt, however nicely it's asked. auto: hardcore in a hardcore world.");
 				onOff("Antics", "antics", "Xen does unpredictable things for fun: dances along when you crouch-dance, shows off tricks (that don't always work), surprises in fights. Playful Xens more.");
 				String mind = xen.mod.core.Mind.VERSION;                           // (the mind that ships: its own name, never out of date)
 				choice("Brain", "brain", List.of("xen2", "dmm"), s -> s.equals("xen2") ? mind : "classic (DMM)",

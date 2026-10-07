@@ -40,6 +40,8 @@ final class Builder {
 	Architect.Plan plan;
 	/** The house it designed and is building (null: not a house of its own design). */
 	Taste.Design design;
+	/** The village house it's copying (null: none). */
+	private VillageHouses.House copied;
 
 	/**
 	 * Its home, as it designed and built it: where (the front left corner), which way the door faces, the design, the
@@ -287,6 +289,12 @@ final class Builder {
 		return plan != null && helping == null && (c.goals.option >= 0 || c.goals.current != null);
 	}
 
+	/** Is this where it's building (in its plan's box, a block around)? What's there is its build, not a tree or a quarry. */
+	boolean onSite(BlockPos p) {
+		if (plan == null || bounds == null) return false;
+		return bounds.deflate(5).contains(Vec3.atCenterOf(p));
+	}
+
 	/** Is a block of its plan still to go here? (So it doesn't put its crafting table there.) */
 	boolean planned(BlockPos p) {
 		if (plan == null) return false;
@@ -336,6 +344,7 @@ final class Builder {
 		ServerLevel level = (ServerLevel) c.player.level();
 		creative = c.player.isCreative();
 		design = null;
+		copied = null;
 		Direction front = facing != null ? facing : c.player.getDirection().getOpposite();   // the door faces where it stood looking from
 		BlockPos feet = c.player.blockPosition();
 		boolean base = what.contains("base") || what.contains("underground") || what.contains("bunker");
@@ -368,6 +377,22 @@ final class Builder {
 			boolean starter = !creative && c.goals.home == null;            // its first house: what a few trees give
 			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
+			// a village house it saw (asked for one, or its taste for copying says so: not for its very first house, which is what a few trees give)
+			boolean village = what.contains("village");
+			VillageHouses.House copy = village || !starter && asked == null && c.taste.copies()
+					? VillageHouses.pick(c, level.getServer(), village && VillageHouses.seen(c).isEmpty() ? VillageHouses.kindAt(level, feet) : null, creative, new Random())
+					: null;
+			if (copy != null) {
+				int[] fp = VillageHouses.footprint(copy, front);
+				BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, fp[0] + 1, fp[1] + 1);
+				if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
+				String wood = woodType();
+				made = VillageHouses.plan(copy, corner, front, creative, wood);
+				c.journal("build", "copies a village house it saw: a " + copy.name());
+				String planned = begin(made, (creative ? "" : " out of " + wood + " wood and cobblestone") + " (a copy of a " + copy.name() + " from a village)", wood);
+				copied = copy;
+				return planned;
+			}
 			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked, area(level, feet));
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, ds.w() + 1, ds.d() + 1);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
@@ -686,6 +711,11 @@ final class Builder {
 		if (building != null && what.endsWith("house")) {                     // its home, as it stands now (the next upgrade starts from it)
 			home = building;
 			building = null;
+		}
+		if (copied != null && what.equals("village house")) {                // how did the copy go? (its taste for copying learns from it)
+			long took = (now() - started) / 20;
+			c.taste.builtCopy(copied.design(), plan.middle(), 0.3f - Math.min(0.6f, miss / (float) Math.max(10, placed) * 3f) - (took > 1800 ? 0.2f : 0));
+			copied = null;
 		}
 		if (design != null && what.endsWith("house")) {                       // how did its design go? (it learns from that)
 			long took = (now() - started) / 20;

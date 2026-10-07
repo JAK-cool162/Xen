@@ -78,10 +78,12 @@ public final class Chat {
 	/** Which model is loaded now (null: none). */
 	public volatile Model loaded;
 
-	static final String PERSONA = "<|im_start|>system\nYou are Xen, a survival companion in Minecraft. You play fair like a real player: "
-			+ "you only know what you have seen yourself, and far-away things are only guesses. You feel fear, pain and "
-			+ "curiosity. Answer as Xen in one or two short, friendly sentences. Only talk about things in your notes; if you "
-			+ "don't know, say so. Never write commands.<|im_end|>\n"
+	// Who Xen is to itself (from its maker's XEN_CORE, cut down for a small model): a player in this world, knowing
+	// only what it perceived, remembers or was told, with goals, friends and fears of its own.
+	static final String PERSONA = "<|im_start|>system\nYou are Xen, a player living in this Minecraft world. You only know what you have seen, remember or were "
+			+ "told yourself; far-away things are guesses, and it is fine not to know. You have your own goals, friends and "
+			+ "fears, and you can say no. Answer as Xen in one or two short, friendly sentences. Only talk about things in your "
+			+ "notes. Never write commands.<|im_end|>\n"
 			+ "<|im_start|>user\nNotes: You feel calm. You know there is a pumpkin 4 blocks from you.\n"
 			+ "Steve says: what do you see?<|im_end|>\n"
 			+ "<|im_start|>assistant\nI can see a pumpkin about 4 blocks from me.<|im_end|>\n"
@@ -90,7 +92,10 @@ public final class Chat {
 			+ "<|im_start|>assistant\nNo, I haven't seen any gold. And I'm hurt, so let's be careful.<|im_end|>\n"
 			+ "<|im_start|>user\nNotes: You feel happy. You carry 12 cobblestone. You know there is water 5 blocks from you.\n"
 			+ "Steve says: thanks for the help!<|im_end|>\n"
-			+ "<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n";
+			+ "<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n"
+			+ "<|im_start|>user\nNotes: You feel curious. Nothing special is around you.\n"
+			+ "Alex says: are you a bot?<|im_end|>\n"
+			+ "<|im_start|>assistant\nNo, I'm Xen. I live out here, same as you.<|im_end|>\n";
 
 	// ------------------------------------------------------------------------------ requests
 	/** What Xen can be asked to do. The chat model picks one of these words; without it, the rules below do. */
@@ -104,11 +109,12 @@ public final class Chat {
 			+ String.join("|", CRAFTABLE) + ")\\b");
 	private static final Pattern CRAFT_WORD = Pattern.compile("\\bcraft(ing)? (me |us )?(a |an |some |the |\\d+ )*([a-z_]+)");
 	private static final Pattern TOWER = Pattern.compile("\\b(tower|skyscraper)\\b"), STILTS = Pattern.compile("\\bstilts?\\b"),
-			MODERN = Pattern.compile("\\b(modern|contemporary|minimalist)\\b"), COTTAGE = Pattern.compile("\\b(cottage|cabin|cozy|cosy)\\b");
+			MODERN = Pattern.compile("\\b(modern|contemporary|minimalist)\\b"), COTTAGE = Pattern.compile("\\b(cottage|cabin|cozy|cosy)\\b"),
+			VILLAGE = Pattern.compile("\\bvillage(r|rs)?('s)? (house|home|hut)|\\b(house|home) like (the|a) village|\\bvillage[- ]style\\b");
 
-	/** A house in the style asked for ("a modern house", "a house on stilts", "a tower"), or just "house". */
+	/** A house in the style asked for ("a modern house", "a house on stilts", "a tower", "a village house"), or just "house". */
 	static String houseStyle(String words) {
-		return TOWER.matcher(words).find() ? "tower" : STILTS.matcher(words).find() ? "stilt house" : MODERN.matcher(words).find() ? "modern house"
+		return VILLAGE.matcher(words).find() ? "village house" : TOWER.matcher(words).find() ? "tower" : STILTS.matcher(words).find() ? "stilt house" : MODERN.matcher(words).find() ? "modern house"
 				: COTTAGE.matcher(words).find() ? "cottage" : "house";
 	}
 
@@ -525,7 +531,8 @@ public final class Chat {
 							+ "<|im_end|>\n<|im_start|>assistant\n";
 					for (int attempt = 0; attempt < 2 && answer == null; attempt++) {  // made something up: try once more
 						String text = safe(model.generate(prompt, 40, 0.5f, 0.9f, System.nanoTime()));
-						if (honest(text, notes).equals(text) && !PROMISE.matcher(text.toLowerCase(Locale.ROOT)).find()) answer = text;
+						if (honest(text, notes).equals(text) && !PROMISE.matcher(text.toLowerCase(Locale.ROOT)).find()
+								&& !OUTSIDE.matcher(text).find()) answer = text;           // (and never "as an AI...")
 					}
 				}
 				reply.accept(answer != null ? answer : plainly(notes, message));
@@ -701,6 +708,9 @@ public final class Chat {
 			{"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},
 			{"\\bYou\\b", "I"}, {"\\byou\\b", "me"}};
 	private static final Pattern PLAN = Pattern.compile("\\bPlan: (.+)$");
+	/** Talk from outside the world (an AI, a bot, a program): not how Xen thinks of itself. Such a reply is thrown away. */
+	static final Pattern OUTSIDE = Pattern.compile("\\b(ai|a\\.i\\.|artificial intelligence|language model|chat ?bot|bot|npc|program|assistant)\\b",
+			Pattern.CASE_INSENSITIVE);
 	/** Talk can't make it do things (only requests do), so it mustn't promise to. */
 	private static final Pattern PROMISE = Pattern.compile("\\b(i'll|i will|i'm going to|let me|i can) (go |go and )?(get|build|chop|mine|dig|find|"
 			+ "bring|give|follow|hunt|make|collect|gather|fetch|craft|check|look|explore|kill)\\b");

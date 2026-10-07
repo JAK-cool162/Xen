@@ -167,7 +167,10 @@ public class XenMod implements ModInitializer {
 		ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, base, taken, blocked) -> {   // (gameplay logs: what hurt whom)
 			if (entity instanceof ServerPlayer && !blocked) gameplayLog.quietly(() -> gameplayLog.damaged(entity, source, taken));
 		});
-		net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, be) -> gameplayLog.quietly(() -> gameplayLog.broke(player, pos, state)));
+		net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, be) -> {
+			gameplayLog.quietly(() -> gameplayLog.broke(player, pos, state));
+			watchedBreak(player, pos, state);
+		});
 		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
 			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.swing(player, entity));
 			return InteractionResult.PASS;
@@ -456,6 +459,12 @@ public class XenMod implements ModInitializer {
 
 	private void tickWorld(MinecraftServer s) {
 		DesignTest.maybeRun(s);                                          // (developing designs: only with -Dxen.designTest)
+		float life = config.hardcore(s) ? 1.4f : 1f;                     // hardcore: one life, every danger weighs more
+		if (life != Personality.lifeWeight) {
+			Personality.lifeWeight = life;
+			for (Companion c : companions) c.applyPersonality();
+			LOG.info("Xens are {}", life > 1 ? "hardcore: one life each, gone for good when they die" : "not hardcore: they respawn");
+		}
 		if (s.getTickCount() % 40 == 0) chatModelNews();
 		if (s.getTickCount() % 20 == 0) avatar.tick();
 		arena.tick();
@@ -581,6 +590,44 @@ public class XenMod implements ModInitializer {
 
 	void forget(Companion c) {
 		companions.remove(c);
+	}
+
+	/**
+	 * A player broke ore: the Xens close by that saw it (in their view, nothing in between) learn where that ore is from
+	 * watching, the way a new player copies someone who knows (not Xens watching Xens: they tell each other instead).
+	 */
+	private void watchedBreak(net.minecraft.world.entity.player.Player player, BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+		if (player instanceof XenPlayer || !(player instanceof ServerPlayer sp)) return;
+		String n = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+		if (!n.endsWith("_ore")) return;
+		for (Companion c : companions) {
+			var me = c.player();
+			if (me == null || me.level() != sp.level() || me.distanceTo(sp) > 24 || !me.hasLineOfSight(sp)) continue;
+			c.lessons.watched(n, pos.getY(), sp.getGameProfile().name(), c.trust(sp.getUUID()));
+			LOG.info("{} watched {} mine {} at y {}: thinks {} around y {}", c.name, sp.getGameProfile().name(), n, pos.getY(),
+					n.contains("diamond") ? "diamonds" : n.contains("iron") ? "iron" : "coal", c.lessons.depth(n.contains("diamond") ? "diamonds" : n.contains("iron") ? "iron" : "coal", 0));
+		}
+	}
+
+	/**
+	 * A hardcore Xen died: it's gone for good. Nothing of it is kept (a Xen by that name later is someone new), it's in
+	 * the world's history, the players are told, and every Xen that knew it remembers (and those that liked it say so).
+	 */
+	void goneForGood(Companion c, java.util.UUID id, BlockPos at, String how) {
+		roster.forget(c.name);
+		roster.save();
+		away.remove(c.name);
+		saveAway();
+		Component line = Component.literal("[Xen] " + c.name + " is gone for good (hardcore: one life).").withStyle(net.minecraft.ChatFormatting.GRAY);
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer)) p.sendSystemMessage(line);
+		LOG.info("{} died for good ({}): hardcore", c.name, how);
+		for (Companion o : companions) {
+			if (o == c || o.player() == null || id == null || !o.known.contains(id) && o.trust(id) == 0) continue;
+			o.journal("remembers", c.name + " died (" + how + ") and is gone for good");
+			if (o.trust(id) > 0.3f && o.player().blockPosition().closerThan(at, 64)) {
+				o.chatter(o.pick3("Rest in peace, " + c.name + ".", "I can't believe " + c.name + " is gone...", c.name + "... gone. Just like that."), true);
+			}
+		}
 	}
 
 	private void ownerLeft(ServerPlayer p) {

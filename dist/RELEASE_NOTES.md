@@ -1,7 +1,57 @@
-**Xen Companion 2.0.0-beta.10**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.11**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.11: hardcore Xens, who Xen is, village houses, and lessons from a run that beat the game
+
+* **Hardcore (new setting, Basics page): one life.** A hardcore Xen that dies is **gone for good**: it doesn't come
+  back, nothing of it is kept (a Xen by that name later is someone new), the players are told, the world's history
+  records it, and the Xens that knew it remember it ("Rest in peace, ..."). It lives like it, too: it minds every
+  danger more, backs off from the dragon sooner, and won't go off on a risky errand while hurt, however nicely it's
+  asked ("No, not hurt like this: I have only one life"). `auto` (the default) is hardcore in a hardcore world.
+* **Who Xen is to itself.** The chat model's prompt is now a short version of the maker's XEN_CORE: a player living in
+  this world, who knows only what it has seen, remembers or was told, has goals, friends and fears of its own, and can
+  say no. A reply that talks about itself as an AI, a bot or a program is thrown away. Asked "are you a bot?", a Xen
+  says something like "No, I'm Xen. I live out here, same as you."
+* **Village houses.** A Xen that comes to a village looks at its houses, and a little of their style rubs off on its
+  own designs. It may also build one of them: a copy, the way a player copies a house they liked, out of what it has
+  (its own wood; cobblestone for the sandstone, terracotta and ice it can't make), or block for block in creative.
+  Whether it copies or designs its own is its taste (curious Xens like their own ideas), and it learns from how the
+  copy went and what you say about it. Ask for one: "build a village house". The houses come from the game's own
+  structure files, read from your game: nothing of Mojang's is copied into Xen.
+* **The End, from a run that beat the game** (an AI agent's full playthrough, shared as a dataset): its arrows at the
+  flying dragon all missed, so a Xen now keeps count of what its own arrows do and waits for her to land when they
+  miss (a Xen that knows it waits from the start); it waits out her breath where it means to stand; it backs off to
+  heal when it's low (down to half a heart, the player got away from the portal, ate and came back full); and before
+  jumping in, it puts its bed down by the portal and uses it, so dying in the End brings it back there.
+* **End stone counts.** A Xen couldn't build with end stone (or netherrack): in the End, once its cobblestone ran out,
+  it gave up on the caged crystals. Now it mines end stone when it's short (the island is all end stone) and builds
+  its towers and bridges with it, so it brings only 64 blocks from home.
+* **It turns its head like a person.** Fitted to 600 recorded runs of people walking and chopping trees: a turn speeds
+  up and slows down (a 90 degree turn takes about half a second, not three ticks).
+* **It learns where ore is by watching you.** A Xen that sees you mine diamonds or iron moves its idea of where they are
+  a little toward that height (and its own finds still count for more).
+* **Fixed:** a Xen short of stone or wood for its house went and dug up its own house (its cobblestone base, its log
+  frame). It never takes from its own build now.
+* Tested in the game:
+
+  | Test | Result |
+  |---|---|
+  | Hardcore Xen killed | "gone for good", never came back, not kept for next time |
+  | Hurt hardcore Xen, "please get some wood" | "No, not hurt like this: I have only one life..."; with hardcore off it went |
+  | "are you a bot?" | "Me? No. I see what I see and do things with my own two hands, like you." |
+  | Steve mines a diamond in front of a Xen | it noted where (its idea of the height moved a few blocks) |
+  | "build a village house" in creative | a snowy village house from the game's own file, finished in 37 to 144 s |
+  | "build a village house" in survival (spruce logs, some cobblestone) | a snowy small house in spruce and cobblestone: 155 blocks in 226 s (26 decorations it had nothing to make from left out) |
+
+* **Credits**: the End lessons come from *Mine AI MCP: the run that beat Minecraft* by AI Bengineering
+  ([aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)); the head turning is fitted to
+  [OpenBlock-Team/Minecraft-Navigation](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-Navigation) and
+  [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Xen holds none of their data: only what was learned
+  from them (a few numbers and rules, written in Xen's own code).
 
 ### 2.0.0-beta.10: the End, from a recorded dragon fight
 

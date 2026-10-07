@@ -344,8 +344,8 @@ final class SmallTalk {
 			return "I can gather wood, stone and ores, craft, build houses in any style, farm, fish, trade, fight, go to the Nether and the End"
 					+ ", and go to any spot you name. Just ask, like \"" + c.name + ", get me some wood\".";
 		}
-		if (BOT.matcher(w).find()) return c.pick3("I'm " + c.name + ". As real as anyone in this world.", "Beep boop. Just kidding. I'm " + c.name + ".",
-				"A bot? I play fair: I only see what I see, and I use my hands like you.");
+		if (BOT.matcher(w).find()) return c.pick3("I'm " + c.name + ". As real as anyone in this world.", "No, I'm " + c.name + ". I live out here, same as you.",
+				"Me? No. I see what I see and do things with my own two hands, like you.");
 		if (SAD.matcher(w).find()) {
 			var m = SAD.matcher(w);
 			m.find();

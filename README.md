@@ -220,8 +220,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.10+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.10+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.11+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.11+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
 **all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
@@ -748,6 +748,17 @@ docs/screenshots/     the settings screen in a real game client
 scripts/              real-server verification, mod test fixtures, circuits for the mod
 tests/                python -m unittest discover -s tests -t .
 ```
+
+## Credits
+
+* Chat model: [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) by Hugging Face (Apache-2.0).
+* End fight lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
+  [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Turned into Xen's own rules and lessons; no data from it is in the repository.
+* Human head turning (2.0.0-beta.11): fitted to [OpenBlock-Team/Minecraft-Navigation](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-Navigation)
+  and [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen,
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Only the fitted numbers are in the code.
+* Village houses: Minecraft's own structure files, read from the player's game at run time (nothing of Mojang's is included).
 
 ## Tests
 

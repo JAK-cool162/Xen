@@ -73,7 +73,15 @@ final class Knowledge {
 			t("pearl_clutch", "flung high or off the edge: an ender pearl at the ground below (or back to land) saves you",
 					"\\b(ender )?pearls?\\b.*\\b(clutch|fall|void|save|down|land|flung)"),
 			new Mechanic("trial_walls", "a big, dead-flat wall in a cave means a trial chamber is behind it (the world makes its walls flat)", false,
-					Pattern.compile("\\b(flat|straight|smooth)\\b.*\\bwalls?\\b.*\\btrial|\\btrial\\b.*\\b(flat|straight|smooth)\\b.*\\bwalls?"), 0.3f));
+					Pattern.compile("\\b(flat|straight|smooth)\\b.*\\bwalls?\\b.*\\btrial|\\btrial\\b.*\\b(flat|straight|smooth)\\b.*\\bwalls?"), 0.3f),
+			// From a recorded run that beat the game (aibengineering/beat-the-game-minecraft on Hugging Face, CC BY 4.0): what
+			// worked in its End fight. Half of players know these going in; the rest find out there, or are told.
+			new Mechanic("dragon_perch", "arrows at the dragon while she flies mostly miss: wait for her to land on the portal and hit her head", false,
+					Pattern.compile("\\bdragon\\b.*\\b(land|lands|perch|perches|sits)\\b|\\b(arrows?|shoot)\\b.*\\bdragon\\b.*\\bmiss"), 0.5f),
+			new Mechanic("end_retreat", "low on health in the End: get away from the portal, eat and heal, then go back", false,
+					Pattern.compile("\\b(end|dragon)\\b.*\\b(low|heal|retreat|back off|run away)\\b|\\b(heal|retreat)\\b.*\\b(end|dragon)\\b"), 0.6f),
+			new Mechanic("end_bed", "before the End, use a bed right by the portal: if you die there, you come back next to it", false,
+					Pattern.compile("\\bbed\\b.*\\b(portal|stronghold|end)\\b.*\\b(spawn|respawn|die)|\\b(spawn|respawn)\\b.*\\bbed\\b.*\\b(portal|stronghold|end)\\b"), 0.5f));
 
 	private static Mechanic m(String id, String fact, boolean born, String taught) {
 		return new Mechanic(id, fact, born, taught == null ? null : Pattern.compile(taught), born ? 1 : 0);

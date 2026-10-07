@@ -70,6 +70,7 @@ final class Structures {
 		if (many) c.places.rememberAnother(sign[1], at, sign[1].equals("village") ? 160 : 96);
 		else c.places.remember(sign[1], at);
 		c.journal("sees", "a " + sign[1] + " at " + at.toShortString() + " (" + c.places.biomeAt(at) + ")");
+		if (sign[1].equals("village")) VillageHouses.saw(c, level, at);       // (it looks at the houses: a little of their style rubs off)
 		if (!sign[1].equals("old ruins")) c.lore(c.name + " found a " + sign[1] + " at " + at.getX() + " " + at.getZ() + " (" + c.places.biomeAt(at) + ")");
 		c.chatter(sign[2], false);
 	}

@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.10
+# Xen Companion (Fabric mod) 2.0.0-beta.11
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.10+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.10+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.10+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.10+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.11+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.11+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.11+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.11+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.10+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.11+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -636,6 +636,26 @@ chat with it, it knows them):
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
 
+## Hardcore, who Xen is, village houses (2.0.0-beta.11)
+
+**Hardcore** (Basics page, `/xen set hardcore auto|on|off`): one life each. A hardcore Xen that dies is gone for good:
+it doesn't come back, nothing of it is kept, and the Xens that knew it remember it. It minds danger more, backs off
+sooner, and won't go off on a risky errand while hurt, however nicely it's asked. `auto` (the default) follows the
+world: hardcore in a hardcore world.
+
+**Who Xen is**: to the chat model, a player living in this world, who knows only what it has seen, remembers or was
+told, with goals, friends and fears of its own. A reply that talks about itself as an AI, a bot or a program is thrown
+away.
+
+**Village houses**: a Xen that comes to a village looks at its houses (their style rubs off on its designs) and may
+build a copy of one, out of what it has; "build a village house" asks for one. They're read from the game's own
+structure files in your game, so nothing of Mojang's is in Xen.
+
+**The End**: it counts what its arrows at the flying dragon do and waits for her to land when they miss, waits out her
+breath, backs off to heal when low, uses a bed by the End portal before jumping in, and mines end stone for towers and
+bridges when it's short. It turns its head like a person (fitted to recorded play), and learns where ore is by
+watching you mine it.
+
 ## The End, from a recorded fight (2.0.0-beta.10)
 
 A Xen hits the perched dragon from the side (never under her head, where her wings fling you as she takes off),
@@ -1144,6 +1164,7 @@ away in single player. On a server, operators use:
 | `localChat` | `true` | chat reaches only those within `chatRange` blocks (Xens close by overhear) |
 | `chatRange` | `32` | how far local chat and local death messages carry |
 | `localDeaths` | `true` | death messages only reach those within `chatRange` |
+| `hardcore` | `auto` | `on`: one life each (a Xen that dies is gone for good, and minds danger more); `off`; `auto`: as the world |
 | `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
 | `chatModelPick` | `"auto"` | Experimental tab: `"135m"`, `"360m"`, `"off"` or `"auto"` (the Talk tab decides) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
@@ -1230,3 +1251,18 @@ cd mod/mc1.21.11     # or mod/mc26
 
 The chat model is [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct)
 by Hugging Face, Apache-2.0 license.
+
+## Credits
+
+* The chat model: [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) by Hugging Face
+  (Apache-2.0).
+* The End lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
+  [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft)
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). What its End fight showed was turned into Xen's own
+  rules and lessons; none of the data is in Xen.
+* How a Xen turns its head (2.0.0-beta.11): fitted to
+  [OpenBlock-Team/Minecraft-Navigation](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-Navigation) and
+  [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen
+  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Only the fitted numbers are in Xen.
+* Village houses: Minecraft's own structure files, read from the player's game while it runs (not copied into Xen).
+* Everything else Xen learned from: its maker's own recorded play.

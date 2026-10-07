@@ -217,6 +217,11 @@ final class Walker {
 		return throwaway() > 0;
 	}
 
+	/** How many blocks it carries to climb and bridge with. */
+	int blocks() {
+		return throwaway();
+	}
+
 	/** Braver for a while (the solver's "bolder way"): bigger drops, longer jumps, and the ways that failed get another go. */
 	void dare(int ticks) {
 		if (now() >= daringUntil) {

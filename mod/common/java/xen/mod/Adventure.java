@@ -39,6 +39,9 @@ final class Adventure {
 	Stage stage;
 	private long stageSince, lastLine;
 	private boolean skipBow;
+	/** The bed it put down by the End portal (and whether it has used it yet: that's where it comes back if it dies). */
+	private BlockPos portalBed;
+	private boolean bedUsed;
 	private final java.util.Random random = new java.util.Random();
 
 	Adventure(Companion c) {
@@ -111,10 +114,13 @@ final class Adventure {
 		return Stage.EYES;
 	}
 
-	/** Ready for the End: food, blocks to tower and bridge with, a water bucket. */
+	/**
+	 * Ready for the End: food, and blocks enough to bridge from the platform it arrives on over to the island (64; the
+	 * rest it mines there: the island is all end stone, the towers to the caged crystals are built of it).
+	 */
 	private boolean prepared() {
 		var items = c.items();
-		return items.getOrDefault("food", 0) >= 10 && items.getOrDefault("cobblestone", 0) + items.getOrDefault("dirt", 0) >= 128;
+		return items.getOrDefault("food", 0) >= 10 && c.walker.blocks() >= 64;
 	}
 
 	/** The next step (null: its other goals decide this moment, like eating and sleeping, or a chore it just started). */
@@ -171,7 +177,7 @@ final class Adventure {
 					c.chores.hunt(6);
 					c.chores.own = true;
 				} else {
-					line("I'll need lots of blocks in the End, for towers and bridges.");
+					line("I'll need some blocks to bridge over to the End island.");
 					c.chores.gather("stone", 64);
 					c.chores.own = true;
 				}
@@ -401,6 +407,8 @@ final class Adventure {
 				line("The portal is open. Let me get ready first.");
 				return null;
 			}
+			Action bed = bedByPortal(level);
+			if (bed != null) return bed;
 			c.chatter(c.pick3("Here goes nothing!", "To the End!", "Wish me luck!"), true);
 			return c.nether.enter(open);
 		}
@@ -424,6 +432,43 @@ final class Adventure {
 		c.hands.useWith(empty, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("ender_eye"));
 		c.acted = true;
 		return Action.PLACE;
+	}
+
+	/**
+	 * Before it jumps in: its bed down by the portal, and used (a bed sets where you come back, day or night), so dying
+	 * in the End brings it back here and not to the world's spawn, far away. A Xen that knows to does it (the recorded
+	 * run that beat the game slept four blocks from the portal first: aibengineering/beat-the-game-minecraft, CC BY 4.0).
+	 */
+	private Action bedByPortal(ServerLevel level) {
+		if (bedUsed || !c.knowledge.knows("end_bed")) return null;
+		java.util.function.Predicate<net.minecraft.world.item.ItemStack> bed = st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed");
+		if (portalBed != null && level.getBlockState(portalBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(portalBed)) > c.player.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(portalBed));
+			c.goals.instant = "using its bed by the portal";
+			c.hands.stop();
+			c.hands.use(portalBed);
+			c.acted = true;
+			bedUsed = true;
+			line("My bed's by the portal now. If I die in there, I come back here.");
+			c.journal("does", "used a bed by the End portal at " + portalBed.toShortString() + ": it comes back here if it dies in the End");
+			return Action.IDLE;
+		}
+		if (c.hands.hotbar(bed) < 0) {                                              // no bed with it: in it goes anyway
+			bedUsed = true;
+			return null;
+		}
+		Companion.BedRoom room = c.bedRoom();
+		if (room == null) {
+			bedUsed = true;
+			return null;
+		}
+		if (c.hands.placeItem(room.foot(), bed, room.foot().below(), net.minecraft.core.Direction.UP, room.facing())) {
+			portalBed = room.foot();
+			c.acted = true;
+			return Action.PLACE;
+		}
+		bedUsed = true;
+		return null;
 	}
 
 	String describe() {

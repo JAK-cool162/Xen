@@ -73,6 +73,10 @@ public final class Companion {
 	private float lastHealth, lastFood;
 	private Map<String, Integer> lastItems = Map.of();
 	private int decisions, respawnIn = -1;
+	/** Hardcore: it died, and in a moment it's gone for good (ticks to go; -1: no). */
+	private int goneIn = -1;
+	private String goneHow = "";
+	private BlockPos goneAt;
 	private long lastChatter;
 	private boolean wasNight;
 	public String lastThought = "";
@@ -262,6 +266,10 @@ public final class Companion {
 
 	private void tickInner() {
 		if (player == null) return;
+		if (goneIn >= 0) {
+			if (--goneIn < 0) goneForGood();
+			return;
+		}
 		if (respawnIn >= 0) {
 			if (--respawnIn < 0) respawn();
 			return;
@@ -2908,7 +2916,32 @@ public final class Companion {
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 5200;              // (items last five minutes)
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
+		if (hardcore() && !inArena) {                                 // one life: that was it
+			goneHow = source.getLocalizedDeathMessage(player).getString();
+			goneAt = here;
+			lore(name + " died for good (" + goneHow + ")");
+			goneIn = 40;
+			respawnIn = -1;
+			return;
+		}
 		respawnIn = 60;                                               // three seconds, like pressing "Respawn"
+	}
+
+	/** Hardcore for Xens (one life each)? */
+	boolean hardcore() {
+		return mod.config.hardcore(server);
+	}
+
+	/** Hardcore: gone for good. Its body leaves the world, nothing of it is kept, and those who knew it remember it. */
+	private void goneForGood() {
+		java.util.UUID id = player == null ? null : player.getUUID();
+		if (player != null && server.getPlayerList().getPlayer(player.getUUID()) == player) {
+			hands.stop();
+			server.getPlayerList().remove(player);
+		}
+		player = null;
+		mod.forget(this);
+		mod.goneForGood(this, id, goneAt == null ? BlockPos.ZERO : goneAt, goneHow);
 	}
 
 	/** Come back where a player would respawn (bed or world spawn), healthy and hungry-free. */
@@ -2966,6 +2999,7 @@ public final class Companion {
 				+ (mimic.skill.isEmpty() ? "" : " " + mimic.describe())
 				+ (lastSign != null && player.level().getGameTime() - lastSignAt < 6000 ? " You read a sign that says: \"" + lastSign + "\"." : "")
 				+ (instructions().isEmpty() ? "" : " " + xen.mod.talk.Chat.TOLD + " " + instructions())
+				+ (hardcore() ? " You have only one life: if you die, you are gone for good." : "")
 				+ (trader.market().isEmpty() ? "" : " " + trader.market())
 				+ (mod.config.personalities ? " Your personality: " + personality.describe() + ". Your fighting style: " + personality.fight
 						+ " (" + Personality.how(personality.fight) + "). " + personality.buildNote()
@@ -3014,6 +3048,9 @@ public final class Companion {
 		String who = from.getName().getString();
 		float t = trust(from.getUUID());
 		if (t < -0.2f) return "No, you won't, because " + who + " hurt you (a sorry would help).";
+		if (hardcore() && OUT.contains(r.intent()) && player.getHealth() < player.getMaxHealth() * 0.6f) {   // (please or not: one life)
+			return "No, not hurt like this: you have only one life, and nobody's request is worth it. Heal first.";
+		}
 		if (PLEASE.matcher(words).find()) return null;
 		if (owner == null && t < 0.3f && !r.intent().equals("peace") && random().nextFloat() < (0.3f - t) * 2 + 0.3f * (1 - personality.kindness)) {
 			return "No, you won't: you don't know " + who + " well enough yet.";   // (like anyone: a stranger asks, it may not feel like it)

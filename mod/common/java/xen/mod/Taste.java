@@ -100,6 +100,7 @@ final class Taste {
 			case "frame:true" -> 0.3f;
 			case "shutters:true", "bushes:true" -> p.curiosity > 0.5f ? 0.2f : 0f;
 			case "porch:true", "chimney:true" -> p.diligence > 0.5f ? 0.1f : -0.1f;
+			case "copy:village" -> 0.3f - 0.6f * p.curiosity;                   // (curious Xens like their own ideas better)
 			default -> 0f;
 		};
 	}
@@ -230,8 +231,32 @@ final class Taste {
 		for (String key : d.keys()) liking.put(key, Math.max(-1f, Math.min(1f, like(key) + 0.08f)));
 	}
 
+	/** Its last house was a copy of a village house (then what people say about it counts for copying too). */
+	boolean lastCopied;
+
+	/**
+	 * A copy of a village house it has seen, instead of a design of its own? Its taste for copying decides (it starts
+	 * from its curiosity, and moves with how its copies went and what people said about them).
+	 */
+	boolean copies() {
+		if (VillageHouses.seen(c).isEmpty()) return false;
+		return like("copy:village") + (random.nextFloat() - 0.5f) * 0.5f > 0;
+	}
+
+	private void rewardCopy(float r) {
+		liking.put("copy:village", Math.max(-1f, Math.min(1f, like("copy:village") + 0.25f * (r - like("copy:village")))));
+	}
+
+	/** It finished a copy of a village house: how it went (as for its own designs), and its taste for copying with it. */
+	void builtCopy(Design d, net.minecraft.core.BlockPos at, float r) {
+		built(d, at, r);
+		lastCopied = true;
+		rewardCopy(r);
+	}
+
 	/** It finished a house of its design: how it went (r: its own view, from how many blocks it had to leave out, how long). */
 	void built(Design d, net.minecraft.core.BlockPos at, float r) {
+		lastCopied = false;
 		last = d;
 		lastAt = at;
 		lastDone = c.player.level().getGameTime();
@@ -259,10 +284,12 @@ final class Taste {
 		String w = words.toLowerCase(Locale.ROOT);
 		if (w.contains("not ") && PRAISE.matcher(w).find() || CRITICISM.matcher(w).find()) {
 			reward(last, -0.6f);
+			if (lastCopied) rewardCopy(-0.6f);
 			return random.nextBoolean() ? "Oh. Okay, I'll try something different next time." : "Hm. Fair. Next one will be better.";
 		}
 		if (PRAISE.matcher(w).find()) {
 			reward(last, 0.9f);
+			if (lastCopied) rewardCopy(0.9f);
 			return random.nextBoolean() ? "Thanks! I'll build more like that." : "Thank you! I like the " + favourite() + " too.";
 		}
 		return null;

@@ -23,10 +23,10 @@ MODEL_URL = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/res
 MODEL_DIR = os.path.join(os.path.expanduser("~"), ".xen", "models")
 
 PERSONA = (
-    "<|im_start|>system\nYou are Xen, a survival companion in Minecraft. You play fair like a real player: "
-    "you only know what you have seen yourself, and far-away things are only guesses. You feel fear, pain and "
-    "curiosity. Answer as Xen in one or two short, friendly sentences. Only talk about things in your notes; if you "
-    "don't know, say so. Never write commands.<|im_end|>\n"
+    "<|im_start|>system\nYou are Xen, a player living in this Minecraft world. You only know what you have seen, remember or were "
+    "told yourself; far-away things are guesses, and it is fine not to know. You have your own goals, friends and "
+    "fears, and you can say no. Answer as Xen in one or two short, friendly sentences. Only talk about things in your "
+    "notes. Never write commands.<|im_end|>\n"
     "<|im_start|>user\nNotes: You feel calm. You know there is a pumpkin 4 blocks from you.\n"
     "Steve says: what do you see?<|im_end|>\n"
     "<|im_start|>assistant\nI can see a pumpkin about 4 blocks from me.<|im_end|>\n"
@@ -35,7 +35,10 @@ PERSONA = (
     "<|im_start|>assistant\nNo, I haven't seen any gold. And I'm hurt, so let's be careful.<|im_end|>\n"
     "<|im_start|>user\nNotes: You feel happy. You carry 12 cobblestone. You know there is water 5 blocks from you.\n"
     "Steve says: thanks for the help!<|im_end|>\n"
-    "<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n")
+    "<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n"
+    "<|im_start|>user\nNotes: You feel curious. Nothing special is around you.\n"
+    "Alex says: are you a bot?<|im_end|>\n"
+    "<|im_start|>assistant\nNo, I'm Xen. I live out here, same as you.<|im_end|>\n")
 
 THINGS = (("diamond",), ("gold",), ("iron",), ("coal",), ("lava",), ("water", "lake", "river", "ocean"),
           ("tree", "wood", "log"), ("zombie",), ("skeleton",), ("creeper",), ("spider",), ("enderman", "endermen"),
@@ -292,8 +295,9 @@ TYPOS = {"fallow": "follow", "folow": "follow", "follw": "follow", "flw": "follo
 
 
 def house_style(words):
-    """A house in the style asked for ("a modern house", "a house on stilts", "a tower"), or just "house"."""
-    return ("tower" if re.search(r"\b(tower|skyscraper)\b", words) else "stilt house" if re.search(r"\bstilts?\b", words)
+    """A house in the style asked for ("a modern house", "a house on stilts", "a tower", "a village house"), or just "house"."""
+    return ("village house" if re.search(r"\bvillage(r|rs)?('s)? (house|home|hut)|\b(house|home) like (the|a) village|\bvillage[- ]style\b", words)
+            else "tower" if re.search(r"\b(tower|skyscraper)\b", words) else "stilt house" if re.search(r"\bstilts?\b", words)
             else "modern house" if re.search(r"\b(modern|contemporary|minimalist)\b", words)
             else "cottage" if re.search(r"\b(cottage|cabin|cozy|cosy)\b", words) else "house")
 

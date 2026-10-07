@@ -42,6 +42,11 @@ final class Roster {
 		return byName.containsKey(name.toLowerCase(Locale.ROOT));
 	}
 
+	/** Gone for good (a hardcore death): nothing of it is kept, so that name is someone new next time. */
+	void forget(String name) {
+		byName.remove(name.toLowerCase(Locale.ROOT));
+	}
+
 	void remember(Companion c, String team) {
 		JsonObject o = new JsonObject();
 		o.addProperty("name", c.name);

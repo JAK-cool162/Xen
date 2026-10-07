@@ -1,7 +1,78 @@
-XEN COMPANION 2.0.0-beta.10: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.11: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.11
+===========================
+
+Hardcore (XenConfig.hardcore: "auto" | "on" | "off"; hardcore(server) is on, or auto and server.isHardcore()):
+- Personality.lifeWeight (1.4 hardcore, else 1) multiplies cautionScale(); XenMod.tickWorld sets it and re-applies every
+  Xen's personality when it changes (emotions.baseCaution comes from it).
+- Companion.died: hardcore and not in the arena -> lore "<name> died for good (<death message>)", goneIn = 40 ticks, no
+  respawn. goneForGood: the body leaves the player list, mod.forget, XenMod.goneForGood: Roster.forget (nothing kept:
+  that name is someone new next time), away list, a grey "[Xen] <name> is gone for good" to players, and every Xen that
+  knew it (known or trust) notes it; those that liked it (trust > 0.3) within 64 blocks say so.
+- refusal: hardcore, an errand that goes out (explore, wood, stone, coal, iron, mine, food) and health under 60%: no,
+  before "please" is looked at. Dragon.heal backs off 4 health sooner. The chat notes end "You have only one life: if
+  you die, you are gone for good."
+Persona (talk/Chat.PERSONA, the same in xen/talk/chat.py and the crossCheck fixture): "a player living in this
+Minecraft world", knows only what it saw, remembers or was told, guesses about far things, may not know; own goals,
+friends and fears; can say no. A fourth example: "are you a bot?" -> "No, I'm Xen. I live out here, same as you."
+Chat.OUTSIDE (ai, artificial intelligence, language model, chatbot, bot, npc, program, assistant) throws a reply away
+like a made-up one (one more try, then its own words). SmallTalk's bot answers stay in the world.
+Village houses (VillageHouses.java):
+- The game's own files: structure/village/<kind>/houses/<kind>_{small,medium,big}_house_<n>.nbt, opened by name from
+  the server's resource manager (26.3 changed listResources), read with a small NBT reader (palette, blocks, size).
+  Jigsaw and structure blocks are left out. The door's lower half gives the front (the edge of the house it's nearest).
+- designOf: footprint, wall height (door to the first layer that's mostly stairs and slabs), roof (stairs facing 4
+  ways above the door: hip, 2: gable, else flat), stone base and bottom row, logs (frame), trapdoors (shutters),
+  fences (porch, yard), leaves, ladder (loft), flowers or farmland (garden), water (pond), work blocks (workshop).
+- loose(): blocks of the shell that can't be reached from the bottom layer through faces (igloo domes held up by snow
+  layers): a house with any isn't copied (3 of the 18 snowy ones).
+- Seeing a village (Structures: a bell): kindOf(biome) (desert, savanna, snowy/ice/frozen, taiga/grove, else plains);
+  Taste.admire 2 of its houses (+0.08 to each of their design choices) and liking "seen:<kind>" = 1 (kept with taste).
+- Taste.copies(): seen any, and like("copy:village") + noise(+-0.25) > 0; its prior is 0.3 - 0.6 curiosity. Asked
+  ("village house", "house like the village", "village-style": Chat.houseStyle and chat.py) it copies anyway (the
+  biome's kind if it has seen none). Not for a first house in survival. builtCopy -> built + copy liking toward how it
+  went; praise and criticism move the copy liking too.
+- plan(): rotate the house so its door side faces front (positions and block states), place it in the site's box (the
+  door one above the floor), air above the floor dug, decor (beds, torches, glass, flowers, work blocks...) last and
+  optional, the shell in one phase from the ground up. Survival: adapt() (its own wood for any wood; stripped logs and
+  wood to logs; stone, bricks, sandstone, smooth stone, snow block and packed ice to cobblestone and its stairs, slabs,
+  walls; terracotta, wool, clay and concrete to planks; grass and sand to dirt), and only houses on flat ground (door
+  at most 2 up), at most 13 across, nine tenths of them of what it can make.
+From the run that beat the game (aibengineering/beat-the-game-minecraft, CC BY 4.0; looked at in scratch, not kept):
+387 actions, 15 crystal attempts (8 open crystals by bow, 2 misses; 2 caged ones: bow failed twice, then 36 end stone
+up and a sword), 4 bow shots at the flying dragon (all missed), 13 perched attacks (about 26 damage each), dragon
+breath over the standing spot (waited), down to 0.68 health, 40 blocks away and back full; a bed slept in 4 blocks from
+the stronghold portal before going in.
+- Knowledge: dragon_perch (0.5), end_retreat (0.6), end_bed (0.5).
+- Dragon.shootHer: arrows used while shooting her in the air (inventory) and her health falling then (not perched);
+  shoots only while (hits + 1) / (shots + told + 2) >= 0.3, told = 4 if it knows dragon_perch; 3 shots, no hit: it
+  learns it (TRIED).
+- Dragon.heal: knows end_retreat (or learns it at 4 health) and health <= 6 + 4 (1 - bravery) (+4 hardcore): off to
+  40 blocks from the middle on the far side from her, eating while food < 20, back at max health - 2.
+- headHit: a breath cloud within its radius + 1.5 of the spot: it waits radius + 3 out, glancing.
+- Blocks: Hands.PLACEABLE and SPARE_FIRST have netherrack and end_stone. In the End with under 32 blocks (and a
+  pickaxe) it mines 48 end stone; a caged crystal needs (pillar top - ground beside it) + 14; short, it mines what's
+  missing + 8. Adventure.prepared() wants 64 blocks (was 128 cobblestone or dirt).
+- Adventure.bedByPortal (knows end_bed): its bed put down beside it at the portal (Companion.bedRoom) and used (a bed
+  sets the respawn point by day too), once, before going in.
+Head turning (Hands.turnToward), fitted to OpenBlock-Team/Minecraft-Navigation and Minecraft-ChopTree (CC BY 4.0;
+200 + 50 runs at 20 a second, looked at in scratch, not kept): their mouse turns took 5 ticks for 9 degrees, 8 for 40,
+11 for 80, 16 for 160, the fastest tick about 0.2 of the turn and barely any of it in the first tick. Now a speed per
+axis: toward sqrt(2 a e) (no faster than it can stop in), at most a = 2.2 degrees a tick more or less each tick
+(TURN_ACCEL, times the reaction setting's turn scale), capped by the caller's maximum; a turn that stopped starts from
+still. The model gives 3, 5, 7, 10 and 15 ticks for those turns. Watching someone (not in a fight) turns the same way.
+Their block snapshots stop at 4096 blocks counted from one edge of the box, so they can't be its senses: Ex1 is not
+retrained on them.
+Watching (XenMod.watchedBreak): a player (not a Xen) breaks an ore; Xens within 24 blocks that can see them:
+Lessons.watched moves the belief up to 4 blocks toward that height (0.15 x trust, less with 3 own finds), a little
+surer each time, teacher = that player.
+Builder.onSite: in its plan's box (a block around). Chores.gather (what it knows) and the gathering step (what it
+glances and what it remembers) skip blocks there.
 
 
 WHAT'S NEW IN 2.0.0-beta.10

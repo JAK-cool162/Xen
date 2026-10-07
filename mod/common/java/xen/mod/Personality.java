@@ -286,8 +286,11 @@ public final class Personality {
 	 */
 	float cautionScale() {
 		return (1.6f - 1.2f * bravery) * Math.max(0.4f, 1 + knobs().fear - 0.15f * sin(Sins.PRIDE) - 0.1f * sin(Sins.WRATH))
-				* (plan == Strategy.SURVIVOR ? 1.2f : 1f);
+				* (plan == Strategy.SURVIVOR ? 1.2f : 1f) * lifeWeight;
 	}
+
+	/** How much its one life weighs: 1, or more when it's hardcore (one life: every danger counts for more). */
+	static volatile float lifeWeight = 1f;
 
 	/** Tries new things half as often (not curious) to 1.5x as often (very curious); some beliefs more or less. */
 	float curiosityScale() {
