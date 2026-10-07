@@ -19,4 +19,26 @@ final class Screens {
 			throw new IllegalStateException("Could not open " + screen, e);
 		}
 	}
+
+	private static java.lang.reflect.Field screenField;
+	private static java.lang.reflect.Method guiScreen;
+	private static boolean looked;
+
+	/** The screen that's open, or null: 26.1 has the field Minecraft.screen, 26.3 Minecraft.gui.screen(). */
+	static Screen current(Minecraft client) {
+		try {
+			if (!looked) {
+				looked = true;
+				try {
+					screenField = Minecraft.class.getField("screen");
+				} catch (NoSuchFieldException e) {
+					guiScreen = Minecraft.class.getField("gui").getType().getMethod("screen");
+				}
+			}
+			if (screenField != null) return (Screen) screenField.get(client);
+			return guiScreen == null ? null : (Screen) guiScreen.invoke(Minecraft.class.getField("gui").get(client));
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
+	}
 }

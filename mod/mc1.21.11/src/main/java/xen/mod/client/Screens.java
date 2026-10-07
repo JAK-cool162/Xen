@@ -10,4 +10,9 @@ final class Screens {
 	static void open(Minecraft client, Screen screen) {
 		client.setScreen(screen);
 	}
+
+	/** The screen that's open, or null (in the game). */
+	static Screen current(Minecraft client) {
+		return client.screen;
+	}
 }

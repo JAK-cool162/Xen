@@ -38,6 +38,27 @@ public class XenClient implements ClientModInitializer {
 		return which == 1 ? net.minecraft.world.InteractionResult.SUCCESS : net.minecraft.world.InteractionResult.FAIL;
 	}
 
+	/**
+	 * With the Build Axe in hand, its clicks aim far (BuildAxe.REACH, 160 blocks): before the game handles them, it
+	 * takes them and looks along where the player looks for the first block. A hit marks a corner; a right-click leaves
+	 * that block out, or into the sky brings the screen back. (Without this, a hand's reach of about five blocks.)
+	 */
+	private static void axeFar(net.minecraft.client.Minecraft client) {
+		var player = client.player;
+		if (player == null || client.level == null || Screens.current(client) != null || !xen.mod.BuildAxe.holding(player)
+				|| !net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(xen.mod.BuildAxe.Corner.TYPE)) return;
+		boolean hit = false, use = false;
+		while (client.options.keyAttack.consumeClick()) hit = true;
+		while (client.options.keyUse.consumeClick()) use = true;
+		if (!hit && !use) return;
+		net.minecraft.world.phys.Vec3 eye = player.getEyePosition(), end = eye.add(player.getViewVector(1f).scale(xen.mod.BuildAxe.REACH));
+		var aim = client.level.clip(new net.minecraft.world.level.ClipContext(eye, end, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, player));
+		boolean block = aim.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK;
+		if (hit && block) net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new xen.mod.BuildAxe.Corner(aim.getBlockPos(), 1));
+		if (use) net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new xen.mod.BuildAxe.Corner(block ? aim.getBlockPos() : player.blockPosition(), block ? 2 : 0));
+	}
+
 	@Override
 	public void onInitializeClient() {
 		xen.mod.talk.Chat.gpu = GlAccelerator::create;                 // in a game client, the chat model can use the GPU
@@ -48,6 +69,7 @@ public class XenClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> axeClick(player, level, pos, 1));
 		net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> axeClick(player, level, hit.getBlockPos(), 2));
 		net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, level, hand) -> axeClick(player, level, player.blockPosition(), 0));
+		ClientTickEvents.START_CLIENT_TICK.register(XenClient::axeFar);
 		String gpuTest = System.getProperty("xen.gpuTest");
 		if (gpuTest != null) {                                       // -Dxen.gpuTest=<model>: CPU vs GPU, then quit
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {

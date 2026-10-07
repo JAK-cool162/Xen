@@ -1,7 +1,18 @@
-XEN COMPANION 2.0.0-beta.15: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.16: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.16
+===========================
+
+Build Axe: BuildAxe.REACH = 160. XenClient.axeFar (ClientTickEvents.START_CLIENT_TICK, the axe in hand, no screen
+open: Screens.current, Minecraft.screen up to 26.1, Minecraft.gui.screen() on 26.3) takes keyAttack/keyUse clicks
+before the game does, clips from the eyes along the view to REACH (ClipContext OUTLINE, no fluids) and sends Corner
+(1 hit, 2 right-click on a block, 0 right-click with no block: the screen). The server takes a Corner within REACH + 8.
+MAX_SIDE 256, MAX_BLOCKS 256 x 64 x 256; BuildAxe.json writes "blocks" straight into the line (no JSON element per
+block).
 
 
 WHAT'S NEW IN 2.0.0-beta.15

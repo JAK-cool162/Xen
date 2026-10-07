@@ -65,8 +65,10 @@ public final class BuildAxe {
 	private BuildAxe() {}
 
 	static final String[] KINDS = {"build", "tree", "cave"};
-	/** The biggest box, a side (a line stays a few megabytes at most). */
-	static final int MAX_SIDE = 64;
+	/** The biggest box: a side, and all of it (256 x 64 x 256, a village; a line of about 15 megabytes at most). */
+	static final int MAX_SIDE = 256, MAX_BLOCKS = 256 * 64 * 256;
+	/** How far off it marks a block, from a game with Xen in it (aimed by the game itself, not a hand's reach). */
+	public static final int REACH = 160;
 	private static final String TAG = "xen_build_axe";
 
 	/** Each player's box so far (two corners and a world), what it's marked as, and the blocks it leaves out (saved as air). */
@@ -175,7 +177,7 @@ public final class BuildAxe {
 			ServerPlayer p = context.player();
 			if (!holding(p)) return;
 			if (payload.which() == 0) reopen(p);
-			else if (!p.blockPosition().closerThan(payload.pos(), 12) || !(p.level() instanceof ServerLevel sl)) return;
+			else if (!p.blockPosition().closerThan(payload.pos(), REACH + 8) || !(p.level() instanceof ServerLevel sl)) return;
 			else if (payload.which() == 1) corner(p, sl, payload.pos());
 			else leaveOut(p, sl, payload.pos());
 		});
@@ -233,7 +235,7 @@ public final class BuildAxe {
 		} else {
 			box.b = at;
 		}
-		String size = first ? ". Hit another block for the other corner." : ": " + size(box) + (fits(box) ? "" : " (too big: " + MAX_SIDE + " a side at most)");
+		String size = first ? ". Hit another block for the other corner." : ": " + size(box) + (fits(box) ? "" : " (too big: " + tooBig() + ")");
 		p.sendSystemMessage(Component.literal("[Xen] Corner " + (first ? 1 : 2) + size).withStyle(ChatFormatting.GOLD));
 		if (!first && fits(box)) ask(p, box);
 	}
@@ -268,7 +270,12 @@ public final class BuildAxe {
 	}
 
 	private static boolean fits(Box b) {
-		return Math.abs(b.a.getX() - b.b.getX()) < MAX_SIDE && Math.abs(b.a.getY() - b.b.getY()) < MAX_SIDE && Math.abs(b.a.getZ() - b.b.getZ()) < MAX_SIDE;
+		long sx = Math.abs(b.a.getX() - b.b.getX()) + 1, sy = Math.abs(b.a.getY() - b.b.getY()) + 1, sz = Math.abs(b.a.getZ() - b.b.getZ()) + 1;
+		return sx <= MAX_SIDE && sy <= MAX_SIDE && sz <= MAX_SIDE && sx * sy * sz <= MAX_BLOCKS;
+	}
+
+	private static String tooBig() {
+		return MAX_SIDE + " a side, " + String.format(java.util.Locale.ROOT, "%,d", MAX_BLOCKS) + " blocks in all, at most";
 	}
 
 	// ------------------------------------------------------------------------------ the command
@@ -325,14 +332,15 @@ public final class BuildAxe {
 		name = name == null ? "" : name.trim();
 		Box box = boxes.get(p.getUUID());
 		if (box == null || box.a == null || box.b == null) return "Mark the box first: hit one corner, then the other, with the Build Axe.";
-		if (!fits(box)) return "Too big (" + size(box) + "): " + MAX_SIDE + " a side at most.";
+		if (!fits(box)) return "Too big (" + size(box) + "): " + tooBig() + ".";
 		if (name.isEmpty() || name.length() > 64) return "Give it a name (1 to 64 letters).";
 		kind = kind(kind) != null ? kind(kind) : box.kind;
 		try {
-			JsonObject line = capture(box, kind, name);
+			int[] cells = new int[cellsOf(box)];
+			JsonObject line = capture(box, kind, name, cells);
 			Path f = dir().resolve(kind + ".jsonl");
 			Files.createDirectories(f.getParent());
-			Files.writeString(f, line + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+			Files.writeString(f, json(line, cells) + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 			long lines;
 			try (var st = Files.lines(f)) {
 				lines = st.filter(l -> !l.isBlank()).count();
@@ -357,14 +365,28 @@ public final class BuildAxe {
 	 * fastest: index = (y * sz + z) * sx + x. With it, where it was (the dimension and biome), and for a cave what the
 	 * blocks alone don't tell: how dark it is and how far under the surface.
 	 */
-	private static JsonObject capture(Box box, String kind, String name) {
+	private static int cellsOf(Box b) {
+		return (Math.abs(b.a.getX() - b.b.getX()) + 1) * (Math.abs(b.a.getY() - b.b.getY()) + 1) * (Math.abs(b.a.getZ() - b.b.getZ()) + 1);
+	}
+
+	/** The line: what capture made, then "blocks" written out as it is (millions of numbers: no JSON objects for each). */
+	private static String json(JsonObject o, int[] cells) {
+		String head = o.toString();
+		StringBuilder sb = new StringBuilder(head.length() + cells.length * 3 + 16).append(head, 0, head.length() - 1).append(",\"blocks\":[");
+		for (int i = 0; i < cells.length; i++) {
+			if (i > 0) sb.append(',');
+			sb.append(cells[i]);
+		}
+		return sb.append("]}").toString();
+	}
+
+	private static JsonObject capture(Box box, String kind, String name, int[] cells) {
 		ServerLevel level = box.level;
 		BlockPos a = box.a, b = box.b;
 		BlockPos lo = new BlockPos(Math.min(a.getX(), b.getX()), Math.min(a.getY(), b.getY()), Math.min(a.getZ(), b.getZ()));
 		BlockPos hi = new BlockPos(Math.max(a.getX(), b.getX()), Math.max(a.getY(), b.getY()), Math.max(a.getZ(), b.getZ()));
 		int sx = hi.getX() - lo.getX() + 1, sy = hi.getY() - lo.getY() + 1, sz = hi.getZ() - lo.getZ() + 1;
 		Map<String, Integer> index = new LinkedHashMap<>();
-		int[] cells = new int[sx * sy * sz];
 		List<Integer> sky = new ArrayList<>(), lamp = new ArrayList<>();
 		int solid = 0, left = 0;
 		BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -413,10 +435,7 @@ public final class BuildAxe {
 		JsonArray palette = new JsonArray();
 		for (String k : index.keySet()) palette.add(k);
 		o.add("palette", palette);
-		JsonArray data = new JsonArray();
-		for (int v : cells) data.add(v);
-		o.add("blocks", data);
-		return o;
+		return o;                                                                // ("blocks" goes on the end: see json)
 	}
 
 	/** "oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]" (another mod's block with its own name first). */

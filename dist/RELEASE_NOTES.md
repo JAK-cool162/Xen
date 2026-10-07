@@ -1,7 +1,16 @@
-**Xen Companion 2.0.0-beta.15**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.16**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.16: a bigger Build Axe
+
+* **It reaches 160 blocks.** With Xen in your game too, the axe marks corners and leaves blocks out as far as 160
+  blocks away: aim and click (from outside a house, or across a cave). Look at the sky and right-click for the screen.
+* **Bigger boxes:** up to 256 blocks a side and 4,194,304 in all (256 x 64 x 256), was 64 a side. Saving is quick
+  and the line small: the blocks go straight into the file.
+* Tested in a real game client: corners and a left-out glowstone marked from 27 blocks away (the screen said 1 x 4 x 4,
+  left out: 1 block); a box of 150 x 26 x 217 (846,300 blocks) saved in a moment, 1.7 MB, the server never fell behind.
 
 ### 2.0.0-beta.15: the Build Axe's screen, leaving blocks out, your own types
 
