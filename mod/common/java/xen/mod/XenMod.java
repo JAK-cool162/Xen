@@ -1196,7 +1196,7 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		if (c.lessons.lessons.isEmpty()) c.lessons.born(random);               // (a rough idea of where ore is: new, or from before 1.8)
-		if ((account || typed) && config.realNameStyle()) {               // a ranked player's name: it fights as well (tiers.txt, or MCTiers)
+		if ((account || typed && wanted != null) && config.realNameStyle()) {               // a ranked player's name: it fights as well (tiers.txt, or MCTiers)
 			String tier = Tiers.local(FabricLoader.getInstance().getConfigDir(), name);
 			if (tier != null) Tiers.apply(c, tier);
 			else {
