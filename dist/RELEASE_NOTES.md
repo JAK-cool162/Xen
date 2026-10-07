@@ -1,7 +1,18 @@
-**Xen Companion 2.0.0-beta.14**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.15**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.15: the Build Axe's screen
+
+* **A screen instead of a command.** Mark the second corner with the Build Axe and a screen comes up: the size of the
+  box, what it is (tap to switch Build, Tree, Cave), its name, and Save (only once it has a name) or Cancel. No typing
+  commands, easier on a phone. Cancel keeps the corners; right-click into the air with the axe to bring it back. The
+  last name you typed is filled in for the next one ("oak 1", then change it to "oak 2").
+* Fixed: with Xen in your game too, the axe's clicks never reached the server (nothing was marked). The game now sends
+  the corners itself. With Xen only on the server, the clicks go as before and `/xen BuildAxe save <name>` still works.
+* Tested in a real game client: corners marked, the screen came up (4 x 3 x 3), switched to Tree, typed "test tree 1",
+  Save: the line was in `tree.jsonl`.
 
 ### 2.0.0-beta.14: the Build Axe (training data)
 

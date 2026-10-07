@@ -1,7 +1,20 @@
-XEN COMPANION 2.0.0-beta.14: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.15: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.15
+===========================
+
+Build Axe screen: payloads xen:build_axe_open (S2C: sx, sy, sz, kind), xen:build_axe_save (C2S: kind, name),
+xen:build_axe_corner (C2S: pos, which: 1 hit, 2 right-click, 0 the screen again). Registered through Compat.toClient /
+toServer (Fabric's PayloadTypeRegistry.playS2C/playC2S on 1.21.11, clientboundPlay/serverboundPlay on 26.x). The
+server's Attack/UseBlock/UseItem callbacks act only server side; XenClient's send the corner and return SUCCESS (with
+Fabric, a SUCCESS on the client held the attack back: nothing reached the server). Both corners marked:
+ServerPlayNetworking.canSend(Open) ? send Open : the chat line. client.BuildAxeScreen: StringWidget, CycleButton (build,
+tree, cave), EditBox (64, the last name kept), Save (active with a name) sends Save; BuildAxe.save writes the line and
+answers in chat.
 
 
 WHAT'S NEW IN 2.0.0-beta.14

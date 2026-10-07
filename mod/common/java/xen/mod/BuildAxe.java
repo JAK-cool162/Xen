@@ -1,5 +1,7 @@
 package xen.mod;
 
+import io.netty.buffer.ByteBuf;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -10,6 +12,7 @@ import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 
 import net.minecraft.ChatFormatting;
@@ -19,6 +22,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -48,11 +55,12 @@ import java.util.UUID;
 /**
  * The Build Axe, a developer's tool (cheats only): an enchanted wooden axe that turns a box of the world into data for
  * training Xen. /xen BuildAxe [build|tree|cave] gives one; with it, hit a block for one corner and use (right-click) a
- * block for the other, then /xen BuildAxe save &lt;name&gt; writes the box as one line of JSON to
- * config/xen/buildaxe/&lt;kind&gt;.jsonl. The axe never breaks or strips anything. Only blocks are kept: no player
- * names, no coordinates.
+ * block for the other. Then a screen comes up (with Xen on the game too: {@link xen.mod.client.BuildAxeScreen}): what
+ * it is (a build, a tree, a cave), its name (a must), Save. Without the screen, /xen BuildAxe save &lt;name&gt;. The box
+ * goes as one line of JSON to config/xen/buildaxe/&lt;kind&gt;.jsonl. The axe never breaks or strips anything. Only
+ * blocks are kept: no player names, no coordinates.
  */
-final class BuildAxe {
+public final class BuildAxe {
 	private BuildAxe() {}
 
 	static final String[] KINDS = {"build", "tree", "cave"};
@@ -68,6 +76,41 @@ final class BuildAxe {
 	}
 
 	private static final Map<UUID, Box> boxes = new HashMap<>();
+
+	// ------------------------------------------------------------------------------ the screen, and what it sends back
+	/** To the game: the box is marked, show the screen (its size, what it's marked as). */
+	public record Open(int sx, int sy, int sz, String kind) implements CustomPacketPayload {
+		public static final CustomPacketPayload.Type<Open> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_open"));
+		public static final StreamCodec<ByteBuf, Open> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_INT, Open::sx, ByteBufCodecs.VAR_INT, Open::sy,
+				ByteBufCodecs.VAR_INT, Open::sz, ByteBufCodecs.STRING_UTF8, Open::kind, Open::new);
+
+		@Override
+		public CustomPacketPayload.Type<Open> type() {
+			return TYPE;
+		}
+	}
+
+	/** From the game (with Xen on it too): a corner it clicked (1 hit, 2 right-click), or 0: show the screen again. */
+	public record Corner(BlockPos pos, int which) implements CustomPacketPayload {
+		public static final CustomPacketPayload.Type<Corner> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_corner"));
+		public static final StreamCodec<ByteBuf, Corner> CODEC = StreamCodec.composite(BlockPos.STREAM_CODEC, Corner::pos, ByteBufCodecs.VAR_INT, Corner::which, Corner::new);
+
+		@Override
+		public CustomPacketPayload.Type<Corner> type() {
+			return TYPE;
+		}
+	}
+
+	/** From the screen: save it as this kind, under this name. */
+	public record Save(String kind, String name) implements CustomPacketPayload {
+		public static final CustomPacketPayload.Type<Save> TYPE = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("xen", "build_axe_save"));
+		public static final StreamCodec<ByteBuf, Save> CODEC = StreamCodec.composite(ByteBufCodecs.STRING_UTF8, Save::kind, ByteBufCodecs.STRING_UTF8, Save::name, Save::new);
+
+		@Override
+		public CustomPacketPayload.Type<Save> type() {
+			return TYPE;
+		}
+	}
 
 	static Path dir() {
 		return FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("buildaxe");
@@ -94,24 +137,62 @@ final class BuildAxe {
 		return src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
 	}
 
-	private static boolean holding(Player p) {
+	public static boolean holding(Player p) {
 		return is(p.getMainHandItem());
 	}
 
-	/** The hooks: hitting a block with it (a corner), using it on a block (the other corner); it never breaks or strips anything. */
+	/**
+	 * The hooks: hitting a block with it (a corner), using it on a block (the other corner); it never breaks or strips
+	 * anything. These are the server's side (a game without Xen sends the clicks as usual); a game with Xen sends the
+	 * corners itself ({@link Corner}: it holds the click back, so nothing else would reach the server).
+	 */
 	static void register() {
 		AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> {
-			if (!holding(player)) return InteractionResult.PASS;
+			if (level.isClientSide() || !holding(player)) return InteractionResult.PASS;
 			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) corner(sp, sl, pos, true);
 			return InteractionResult.SUCCESS;
 		});
 		UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-			if (!holding(player)) return InteractionResult.PASS;
+			if (level.isClientSide() || !holding(player)) return InteractionResult.PASS;
 			if (player instanceof ServerPlayer sp && level instanceof ServerLevel sl) corner(sp, sl, hit.getBlockPos(), false);
 			return InteractionResult.SUCCESS;
 		});
-		UseItemCallback.EVENT.register((player, level, hand) -> holding(player) ? InteractionResult.SUCCESS : InteractionResult.PASS);
+		UseItemCallback.EVENT.register((player, level, hand) -> {
+			if (level.isClientSide() || !holding(player)) return InteractionResult.PASS;
+			if (player instanceof ServerPlayer sp) reopen(sp);                   // (into the air: the screen again, for the box it has)
+			return InteractionResult.SUCCESS;
+		});
+		Compat.toServer(Corner.TYPE, Corner.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(Corner.TYPE, (payload, context) -> {
+			ServerPlayer p = context.player();
+			if (!holding(p)) return;
+			if (payload.which() == 0) reopen(p);
+			else if (p.blockPosition().closerThan(payload.pos(), 12) && p.level() instanceof ServerLevel sl) corner(p, sl, payload.pos(), payload.which() == 1);
+		});
 		PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, be) -> !holding(player));
+		Compat.toClient(Open.TYPE, Open.CODEC);
+		Compat.toServer(Save.TYPE, Save.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(Save.TYPE, (payload, context) -> {
+			ServerPlayer p = context.player();
+			if (!cheats(p.createCommandSourceStack())) return;
+			String said = save(p, payload.kind(), payload.name());
+			p.sendSystemMessage(Component.literal(said).withStyle(said.startsWith("[Xen] Saved") ? ChatFormatting.GOLD : ChatFormatting.RED));
+		});
+	}
+
+	/** Both corners marked: the screen (with Xen on the game), or how to name it in chat. */
+	private static void ask(ServerPlayer p, Box box) {
+		int sx = Math.abs(box.a.getX() - box.b.getX()) + 1, sy = Math.abs(box.a.getY() - box.b.getY()) + 1, sz = Math.abs(box.a.getZ() - box.b.getZ()) + 1;
+		if (ServerPlayNetworking.canSend(p, Open.TYPE)) {
+			ServerPlayNetworking.send(p, new Open(sx, sy, sz, box.kind));
+			return;
+		}
+		p.sendSystemMessage(Component.literal("[Xen] " + size(box) + " marked. Now name it: /xen BuildAxe save <name>").withStyle(ChatFormatting.GOLD));
+	}
+
+	private static void reopen(ServerPlayer p) {
+		Box box = boxes.get(p.getUUID());
+		if (box != null && box.a != null && box.b != null && fits(box) && cheats(p.createCommandSourceStack())) ask(p, box);
 	}
 
 	private static void corner(ServerPlayer p, ServerLevel level, BlockPos pos, boolean first) {
@@ -129,8 +210,10 @@ final class BuildAxe {
 		box.level = level;
 		if (first) box.a = at;
 		else box.b = at;
-		String size = box.a != null && box.b != null ? ": " + size(box) + (fits(box) ? ". Now name it: /xen BuildAxe save <name>" : " (too big: " + MAX_SIDE + " a side at most)") : "";
+		boolean both = box.a != null && box.b != null;
+		String size = both ? ": " + size(box) + (fits(box) ? "" : " (too big: " + MAX_SIDE + " a side at most)") : "";
 		p.sendSystemMessage(Component.literal("[Xen] Corner " + (first ? 1 : 2) + " (" + box.kind + ")" + size).withStyle(ChatFormatting.GOLD));
+		if (both && fits(box)) ask(p, box);
 	}
 
 	private static String size(Box b) {
@@ -145,7 +228,7 @@ final class BuildAxe {
 	static LiteralArgumentBuilder<CommandSourceStack> command(String name) {
 		LiteralArgumentBuilder<CommandSourceStack> c = Commands.literal(name).requires(BuildAxe::cheats).executes(ctx -> give(ctx, "build"));
 		for (String k : KINDS) c.then(Commands.literal(k).executes(ctx -> give(ctx, k)));
-		c.then(Commands.literal("save").then(Commands.argument("name", StringArgumentType.greedyString()).executes(BuildAxe::save))
+		c.then(Commands.literal("save").then(Commands.argument("name", StringArgumentType.greedyString()).executes(BuildAxe::saveCommand))
 				.executes(ctx -> {
 					ctx.getSource().sendFailure(Component.literal("Give it a name: /xen BuildAxe save <name>"));
 					return 0;
@@ -162,45 +245,51 @@ final class BuildAxe {
 		box.kind = kind;
 		if (!holding(p) && !p.getInventory().add(make(kind))) Compat.drop(p, make(kind));
 		else if (holding(p)) p.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, make(kind));
-		ctx.getSource().sendSuccess(() -> Component.literal("[Xen] Build Axe (" + kind + "): hit a block for one corner, right-click a block for the other, then /xen BuildAxe save <name>. Saved to config/xen/buildaxe/" + kind + ".jsonl."), false);
+		ctx.getSource().sendSuccess(() -> Component.literal("[Xen] Build Axe (" + kind + "): hit a block for one corner, right-click a block for the other, then name it. Saved to config/xen/buildaxe/" + kind + ".jsonl."), false);
 		return 1;
 	}
 
-	private static int save(CommandContext<CommandSourceStack> ctx) {
-		String name = StringArgumentType.getString(ctx, "name").trim();
-		Box box = ctx.getSource().getEntity() instanceof ServerPlayer p ? boxes.get(p.getUUID()) : null;
-		if (box == null || box.a == null || box.b == null) {
-			ctx.getSource().sendFailure(Component.literal("Mark the box first: hit one corner and right-click the other with the Build Axe."));
+	private static int saveCommand(CommandContext<CommandSourceStack> ctx) {
+		if (!(ctx.getSource().getEntity() instanceof ServerPlayer p)) {
+			ctx.getSource().sendFailure(Component.literal("Only a player can hold the Build Axe."));
 			return 0;
 		}
-		if (!fits(box)) {
-			ctx.getSource().sendFailure(Component.literal("Too big (" + size(box) + "): " + MAX_SIDE + " a side at most."));
+		Box box = boxes.get(p.getUUID());
+		String said = save(p, box == null ? "build" : box.kind, StringArgumentType.getString(ctx, "name"));
+		if (!said.startsWith("[Xen] Saved")) {
+			ctx.getSource().sendFailure(Component.literal(said));
 			return 0;
 		}
-		if (name.isEmpty() || name.length() > 64) {
-			ctx.getSource().sendFailure(Component.literal("A name of 1 to 64 letters, please."));
-			return 0;
-		}
+		ctx.getSource().sendSuccess(() -> Component.literal(said).withStyle(ChatFormatting.GOLD), false);
+		return 1;
+	}
+
+	/** Saves the player's box as this kind under this name: what happened, in words ("[Xen] Saved ..." when it did). */
+	static String save(ServerPlayer p, String kind, String name) {
+		name = name == null ? "" : name.trim();
+		Box box = boxes.get(p.getUUID());
+		if (box == null || box.a == null || box.b == null) return "Mark the box first: hit one corner and right-click the other with the Build Axe.";
+		if (!fits(box)) return "Too big (" + size(box) + "): " + MAX_SIDE + " a side at most.";
+		if (name.isEmpty() || name.length() > 64) return "Give it a name (1 to 64 letters).";
+		if (!Arrays.asList(KINDS).contains(kind)) kind = box.kind;
 		try {
-			JsonObject line = capture(box.level, box.a, box.b, box.kind, name);
-			Path f = dir().resolve(box.kind + ".jsonl");
+			JsonObject line = capture(box.level, box.a, box.b, kind, name);
+			Path f = dir().resolve(kind + ".jsonl");
 			Files.createDirectories(f.getParent());
 			Files.writeString(f, line + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
 			long lines;
-			try (var s = Files.lines(f)) {
-				lines = s.filter(l -> !l.isBlank()).count();
+			try (var st = Files.lines(f)) {
+				lines = st.filter(l -> !l.isBlank()).count();
 			}
 			int solid = line.getAsJsonObject("features").get("solid").getAsInt();
 			String sz = size(box);
-			ctx.getSource().sendSuccess(() -> Component.literal("[Xen] Saved " + box.kind + " \"" + name + "\" (" + sz + ", " + solid + " blocks) to config/xen/buildaxe/"
-					+ box.kind + ".jsonl (" + lines + " in it).").withStyle(ChatFormatting.GOLD), false);
-			XenMod.LOG.info("Build Axe: saved {} \"{}\" ({}) to {}", box.kind, name, sz, f);
+			XenMod.LOG.info("Build Axe: saved {} \"{}\" ({}) to {}", kind, name, sz, f);
+			box.kind = kind;
 			box.a = null;
 			box.b = null;
-			return 1;
+			return "[Xen] Saved " + kind + " \"" + name + "\" (" + sz + ", " + solid + " blocks) to config/xen/buildaxe/" + kind + ".jsonl (" + lines + " in it).";
 		} catch (IOException e) {
-			ctx.getSource().sendFailure(Component.literal("Couldn't save it: " + e.getMessage()));
-			return 0;
+			return "Couldn't save it: " + e.getMessage();
 		}
 	}
 

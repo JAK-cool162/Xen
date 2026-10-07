@@ -210,4 +210,16 @@ final class Compat {
 			// still a team, just without a color
 		}
 	}
+
+	/** A message to the game (the Build Axe's screen): Fabric calls it clientboundPlay here. */
+	static <T extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> void toClient(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<T> type,
+			net.minecraft.network.codec.StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf, T> codec) {
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay().register(type, codec);
+	}
+
+	/** A message from the game: serverboundPlay here. */
+	static <T extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> void toServer(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<T> type,
+			net.minecraft.network.codec.StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf, T> codec) {
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.serverboundPlay().register(type, codec);
+	}
 }

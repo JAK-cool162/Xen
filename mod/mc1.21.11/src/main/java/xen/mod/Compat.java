@@ -79,4 +79,16 @@ final class Compat {
 	static void teamColor(PlayerTeam team, ChatFormatting color) {
 		team.setColor(color);
 	}
+
+	/** A message to the game (the Build Axe's screen): Fabric calls it playS2C here. */
+	static <T extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> void toClient(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<T> type,
+			net.minecraft.network.codec.StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf, T> codec) {
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.playS2C().register(type, codec);
+	}
+
+	/** A message from the game: playC2S here. */
+	static <T extends net.minecraft.network.protocol.common.custom.CustomPacketPayload> void toServer(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<T> type,
+			net.minecraft.network.codec.StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf, T> codec) {
+		net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.playC2S().register(type, codec);
+	}
 }

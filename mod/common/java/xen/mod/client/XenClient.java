@@ -27,9 +27,25 @@ public class XenClient implements ClientModInitializer {
 		}
 	}
 
+	/** A Build Axe click in this game: to the server as a corner (or "the screen again"), if the server has Xen too. */
+	private static net.minecraft.world.InteractionResult axeClick(net.minecraft.world.entity.player.Player player, net.minecraft.world.level.Level level,
+			net.minecraft.core.BlockPos pos, int which) {
+		if (!level.isClientSide() || !xen.mod.BuildAxe.holding(player)
+				|| !net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(xen.mod.BuildAxe.Corner.TYPE)) return net.minecraft.world.InteractionResult.PASS;
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new xen.mod.BuildAxe.Corner(pos.immutable(), which));
+		return net.minecraft.world.InteractionResult.SUCCESS;
+	}
+
 	@Override
 	public void onInitializeClient() {
 		xen.mod.talk.Chat.gpu = GlAccelerator::create;                 // in a game client, the chat model can use the GPU
+		// the Build Axe's screen, when the server says a box is marked
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(xen.mod.BuildAxe.Open.TYPE,
+				(payload, context) -> Screens.open(context.client(), new BuildAxeScreen(payload)));
+		// ...and its clicks: the corners go to the server as they are (the click itself is held back: nothing breaks or strips)
+		net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> axeClick(player, level, pos, 1));
+		net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> axeClick(player, level, hit.getBlockPos(), 2));
+		net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, level, hand) -> axeClick(player, level, player.blockPosition(), 0));
 		String gpuTest = System.getProperty("xen.gpuTest");
 		if (gpuTest != null) {                                       // -Dxen.gpuTest=<model>: CPU vs GPU, then quit
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {

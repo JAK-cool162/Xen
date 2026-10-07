@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.14
+# Xen Companion (Fabric mod) 2.0.0-beta.15
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.14+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.14+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.14+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.14+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.15+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.15+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.15+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.15+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.14+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.15+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -636,11 +636,13 @@ chat with it, it knows them):
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
 
-## Build Axe: training data (2.0.0-beta.14)
+## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15)
 
-A developer's tool, cheats only. `/xen BuildAxe` (or `/xen BuildAxe build|tree|cave`) gives an enchanted wooden axe.
-Hit a block with it for one corner of a box, right-click a block for the other corner, then name it:
-`/xen BuildAxe save <name>` (a name is a must). The box goes into `config/xen/buildaxe/<kind>.jsonl`, one line each:
+A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe. Hit a block with it for one corner of
+a box, right-click a block for the other corner, and a screen comes up: the box's size, what it is (tap to switch
+Build, Tree, Cave), its name (a must), and Save or Cancel. Cancel keeps the corners: move one, or right-click into the
+air with the axe, and the screen comes back. (With Xen only on the server and not in your game, there's no screen:
+name it with `/xen BuildAxe save <name>`.) The box goes into `config/xen/buildaxe/<kind>.jsonl`, one line each:
 its kind and name, the dimension and biome, its size, a palette of the blocks in it (with their states) and one
 palette index per block (air too), and how dark it is and how far under the surface. Up to 64 blocks a side. The axe
 never breaks or strips anything, and nothing about you or where it was is kept. Xens don't learn from it in the game:
