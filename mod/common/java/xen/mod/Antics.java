@@ -1,5 +1,6 @@
 package xen.mod;
 
+import xen.mod.talk.Voice.Say;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -55,11 +56,6 @@ final class Antics {
 
 	private long now() {
 		return c.player.level().getGameTime();
-	}
-
-	private String pick(String... byTone) {
-		int t = Math.max(0, java.util.Arrays.asList(Personality.TONES).indexOf(c.personality.tone));
-		return byTone[Math.min(byTone.length - 1, t)];
 	}
 
 	boolean busy() {
@@ -118,8 +114,7 @@ final class Antics {
 		c.crouchWave(2 + random.nextInt(3));                                  // crouch, crouch (a few): right away, like a player
 		boolean said = now - saidHiAt.getOrDefault(p.getUUID(), -100_000L) < 2400;   // (it crouches back every time; says hi once in two minutes)
 		if (!said && !(p instanceof XenPlayer)) saidHiAt.put(p.getUUID(), now);
-		if (!said && !(p instanceof XenPlayer)) c.talker.sayNear(pick("Hi hi! *crouches back*", "Hey. *crouches back*", "Hm. Hi.", "O-oh, hi! *crouches*",
-				"Yo! *crouch crouch*", "*crouch crouch crouch* Hiii!"));
+		if (!said && !(p instanceof XenPlayer)) c.talker.sayNear(c.words(Say.HELLO, null, p.getName().getString()));   // (the crouch says the rest)
 		if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} greeted {} back (trust now {})", c.name, p.getName().getString(), c.trust(p.getUUID()));
 	}
 
@@ -148,8 +143,7 @@ final class Antics {
 				start("dance", 60 + random.nextInt(40));
 				if (now - danceLineAt < 2400) continue;                            // (dancing again soon: no need to say so again)
 				danceLineAt = now;
-				c.talker.sayNear(pick("Dance party!", "Alright, alright.", "Ugh... fine. One dance.", "O-okay, I'll dance too...",
-						"LET'S GOOO!", "Wheee! Dance party!"));
+				c.talker.sayNear(c.words(Say.CHEER, "dance party"));
 			}
 		}
 	}
@@ -198,7 +192,7 @@ final class Antics {
 		if (random.nextBoolean() && startTrick()) return Action.IDLE;
 		partner = friend;
 		start("spin", 12);
-		c.talker.sayNear(pick("Wheee!", "Spin!", "...", "Hehe.", "Behold!", "Weeeee!"));
+		c.talker.sayNear(c.words(Say.CHEER, null));
 		return Action.TURN_LEFT;
 	}
 
@@ -235,7 +229,7 @@ final class Antics {
 			c.hands.yaw = yaw;
 			runTo = Vec3.atCenterOf(feet.offset(f[0] * 6, 0, f[1] * 6));
 			start("trick", 60);
-			c.talker.sayNear(pick("Watch this!", "Watch this.", "Hey. Watch.", "U-um, watch this...", "Watch THIS!", "Hold my potato. Watch this!"));
+			c.talker.sayNear(c.words(Say.TELL, "watch this"));
 			return true;
 		}
 		return false;
@@ -259,12 +253,11 @@ final class Antics {
 		c.player.setSprinting(false);
 		boolean nailed = random.nextFloat() < 0.35f + 0.5f * c.personality.diligence;
 		if (nailed) {
-			c.talker.sayNear(pick("Nailed it!", "Clean.", "Heh. Not bad.", "I did it!", "Flawless.", "NAILED IT!"));
+			c.talker.sayNear(c.words(Say.CHEER, "I did it"));
 			start("dance", 30);
 		} else {
 			c.player.setShiftKeyDown(true);                                 // stumbles
-			c.talker.sayNear(pick("Oof! I meant to do that.", "That... was on purpose.", "Don't. Say. Anything.", "Ow... nobody saw that, right?",
-					"I meant to do that!", "Oops! 10 out of 10 anyway!"));
+			c.talker.sayNear(c.words(Say.LAUGH, "I meant to do that"));
 			doing = "stumble";
 			until = now() + 20;
 		}
@@ -285,12 +278,11 @@ final class Antics {
 		lastSurprise = now;
 		boolean foeLow = foe.getHealth() < foe.getMaxHealth() * 0.3f;
 		if (foeLow && distance > 3 && c.hands.canHeal()) {
-			c.talker.sayNear(pick("Snack break!", "Hold on, I'm eating.", "Not even worth a sword. *munch*", "U-um, sorry, I'm hungry...",
-					"Mid-fight snack!", "Nom nom nom."));
+			c.talker.sayNear(c.words(Say.LAUGH, "snack break"));
 			return Action.EAT;
 		}
 		if (foeLow && distance > 2.5 && !(foe instanceof net.minecraft.server.level.ServerPlayer)) {   // (a player: it talks terms instead, and keeps at it)
-			c.talker.sayNear(pick("Hehe, gotcha!", "Too easy.", "Is that all?", "Boop!", "Next!", "Ha!"));
+			c.talker.sayNear(c.words(Say.LAUGH, "got you"));
 			c.player.setShiftKeyDown(true);
 			c.hands.watching = foe;
 			return Action.IDLE;

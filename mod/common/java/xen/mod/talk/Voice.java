@@ -1057,6 +1057,57 @@ public final class Voice {
 
 	// ------------------------------------------------------------------------------------ talking first
 	/** Something to say to another Xen (or anyone) to start a chat: a question, what it thinks of something, its news, a joke. */
+	/** The kinds of thing a Xen means to say in the game (what it says them with is its own). */
+	public enum Say { HELLO, BYE, OK, CANT, NO, THANKS, SORRY, GLAD, BAD, LAUGH, WARN, CHEER, TELL, PLAN, ASK }
+
+	/**
+	 * Something it means to say, in its own words: nothing written for it, only what it means. Now and then a word or two
+	 * for the kind of thing it is (a greeting, an okay, bad news...), from its word library in its own tone; the thing
+	 * itself in plain words (what the game knows: "I'll stay here", "a creeper behind you"; null for just the word); now
+	 * and then the name of the one it's talking to; how it feels, when it feels strongly; all written the way it writes
+	 * (a shy one stammers and trails off, a cheerful one shouts, a grumpy one mutters).
+	 */
+	public String express(Say act, String what, String to) {
+		List<Sent> out = new ArrayList<>();
+		boolean bare = what == null || what.isBlank();
+		String pool = switch (act) {
+			case HELLO -> "greet";
+			case BYE -> "bye";
+			case OK -> "sure_ack";
+			case CANT -> "cant_ack";
+			case NO -> "no";
+			case THANKS -> "thanks";
+			case SORRY -> "sorry";
+			case GLAD -> "wow_good";
+			case BAD -> "wow_bad";
+			case LAUGH -> "laugh";
+			case WARN -> "warn";
+			case CHEER -> "cheer";
+			case TELL -> "remark_start";
+			case PLAN, ASK -> "filler";
+		};
+		float lead = bare ? 1f : switch (act) {
+			case HELLO, BYE, WARN, THANKS, LAUGH -> 0.85f;
+			case OK, CANT, NO, SORRY, GLAD, BAD, CHEER -> 0.55f;
+			default -> 0.12f + 0.25f * me.chattiness();                          // (telling, planning, asking: mostly straight out)
+		};
+		String head = random.nextFloat() < lead ? w(pool) : "";
+		boolean named = to != null && !to.isBlank() && random.nextFloat() < (act == Say.HELLO || act == Say.BYE || act == Say.WARN ? 0.6f : 0.15f);
+		String body = bare ? "" : stripEnd(what);
+		if (!head.isEmpty()) out.add(new Sent(head + (named ? " " + to : ""), false));
+		else if (named && !body.isEmpty()) body = to + ", " + (body.length() > 1 && Character.isUpperCase(body.charAt(1)) ? body : Character.toLowerCase(body.charAt(0)) + body.substring(1));
+		if (!body.isEmpty()) out.add(new Sent(body, act == Say.ASK || what.trim().endsWith("?")));
+		if (act == Say.HELLO && body.isEmpty() && random.nextFloat() < 0.25f + 0.4f * me.chattiness()) {
+			String tail = w("greet_tail");
+			if (!tail.isEmpty()) out.add(new Sent(tail, tail.startsWith("what") || tail.startsWith("how")));
+		}
+		String mood = me.mood();
+		boolean strong = mood.equals("afraid") || mood.equals("terrified") || mood.equals("hurt") || mood.equals("pleased");
+		if (!body.isEmpty() && act != Say.ASK && strong && random.nextFloat() < 0.2f * (0.5f + me.chattiness())) out.add(new Sent(feeling(), false));
+		if (out.isEmpty()) return "";
+		return write(out);
+	}
+
 	public String opener(String other) {
 		List<Sent> out = new ArrayList<>();
 		float r = random.nextFloat() * (me.kindness() + me.curiosity() + 2 * me.chattiness() + ("silly".equals(me.tone()) ? 0.6f : 0.15f) + 0.3f);

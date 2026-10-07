@@ -849,7 +849,7 @@ final class Chores {
 		ItemEntity drop = dropToPickUp();                               // what it just mined, lying on the ground
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
-			return c.walkTo(drop.position());
+			return c.stepTo(drop.position());
 		}
 		BlockPos bonus = oreInReach();                                  // ore showing right by it: nobody walks past iron for stone
 		if (bonus != null) {
@@ -1086,7 +1086,7 @@ final class Chores {
 		ItemEntity drop = dropToPickUp();
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
-			return c.walkTo(drop.position());
+			return c.stepTo(drop.position());
 		}
 		if (debrisHunt) {                                                    // ancient debris: any it can see (it hides in the netherrack)
 			BlockPos d = debrisInSight();
@@ -1257,7 +1257,7 @@ final class Chores {
 		ItemEntity drop = dropToPickUp();
 		if (drop != null) {
 			doing = "picking up the " + what;
-			return c.walkTo(drop.position());
+			return c.stepTo(drop.position());
 		}
 		if (isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath(), pickupId)) {
 			doing = "breaking the " + what + " to take it";
@@ -1298,7 +1298,7 @@ final class Chores {
 		ItemEntity drop = dropToPickUp();
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
-			return c.walkTo(drop.position());
+			return c.stepTo(drop.position());
 		}
 		if (target == null || !isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(c.player.level().getBlockState(target).getBlock()).getPath(), blocksId)
 				|| skip.contains(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()))) {
@@ -1361,7 +1361,7 @@ final class Chores {
 		ItemEntity drop = dropToPickUp();
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
-			return c.walkTo(drop.position());
+			return c.stepTo(drop.position());
 		}
 		if (prey == null || !prey.isAlive() || c.player.distanceTo(prey) > 48) prey = nearestOf(slayType);
 		if (prey == null) {
@@ -1563,7 +1563,9 @@ final class Chores {
 			String k = c.itemKey(drop.getItem());
 			boolean wanted = false;
 			for (String i : items) wanted |= i.equals(k);
-			if (!wanted && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
+			// what it just mined is its too (a player picks up what they dig, cobblestone and all): close by, if there's room
+			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
+			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;
@@ -2041,7 +2043,7 @@ final class Chores {
 						|| forWool && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath().endsWith("_wool"))
 						&& Math.abs(x.getY() - feet) <= 1.5)) {
 			doing = forWool ? "picking up what the sheep dropped" : "picking up food";
-			return c.walkTo(drop.position());                             // pick up what it hunted
+			return c.stepTo(drop.position());                             // pick up what it hunted
 		}
 		doing = forWool ? "looking around for sheep" : "no animals in sight, looking around";
 		return lookAround();

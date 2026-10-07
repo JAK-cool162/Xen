@@ -37,6 +37,15 @@ interface Goal {
 		return heuristic(p.getX(), p.getY(), p.getZ());
 	}
 
+	/** How many levels down it still is from there (none if it's level, above, or any height will do). */
+	default int below(int x, int y, int z) {
+		return 0;
+	}
+
+	default int below(BlockPos p) {
+		return below(p.getX(), p.getY(), p.getZ());
+	}
+
 	private static double dist(double dx, double dy, double dz) {
 		return Math.sqrt(dx * dx + dz * dz + 1.5 * dy * dy) * PER_BLOCK;
 	}
@@ -50,6 +59,10 @@ interface Goal {
 
 			public double heuristic(int x, int y, int z) {
 				return dist(x - p.getX(), y - p.getY(), z - p.getZ());
+			}
+
+			public int below(int x, int y, int z) {
+				return Math.max(0, y - p.getY());
 			}
 
 			public Vec3 center() {
@@ -75,6 +88,10 @@ interface Goal {
 				return Math.max(0, dist(x - p.getX(), y - p.getY(), z - p.getZ()) - r * PER_BLOCK);
 			}
 
+			public int below(int x, int y, int z) {
+				return Math.max(0, y - p.getY() - r);
+			}
+
 			public Vec3 center() {
 				return Vec3.atBottomCenterOf(p);
 			}
@@ -98,6 +115,10 @@ interface Goal {
 
 			public double heuristic(int x, int y, int z) {
 				return Math.max(0, dist(x - p.getX(), y - p.getY(), z - p.getZ()) - PER_BLOCK);
+			}
+
+			public int below(int x, int y, int z) {
+				return Math.max(0, y - p.getY());
 			}
 
 			public Vec3 center() {
@@ -142,6 +163,10 @@ interface Goal {
 				return Math.abs(y - gy) * 2 * PER_BLOCK;                              // (a staircase: about two blocks a level)
 			}
 
+			public int below(int x, int y, int z) {
+				return Math.max(0, y - gy);
+			}
+
 			public Vec3 center() {
 				return new Vec3(0, gy, 0);
 			}
@@ -165,6 +190,12 @@ interface Goal {
 				double best = Double.MAX_VALUE;
 				for (Goal g : all) best = Math.min(best, g.heuristic(x, y, z));
 				return best;
+			}
+
+			public int below(int x, int y, int z) {
+				int least = Integer.MAX_VALUE;
+				for (Goal g : all) least = Math.min(least, g.below(x, y, z));
+				return all.isEmpty() ? 0 : least;
 			}
 
 			public Vec3 center() {

@@ -185,7 +185,11 @@
     "listen":       ["yes", "yeah", "hm", "hmm|calm", "what is it|grumpy,bold", "what|grumpy", "y-yes|shy", "that's me|silly,cheerful", "I'm listening|calm", "you called|cheerful,silly"],
     "yuck":         ["ugh", "oh no", "eww|silly,cheerful", "please, no|shy,calm", "don't remind me|grumpy", "hmph|grumpy,bold", "don't get me started|bold,grumpy"],
     "forgive":      ["it's okay", "no worries", "don't worry about it", "it's fine|calm,grumpy", "i-it's okay|shy", "apology accepted|bold", "all good|silly,cheerful"],
-    "okay_then":    ["oh, okay", "fair enough|calm,grumpy", "alright then", "okay then", "o-okay|shy", "your loss|grumpy,bold", "suit yourself|bold,silly"]
+    "okay_then":    ["oh, okay", "fair enough|calm,grumpy", "alright then", "okay then", "o-okay|shy", "your loss|grumpy,bold", "suit yourself|bold,silly"],
+    "thanks":       ["thanks", "thank you", "ty|silly,bold", "thx|bold,silly", "appreciate it|calm", "t-thanks|shy", "cheers|calm,cheerful", "thanks a lot|cheerful"],
+    "sorry":        ["sorry", "my bad|bold,silly", "oops|silly,cheerful", "s-sorry|shy", "whoops|silly", "apologies|calm", "ugh, sorry|grumpy"],
+    "warn":         ["watch out", "careful", "heads up|calm,cheerful", "look out|bold", "w-watch out|shy", "yo|bold,grumpy", "hey|calm"],
+    "cheer":        ["yes", "let's go|bold,cheerful", "finally|grumpy,bold", "yay|cheerful,silly", "woo|silly", "nice|calm", "y-yay|shy", "there we go|calm"]
   },
 
   "jokes": [

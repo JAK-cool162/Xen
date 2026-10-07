@@ -385,6 +385,9 @@ final class Walker {
 		Goal aim = want != null ? want : Goal.block(target);
 		partial = false;
 		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
+		// (stone, with what's in its hand: a little over, so it keeps on down one staircase rather than start a dozen)
+		float stone = dig ? c.player.isCreative() ? 0.5f : c.hands.digSpeed(Blocks.STONE.defaultBlockState(), level, start) : 0;
+		rock = stone > 1f / 200 ? Math.max(0, 1.2 * (WALK + 2 + 3 * (1 / stone + 12)) - 2 * Goal.PER_BLOCK) : 0;
 		mobWay = false;
 		if (want == null && mobPaths() && now() >= noMobWayUntil && reachable(target)) {   // the mobs' way first (the setting): quick, sure, no digging
 			List<Move> m = mobPath.plan(c, level, start, to, 1600);
@@ -444,6 +447,8 @@ final class Walker {
 			return null;
 		}
 		partial = !aim.isIn(best.pos) && !(want == null && h(aim, best.pos) < 0.01);   // (only part of the way: more later)
+		if (WALK_DEBUG && partial) XenMod.LOG.info("[walk] {} partial: expanded {}, best {} h {} g {} (start h {}, rock {})", c.name, expanded,
+				best.pos.toShortString(), String.format("%.0f", bestH), String.format("%.0f", best.g), String.format("%.0f", first.f), String.format("%.0f", rock));
 		List<Move> out = new ArrayList<>();
 		for (Node n = best; n.via != null; n = n.parent) out.add(0, n.via);
 		return out;
@@ -467,6 +472,8 @@ final class Walker {
 				if (!m.dig().contains(b) && !passable(b) && m.kind() != Kind.PILLAR && m.kind() != Kind.CLIMB_UP && m.kind() != Kind.SWIM) return false;
 			}
 			if (lava(m.to()) || lava(m.to().below())) return false;
+			// (ground it took for granted, unseen, isn't there: a hole, a ravine under the grass)
+			if ((m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL) && m.dig().isEmpty() && !floor(m.to()) && !water(m.to())) return false;
 		}
 		return true;
 	}
@@ -502,11 +509,18 @@ final class Walker {
 		}
 	}
 
-	/** At best a sprint the whole way (a little more: it would rather find a good way than the shortest one). */
-	/** How far from the goal, a little more than a sprint the whole way (it would rather find a good way than the shortest). */
-	private static double h(Goal aim, BlockPos p) {
-		return aim.isIn(p) ? 0 : aim.heuristic(p) * 1.15;
+	/**
+	 * How far from the goal, a little more than a sprint the whole way (it would rather find a good way than the
+	 * shortest); and down through rock, what a step of a staircase in the rock it stands on costs, each level. Without
+	 * that, sixteen down looked a short stroll, it thought all around the top for a way that wasn't there, and the
+	 * cheapest it saw was a shaft straight down.
+	 */
+	private double h(Goal aim, BlockPos p) {
+		return aim.isIn(p) ? 0 : aim.heuristic(p) * 1.15 + aim.below(p) * rock;
 	}
+
+	/** A step of a staircase down through stone, over what the goal's own measure counts a level. */
+	private double rock;
 
 	private static long key(Move m) {
 		return m.from().asLong() * 31 + m.to().asLong();
@@ -602,8 +616,10 @@ final class Walker {
 		if (dig && floor(p) && !inWater) {                                // straight down (players don't like to: only when there's no other way)
 			BlockPos b = p.below();
 			double br = breaks(b);
-			if (br > 0 && br < INF && fullBlock(b.below()) && !lava(b.below()) && !water(b.below())) {
-				add(Kind.DIG_DOWN, p, b, br + 6 + 20, List.of(b));
+			// (a staircase step digs three blocks and walks down: this has to cost clearly more, or the way down comes
+			// out a muddle of shafts and steps; and never where it can't see what's under: lava, a cave)
+			if (br > 0 && br < INF && fullBlock(b.below()) && !lava(b.below()) && !water(b.below()) && !lava(b.below(2))) {
+				add(Kind.DIG_DOWN, p, b, 2 * br + 6 + 60, List.of(b));
 			}
 		}
 		return out;
@@ -616,9 +632,14 @@ final class Walker {
 	}
 
 	// ------------------------------------------------------------------------------------ the world, as it knows it
-	/** What it can know: close by it feels it; further off only what's out in the light (a dark cave far away: rock), or the way it came. */
-	private boolean known(BlockPos p) {
-		return p.distManhattan(eyes) <= 8 || level.getRawBrightness(p, 0) > 0 || level.dimension() == wayIn && way.contains(p.asLong());
+	/**
+	 * What it can know: close by it feels it; out under the sky, the lay of the land; under cover only the open space
+	 * its eyes have seen ({@link Eyes#looked}), or the way it came. The rest is rock to it (no seeing through hills: a
+	 * lit cave behind the rock, the floor of a lake, a ravine under the grass, it finds when it gets there).
+	 */
+	private boolean known(BlockPos p, net.minecraft.world.level.chunk.LevelChunk chunk) {
+		return p.distManhattan(eyes) <= 8 || p.getY() >= chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX() & 15, p.getZ() & 15)
+				|| c.eyes.looked(p, level) || level.dimension() == wayIn && way.contains(p.asLong());
 	}
 
 	/**
@@ -668,7 +689,7 @@ final class Walker {
 			s = Blocks.BEDROCK.defaultBlockState();
 		} else {
 			s = chunk.getBlockState(p);
-			if (!known(p) && s.getCollisionShape(level, p).isEmpty() && s.getFluidState().isEmpty()) s = Blocks.STONE.defaultBlockState();
+			if (s.getCollisionShape(level, p).isEmpty() && s.getFluidState().isEmpty() && !known(p, chunk)) s = Blocks.STONE.defaultBlockState();
 		}
 		cache.put(key, s);
 		return s;
@@ -781,6 +802,7 @@ final class Walker {
 		if (!dig) return INF;
 		BlockState s = state(p);
 		if (s.getDestroySpeed(level, p) < 0 || !natural(s)) return INF;
+		if (Hands.holdsSomeone(level, p, c.player)) return INF;                  // (someone stands on it: not that way)
 		for (Direction d : Direction.values()) {
 			if (d == Direction.DOWN) continue;
 			var f = level.getFluidState(p.relative(d));

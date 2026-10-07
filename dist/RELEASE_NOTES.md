@@ -1,7 +1,28 @@
-**Xen Companion 2.0.0-beta.12**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.13**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.13: mining like a player (and nobody falls in the lava)
+
+* **Staircases, not shafts.** Going down through rock, a Xen now counts what each level really costs it (a step of a
+  staircase with the pickaxe it has), so it digs a staircase or takes a cave it has seen, instead of holes straight
+  down. Straight down only when there's no other way.
+* **It never digs out the block someone is standing on**, a player's or another Xen's. (A Xen mining beside you could
+  take the block under your feet and drop you in lava.)
+* **It picks up what it mines right away**: it walks over to its drops instead of standing there, straight to them
+  when nothing's in the way, around when something is.
+* **No seeing through rock.** Its way finding knows only what the Xen could know: out under the sky, the lay of the
+  land; under the ground, the open space it has seen, what's right by it, and the way it came. The rest is rock to it
+  until it gets there (a lit cave behind a hill, the floor of a lake, a ravine under the grass). The way finder helps
+  with the next steps; where to go is the Xen's own choice.
+* **Its own words.** The crouch greeting, tricks and reactions are now put in the Xen's own words by its voice, not
+  picked from fixed lines, and there are no typed emotes like *crouch* or *munch*. (Some other lines are still fixed;
+  more to come.)
+* Tested in the game: told to go 16 blocks down, on a hill it went by a cave and on a mountain by a ravine and a
+  staircase, both to the spot, with no shafts; a player standing over the spot and one beside a Xen mining stone stayed
+  on their feet at full health; mining stone, it stood beside its own drops 87 seconds out of 90 before, 1 to 3
+  seconds at a time now.
 
 ### 2.0.0-beta.12: whispers, and it finishes the house it started
 

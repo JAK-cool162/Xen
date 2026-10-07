@@ -458,6 +458,11 @@ public final class Hands {
 			limit = 2;
 			return;
 		}
+		if (holdsSomeone(level, pos, p)) {                             // someone's standing on it: a player never digs out the ground under a friend
+			cantMine = pos.immutable();
+			limit = 2;
+			return;
+		}
 		selectBestTool(state);
 		if (tooSlow(state.getDestroyProgress(p, level, pos))) {       // more than 10 seconds with what it has: not worth it
 			cantMine = pos.immutable();
@@ -659,9 +664,28 @@ public final class Hands {
 	}
 
 	/** Mine a block it can reach by looking at it (not just ahead or under its feet): for staircases. */
+	/**
+	 * Is someone else (a player or a Xen) standing on this block, or on its edge? Then it's their ground: digging it out
+	 * drops them (into a cave, into lava). A player doesn't do that to someone, so it doesn't either.
+	 */
+	static boolean holdsSomeone(ServerLevel level, BlockPos pos, net.minecraft.world.entity.player.Player self) {
+		double top = pos.getY() + 1;
+		for (var o : level.players()) {
+			if (o == self || o.isSpectator() || !o.isAlive() || o.distanceToSqr(Vec3.atCenterOf(pos)) > 16) continue;
+			var box = o.getBoundingBox();
+			if (box.minY >= top - 0.05 && box.minY <= top + 0.6 && box.maxX > pos.getX() && box.minX < pos.getX() + 1
+					&& box.maxZ > pos.getZ() && box.minZ < pos.getZ() + 1) return true;
+		}
+		return false;
+	}
+
 	boolean mine(BlockPos pos) {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
 		ServerLevel level = (ServerLevel) p.level();
+		if (holdsSomeone(level, pos, p)) {                                  // (someone stands on it)
+			cantMine = pos.immutable();
+			return false;
+		}
 		BlockState state = level.getBlockState(pos);
 		cantMineUnseen = false;
 		if (state.getDestroySpeed(level, pos) < 0 || tooSlow(bestSpeed(state, level, pos))) {   // bedrock, or far too slow

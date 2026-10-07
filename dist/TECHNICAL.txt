@@ -1,7 +1,30 @@
-XEN COMPANION 2.0.0-beta.12: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.13: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.13
+===========================
+
+Going down: Walker.h = goal.heuristic x 1.15 + goal.below(p) x rock. Goal.below (block, near, nextTo, level, anyOf:
+levels still to go down; column: 0). rock, per plan = 1.2 x (WALK + 2 + 3 x (1 / stone speed with its tool + 12)) -
+2 x PER_BLOCK (0 without digging): before, 16 levels down looked a 70-tick stroll, the search spread over the surface
+and the cheapest it saw was DIG_DOWN (then br + 26, under a staircase step's 3 blocks). DIG_DOWN now 2 br + 66, never
+over lava two below. Hands.holdsSomeone (anyone else standing on the block): Walker.breaks INF, Hands.mine and
+startMining refuse.
+Drops: Chores.dropToPickUp also takes its own fresh drops (under 5 blocks, under 30 s old, room for them);
+Companion.stepTo walks straight only when straightTo (floor all the way, nothing at its feet or head, no fluid, fire,
+lava or magma) and it gets closer; 15 ticks without getting closer: the walker's way for 3 s. (FORWARD goes the way
+the body faces, steer bends it at most 50 degrees: into the wall it had just mined, it stood.)
+What it knows: Eyes.sawOpen keeps the open cells its sight lines pass under cover (below the heightmap) in two
+LongOpenHashSets of 40000 (the older let go when the newer fills; cleared in a new dimension). Walker.known(p, chunk):
+within 8 (Manhattan), at or above the heightmap, Eyes.looked, or the way it came (was: any lit block, behind rock or
+not). Open cells it can't know are stone to the planner. stillGood also checks the floor of the next walk moves.
+Words: Voice.express(Say, what, to) (Say: HELLO, BYE, OK, CANT, NO, THANKS, SORRY, GLAD, BAD, LAUGH, WARN, CHEER,
+TELL, PLAN, ASK): a lead word from its tone's pool (words.json: thanks, sorry, warn, cheer added), sometimes the name,
+the meaning, a greeting tail, a feeling when it's strong, then write() styles it. Companion.words. Antics and Reactions
+use it; other classes still have fixed lines.
 
 
 WHAT'S NEW IN 2.0.0-beta.12

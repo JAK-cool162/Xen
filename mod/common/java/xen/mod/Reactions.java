@@ -1,5 +1,6 @@
 package xen.mod;
 
+import xen.mod.talk.Voice.Say;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
@@ -132,12 +133,12 @@ final class Reactions {
 	private String line(ServerPlayer o) {
 		String n = o.getName().getString();
 		return switch (how) {
-			case "hello" -> c.pick3("Hi " + n + "!", "Hey " + n + "! *crouches*", "Oh, hi " + n + ".");
-			case "wary" -> c.pick3("Who's that?", "Stay back, " + n + ".", "...I'm watching you, " + n + ".");
-			case "stare" -> c.pick3("What do you want, " + n + "?", "Don't try anything.", "You looking at me?");
-			case "boast" -> c.pick3("Nice gear, " + n + ". Mine's better.", "Behold, the best player around.", "Take notes, " + n + ".");
-			case "envy" -> c.pick3("Where'd you get that gear?", "Must be nice, having all that.", "Hmph. Show-off.");
-			case "trade" -> c.pick3("Hey " + n + ", got anything to trade?", "Nice stuff. Want to make a deal?", "Selling anything?");
+			case "hello" -> c.words(Say.HELLO, null, n);
+			case "wary" -> c.words(Say.WARN, "stay back", n);
+			case "stare" -> c.words(Say.ASK, "what do you want", n);
+			case "boast" -> c.words(Say.TELL, "my gear is better than yours", n);
+			case "envy" -> c.words(Say.ASK, "where did you get that gear", n);
+			case "trade" -> c.words(Say.ASK, "got anything to trade", n);
 			default -> random.nextBoolean() ? "Hey." : null;
 		};
 	}

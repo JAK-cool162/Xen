@@ -2029,6 +2029,51 @@ public final class Companion {
 		return walkTo(g, g.center());
 	}
 
+	/**
+	 * A drop (or a spot) right by it: it just walks onto it, a step or two straight there, the way a player does (no
+	 * route to plan: that's where it stood about, a block short). Further, or up or down a step: the usual way.
+	 */
+	Action stepTo(Vec3 at) {
+		Vec3 d = at.subtract(player.position());
+		double flat = Math.hypot(d.x, d.z);
+		long now = player.level().getGameTime();
+		// straight there only with nothing in the way, and while it gets closer (a wall it walked into: round, the usual way)
+		if (flat < stepLast - 0.05 || flat > stepLast + 1 || now - stepCalled > 5) {
+			stepLast = flat;
+			stepSince = now;
+		}
+		stepCalled = now;
+		if (now - stepSince > 15) stepAroundUntil = now + 60;
+		if (flat > 3 || Math.abs(d.y) > 0.6 || !player.onGround() || now < stepAroundUntil || !straightTo(at)) return walkTo(at);
+		if (flat < 0.3) return Action.IDLE;                                  // (on it: it's picked up)
+		hands.face(new Vec3(at.x, player.getEyeY(), at.z));
+		hands.steer = at;
+		acted = true;
+		return Action.FORWARD;
+	}
+
+	private double stepLast = Double.MAX_VALUE;
+	private long stepSince, stepCalled, stepAroundUntil;
+
+	/** A clear walk straight there on the level: floor all the way, nothing at its feet or head, no hole, no lava. */
+	private boolean straightTo(Vec3 at) {
+		ServerLevel level = (ServerLevel) player.level();
+		Vec3 from = player.position(), d = at.subtract(from);
+		int n = (int) Math.ceil(Math.hypot(d.x, d.z) / 0.3);
+		for (int i = 1; i <= n; i++) {
+			Vec3 q = from.add(d.x * i / n, 0, d.z * i / n);
+			BlockPos feet = BlockPos.containing(q.x, from.y + 0.1, q.z);
+			for (BlockPos b : new BlockPos[] {feet, feet.above()}) {
+				var s = level.getBlockState(b);
+				if (!s.getCollisionShape(level, b).isEmpty() || !s.getFluidState().isEmpty() || s.is(net.minecraft.tags.BlockTags.FIRE)) return false;
+			}
+			var under = level.getBlockState(feet.below());
+			if (under.getCollisionShape(level, feet.below()).isEmpty() || under.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)
+					|| under.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK)) return false;
+		}
+		return true;
+	}
+
 	/** When it last looked for ore to take on its way. */
 	private int lookedOnTheWay;
 
@@ -3905,6 +3950,19 @@ public final class Companion {
 	/** Who it's talking with (so "what about you?" without its name is for it), and until when. */
 	UUID talkingWith;
 	long talkingUntil;
+
+	/**
+	 * What it means to say, in its own words (its voice words it: {@link xen.mod.talk.Voice#express}): the game gives the
+	 * meaning, never the line. what: the thing itself in plain words (null: just the word for it, like a greeting).
+	 */
+	String words(xen.mod.talk.Voice.Say act, String what) {
+		return words(act, what, null);
+	}
+
+	String words(xen.mod.talk.Voice.Say act, String what, String to) {
+		String s = voice.express(act, what, to);
+		return s.isEmpty() ? (what == null ? "" : what) : s;
+	}
 
 	String pick3(String a, String b, String c3) {
 		int r = random.nextInt(3);

@@ -157,12 +157,41 @@ final class Eyes {
 				if (!open) return;                                              // a wall in the dark: it can't make it out
 				continue;
 			}
+			if (open && s.getFluidState().isEmpty() && chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) > y) sawOpen(level);
 			String k = kind(s);
 			if (k != null) remember(k, m, t);
 			else if (darkRun > 0 && !open && deepStone(s)) remember("deepstone", m, t);   // dark stone under the grass: where ore is
 
 			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) return;               // rock, a wall: that's as far as it sees
 			if (!s.getFluidState().isEmpty() && t > 16) return;                  // (deep water: murky)
+		}
+	}
+
+	/**
+	 * The open space it has seen under cover (caves, overhangs, under water's edge): the shape of the world as far as
+	 * it knows it, for its way. Out under the sky anyone sees the lay of the land; under the ground only this, what's
+	 * close by and the way it came, the rest is rock to it. Two lots, the older let go when the new one fills (a few
+	 * hundred kilobytes, never the world).
+	 */
+	private it.unimi.dsi.fastutil.longs.LongOpenHashSet looked = new it.unimi.dsi.fastutil.longs.LongOpenHashSet(),
+			lookedBefore = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lookedIn;
+	private static final int LOOKED_CAP = 40000;
+
+	boolean looked(BlockPos p, ServerLevel level) {
+		long k = p.asLong();
+		return level.dimension() == lookedIn && (looked.contains(k) || lookedBefore.contains(k));
+	}
+
+	private void sawOpen(ServerLevel level) {
+		if (level.dimension() != lookedIn) {
+			looked.clear();
+			lookedBefore.clear();
+			lookedIn = level.dimension();
+		}
+		if (looked.add(m.asLong()) && looked.size() >= LOOKED_CAP) {
+			lookedBefore = looked;
+			looked = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 		}
 	}
 
