@@ -1,7 +1,29 @@
-XEN COMPANION 2.0.0-beta.8: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.8.1: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.8.1
+============================
+
+Tested in the game with a pass or fail check for each tactic (scratch test proof_client.js: a 25x25 glass-walled
+arena, and a 9x4x3 stone block with a 7-long tunnel for the underground ones). The fixes:
+- Companion.request: knowledge.heard(words) now runs right after requestWords, for anyone trusted 0.3 or more.
+  heard() only takes mechanics it doesn't know yet, so a sentence about one it knows goes on as before. Before, it ran
+  after the intent and opinion handlers: a sentence that matched a shelter request or an opinion never got there.
+- Companion.instinct: tactics.next() moved to right after gut.override(). Before, it was after the water and shore
+  reflexes, which took every tick with water at its feet.
+- Fighter: a creeper with isIgnited() (flint and steel, or a command) is about to blow too, not only one with
+  getSwellDir() > 0.
+- Critters (an archer in sight, between its shots, the Xen armed): with skeleton_dodge, more than 4 away, it watches
+  it and goes LEFT, FORWARD, RIGHT, FORWARD (8 ticks each), not straight at it. Fighter's version of this never ran
+  for archers: Critters comes first.
+- The test's own mistake, for the record: a Xen told "stay" walks back to where it was told, so each scene told it
+  "stay" again where it was.
+Results: water, lava, creeper (19 of 20 health after the blast), skeleton (a sideways wobble of -1.3 to +1.8 blocks,
+3 turns), full bag, storm ("night: digging down to mine (safe under the ground)" right after it began): all pass.
+Diamonds: 2 of 5 Xens said they had none.
 
 
 WHAT'S NEW IN 2.0.0-beta.8

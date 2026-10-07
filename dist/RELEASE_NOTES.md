@@ -1,7 +1,32 @@
-**Xen Companion 2.0.0-beta.8**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.8.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.8.1: proven in the game (and the fixes that took)
+
+Each of beta.8's tactics was tested in the game, with a pass or fail check. The first run found four that didn't work,
+now fixed:
+
+| Test | Result |
+|---|---|
+| Water let into its tunnel right next to it | **pass**: it put a block on the water |
+| Lava put in the floor beside it | **pass**: covered |
+| A lit creeper 2 blocks away in a 1-wide tunnel | **pass**: a block between them; it had 19 of 20 health after the blast |
+| A skeleton shooting from 10 blocks | **pass**: it came in side to side (more than a block each way, 3 turns) |
+| A full bag (sticks, logs, dirt, cobblestone, sand, gravel) | **pass**: gravel went, sticks and logs stayed |
+| A thunderstorm (a Xen living its own life, told the tactic) | **pass**: it stopped gathering wood and dug down to wait under the ground |
+| 5 Xens with 2 diamonds each asked for them | 2 said they had none (they had 2), 1 said no because it needs them, 2 gave them |
+
+Fixed:
+* **Telling a Xen how to handle something** now teaches it, even when the sentence sounds like an order or an
+  opinion. Before, "in a thunder storm wait in a shelter" made it build a hut on the spot, and "if a creeper hisses,
+  put a block between you" got "eww, creepers".
+* **Water first**: its "back to shore" reflex came before the tactics, so a Xen with water at its feet swam about
+  instead of blocking it.
+* **A creeper lit with flint** (not only one hissing at it) counts as about to blow.
+* **Skeletons**: the side-to-side dodge is now part of its usual way of going in on an archer between shots.
+* Xens teach each other these, too: in the test, a new Xen learned the mace and wind charge tricks from two others.
 
 ### 2.0.0-beta.8: what players do (your answers), spears and maces, PvP tiers
 

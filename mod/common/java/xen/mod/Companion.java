@@ -886,6 +886,8 @@ public final class Companion {
 		}
 		Action survive = gut.override();                              // Xen 2.0's gut first: lava, fire, badly hurt with a monster on it
 		if (survive != null) return survive;
+		Action taught = tactics.next();                               // water flooding in, lava beside it, powder snow, a spawner
+		if (taught != null) return taught;
 		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
 			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) {
 				walker.stop();                                        // (its way led under: air first)
@@ -917,8 +919,6 @@ public final class Companion {
 			if (goals.instant.isEmpty()) goals.instant = "fighting " + (fightingWhat.equals(fightingWhat.toLowerCase(java.util.Locale.ROOT)) ? "the " : "") + fightingWhat;
 			return fight;
 		}
-		Action taught = tactics.next();                               // water flooding in, lava beside it, powder snow, a spawner
-		if (taught != null) return taught;
 		Action care = critters.danger();                              // arrows coming, drowned about, poison
 		if (care != null) return care;
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
@@ -3051,6 +3051,7 @@ public final class Companion {
 		String who = from.getName().getString();
 		Talk talk = talks.computeIfAbsent(u, k -> new Talk());         // what was said before: "what about cows?", "and you?", "is it good?"
 		long saidAt = player.level().getGameTime();
+
 		if (said != null && r.intent().equals("chat")) {
 			boolean fresh = saidAt - talk.at < 20 * 60 * 3;
 			String full = xen.mod.talk.Voice.followUp(said, name, fresh ? talk.question : null, fresh ? talk.subject : null, fresh ? talk.line : null);
@@ -3073,6 +3074,7 @@ public final class Companion {
 			}
 		}
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
+		if (trust(u) >= 0.3f && knowledge.heard(words)) return null;   // how to handle something it didn't know ("in a storm, wait in a shelter"): learned, not an order
 		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
 		boolean aboutThem = words.toLowerCase(java.util.Locale.ROOT).matches("(?s)^\\s*i('m| am| really| just| also)? ?(love|like|hate|found|got|have|had|made|saw|think|mined|killed|built|am|was)\\b.*");
 		if ((told.news || told.feelMe || aboutThem) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!", "I love diamonds": talk, not "go mine diamonds"

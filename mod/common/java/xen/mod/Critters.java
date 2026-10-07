@@ -84,6 +84,12 @@ final class Critters {
 					return Action.ATTACK;
 				}
 				c.run(true);
+				if (c.knowledge.knows("skeleton_dodge") && p.distanceTo(m) > 4) {   // (a player's way: side to side on the way in, so the next shot misses)
+					c.hands.watching = m;
+					int phase = (p.tickCount / 8) % 4;
+					c.acted = true;
+					return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
+				}
 				return c.walkTo(m.position());
 			}
 			Vec3 away = p.position().subtract(m.position()).normalize().scale(14).add(p.position());

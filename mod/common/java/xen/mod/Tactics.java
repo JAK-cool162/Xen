@@ -60,6 +60,7 @@ final class Tactics {
 				c.acted = true;
 				return Action.PLACE;
 			}
+			if (w != null) c.journal("thinks", "water coming in at " + w.toShortString() + ", can't block it: " + c.hands.cantPlace);
 		}
 		if (under && c.knowledge.knows("cover_lava")) {
 			BlockPos l = lavaBeside(level, feet);

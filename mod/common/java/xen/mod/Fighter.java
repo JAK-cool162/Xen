@@ -76,7 +76,7 @@ final class Fighter {
 			comboAt = now;
 			if (combo >= 3 && c.knowledge.knows("combo_shield")) shieldUntil = now + 20;
 		}
-		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && creeper.getSwellDir() > 0 && d < 5) {
+		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && d < 5) {
 			c.goals.instant = "getting away from the creeper";                 // it's hissing: run, like anyone would
 			if (!c.inArena) c.chatter("Creeper! Run!", false);
 			if (d < 3 && c.knowledge.knows("creeper_block")) {                  // right on it (a tunnel, no room to run): what players do
@@ -91,6 +91,7 @@ final class Fighter {
 					c.acted = true;
 					return Action.PLACE;
 				}
+				c.journal("thinks", "no block between it and the creeper: " + h.cantPlace);
 				if (h.raiseShield()) return idle();                            // or the shield
 			}
 			return runFrom(foe, sprintable);
@@ -205,10 +206,10 @@ final class Fighter {
 		p.setSprinting(sprintable && d > 2);
 		String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(foe.getType()).getPath();
 		boolean archer = kind.endsWith("skeleton") || kind.equals("stray") || kind.equals("bogged");
-		if (archer && d > 4 && c.knowledge.knows("skeleton_dodge")) {
-			Vec3 to = foe.position().subtract(p.position()).multiply(1, 0, 1);  // side to side on the way in: its arrows miss
-			Vec3 side = new Vec3(-to.z, 0, to.x).normalize().scale((now / 15) % 2 == 0 ? 2.5 : -2.5);
-			return c.walkTo(p.position().add(to.normalize().scale(3)).add(side));
+		if (archer && d > 4 && c.knowledge.knows("skeleton_dodge")) {        // side to side on the way in, eyes on it: its arrows miss
+			h.watching = foe;
+			int phase = (now / 8) % 4;                                          // (a strafe, a step in, the other strafe, a step in)
+			return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
 	}
