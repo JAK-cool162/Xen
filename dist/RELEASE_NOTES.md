@@ -1,7 +1,36 @@
-**Xen Companion 2.0.0-beta.7**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.8**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.8: what players do (your answers), spears and maces, PvP tiers
+
+* **Taught by a player.** A player's own answers to "how do you survive this?" are now things Xens know, and do. Most
+  Xens start out knowing each one (about 6 in 10, different ones for different Xens). One that doesn't can be told in
+  chat, or learn it from a Xen who knows.
+  * **Water flooding** into its tunnel: it puts a block on it and goes another way.
+  * **Lava** next to it underground: it covers it with blocks.
+  * **A creeper** hissing right by it (a tunnel, no room to run): a hit to knock it back, then a block between them,
+    or the shield.
+  * **Skeletons**: on the way in it moves side to side, so the arrows miss.
+  * **Phantoms** about, or **a thunderstorm**: it goes in until it's over.
+  * **Powder snow**: it mines its way out.
+  * **A spawner**: a torch on top (no monsters from it), and it remembers the spot for a mob farm, without breaking it.
+  * **A full bag**: the extra stone, dirt, sand and gravel go. Sticks and logs stay.
+  * **A friend asks for its diamonds**: it gives them if it has plenty. If not, a greedy Xen may say it has none.
+* **Spears** (1.21.11): a spear's jab reaches 2 to 4.5 blocks, further than a sword's 3, but not closer than 2. With a
+  spear and a sword, a Xen jabs from out of a sword's reach and takes the sword up close. In a test it held the spear
+  at 2.7 to 3.4 blocks from a zombie, the sword closer, and killed it in about 10 seconds.
+* **Maces**: with a wind charge, it throws one at its feet next to the foe, goes up, and comes down on it with the mace.
+  A mace hits harder for each block it falls. In a test it killed a full-health zombie with one smash. It needs to
+  know both tricks: tell it "a mace hits harder the farther you fall" and "a wind charge at your feet launches you
+  up".
+* **Shield after a combo** (from the Theobald practice bot): hit three times in a row, it puts its shield up until it
+  can hit back.
+* **PvP tiers**: a Xen with a real player's name (the accurate name style) fights as well as that player is ranked.
+  The tier comes from `config/xen/tiers.txt` (`Name HT1`, one a line) or, when there's internet, from MCTiers. In a
+  test, `jeb_ HT1` in tiers.txt gave that Xen the best fighting skill.
+* Fixed: right before a hit, a Xen picked its sword again, so the axe it took out for a raised shield was never used.
 
 ### 2.0.0-beta.7: faster to iron, no hiding in the daytime, fights first, curious exploring
 

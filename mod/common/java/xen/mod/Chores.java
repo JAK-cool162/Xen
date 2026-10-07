@@ -289,6 +289,12 @@ final class Chores {
 		int have = item.equals("all") ? giveable().size() : count(item);
 		if (have == 0) return item.equals("all") ? "You have nothing to give." : "You have no " + named(item, 2) + " to give.";
 		int keep = item.equals("all") ? 0 : keepFor(item);
+		boolean precious = item.contains("diamond") || item.contains("emerald") || item.contains("netherite") || item.equals("totem_of_undying");
+		float greed = c.personality.sin(xen.mod.core.Sins.GREED);
+		if (precious && have <= keep + 2 && random.nextFloat() < greed) {     // (a player's way: not enough to spare, and it doesn't want to: it says it has none)
+			c.journal("lies", "says it has no " + named(item, 2) + " (it has " + have + ")");
+			return "You have no " + named(item, 2) + " to give.";
+		}
 		if (!item.equals("all") && have <= keep) {
 			return "You can't give your " + named(item, 2) + " away, because you need the " + have + " you have " + why(item) + ".";
 		}

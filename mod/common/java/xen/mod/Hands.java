@@ -1021,6 +1021,54 @@ public final class Hands {
 		if (weapon >= 0 && weapon != p.getInventory().getSelectedSlot()) p.getInventory().setSelectedSlot(weapon);
 	}
 
+	/** A spear's jab reaches from 2 to 4.5 blocks (a sword's 3, any closer); a mace smashes after a fall of more than 1.5. */
+	static final double SPEAR_MIN = 2.0, SPEAR_REACH = 4.5;
+
+	/** Its weapon for a foe d blocks off: out of a sword's reach and within a spear's, the spear; else as ready(axeFirst). */
+	void ready(boolean axeFirst, double d) {
+		if (digging != null) return;
+		if (d > 3.0 && d <= SPEAR_REACH && readySpear()) return;
+		ready(axeFirst);
+	}
+
+	boolean readySpear() {
+		int slot = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().endsWith("_spear"));
+		if (slot < 0) return false;
+		p.getInventory().setSelectedSlot(slot);
+		return true;
+	}
+
+	boolean holdingSpear() {
+		return BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath().endsWith("_spear");
+	}
+
+	/** Does it carry this item (anywhere in its bag)? */
+	boolean carries(String id) {
+		Inventory inv = p.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (!s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id)) return true;
+		}
+		return false;
+	}
+
+	/** Throw something it carries straight down at its feet (a wind charge: it goes up). False if it has none. */
+	boolean throwDown(String id) {
+		int slot = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id));
+		if (slot < 0) return false;
+		stop();
+		lowerShield();
+		p.getInventory().setSelectedSlot(slot);
+		p.setXRot(90f);                                                        // eyes on its feet, then right-click
+		pitch = -1;
+		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 2;
+		return true;
+	}
+
 	boolean holdingAxe() {
 		return BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath().endsWith("_axe");
 	}
@@ -1091,7 +1139,7 @@ public final class Hands {
 	void hit(LivingEntity e) {
 		stop();
 		lowerShield();
-		ready();
+		ready(e.isBlocking(), p.distanceTo(e));                        // (an axe for a raised shield, the spear out of a sword's reach)
 		if (p.fallDistance > 1.5 && e.getY() < p.getY()) readyMace();            // falling onto it: a mace smash, if it has one
 		face(e.getEyePosition());
 		XenMod.INSTANCE.gameplayLog.quietly(() -> XenMod.INSTANCE.gameplayLog.swing(p, e));

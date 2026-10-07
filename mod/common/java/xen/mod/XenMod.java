@@ -1184,6 +1184,15 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		if (c.lessons.lessons.isEmpty()) c.lessons.born(random);               // (a rough idea of where ore is: new, or from before 1.8)
+		if ((account || typed) && config.realNameStyle()) {               // a ranked player's name: it fights as well (tiers.txt, or MCTiers)
+			String tier = Tiers.local(FabricLoader.getInstance().getConfigDir(), name);
+			if (tier != null) Tiers.apply(c, tier);
+			else {
+				String who = name;
+				java.util.concurrent.CompletableFuture.supplyAsync(() -> Tiers.online(who))
+						.thenAccept(t -> { if (t != null) server.execute(() -> Tiers.apply(c, t)); });
+			}
+		}
 		return c;
 	}
 

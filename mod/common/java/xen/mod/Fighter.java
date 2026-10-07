@@ -31,6 +31,8 @@ final class Fighter {
 	private int foeSwungAt = -100;
 	private boolean foeSwung;
 	private LivingEntity lastFoe;
+	/** Hits taken in a row without landing one (three: its shield goes up), and until when it holds the shield up. */
+	private int combo, comboAt, shieldUntil, windAt = -1000;
 
 	Fighter(Companion c) {
 		this.c = c;
@@ -69,9 +71,28 @@ final class Fighter {
 		double d = p.distanceTo(foe);
 		boolean sprintable = p.getFoodData().getFoodLevel() > 6;             // like a player, it can't sprint when starving
 
+		if (hurtNow) {                                                         // hit again (and again): a combo on it
+			combo = now - comboAt < 30 ? combo + 1 : 1;
+			comboAt = now;
+			if (combo >= 3 && c.knowledge.knows("combo_shield")) shieldUntil = now + 20;
+		}
 		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && creeper.getSwellDir() > 0 && d < 5) {
 			c.goals.instant = "getting away from the creeper";                 // it's hissing: run, like anyone would
 			if (!c.inArena) c.chatter("Creeper! Run!", false);
+			if (d < 3 && c.knowledge.knows("creeper_block")) {                  // right on it (a tunnel, no room to run): what players do
+				if (p.getAttackStrengthScale(0.5f) > 0.9f && d <= p.entityInteractionRange()) {
+					sTap = 3;                                                  // a hit knocks it back...
+					return hit(foe);
+				}
+				net.minecraft.core.BlockPos between = p.blockPosition().relative(net.minecraft.core.Direction.getApproximateNearest(
+						foe.getX() - p.getX(), 0, foe.getZ() - p.getZ()));
+				if (h.placeAt(between, "any")) {                                // ...then a block between
+					c.goals.instant = "a block between it and the creeper";
+					c.acted = true;
+					return Action.PLACE;
+				}
+				if (h.raiseShield()) return idle();                            // or the shield
+			}
 			return runFrom(foe, sprintable);
 		}
 
@@ -96,11 +117,28 @@ final class Fighter {
 		Action surprise = c.antics.surprise(foe, d);                          // not in the script
 		if (surprise != null) return surprise;
 
-		h.ready(foe.isBlocking());                                             // an axe for a raised shield, else its sword
+		h.ready(foe.isBlocking(), d);                                          // an axe for a raised shield, a spear out of a sword's reach, else its sword
 		float charge = p.getAttackStrengthScale(0.5f);
 		if (charge < lastCharge - 0.3f) newSwing();                            // it just swung: a new cycle
 		lastCharge = charge;
 		boolean ready = charge >= 0.85f + 0.15f * gene(1);
+		boolean spear = h.holdingSpear();
+		double reach = spear ? (d >= Hands.SPEAR_MIN ? Hands.SPEAR_REACH : 0) : p.entityInteractionRange();   // (a spear can't jab closer than 2)
+
+		// A mace and a wind charge: one at its feet throws it up, and it comes down on the foe with the mace (a smash).
+		if (ready && p.onGround() && d < 3.5 && now - windAt > 40 && c.knowledge.knows("wind_charge") && c.knowledge.knows("mace")
+				&& h.carries("mace") && h.carries("wind_charge") && foe.getY() <= p.getY() + 0.5) {
+			windAt = now;
+			if (h.throwDown("wind_charge")) {
+				c.goals.instant = "up with a wind charge, for a mace smash";
+				c.acted = true;
+				return Action.JUMP;
+			}
+		}
+		if (spear && d < Hands.SPEAR_MIN && !hurtNow) {                       // too close for its jab: a step back to spear range
+			h.watching = foe;
+			return Action.BACK;
+		}
 
 		if (hurtNow && p.onGround() && d < 4.5 && random.nextFloat() < gene(4)) {
 			h.watching = foe;                                                  // jump reset: jump into the hit
@@ -108,7 +146,11 @@ final class Fighter {
 			return Action.JUMP;
 		}
 		boolean falling = !p.onGround() && p.getDeltaMovement().y < 0 && p.fallDistance > 0;
-		if (d <= p.entityInteractionRange()) {
+		if (now < shieldUntil && !ready && h.raiseShield()) {                // a combo on it: shield up till it can hit back
+			h.watching = foe;
+			return idle();
+		}
+		if (d <= reach) {
 			if (ready && foe.isBlocking() && !h.holdingAxe()) {
 				h.watching = foe;                                              // a shield in the way and no axe: go around it
 				return strafe();
@@ -146,7 +188,7 @@ final class Fighter {
 			}
 			if (useShield && h.raiseShield()) return idle();
 			if (foeRising && d < 3.5 && random.nextFloat() < gene(6)) return Action.BACK;   // it jumps in for a crit: step out
-			double spacing = 2.2 + 0.8 * gene(2);
+			double spacing = spear && c.knowledge.knows("spear_reach") ? 3.6 : 2.2 + 0.8 * gene(2);   // (a spear: out of a sword's reach)
 			if (d < spacing - 0.2) return random.nextFloat() < gene(5) ? strafe() : Action.BACK;
 			return random.nextFloat() < gene(5) ? strafe() : idle();
 		}
@@ -161,6 +203,13 @@ final class Fighter {
 			return idle();
 		}
 		p.setSprinting(sprintable && d > 2);
+		String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(foe.getType()).getPath();
+		boolean archer = kind.endsWith("skeleton") || kind.equals("stray") || kind.equals("bogged");
+		if (archer && d > 4 && c.knowledge.knows("skeleton_dodge")) {
+			Vec3 to = foe.position().subtract(p.position()).multiply(1, 0, 1);  // side to side on the way in: its arrows miss
+			Vec3 side = new Vec3(-to.z, 0, to.x).normalize().scale((now / 15) % 2 == 0 ? 2.5 : -2.5);
+			return c.walkTo(p.position().add(to.normalize().scale(3)).add(side));
+		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
 	}
 
@@ -183,6 +232,7 @@ final class Fighter {
 	}
 
 	private Action hit(LivingEntity foe) {
+		combo = 0;
 		if (Companion.DEBUG) {
 			var p = c.player;
 			XenMod.LOG.info("[xen fight] {} hits: charge {} falling {} sprinting {} fall {} ground {} foe hp {}", c.name,

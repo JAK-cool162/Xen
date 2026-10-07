@@ -395,10 +395,14 @@ final class Habits {
 	}
 
 	// ------------------------------------------------------------------------------ a full bag
+	// (a player's way: the extra stone and dirt go; sticks never do, nor logs: it keeps a dozen or more for when it needs them)
 	private static final Set<String> JUNK = Set.of("rotten_flesh", "poisonous_potato", "spider_eye", "wheat_seeds", "beetroot_seeds", "gravel",
-			"dirt", "andesite", "diorite", "granite", "tuff", "cobbled_deepslate", "netherrack", "flint", "stick", "bone", "string", "feather");
-	private static final java.util.Map<String, Integer> KEEP = java.util.Map.of("dirt", 32, "cobbled_deepslate", 32, "netherrack", 32,
-			"flint", 4, "stick", 16, "bone", 8, "string", 8, "feather", 8, "wheat_seeds", 8, "gravel", 0);
+			"dirt", "andesite", "diorite", "granite", "tuff", "cobbled_deepslate", "cobblestone", "netherrack", "sand", "red_sand", "flint",
+			"bone", "string", "feather");
+	private static final java.util.Map<String, Integer> KEEP = java.util.Map.ofEntries(java.util.Map.entry("dirt", 32),
+			java.util.Map.entry("cobbled_deepslate", 32), java.util.Map.entry("cobblestone", 64), java.util.Map.entry("netherrack", 32),
+			java.util.Map.entry("sand", 16), java.util.Map.entry("flint", 4), java.util.Map.entry("bone", 8), java.util.Map.entry("string", 8),
+			java.util.Map.entry("feather", 8), java.util.Map.entry("wheat_seeds", 8), java.util.Map.entry("gravel", 0));
 
 	/** No room left in its bag: the junk goes (a stack at a time, like pressing Q), keeping a little. */
 	private void tossJunk() {

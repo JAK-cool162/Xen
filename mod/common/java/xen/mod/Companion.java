@@ -917,6 +917,8 @@ public final class Companion {
 			if (goals.instant.isEmpty()) goals.instant = "fighting " + (fightingWhat.equals(fightingWhat.toLowerCase(java.util.Locale.ROOT)) ? "the " : "") + fightingWhat;
 			return fight;
 		}
+		Action taught = tactics.next();                               // water flooding in, lava beside it, powder snow, a spawner
+		if (taught != null) return taught;
 		Action care = critters.danger();                              // arrows coming, drowned about, poison
 		if (care != null) return care;
 		if (inArena) return Action.IDLE;                              // between duels it waits for the next one
@@ -1956,6 +1958,7 @@ public final class Companion {
 
 	/** The mobs and animals around it: arrows, drowned, poison, breeding, shearing, cats (see {@link Critters}). */
 	final Critters critters = new Critters(this);
+	final Tactics tactics = new Tactics(this);
 
 	/** Who it's chasing, since when, and the closest it got (and when). */
 	private LivingEntity chasing;

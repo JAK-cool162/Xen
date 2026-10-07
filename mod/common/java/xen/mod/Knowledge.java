@@ -21,7 +21,7 @@ final class Knowledge {
 	enum How { BORN, SEEN, TRIED, TAUGHT, TRIBE, EVOLVED }
 
 	/** A mechanic: what knowing it means (in its own words), whether every player starts with it, how you'd tell it. */
-	record Mechanic(String id, String fact, boolean born, Pattern taught) {}
+	record Mechanic(String id, String fact, boolean born, Pattern taught, float share) {}
 
 	static final List<Mechanic> ALL = List.of(
 			m("wood", "punching trees gives logs, and logs make planks, sticks, a crafting table and tools", true, null),
@@ -53,10 +53,31 @@ final class Knowledge {
 			m("breeze", "arrows bounce off breezes: hit them up close", false, "\\bbreezes?\\b.*\\b(arrows?|bounce|deflect)\\b"),
 			m("mace", "a mace hits harder the farther you fall before the hit", false, "\\bmace\\b.*\\b(fall|drop|smash|height)\\b"),
 			m("sulfur", "potent sulfur under water gives off a gas that makes you sick", false, "\\bsulfur\\b.*\\b(gas|sick|nausea)\\b"),
-			m("wind_charge", "a wind charge at your feet throws you up high", false, "\\bwind charges?\\b.*\\b(jump|launch|up|feet)\\b"));
+			m("wind_charge", "a wind charge at your feet throws you up high", false, "\\bwind charges?\\b.*\\b(jump|launch|up|feet)\\b"),
+			// What players do (a player's own answers to "how do you survive this?"). Most Xens start knowing each one, the
+			// rest can be told, or learn it from a Xen who knows.
+			t("block_water", "water flooding into your tunnel: block it and dig the other way", "\\b(block|plug|stop)\\b.*\\bwater\\b"),
+			t("cover_lava", "lava next to what you're mining: cover it with blocks first", "\\b(cover|block)\\b.*\\blava\\b"),
+			t("creeper_block", "a creeper hissing right by you: hit it back, then put a block between you, or raise your shield",
+					"\\bcreepers?\\b.*\\b(block|shield|knock)"),
+			t("skeleton_dodge", "a skeleton shooting: keep moving side to side so its arrows miss, or get behind cover",
+					"\\bskeletons?\\b.*\\b(dodge|zig|side|cover|hide|miss)"),
+			t("phantoms_hide", "phantoms come after nights without sleep: sleep, or hide until morning", "\\bphantoms?\\b.*\\b(hide|sleep|run)"),
+			t("powder_snow", "stuck in powder snow: mine your way out", "\\bpowder snow\\b.*\\b(mine|dig|break)"),
+			t("storm_shelter", "in a thunderstorm, wait in a shelter or sleep it off", "\\b(storm|thunder)\\b.*\\b(shelter|sleep|wait|hide)"),
+			t("spawner_torch", "a spawner: light it up with torches and keep it for a mob farm, don't break it",
+					"\\bspawners?\\b.*\\btorch"),
+			t("spear_reach", "a spear's jab reaches 2 to 4.5 blocks, further than a sword: keep out of the sword's reach",
+					"\\bspears?\\b.*\\b(reach|far|distance|range)"),
+			t("combo_shield", "hit three times in a row: put your shield up", "\\bshield\\b.*\\b(combo|three|3) (hits|times)"));
 
 	private static Mechanic m(String id, String fact, boolean born, String taught) {
-		return new Mechanic(id, fact, born, taught == null ? null : Pattern.compile(taught));
+		return new Mechanic(id, fact, born, taught == null ? null : Pattern.compile(taught), born ? 1 : 0);
+	}
+
+	/** A player's way of handling something: most (60%) start knowing it. */
+	private static Mechanic t(String id, String fact, String taught) {
+		return new Mechanic(id, fact, false, Pattern.compile(taught), 0.6f);
 	}
 
 	static Mechanic find(String id) {
@@ -74,7 +95,18 @@ final class Knowledge {
 		for (Mechanic m : ALL) if (m.born) known.put(m.id, How.BORN);
 	}
 
+	private boolean seeded;
+
+	/** The players' ways it starts out knowing: decided once, by its name (so the same Xen always knows the same ones). */
+	private void seed() {
+		if (seeded || c.name == null) return;
+		seeded = true;
+		java.util.Random r = new java.util.Random(c.name.toLowerCase(Locale.ROOT).hashCode() * 131L + 17);
+		for (Mechanic m : ALL) if (!m.born && m.share > 0 && r.nextFloat() < m.share) known.putIfAbsent(m.id, How.BORN);
+	}
+
 	boolean knows(String id) {
+		seed();
 		if (known.containsKey(id)) return true;
 		int gen = c.personality.generation, smart = c.mod.config.smartsAtGeneration;
 		if ((id.equals("portal_math") || id.equals("triangulate")) && gen >= smart

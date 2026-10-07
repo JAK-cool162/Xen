@@ -251,7 +251,11 @@ final class MindSense {
 		a[Mind.CRAFT] = c.crafter.canTry() && c.crafter.upgrade() != null;
 		a[Mind.FOOD] = true;
 		a[Mind.EAT] = (food < 16 || food < 19 && c.player.getHealth() < 14) && c.items().getOrDefault("food", 0) > 0;
-		a[Mind.SHELTER] = night || f[Mind.DUSK] > 0.5f;
+		var lvl = c.player.level();
+		boolean storm = lvl.isThundering() && c.knowledge.knows("storm_shelter");   // (a player's way: in till it's over)
+		boolean phantoms = c.knowledge.knows("phantoms_hide") && !lvl.getEntitiesOfClass(net.minecraft.world.entity.monster.Phantom.class,
+				c.player.getBoundingBox().inflate(32), net.minecraft.world.entity.Entity::isAlive).isEmpty();
+		a[Mind.SHELTER] = night || f[Mind.DUSK] > 0.5f || storm || phantoms;
 		a[Mind.SLEEP] = night && c.hasBed();
 		a[Mind.HOUSE] = (!c.builder.busy() && !creative && (c.goals.home == null && wood >= 60 && c.goals.firstHouseTime() || c.goals.home != null && wood >= 160
 				|| c.goals.home != null && c.builder.canUpgrade() && wood >= 40)) || !nearby && !c.builder.busy() && c.builder.friendBuilding() != null;   // (or a friend's build to help with)

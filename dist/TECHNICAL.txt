@@ -1,7 +1,63 @@
-XEN COMPANION 2.0.0-beta.7: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.8: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.8
+==========================
+
+Knowledge (a player's answers):
+- New mechanics, made with t(): born false, a chat pattern to be told it, share 0.6. seed() runs on the first knows()
+  (the name isn't set when Knowledge is made). It gives each one with chance 0.6 from Random(name hash * 131 + 17), so
+  the same Xen always knows the same ones. They are block_water, cover_lava, creeper_block, skeleton_dodge,
+  phantoms_hide, powder_snow, storm_shelter, spawner_torch, spear_reach and combo_shield. They spread like the others
+  (told in chat, Tribe sharing).
+Tactics.java (in Companion.instinct, before critters.danger):
+- powder_snow: isInPowderSnow, so mine the powder snow at head, then feet (every tick).
+- Every 10 ticks, under the sky only, not in water or lava:
+  - block_water: water in a replaceable block beside its feet or head, or above, gets placeAt(any), then walker.stop.
+  - cover_lava: lava beside it (level, one down, one up) or under its feet gets placeAt(any).
+- spawner_torch (every 40 ticks): a spawner within 4 (2 down, 3 up) goes into Places "spawner" (once, journal
+  "notes"). A torch goes on top if the top is free and it carries one.
+- Checked in game: "putting a torch on the spawner" (the torch was there), and "mining its way out of the powder
+  snow" (its head block was mined).
+Fighter:
+- Hands.ready(axeFirst, d): beyond 3 and up to SPEAR_REACH 4.5, the spear; else as before. hit() uses it too. Before,
+  hit() called ready() (sword first), which undid the axe picked for a raised shield.
+- Holding a spear, reach is 4.5 when d >= 2, else 0. Too close (under 2, not hurt this tick), it steps BACK. Spacing
+  with spear_reach is 3.6.
+  - The 1.21.11 spear item has AttackRange(2.0, 4.5, 2.0, 6.5, 0.125, 0.5), from Item.Properties.spear.
+  - Checked: iron spear and iron sword against a zombie. The spear at 3.4 to 2.7 blocks, the sword at 2.6 and closer,
+    and the zombie was dead in about 10 s.
+- Wind-charge smash: knows wind_charge and mace, carries both, attack ready, on the ground, foe within 3.5 and not
+  above it, at most every 40 ticks. Hands.throwDown("wind_charge") sets pitch 90 and uses it. hit() already swaps to
+  the mace when fallDistance > 1.5 and the foe is below.
+  - MaceItem: SMASH_ATTACK_FALL_THRESHOLD 1.5. The bonus is 4 a block to 3, 2 a block to 8, then 1 a block, plus
+    density. A smash cancels the attacker's fall damage.
+  - Checked: one smash killed a 20-health zombie, using 1 of 8 wind charges.
+- combo_shield: hurt again within 30 ticks counts up the combo. At 3 it holds the shield up for 20 ticks while not
+  ready (shieldUntil). Any hit of its own resets the combo. This is the Theobald bot's tempshield (combo >= 3).
+- creeper_block: a hissing creeper within 3. If charged and in reach: a hit and an S-tap. Else placeAt(any) on the
+  block between them, else raiseShield. Else it runs, as before.
+- skeleton_dodge: a skeleton, stray or bogged (by type id: the class moved between versions) more than 4 off. It
+  walks at a point 3 ahead and 2.5 to the side, switching sides every 15 ticks.
+MindSense: SHELTER is also allowed in a thunderstorm (storm_shelter), or with a phantom within 32 (phantoms_hide).
+Habits.tossJunk: JUNK adds cobblestone (keeps 64), sand (16) and red sand. Sticks are no longer junk, and logs never
+were.
+Chores.give: a precious thing (diamond, emerald, netherite, totem) it has no more than keep + 2 of. With chance
+greed, it says it has none (journal "lies").
+Tiers.java: skill(HT1..LT5) is 1.0 minus 0.05 a rank (LT5 0.55). local() reads config/xen/tiers.txt (made with
+notes). online() calls GET mctiers.com/api/search_profile/<name>. It takes the best of rankings.*.{tier, pos}, where
+pos 0 is high. That host is blocked from the build machine, so the format is from MCTiers' public API and untested
+here. XenMod.create sets the tier at the end of create (after skills.born or restore) for an account's name (from the
+list, or typed in /xen summon). FIGHT becomes max(FIGHT, skill).
+- Checked: tiers.txt "jeb_ HT1", then /xen summon jeb_ logged "jeb_ fights like a HT1 (fight skill 1.0)".
+The Theobald PVP Practice world (looked at, not run): TheobaldTheBot is a Carpet fake player driven by a datapack
+(87 functions). It has sword and crystal tactics only: crit jumps from 3.5 to 6, an 11-tick hit cooldown, S-taps and
+W-taps, random strafing every 5 ticks, a jump reset at HurtTime 10, an axe swap on a raised shield, the shield after a
+3-hit combo, and a pearl when the target is 7 or more off. Xen's Fighter already had all of these but the combo shield.
+The maces (density, wind burst) and spears are only in its kit chests.
 
 
 WHAT'S NEW IN 2.0.0-beta.7
