@@ -331,7 +331,7 @@ final class Goals {
 			case TRADE -> c.mod.config.trading && c.trader.villagerNear() != null && c.trader.hasSomethingToTrade() ? 0.35f : 0;
 			case EXPLORE -> 0.3f * (0.5f + p.curiosity) * (progressWaiting() ? 0.4f : 1f);   // not while there's progress to make
 			// the way a player gets on in the world: a real house once it has tools, then down for iron, then diamonds
-			case HOUSE -> home == null && !busyBuilding && c.crafter.pickTier() >= 2 && !evening() && !c.player.isCreative()
+			case HOUSE -> home == null && !busyBuilding && firstHouseTime() && !evening() && !c.player.isCreative()   // (its first house: once it has iron, or from its second day; the first day is for tools)
 					? 0.7f * (0.6f + p.diligence)
 					: home != null && !busyBuilding && !evening() && c.builder.canUpgrade() && items.getOrDefault("log", 0) >= 16
 					? 0.45f * (0.5f + p.diligence)                                        // its house, a stage better (like players do)
@@ -426,6 +426,28 @@ final class Goals {
 		return seen >= 2 && wet * 2 >= seen;
 	}
 
+	/** The place it's on its way to have a look at (exploring), and the ones it has seen up close. */
+	private String curiousOf;
+	private final java.util.Set<String> seenUpClose = new java.util.HashSet<>();
+	private static final java.util.Set<String> OWN_PLACES = java.util.Set.of("home", "mine", "mine base", "bed", "diamonds", "spawn", "death", "chest", "base", "farm",
+			"pen", "portal");
+
+	/** The nearest place it spotted (a village, a temple, ruins...) within 160 blocks, in this world, that it hasn't been to; null if none. */
+	private Places.Place curiousAbout() {
+		BlockPos feet = c.player.blockPosition();
+		for (Places.Place pl : c.places.all()) {
+			if (!pl.dim().equals(c.places.here()) || pl.pos().distSqr(feet) > 160 * 160) continue;
+			String kind = pl.name().replaceAll(" \\d+$", "");
+			if (OWN_PLACES.contains(kind) || kind.startsWith("mine") || seenUpClose.contains(pl.name())) continue;
+			if (pl.pos().distSqr(feet) < 10 * 10) {                            // (there already)
+				seenUpClose.add(pl.name());
+				continue;
+			}
+			return pl;
+		}
+		return null;
+	}
+
 	Action exploreStep() {
 		var p = c.player;
 		long now = p.level().getGameTime();
@@ -464,9 +486,26 @@ final class Goals {
 			return Action.IDLE;
 		}
 		if (exploreTo != null && (Math.hypot(p.getX() - exploreTo.x, p.getZ() - exploreTo.z) < 4 || now - exploreSince > 20 * 90)) {
+			boolean sawIt = curiousOf != null;
+			if (sawIt) {                                                    // there: it takes a good look (and doesn't come back to it)
+				seenUpClose.add(curiousOf);
+				c.journal("explores", "had a look at the " + curiousOf.replaceAll(" \\d+$", ""));
+				curiousOf = null;
+			}
 			exploreTo = null;
-			lookUntil = now + 30 + random.nextInt(50);
+			lookUntil = now + (sawIt ? 60 + random.nextInt(60) : 30 + random.nextInt(50));
 			return Action.IDLE;
+		}
+		if (exploreTo == null) {                                            // something it spotted and hasn't been to: a player goes to see it
+			var poi = curiousAbout();
+			if (poi != null) {
+				curiousOf = poi.name();
+				exploreTo = Vec3.atBottomCenterOf(poi.pos());
+				exploreSince = now;
+				instant = "going to see the " + poi.name().replaceAll(" \\d+$", "");
+				c.run(p.position().distanceTo(exploreTo) > 6);
+				return c.walkTo(exploreTo);
+			}
 		}
 		if (exploreTo == null) {
 			if (Double.isNaN(heading)) heading = random.nextDouble() * Math.PI * 2;
@@ -570,6 +609,24 @@ final class Goals {
 
 	boolean needBlocksForTheNight() {
 		return evening() && blocks() < NIGHT_BLOCKS;
+	}
+
+	/** Its first house: once it has iron, or from its second day with stone tools (the first day is for tools and iron). */
+	boolean firstHouseTime() {
+		return c.crafter.pickTier() >= 3 || c.crafter.pickTier() >= 2 && livedDays() >= 2;
+	}
+
+	/** Whole days it has lived (from its first day in the world). */
+	long livedDays() {
+		long today = c.player.level().getGameTime() / 24000;
+		return c.life.bornDay < 0 ? 0 : Math.max(1, today - c.life.bornDay + 1);   // (bornDay is the first new day it saw: that's day 1)
+	}
+
+	/** The sun going down for real (beds work from 12542, monsters come at about 13000), or dark already: time to go in. */
+	boolean sunDown() {
+		var level = c.player.level();
+		long time = Compat.timeOfDay(level);
+		return time >= 12500 && time < 23500 || level.isDarkOutside();
 	}
 
 	/** Evening or night: time to think about a shelter. */
@@ -803,6 +860,13 @@ final class Goals {
 		Personality who = c.personality;
 		int plan = who.plan;
 		if (can[Mind.EAT] && hunger < Math.min(18, who.eatAt() + 4)) return why(Mind.EAT, "hungry");   // (a glutton sooner)
+		if (dark && f[Mind.NIGHT] < 0.5f && !sunDown() && f[Mind.DANGER] < 0.2f) {   // late afternoon: ready for the night, not in for it yet (a player keeps at it till the sun goes down)
+			if (home != null && can[Mind.SHELTER] && !c.player.blockPosition().closerThan(home, 48) && c.player.blockPosition().closerThan(home, 400))
+				return why(Mind.SHELTER, "dusk: heading home before dark");
+			if (blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below && (home == null || !c.player.blockPosition().closerThan(home, 96)))
+				return why(Mind.STONE, "dusk: blocks for a hut tonight");
+			dark = false;                                                       // (else its afternoon goes on)
+		}
 		if (dark) {
 			if (can[Mind.SLEEP]) return why(Mind.SLEEP, "night: bed");
 			boolean bedWithIt = items.keySet().stream().anyMatch(k -> k.endsWith("_bed"));

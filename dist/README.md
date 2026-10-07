@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.6
+# Xen Companion (Fabric mod) 2.0.0-beta.7
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.6+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.6+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.6+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.6+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.7+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.7+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.7+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.7+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.6+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.7+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -402,9 +402,11 @@ slow a server away. Turn **Redstone** off to disable it.
 
 ## Names, personalities and skins
 
-* **Names**: by default new Xens get **names like real players have now**
-  (`player`: luvhi, MeeroSG, cold_lemon, Brushriver851, xKairox), made up here,
-  never copied from anyone's account. Or names that fit their nature, in the
+* **Names**: by default (`accurate`) a Xen you summon by a real account's name
+  (`/xen summon jeb_`), or one listed in `config/xen/real_names.txt`, is that
+  account, with its real skin, like the Carpet mod. Other new Xens get **names
+  like real players have now** (luvhi, MeeroSG, cold_lemon, Brushriver851,
+  xKairox), made up here, never copied from anyone's account. Or names that fit their nature, in the
   **Name style** (`nameStyle`) you like: `fun` (a silly Xen may be WobblyNoodle or LilPickle,
   a bold one IronComet, a grumpy one SaltyBadger), `gamer` (Pickle_42,
   xXWaffleXx, TheSneakyGoose), `fantasy` (Zorbax, Lumika), `classic` (Pip,
@@ -633,6 +635,21 @@ chat with it, it knows them):
 
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
+
+## Getting on like a player (2.0.0-beta.7)
+
+* It crafts what needs a table without getting stuck (a furnace no longer stalls it), and mines stone for a furnace
+  instead of waiting.
+* Its first house waits until it has iron (or its second day), and with no stone a house is built of planks, not of
+  whole logs.
+* It goes in when the sun really goes down. In the late afternoon it heads home or gets blocks for a hut.
+* A monster coming for it comes first, before its chore, and it doesn't break off a fight between hits.
+* It doesn't dig into water underground, and goes to see places it has spotted and not been to.
+* It remembers the way it came, so it walks back up its own stairs out of a mine. It doesn't use the stone it needs
+  to climb, and it puts down dirt first.
+* **Accurate names and skins** (the default): summon a Xen by a real account's name (`/xen summon jeb_`), or list
+  names in `config/xen/real_names.txt`, and it gets that account's real skin, like the Carpet mod. Other Xens get
+  realistic made-up names and skins real players made.
 
 ## Words, grammar and memory (2.0.0-beta.6)
 
@@ -1093,8 +1110,8 @@ away in single player. On a server, operators use:
 | `trading` | `true` | Xen trades with villagers and bargains with players |
 | `refuse` | `true` | Xen may say no (and why) |
 | `copy` | `true` | Xen copies moves that work out for players it watches (the water clutch, a winning fighting style) |
-| `skins` | `["modern"]` | `modern`, `fun`, `pack` (both), `random`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
-| `nameStyle` | `"player"` | `player` (like real players' names), `mixed`, `fun`, `gamer`, `fantasy` or `classic` |
+| `skins` | `["accurate"]` | `accurate` (a real account's skin for a real name, else skins real players made), `blob`, `modern`, `fun`, `pack` (both), `random`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
+| `nameStyle` | `"accurate"` | `accurate` (real accounts you name or list, with their skins; else names like real players'), `player` (like real players' names), `mixed`, `fun`, `gamer`, `fantasy`, `classic` or `real` |
 | `antics` | `true` | dancing along, tricks, surprises in fights |
 | `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
 | `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |

@@ -27,6 +27,26 @@ import java.util.Set;
  */
 public final class Hands {
 	static final Set<String> PLACEABLE = Set.of("cobblestone", "cobbled_deepslate", "dirt");
+	/** The order it spares them in (to climb on, to bridge, to block a gap): dirt, then deepslate, the cobblestone it makes things of last. */
+	private static final String[] SPARE_FIRST = {"dirt", "cobbled_deepslate", "cobblestone"};
+
+	/** The block it can best spare that it carries, or null. */
+	String spareBlock() {
+		Inventory inv = p.getInventory();
+		for (String n : SPARE_FIRST) {
+			for (int i = 0; i < inv.getContainerSize(); i++) {
+				ItemStack s = inv.getItem(i);
+				if (!s.isEmpty() && BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(n)) return n;
+			}
+		}
+		return null;
+	}
+
+	/** The slot (in the hotbar, swapped in if need be) of the block it can best spare, or -1. */
+	private int spareSlot() {
+		String n = spareBlock();
+		return n == null ? -1 : findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(n));
+	}
 	static final float[] YAW = {180f, -90f, 0f, 90f};                  // our facing index -> Minecraft degrees
 
 	final XenPlayer p;
@@ -94,7 +114,7 @@ public final class Hands {
 
 	/** Jump and put a block under its feet (a player's way out of a hole). Returns false without blocks. */
 	boolean startPillar() {
-		if (findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath())) < 0) return false;
+		if (spareBlock() == null) return false;
 		stop();
 		current = Action.JUMP;
 		pillar = true;
@@ -110,7 +130,7 @@ public final class Hands {
 		if (p.getY() < pillarFrom.getY() + 1.0) return;
 		ServerLevel level = (ServerLevel) p.level();
 		if (!level.getBlockState(pillarFrom).canBeReplaced()) return;
-		int slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		int slot = spareSlot();
 		if (slot < 0) return;
 		p.getInventory().setSelectedSlot(slot);
 		BlockPos ground = pillarFrom.below();
@@ -652,7 +672,7 @@ public final class Hands {
 		BlockPos pos = target();
 		BlockState here = level.getBlockState(pos);
 		if (!here.canBeReplaced()) return;
-		int slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		int slot = spareSlot();
 		if (slot < 0) return;
 		for (Direction d : Direction.values()) {
 			BlockPos against = pos.relative(d);
@@ -762,8 +782,8 @@ public final class Hands {
 			return false;
 		}
 		Set<String> liked = favorite(material);
-		int slot = findHotbar(s -> liked.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
-		if (slot < 0) slot = findHotbar(s -> PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		int slot = material.equals("any") ? spareSlot() : findHotbar(s -> liked.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()));
+		if (slot < 0) slot = spareSlot();
 		if (slot < 0) {
 			cantPlace = "no blocks left";
 			return false;

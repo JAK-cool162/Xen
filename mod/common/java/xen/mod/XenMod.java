@@ -125,7 +125,7 @@ public class XenMod implements ModInitializer {
 			default -> config.chatModelSize;
 		};
 		skins.prepare(configDir, config.skins);
-		if (config.nameStyle.equals("real")) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
+		if (config.realNameStyle()) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
@@ -1124,12 +1124,17 @@ public class XenMod implements ModInitializer {
 
 	/** A Xen: the same one again if it has been here before (by name), otherwise new, with a name, nature and skin. */
 	Companion create(String wanted, ServerPlayer owner, Personality nature) {
+		return create(wanted, owner, nature, false);
+	}
+
+	/** typed: the name is one a person gave it (summoned by name, or their own), so with real names it's an account's. */
+	Companion create(String wanted, ServerPlayer owner, Personality nature, boolean typed) {
 		java.util.Set<String> taken = takenNames();
 		if (wanted == null) taken.addAll(roster.names());                 // a new Xen gets a new name
 		Personality born = nature != null ? nature : config.personalities ? Personality.random(random) : Personality.plain();
 		String name = wanted;
 		String real = null;
-		if (name == null && config.randomNames && config.nameStyle.equals("real")) {   // a real account's name (one listed in real_names.txt), and its real skin
+		if (name == null && config.randomNames && config.realNameStyle()) {     // a real account's name (one listed in real_names.txt), and its real skin
 			for (String n : Skins.realNames(FabricLoader.getInstance().getConfigDir())) {
 				if (!taken.contains(n.toLowerCase(Locale.ROOT))) {
 					name = real = n;
@@ -1137,7 +1142,7 @@ public class XenMod implements ModInitializer {
 				}
 			}
 		}
-		if (name == null && config.randomNames) name = Names.fresh(config.nameStyle.equals("real") ? "player" : config.nameStyle, born.tone, taken, random);   // fits its nature
+		if (name == null && config.randomNames) name = Names.fresh(config.realNameStyle() ? "player" : config.nameStyle, born.tone, taken, random);   // fits its nature
 		if (name == null) name = Looks.freshName(false, taken, random);
 		com.google.gson.JsonObject known = roster.get(name);
 		Personality p = nature != null ? nature
@@ -1151,8 +1156,11 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		String skin = known != null && known.has("skin") && nature == null ? known.get("skin").getAsString() : skins.pick(config.skins, random);
-		if (config.nameStyle.equals("real") && skins.player(name) != null) skin = skins.player(name);   // (real names: the account's own skin)
-		else if (real != null) skins.prepareReal(List.of(real));
+		// Real names: the account's own skin, like the Carpet mod. A name from the list, or a new one someone summons a Xen
+		// by (never a made-up one: that could be a stranger's account), fetched now if it isn't in yet (a few seconds at most).
+		boolean account = real != null || config.nameStyle.equals("accurate") && typed && wanted != null && known == null;
+		String own = config.realNameStyle() ? (account ? skins.playerNow(name, 3000) : skins.player(name)) : null;
+		if (own != null) skin = own;
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (config.ownLife && config.wants) c.mode = Companion.Mode.FREE;   // its own life: it plays its own game
@@ -1477,7 +1485,7 @@ public class XenMod implements ModInitializer {
 			ctx.getSource().sendFailure(Component.literal("The world already has " + companions.size() + " Xens (max " + config.maxXens + ")."));
 			return 0;
 		}
-		Companion c = create(wanted, owner, null);
+		Companion c = create(wanted, owner, null, true);
 		String name = c.name;
 		if (owner != null) {
 			Vec3 at = owner.position();                                // next to its owner, where there is room to stand

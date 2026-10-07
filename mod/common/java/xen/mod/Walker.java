@@ -291,12 +291,45 @@ final class Walker {
 			maxFall = Math.min(maxFall, 3);
 		}
 		blocks = throwaway();
+		worth = placeWorth();
 		dig = true;
 		if (now() < daringUntil) {                                           // (the solver said: be bolder)
 			maxFall += h >= 16 ? 4 : 2;
 			maxGap = 3;
 		}
 		if (now() - badSince > 400) bad.clear();                           // (old troubles forgotten)
+	}
+
+	/** What a block it puts down costs it ({@link #placeWorth}), and whether the stone it digs is stone it wants. */
+	private double worth;
+
+	/**
+	 * What a block put down (to climb, or to walk across a gap) costs its future self, in the walker's units (about a
+	 * tick each): next to nothing in dirt, or in stone it has plenty of; in the stone it still needs (a furnace, its
+	 * tools), about what mining one more costs. That stone it would rather get by digging its way up a staircase,
+	 * which also leaves it a way back down.
+	 */
+	private double placeWorth() {
+		if (c.player.isCreative()) return 0;
+		int dirt = 0, stone = 0, furnace = 0;
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack s = inv.getItem(i);
+			if (s.isEmpty()) continue;
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			if (n.equals("dirt")) dirt += s.getCount();
+			else if (n.equals("cobblestone") || n.equals("cobbled_deepslate")) stone += s.getCount();
+			else if (n.equals("furnace")) furnace += s.getCount();
+		}
+		int tier = c.crafter.pickTier();
+		int need = (furnace == 0 && tier < 3 ? 8 : 0) + (tier < 2 ? 3 : 0);
+		return dirt > 0 || stone > need + 8 ? 2 : 30;
+	}
+
+	/** Stone (it drops cobblestone), for digging its way up when it wants the stone. */
+	private boolean stone(BlockPos p) {
+		BlockState s = state(p);
+		return s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Blocks.COBBLESTONE) || s.is(Blocks.COBBLED_DEEPSLATE);
 	}
 
 	private int throwaway() {
@@ -495,7 +528,11 @@ final class Walker {
 			BlockPos up = q.above();
 			if (!passable(q) && step(q) && floorOnceDug(up) && !farmland(up)) {   // (never jump onto farmland: it tramples it)
 				double br = breaks(p.above(2)) + breaks(up.above()) + breaks(up);
-				if (br < INF) add(Kind.ASCEND, p, up, SPRINT + JUMP + br + danger(up), br > 0 ? List.of(p.above(2), up.above(), up) : List.of());
+				boolean digs = br > 0;
+				if (digs && br < INF && worth > 2) {                         // (stone it wants: the step up pays it back; no tunnelling reluctance)
+					for (BlockPos b : new BlockPos[] {p.above(2), up.above(), up}) if (!passable(b) && stone(b)) br -= 12;
+				}
+				if (br < INF) add(Kind.ASCEND, p, up, SPRINT + JUMP + br + danger(up), digs ? List.of(p.above(2), up.above(), up) : List.of());
 			}
 			// down: walk off and drop (as far as it dares; into water from anywhere)
 			if (passable(q) && passable(q.above()) && !floor(q) && !water(q)) {
@@ -530,7 +567,7 @@ final class Walker {
 				}
 				// or a block down to walk on (sneaking at the edge, placed against the side of the one it stands on)
 				if (blocks > 0 && passable(q.below()) && !water(q.below()) && (fullBlock(p.below()) || placedFloor) && !lava(q.below().below())) {
-					add(Kind.BRIDGE, p, q, SNEAK + PLACE + danger, List.of());
+					add(Kind.BRIDGE, p, q, SNEAK + PLACE + worth + danger, List.of());
 				}
 			}
 			// a staircase down: dig the step in front and walk down onto it
@@ -555,7 +592,7 @@ final class Walker {
 		if (inWater && water(p.below())) add(Kind.SWIM, p, p.below(), SWIM + under(p.below()), List.of());
 		if (blocks > 0 && onFloor && !inWater) {                          // tower up (out of a hole): jump, block under its feet
 			double br = breaks(p.above(2));
-			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 24 + br, br > 0 ? List.of(p.above(2)) : List.of());   // (a last resort: a jump up a step is better)
+			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 24 + worth + br, br > 0 ? List.of(p.above(2)) : List.of());   // (a last resort: a jump up a step is better)
 		}
 		if (dig && floor(p) && !inWater) {                                // straight down (players don't like to: only when there's no other way)
 			BlockPos b = p.below();
@@ -574,9 +611,31 @@ final class Walker {
 	}
 
 	// ------------------------------------------------------------------------------------ the world, as it knows it
-	/** What it can know: close by it feels it; further off only what's out in the light (a dark cave far away: rock). */
+	/** What it can know: close by it feels it; further off only what's out in the light (a dark cave far away: rock), or the way it came. */
 	private boolean known(BlockPos p) {
-		return p.distManhattan(eyes) <= 8 || level.getRawBrightness(p, 0) > 0;
+		return p.distManhattan(eyes) <= 8 || level.getRawBrightness(p, 0) > 0 || level.dimension() == wayIn && way.contains(p.asLong());
+	}
+
+	/**
+	 * The way it came: the blocks it has stood in (its own stairs and tunnels down a mine), known even in the dark, the
+	 * way a player remembers the way back up. Without it, its own staircase further than a few blocks off was rock to
+	 * it, and climbing out looked easier by putting blocks under its feet.
+	 */
+	private final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet way = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> wayIn;
+
+	private void remember() {
+		var p = c.player;
+		if (p == null) return;
+		if (p.level().dimension() != wayIn) {
+			way.clear();
+			wayIn = p.level().dimension();
+		}
+		BlockPos feet = p.blockPosition();
+		if (way.add(feet.asLong())) {
+			way.add(feet.above().asLong());
+			while (way.size() > 4000) way.removeFirstLong();                 // (the last couple of thousand blocks of its way)
+		}
 	}
 
 	/**
@@ -739,6 +798,7 @@ final class Walker {
 	// ------------------------------------------------------------------------------------ doing it
 	/** Every tick while it has a way: the keys for the move it's on. True while it has the keys (else its hands are busy). */
 	boolean tick() {
+		remember();
 		if (path == null) return false;
 		var p = c.player;
 		level = (ServerLevel) p.level();
@@ -1030,7 +1090,8 @@ final class Walker {
 		p.zza = 0;
 		if (c.hands.busy()) return;
 		int slot = -1;
-		boolean placed = c.hands.placeItem(under, s -> Hands.PLACEABLE.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()),
+		String spare = c.hands.spareBlock();                                // (dirt before the stone it makes things of)
+		boolean placed = spare != null && c.hands.placeItem(under, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(spare),
 				m.from().below(), d, -1);
 		if (!placed && now() - stepStarted > 40) problem(m, "couldn't put a block down to bridge (" + c.hands.cantPlace + ")");
 	}

@@ -396,7 +396,8 @@ final class Architect {
 	 */
 	static Plan designed(BlockPos origin, Direction front, Taste.Design ds, Palette p, Random random, int stage) {
 		boolean depth = stage >= DEPTH, detail = stage >= DETAIL, polish = stage >= POLISH;
-		boolean useFrame = ds.frame() && depth, lowerStone = ds.lowerStone() && depth, stoneBase = ds.base() && depth;
+		boolean stoneOn = !p.base().equals(p.frame());                                     // (a survival palette with no stone: its base is the log)
+		boolean useFrame = ds.frame() && depth, lowerStone = ds.lowerStone() && depth && stoneOn, stoneBase = ds.base() && depth && stoneOn;
 		boolean shutters = ds.shutters() && detail, porch = ds.porch() && detail, chimney = ds.chimney() && detail;
 		boolean bushes = (ds.bushes() || polish) && polish, garden = ds.garden() && polish, yard = ds.yard() && polish;
 		boolean pond = ds.pond() && polish, workshop = ds.workshop() && polish;

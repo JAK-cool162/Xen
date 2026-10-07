@@ -150,15 +150,25 @@ public final class XenConfig {
 	public boolean localDeaths = true;
 	/** The generation (of evolution) from which Xens know the Nether portal math (and triangulate strongholds). */
 	public int smartsAtGeneration = 4;
-	/** Skins to choose from: built-in ("alex", "ari:slim", ... or "random"), or "texture:<value>:<signature>" from mineskin.org. */
-	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("blob"));
 	/**
-	 * How new Xens are named: "player" (like real players' names now: luvhi, MeeroSG, cold_lemon, Solen2009; made up,
-	 * never someone's), "mixed", "fun" (SneakyWaffle), "gamer" (Pickle_42), "fantasy" (Zorbax), "classic" (Pip), or
-	 * "real": real Minecraft accounts you list in config/xen/real_names.txt, with their real skins (like the Carpet
-	 * mod's fake players; only the names you put there).
+	 * Skins to choose from: "accurate" (the default: a real account's own skin for a Xen with a real name, otherwise
+	 * skins real players made, from mineskin.org's gallery), built-in ("blob", "modern", "alex", "ari:slim", ... or
+	 * "random"), or "texture:<value>:<signature>" from mineskin.org.
 	 */
-	public String nameStyle = "player";
+	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("accurate"));
+	/**
+	 * How new Xens are named: "accurate" (the default: real Minecraft accounts, like the Carpet mod's fake players: the
+	 * names you list in config/xen/real_names.txt and any name you summon a Xen by, each with that account's real skin;
+	 * once the list is used up, names like real players' that are made up), "player" (like real players' names now:
+	 * luvhi, MeeroSG, cold_lemon, Solen2009; made up, never someone's), "mixed", "fun" (SneakyWaffle), "gamer"
+	 * (Pickle_42), "fantasy" (Zorbax), "classic" (Pip), or "real" (only the names in real_names.txt).
+	 */
+	public String nameStyle = "accurate";
+
+	/** Real accounts' names, with their real skins (the "accurate" and "real" name styles). */
+	public boolean realNameStyle() {
+		return nameStyle.equals("accurate") || nameStyle.equals("real");
+	}
 
 	/**
 	 * Teams: -1 = auto (like an SMP: no teams handed out; Xens start and join their own, and anyone not on theirs
@@ -192,7 +202,7 @@ public final class XenConfig {
 	/** Follow the owner when further away than this. */
 	public double followDistance = 4;
 	/** The settings file's version (older files get new defaults where the old ones were a bad fit). */
-	public int version = 9;
+	public int version = 10;
 	/** Your own words for Xens: who they are, what they should know or do (for the chat model, and its notes). */
 	public String instructions = "";
 	/** Your own little script for Xens: lines like "when night: shelter" or "when hungry: say I'm starving!". */
@@ -230,7 +240,11 @@ public final class XenConfig {
 				if ((!j.has("version") || j.get("version").getAsInt() < 9) && config.skins.equals(java.util.List.of("modern"))) {   // 2.0: the blob look
 					config.skins = new java.util.ArrayList<>(java.util.List.of("blob"));
 				}
-				config.version = 9;
+				if (!j.has("version") || j.get("version").getAsInt() < 10) {          // 2.0 beta 7: real accounts and their skins by default
+					if (config.nameStyle.equals("player")) config.nameStyle = "accurate";
+					if (config.skins.equals(java.util.List.of("blob"))) config.skins = new java.util.ArrayList<>(java.util.List.of("accurate"));
+				}
+				config.version = 10;
 			}
 			Files.createDirectories(path.getParent());
 			Files.writeString(path, gson.toJson(config));

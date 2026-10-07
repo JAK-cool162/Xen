@@ -1,7 +1,75 @@
-XEN COMPANION 2.0.0-beta.6: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.7: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.7
+==========================
+
+Crafting:
+- Crafter.orderNext: Pace.craftPrep(order) used to run before the table steps, and step() ran its own craftPrep
+  ("a place for the table", "a crafting table"). Each reset prepFor, so an order that needed a table it hadn't placed
+  never got past the wait. This hit the furnace, and the builder's doors, stairs and chests. Now the table steps
+  come first, and craftPrep(order) runs only with the table near (or for a 2x2 recipe).
+  - Checked: a Xen given 3 raw iron, coal and 8 cobblestone, with no table down. Before, it waited at "making
+    furnace" for over 100 s. Now: furnace 61 s after the give, iron pickaxe 96 s, with the stone tools and torches
+    made first.
+- Chores.smeltNext: no furnace, and under 8 stone (cobblestone, cobbled deepslate or blackstone): it gets stone first
+  (stone in sight, else the staircase down) instead of ordering a furnace it can't make.
+Building:
+- First house: Goals.firstHouseTime() is an iron pickaxe, or a stone pickaxe and livedDays() >= 2. Both the HOUSE
+  short goal and the Mind's HOUSE option (MindSense) use it. The Mind's option only needed 60 wood before, so a day-1
+  Xen with stone tools chose a house: "stone +42.3 house +44.5 wood +43.8".
+- Palettes with no stone (Architect.ofWood with stoneBase false: the base is the log). TimberHouse and Architect.designed
+  used the base for the lower walls, the wall fill and two layers of foundation under the edges. Now those are the
+  wall block (planks), and there is no foundation under the ground. The 7x5 "simple" cottage asked for {wood=1406}
+  (352 logs) before.
+Night:
+- Goals.sunDown(): time of day 12500 to 23500, or dark outside. Goals.evening() (from 11000) is still used for "too
+  late to start something".
+- Dusk branch in the Mind's options: evening, not night, before sunDown, no danger. It is SHELTER when home is 48 to
+  400 blocks away ("dusk: heading home before dark"), STONE when it has under NIGHT_BLOCKS blocks and isn't near home
+  ("dusk: blocks for a hut tonight"), and otherwise the day goes on. Before, the dark branch started at 11000, and it
+  dug in while the sun was up.
+Fights:
+- Companion.foe(): the last foe it hit stays its foe for 3 s (alive, within 10 blocks, not at peace with it, not a
+  creative or spectator player). Next comes a hostile mob within 10 that has it as its target and is in sight
+  (nearest first). Then the old checks. Before, foe() could return null between hits, and the chore ran in the gaps.
+Mining:
+- Choices.unsafeToBreak: under the ground (no sky above), a block with water beside or above it is "water behind it:
+  it would flood the tunnel".
+Exploring:
+- Goals.curiousAbout(): the nearest place in Places within 160 blocks in this dimension that it hasn't seen up close
+  (not its own places: home, mine, bed, farm, pen, portal...). exploreStep walks there ("going to see the village").
+  Within 10 blocks it counts as seen, and the journal says "explores: had a look at the village". There it looks
+  around for 3 to 6 s instead of 1.5 to 4.
+Walker (thinking about the way back):
+- known(p) is also true for blocks on its way: a LongLinkedOpenHashSet of the blocks its feet and head have been in
+  (the last 4000, cleared on a change of dimension), filled every tick by Walker.tick. Before, a dark block more than
+  8 blocks away (Manhattan) was planned as stone. Its own staircase down a mine looked like rock to dig through, and
+  PILLAR won.
+  - Checked: told to go 20 blocks down and back, it went down to y 64. The way up was 35 moves (walk 18, ascend 13,
+    pillar 3), and it was at the top in 13 s with the same 34 cobblestone.
+- placeWorth(): 2 with dirt, or more than need + 8 stone; otherwise 30. need is 8 for a furnace (no furnace, no iron
+  pickaxe) plus 3 under a stone pickaxe. PILLAR and BRIDGE add it. ASCEND that digs stone gives back the +12
+  tunnelling reluctance of each stone block when the worth is 30 (the stone is wanted).
+- Hands.spareBlock(): it puts down dirt, then cobbled deepslate, then cobblestone. This covers pillaring, bridging,
+  place() and placeAt("any").
+Names and skins:
+- nameStyle "accurate" (the new default) and skins "accurate" (the new default). Config version 10 moves "player" and
+  ["blob"] (the old defaults) to them.
+  - The accurate name style is real_names.txt first, like "real". A name typed in /xen summon <name> for a Xen not seen
+    before is taken as an account's: create(..., typed) waits up to 3 s for its skin (Skins.playerNow, on the common
+    pool, not behind the gallery). After that come Names.fresh("player") names, whose skins are never fetched (a made-up name could be a
+    stranger's account). Arena names (Red1...) and returning Xens keep their own skins.
+  - The accurate skins setting is mineskin.org's gallery (fetched at start), with the modern pack until the gallery is in.
+  - Checked: /xen summon jeb_ logged "Xen has jeb_'s skin". A random Xen was "naminel", with a gallery skin.
+Benchmark (bench_client.js: 3 Xens at 1250 -820, /tick rate 40, 12 real minutes = 28800 ticks):
+- Stone pickaxes at 37 to 42 s. lazy_matcha: furnace 5:01, iron ingot 5:07, iron pickaxe 5:18. neon_maple: furnace
+  10:51, iron ingot 10:57. rinaeer was slain by a zombie at 11:37.
+- The run before these fixes: no iron, 2 deaths to zombies, one Xen at "making furnace" for 208 s.
+- First shelter at 5:09 (time of day about 12400).
 
 
 WHAT'S NEW IN 2.0.0-beta.6
@@ -413,7 +481,7 @@ Talk:
   - back at where it died: "I died here (<what>). Careful.".
 
 Skins and names:
-- "blob" (the default; config version 9 moves "modern" to "blob"): 24 simple flat-colour skins from
+- "blob" (the default in beta 1 to 6, "accurate" since beta 7; config version 9 moved "modern" to "blob"): 24 simple flat-colour skins from
   scripts/make_blob_skins.py, signed through mineskin.org, in assets/xen/skins/blob.json.
 - nameStyle "real": the first untaken name in config/xen/real_names.txt (created with notes on first use); that
   account's skin from Mojang's profile API (fetched at start for every listed name).

@@ -1,7 +1,54 @@
-**Xen Companion 2.0.0-beta.6**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.7**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.7: faster to iron, no hiding in the daytime, fights first, curious exploring
+
+From your play-test reports (slow stone and iron, hiding in a hole in the daytime, not much exploring, chopping wood
+while a zombie hits it), and a 12-minute benchmark of 3 new Xens:
+
+* **The furnace stall is fixed.** A Xen with stone in its pockets could stand "making a furnace" for minutes. When
+  something it makes needs a crafting table it hasn't put down, two "getting ready" moments kept starting each other
+  over. Now it puts the table down, then crafts. This also fixes the builder's doors, stairs and chests. In a test
+  it went from raw iron to an iron pickaxe in about 1.5 minutes; before, it never got there.
+* **Stone for the furnace first**: with fewer than 8 cobblestone, it mines some instead of waiting.
+* **Its first house waits for iron** (or for its second day). On day 1 its Mind could choose a house with stone
+  tools and spend the day on wood. Now the first day is for tools and iron, like a player's.
+* **Houses without stone use planks.** With no stone, a house's walls were made of whole logs, and one 7 by 5
+  cottage asked for 352 logs. Now the walls are planks, with no wooden foundation under the ground.
+* **No hiding in the daytime.** It went into a shelter from late afternoon (the game's "evening" starts while it's
+  still bright). Now, in the late afternoon it gets ready: it heads home if it's far, or gets blocks for a hut. It
+  goes in when the sun really goes down.
+* **Fights first.** A monster coming for it, in sight, is dealt with before its chore, so no more chopping wood
+  while a zombie hits it. Once in a fight, it stays in it: a step back or a moment out of sight doesn't send it back
+  to its tree.
+* **No mining into water**: underground, it doesn't break a block with water behind it (a Xen drowned in a flooded
+  tunnel).
+* **Curious exploring**: places it has spotted and not been to (a village, a temple, ruins...) within 160 blocks, it
+  goes to see, and it has a good look around when it gets there.
+* **It thinks about the way back up.** Down a mine, its own stairs further than a few blocks off were "unknown rock"
+  to it, so climbing out by putting blocks under its feet looked easier. Now it remembers the way it came (its last
+  few thousand blocks), so it walks back up its own staircase. In a test it went 17 blocks down and came back up its
+  stairs to the surface in 13 seconds, keeping all its stone.
+* **It counts what a block is worth to it.** Climbing or bridging with stone it still needs (for a furnace or its
+  tools) now costs as much as mining that stone again. So it would rather dig steps up, which gives it stone, and it
+  puts down dirt before cobblestone.
+* **Accurate names and skins (the new default).** Like the Carpet mod's fake players: a Xen you summon by a real
+  account's name (`/xen summon jeb_`), or one from your `config/xen/real_names.txt`, gets that account's real skin.
+  Other Xens get made-up names like real players' (never someone's account) and skins real players made (from
+  mineskin.org's gallery; the modern skins when offline). It picks real accounts only when you name them.
+
+  Settings you never changed move to this. To get the old look back, use `/xen set nameStyle player` and
+  `/xen set skins blob`.
+* **Benchmark** (3 new Xens, 12 minutes at double speed, a full day; the same test as before the fixes):
+
+  | | before | now |
+  |---|---|---|
+  | Stone tools (all 3) | 30 to 45 s | 37 to 42 s |
+  | First iron | none in 12 min | 5:07 (iron pickaxe at 5:18); a second Xen at 10:57 |
+  | Deaths | 2 (zombies) | 1 (a zombie, at 11:37) |
+  | Into a shelter | from late afternoon, sun still up | at sundown |
 
 ### 2.0.0-beta.6: Xen's own words, grammar and memory; mining fixes
 

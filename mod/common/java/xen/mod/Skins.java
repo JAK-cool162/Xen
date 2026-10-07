@@ -29,7 +29,9 @@ import java.util.concurrent.Executors;
 /**
  * Where Xens' skins come from (the {@code skins} setting, any mix of these):
  * <ul>
- *   <li>{@code "blob"} (the default since Xen 2.0): simple skins: flat colour (any colour), two plain eyes, at most a
+ *   <li>{@code "accurate"} (the default since 2.0 beta 7): skins real players made, from mineskin.org's public gallery
+ *   (online; the modern ones until it's in). A Xen with a real account's name gets that account's own skin;</li>
+ *   <li>{@code "blob"} (the default in 2.0 beta 1 to 6): simple skins: flat colour (any colour), two plain eyes, at most a
  *   shirt, a belly, shoes or a blush; drawn for the mod and signed so everyone sees them;</li>
  *   <li>{@code "modern"}: the mod's skins in today's style: shaded hair with volume, hoodies, jackets,
  *   sneakers, muted and pastel colours, many with slim arms (original, free to use, signed so everyone sees them);</li>
@@ -96,7 +98,7 @@ final class Skins {
 			Path f = configDir.resolve("xen").resolve("real_names.txt");
 			if (!Files.exists(f)) {
 				Files.createDirectories(f.getParent());
-				Files.writeString(f, "# Real Minecraft names for Xens, one a line (with the \"real\" name style: /xen set nameStyle real).\n"
+				Files.writeString(f, "# Real Minecraft names for Xens, one a line (the \"accurate\" name style, the default, or \"real\").\n"
 						+ "# Each Xen gets one of these names and that account's real skin, like the Carpet mod's fake players.\n"
 						+ "# Only put names here you're allowed to use (yours, your friends').\n");
 			}
@@ -113,6 +115,19 @@ final class Skins {
 	/** Fetch these accounts' skins (in the background), for Xens named after them. */
 	void prepareReal(List<String> names) {
 		for (String n : names) if (!players.containsKey(n.toLowerCase(Locale.ROOT))) net.submit(() -> fetchPlayer(n));
+	}
+
+	/** A real account's skin, fetched if need be, waiting at most waitMs for it (null: no such account, or not in time). */
+	String playerNow(String name, long waitMs) {
+		String have = player(name);
+		if (have != null) return have;
+		try {
+			java.util.concurrent.CompletableFuture.runAsync(() -> fetchPlayer(name))   // (its own thread: not behind the gallery)
+					.get(waitMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+		} catch (Exception e) {
+			XenMod.LOG.info("{}'s skin isn't in yet ({})", name, e.toString());
+		}
+		return player(name);
 	}
 
 	/** A real account's skin, if it came (null: not yet, or no such account). */
@@ -136,7 +151,7 @@ final class Skins {
 		for (String s : setting) {
 			String k = s.trim();
 			if (k.equalsIgnoreCase("folder")) net.submit(this::signFolder);
-			else if (k.equalsIgnoreCase("mineskin")) fetchGallery();
+			else if (k.equalsIgnoreCase("mineskin") || k.equalsIgnoreCase("accurate")) fetchGallery();
 			else if (k.toLowerCase(Locale.ROOT).startsWith("player:")) {
 				String name = k.substring(7).trim();
 				if (!players.containsKey(name.toLowerCase(Locale.ROOT))) net.submit(() -> fetchPlayer(name));
@@ -167,6 +182,11 @@ final class Skins {
 					for (String d : Looks.SKINS) out.add(d);
 				}
 				case "folder" -> out.addAll(folder.values());
+				case "accurate" -> {                                          // skins real players made (the gallery), the modern ones offline
+					out.addAll(gallery);
+					if (gallery.size() < 8) fetchGallery();
+					if (out.isEmpty()) out.addAll(modern);
+				}
 				case "mineskin" -> {
 					out.addAll(gallery);
 					if (gallery.size() < 8) fetchGallery();

@@ -1471,6 +1471,14 @@ final class Chores {
 		if (furnace != null && !level.getBlockState(furnace).is(net.minecraft.world.level.block.Blocks.FURNACE)) furnace = null;
 		if (furnace == null) furnace = findFurnace();
 		if (furnace == null) {
+			int stone = countItem("cobblestone") + countItem("cobbled_deepslate") + countItem("blackstone");
+			if (countItem("furnace") == 0 && stone < 8) {                      // no furnace, and not the stone for one: that first (it doesn't stand about waiting)
+				doing = "getting stone for a furnace (" + stone + " of 8)";
+				int[] s = glance(new int[] {Blocks.STONE});
+				if (s != null) return reach(new BlockPos(s[0], s[1], s[2]));
+				BlockPos feet = c.player.blockPosition();
+				return digDown(feet.relative(c.player.getDirection(), 2).below(2));   // (none in sight: the stone under its feet, the staircase way)
+			}
 			if (countItem("furnace") == 0) {                                  // make one (8 cobblestone, in its crafting table)
 				doing = "making a furnace";
 				if (!c.crafter.hasOrder()) c.crafter.orderRecipe("furnace", 1);

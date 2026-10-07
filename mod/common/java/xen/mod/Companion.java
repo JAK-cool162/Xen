@@ -2178,6 +2178,8 @@ public final class Companion {
 			fighting = false;
 			return null;
 		}
+		lastFoe = foe;
+		lastFoeAt = player.level().getGameTime();
 		fightingWhat = foe.getName().getString();
 		if (!(foe instanceof ServerPlayer)) fightingWhat = fightingWhat.toLowerCase(java.util.Locale.ROOT);
 		if (!(foe instanceof ServerPlayer sp && skills.sparringWith(sp.getUUID()))) diplomacy.during(foe);   // it may talk (truce, give up); not in a spar
@@ -2185,6 +2187,9 @@ public final class Companion {
 	}
 
 	private String fightingWhat = "";
+	/** Who it's fighting, and when it last was: a fight goes on for a moment after they step out of reach or sight. */
+	private LivingEntity lastFoe;
+	private long lastFoeAt;
 
 	final Fighter fighter = new Fighter(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
@@ -2578,6 +2583,21 @@ public final class Companion {
 				player.getBoundingBox().inflate(5), x -> x.isAlive() && x.getSwellDir() > 0)) {
 			if (player.distanceTo(creeper) < 5) return creeper;           // hissing close by: it hears that (and runs)
 		}
+		long tick = player.level().getGameTime();
+		if (lastFoe != null && lastFoe.isAlive() && lastFoe.level() == player.level() && player.distanceTo(lastFoe) < 10 && tick - lastFoeAt < 60
+				&& !diplomacy.atPeace(lastFoe) && !(lastFoe instanceof ServerPlayer sp0 && (sp0.isCreative() || sp0.isSpectator())))
+			return lastFoe;                                                     // in a fight: it stays in it (a step back, a moment out of sight, isn't the end of it)
+		LivingEntity coming = null;                                          // a monster coming for it, in sight: it deals with that before going on (a player turns round)
+		double comingD = 10;
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(10),
+				m -> m.isAlive() && m.getTarget() == player && hostile(m))) {
+			double d = player.distanceTo(m);
+			if (d < comingD && player.hasLineOfSight(m)) {
+				comingD = d;
+				coming = m;
+			}
+		}
+		if (coming != null) return coming;
 		double reach = player.entityInteractionRange() + 0.5;
 		LivingEntity best = null;
 		double bestD = reach;

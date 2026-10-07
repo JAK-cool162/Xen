@@ -369,24 +369,20 @@ final class Crafter {
 			making = null;
 			return null;
 		}
-		Action wait = c.pace.craftPrep(order, order);                    // a moment to get ready (quick for what it knows)
-		if (wait != null) return wait;
+		boolean small = fitsSmallGrid(r);
+		BlockPos at = small ? null : nearbyTable();
+		if (!small && at == null) {                                       // a table first (each step its own moment)
+			if (count(n -> n.equals("crafting_table")) == 0) {
+				if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(() -> craftSmall(planksRecipe()), "planks");
+				return step(() -> craftSmall("crafting_table"), "a crafting table");
+			}
+			return step(() -> placeTable(), "a place for the table");
+		}
+		Action wait = c.pace.craftPrep(order, order);                    // a moment to get ready (quick for what it knows); only now, at
+		if (wait != null) return wait;                                   // the table (before it, the table's own steps would start it over)
 		orderSteps++;
 		int before = count(n -> n.equals(order));
-		boolean made;
-		if (fitsSmallGrid(r)) {
-			made = craftSmall(order);
-		} else {
-			BlockPos at = nearbyTable();
-			if (at == null) {
-				if (count(n -> n.equals("crafting_table")) == 0) {
-					if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(() -> craftSmall(planksRecipe()), "planks");
-					return step(() -> craftSmall("crafting_table"), "a crafting table");
-				}
-				return step(() -> placeTable(), "a place for the table");
-			}
-			made = craftAt(at, order);
-		}
+		boolean made = small ? craftSmall(order) : craftAt(at, order);
 		c.acted = true;
 		int got = count(n -> n.equals(order)) - before;
 		c.pace.crafted(order, order, made && got > 0);

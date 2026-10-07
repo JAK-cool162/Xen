@@ -44,7 +44,7 @@ final class Places {
 		return level.dimension().identifier().getPath();
 	}
 
-	private String here() {
+	String here() {
 		return dim(c.player.level());
 	}
 

@@ -226,7 +226,8 @@ final class TimberHouse {
 
 		// ---- materials
 		String wall = p.wall(), floor = p.floor(), log = frameOf(p, any);
-		String frame = depth ? log : wall, low = depth ? (any ? "cobblestone" : p.base()) : wall, high = depth ? p.base() : wall;
+		boolean stoneBase = any || !p.base().equals(p.frame());                            // (no stone yet: plank walls, not walls of logs)
+		String frame = depth ? log : wall, low = depth && stoneBase ? (any ? "cobblestone" : p.base()) : wall, high = depth && stoneBase ? p.base() : wall;
 		String upper = detail ? accentOf(p, any) : wall;                                    // the infill between the timbers
 		String roof = roofOf(p, any), stairs = stairsOf(roof), slab = slabOf(roof);
 		String edgeWood = detail ? edgeOf(roof, any) : roof, edge = stairsOf(edgeWood), edgeSlab = slabOf(edgeWood);
@@ -304,7 +305,7 @@ final class TimberHouse {
 				if (!inG.test(u, v)) continue;
 				boolean edgeOfIt = ground.containsKey(key(u, v));
 				L.put(u, v, 0, edgeOfIt ? low : floor, SUPPORT);
-				if (edgeOfIt && depth) for (int y = -2; y <= -1; y++) L.put(u, v, y, low, SUPPORT);
+				if (edgeOfIt && depth && stoneBase) for (int y = -2; y <= -1; y++) L.put(u, v, y, low, SUPPORT);
 			}
 		}
 		// ---- the ground floor (y 1-3): stone, log posts, windows two tall, a beam over the door

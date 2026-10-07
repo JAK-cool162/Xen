@@ -297,6 +297,7 @@ final class Choices {
 	String unsafeToBreak(BlockPos q) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (Chores.lavaBehind(level, q)) return "lava behind it";
+		if (!level.canSeeSky(q.above()) && waterBehind(level, q)) return "water behind it: it would flood the tunnel";   // (a flooded cave or an aquifer: mining into it drowns you)
 		BlockPos feet = c.player.blockPosition();
 		if (q.getX() == feet.getX() && q.getZ() == feet.getZ() && q.getY() == feet.getY() - 1) {
 			int air = 0;
@@ -309,6 +310,14 @@ final class Choices {
 			if (air >= 3) return "a drop under it: I'd fall in";
 		}
 		return null;
+	}
+
+	/** Water beside or above it (under the ground: open it and the water pours in). */
+	static boolean waterBehind(ServerLevel level, BlockPos b) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.WATER)) return true;
+		}
+		return false;
 	}
 
 	/** The pickaxe an ore takes to drop anything (1 wooden, 2 stone, 3 iron, 4 diamond; 0: anything). */
