@@ -1,7 +1,46 @@
-XEN COMPANION 2.0.0-beta.9: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.10: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.10
+===========================
+
+The recording (looked at in scratch, not kept): 290 s in the End. It took 39 hits: enderman 48.9 damage, the dragon
+20.8, a fall 2.2. It swung at the dragon 22 times and at endermen 19. The fling came at 45.7 s: velocity
+(4.08, 2.83, 0) right after two jump hits on the perched dragon, from the exit portal under her head. Then pitch 79
+and an ender pearl at 47.3 s, and landing at 48.7 s with 2.25 damage. Looking at the dragon: median 37 degrees off,
+within 15 degrees 18% of the time. Endermen within 16: median 94 degrees off.
+Dragon.java:
+- headHit: it stands 3 blocks from her head, on the side away from her body (head minus body, flat, normalised), and
+  walks there when more than 2.5 off or out of reach. Before, it walked to under the head.
+- glance(dragon) while waiting for her to land: watching her 18 ticks in each 70. The rest, it holds a look at the
+  ground 6 ahead. Before: watching = dragon, all the time.
+Tactics:
+- pearlTick (every tick, from Companion.tick right after the water clutch). It needs pearl_clutch (share 0.5) and a
+  pearl, and to be falling (vy <= 0, not in water, not gliding), at most once in 30 ticks. The cooldown resets on
+  landing.
+  - lastGround is its position on the ground, only when a block is really under it (a teleport can say onGround in
+    mid-air).
+  - Off an edge first: lastGround within 30 across, between 12 above and 25 below it, and nothing under it within 6.
+    The landing spot is the top of the block within 3 of lastGround with the most solid blocks around it (less 0.3 a
+    block of distance). pearlAim flies pitches -60 to 60 (step 2) from just under the eyes, 1.5 a tick, gravity 0.03
+    then drag 0.99 each tick, moving in quarters. Only a flight that comes down onto a block's top (free above)
+    counts; the nearest to the spot within 4 is taken. A Xen's pearl gets none of its movement:
+    Projectile.shootFromRotation adds getKnownMovement(), which for a ServerPlayer is lastKnownClientMovement. It
+    starts at Vec3.ZERO, and only the network handler sets it.
+  - Else, ground below within 64 and fall + depth >= 12 (vy < -0.3): Hands.throwAt(pearl, yaw, 90).
+  - -Dxen.pearlDebug=true journals each throw's aim and where the pearl came down.
+- Endermen (knows "endermen", born), every 4 ticks, not fighting: an enderman within 32 that isn't after it means a held
+  look at the ground 3 ahead (about 30 degrees down), whichever way it turns. Companion.somethingToLookAt and the
+  Habits glance leave endermen out.
+Checked (scratch end_client.js):
+- 40-block drops: alive at 17 to 18 health every run.
+- Off a sky platform 8 blocks from each edge, 40 down: 6 of 6 back onto it ("off the edge: an ender pearl back to").
+- The enderman 10 ahead at eye height: 0 to 5 of 20 samples within 14 degrees, varying from run to run.
+- In the End the platform tests weren't reliable: with no player there, the forced chunks weren't always loaded in
+  time for the fill. The pearls that were logged came down on the platform where they were aimed.
 
 
 WHAT'S NEW IN 2.0.0-beta.9

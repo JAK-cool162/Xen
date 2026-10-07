@@ -252,7 +252,8 @@ final class Habits {
 			var level = p.level();
 			java.util.List<Vec3> things = new java.util.ArrayList<>();
 			java.util.List<String> kinds = new java.util.ArrayList<>();
-			for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, p.getBoundingBox().inflate(24), x -> x.isAlive() && x != p)) {
+			for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, p.getBoundingBox().inflate(24), x -> x.isAlive() && x != p
+					&& !(Tactics.enderman(x) && c.knowledge.knows("endermen")))) {   // (not an enderman's eyes)
 				if (!p.hasLineOfSight(e)) continue;
 				things.add(e.getEyePosition());
 				kinds.add(e instanceof net.minecraft.world.entity.player.Player ? "someone" : BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath().replace('_', ' '));

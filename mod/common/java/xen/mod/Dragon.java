@@ -156,8 +156,24 @@ final class Dragon {
 		c.goals.instant = "waiting for the dragon to land";
 		Vec3 spot = middle.add(c.player.getX() > 0 ? 15 : -15, 0, 0);            // (out of reach of her wings when she lands)
 		if (c.player.position().distanceTo(spot) > 3) return c.walkTo(spot);
-		c.hands.watching = dragon;
+		glance(dragon);
 		return Action.IDLE;
+	}
+
+	/**
+	 * Eyes on her now and then, not all the time: a player glances up at the dragon every few seconds and otherwise
+	 * watches the ground around (in a recorded fight, within 15 degrees of her only 18% of the time). Staring up the
+	 * whole time, it sees nothing coming (endermen, her breath, the edge).
+	 */
+	private void glance(EnderDragon dragon) {
+		int t = c.player.tickCount % 70;
+		if (t < 18) {
+			c.hands.watching = dragon;
+			return;
+		}
+		c.hands.watching = null;
+		Vec3 ahead = Vec3.directionFromRotation(0, c.player.getYRot()).scale(6);
+		c.hands.holdLook(c.player.position().add(ahead.x, 0, ahead.z), 10);
 	}
 
 	/** She landed: up to her head, and hit it (a jump before each swing, for a critical hit). */
@@ -165,10 +181,12 @@ final class Dragon {
 		c.goals.instant = "hitting the dragon's head";
 		Vec3 head = dragon.head.position().add(0, dragon.head.getBbHeight() / 2, 0);
 		double d = c.player.getEyePosition().distanceTo(head);
-		if (d > c.player.entityInteractionRange() + 0.5) {
-			Vec3 under = new Vec3(head.x, c.player.getY(), head.z);
-			return c.walkTo(under);
-		}
+		// From the side, 3 blocks out from her head on the side away from her body: never under her (when she takes off,
+		// her wings throw whoever's under her thirty blocks: what flung the player in a recorded fight).
+		Vec3 out = head.subtract(dragon.position()).multiply(1, 0, 1);
+		if (out.lengthSqr() < 1e-4) out = new Vec3(1, 0, 0);
+		Vec3 spot = new Vec3(head.x, c.player.getY(), head.z).add(out.normalize().scale(3));
+		if (d > c.player.entityInteractionRange() + 0.5 || c.player.position().distanceTo(spot) > 2.5) return c.walkTo(spot);
 		if (c.player.getAttackStrengthScale(0.5f) < 0.9f) {
 			c.hands.face(head);
 			c.acted = true;

@@ -334,6 +334,7 @@ public final class Companion {
 		reactions.look();                                               // someone new in view? (it reacts, in its own way)
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
+		if (tactics.pearlTick()) return;                               // flung, or off the edge: an ender pearl
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {
 			hitBy(by);
@@ -653,7 +654,8 @@ public final class Companion {
 	/** Something to rest its eyes on: an animal or a mob close by, or a spot out over the land. */
 	private Vec3 somethingToLookAt() {
 		var around = player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(14),
-				e -> e != player && e.isAlive() && !(e instanceof ServerPlayer) && player.hasLineOfSight(e));
+				e -> e != player && e.isAlive() && !(e instanceof ServerPlayer) && player.hasLineOfSight(e)
+						&& !(Tactics.enderman(e) && knowledge.knows("endermen")));   // (never an enderman in the eyes)
 		if (!around.isEmpty() && random.nextFloat() < 0.6f) return around.get(random.nextInt(around.size())).getEyePosition();
 		double a = Math.toRadians(player.getYRot() + (random.nextFloat() - 0.5f) * 160f);
 		return player.getEyePosition().add(-Math.sin(a) * 10, (random.nextFloat() - 0.6f) * 4, Math.cos(a) * 10);

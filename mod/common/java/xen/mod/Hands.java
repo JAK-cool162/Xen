@@ -1052,6 +1052,24 @@ public final class Hands {
 		return false;
 	}
 
+	/** Throw something it carries this way (yaw and pitch in the game's degrees: an ender pearl back to land). False if it has none. */
+	boolean throwAt(String id, float yawDeg, float pitchDeg) {
+		int slot = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id));
+		if (slot < 0) return false;
+		stop();
+		lowerShield();
+		p.getInventory().setSelectedSlot(slot);
+		p.setYRot(yawDeg);
+		p.setYHeadRot(yawDeg);
+		p.setXRot(pitchDeg);
+		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 2;
+		return true;
+	}
+
 	/** Throw something it carries straight down at its feet (a wind charge: it goes up). False if it has none. */
 	boolean throwDown(String id) {
 		int slot = findHotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals(id));

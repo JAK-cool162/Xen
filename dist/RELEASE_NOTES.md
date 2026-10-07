@@ -1,7 +1,34 @@
-**Xen Companion 2.0.0-beta.9**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.10**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.10: the End, from a recorded dragon fight
+
+From 5 minutes of a player fighting the Ender Dragon (with endermen all round, flung once, nearly killed by endermen):
+
+* **No more being flung.** To hit her head, a Xen walked right under it when she perched on the portal. That's where
+  the recorded player stood when her wings threw them thirty blocks up as she took off. Now it hits her from the side,
+  three blocks out from her head, never under her.
+* **It glances at the dragon, not stares.** The player looked her way only now and then (within 15 degrees of her 18%
+  of the time) and watched the ground the rest. Waiting for her to land, a Xen now does the same, instead of staring
+  up at her the whole time.
+* **Endermen**: they did the player more harm than the dragon (49 of the 71 damage). The player kept them out of
+  view. A Xen now keeps its eyes on the ground a few blocks ahead when endermen are about, and never rests its eyes on
+  one when idle.
+* **The pearl clutch**: flung high, the player looked straight down and threw an ender pearl at the ground, landing
+  with a scratch. A Xen that knows it (about half do; tell one "if you get flung, throw an ender pearl down") does too.
+  Off an edge (the island, a bridge, a tower), it throws a pearl back onto the land it came off. It works out the
+  throw by flying the pearl the game's way through the real blocks, landing it on top of a block well in from the edge.
+* Tested in the game:
+
+  | Test | Result |
+  |---|---|
+  | Dropped 40 blocks onto the ground with 4 pearls (the fall alone kills) | lived every time, 18 of 20 health, 1 pearl used |
+  | Off a sky platform's edge (east, south, west), 40 blocks of air below | a pearl back onto it, 6 of 6 |
+  | An enderman 10 blocks right in front | looked at it 0 to 5 times in 20 checks (it used to stare) |
+
+  The side-on hits and the glances at the dragon have not been tried on a live dragon yet.
 
 ### 2.0.0-beta.9: boredom and whims, trust, trial chamber walls, simpler settings, no cheats needed
 

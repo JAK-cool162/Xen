@@ -70,6 +70,8 @@ final class Knowledge {
 			t("spear_reach", "a spear's jab reaches 2 to 4.5 blocks, further than a sword: keep out of the sword's reach",
 					"\\bspears?\\b.*\\b(reach|far|distance|range)"),
 			t("combo_shield", "hit three times in a row: put your shield up", "\\bshield\\b.*\\b(combo|three|3) (hits|times)"),
+			t("pearl_clutch", "flung high or off the edge: an ender pearl at the ground below (or back to land) saves you",
+					"\\b(ender )?pearls?\\b.*\\b(clutch|fall|void|save|down|land|flung)"),
 			new Mechanic("trial_walls", "a big, dead-flat wall in a cave means a trial chamber is behind it (the world makes its walls flat)", false,
 					Pattern.compile("\\b(flat|straight|smooth)\\b.*\\bwalls?\\b.*\\btrial|\\btrial\\b.*\\b(flat|straight|smooth)\\b.*\\bwalls?"), 0.3f));
 
