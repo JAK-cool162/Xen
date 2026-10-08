@@ -1,7 +1,56 @@
-**Xen Companion 2.0.0-beta.18**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.19**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.19: a whole place of its own, pictured first
+
+* **"Pip, build a place"** (or "set up your own place", "build a homestead"): a Xen lays out a whole place by itself,
+  with no template. It looks over the ground round it (water, trees, anyone's build, what it can't see from there),
+  pictures its house, a pool, a sitting area, a road out from its door with paths to each part and a wall round it
+  all, in thousands of ways in its head, and keeps the one it likes best. It also does this on its own sometimes, when
+  it builds its home.
+* **Not copies:** from what it was shown it learned a style (what a road, a wall and a pool are made of, a lantern on a
+  post, stairs for chairs, moss for a bush) and makes its own to fit the ground: a road dug into the ground (bumps
+  mined down, dips filled, a slab where it climbs, lamps along it, on out past the gate), a pool dug in, a sitting
+  area with a table and chairs, a wall that follows the land with posts and a gate, bushes by the door. The house can
+  still be one it was shown (its own version) or one of its own designs.
+* **Its own taste decides:** which parts it wants (silly Xens like a pool, fort builders a wall, chatty ones a sitting
+  area), flat ground, the door facing the way in, a straight or winding road, tidy or loose, close or spread out. It
+  learns from what you say about the place.
+* **See what it pictured:** each part outlined in the world in its own colour (gold house, cyan pool, pink sitting
+  area), the road and paths dotted white, the wall grey, the gate purple, the door red, while it pictures it and for a
+  minute after. `/xen layout` shows it again. Its journal has a map of it.
+* **Trained on the new Build Axe data** (21 builds, a tree, 8 caves, a river): its style is learned for each kind of
+  place (in the snow, spruce walls with stripped spruce posts, from the snowy house; in the desert, what the desert
+  buildings are made of), and in a place of its own it takes the house shown there first (the snowy house in the snow).
+  It learned the tree's shape (the spruce: its trunk, how its leaves narrow) and grows its own like it in its garden,
+  never the same twice.
+* **It knows what it's looking at:** the caves and the river you marked aren't builds, they're for seeing. From them a
+  Xen learned what a cave entrance, the inside of a cave, a ravine, a river and a frozen river look like (the ground on
+  top, the hollow under it, how steeply it drops). Every few seconds it takes in the spot its eyes are on, names it if
+  it's one of those, remembers it ("the ravine", "the river 2") and now and then says so ("Whoa, a ravine over there.").
+  On what it was shown, it names caves, rivers and frozen rivers right 95 to 100 times in 100, cave entrances and
+  ravines about half the time (`scripts/learn_sights.py`). Big caves like the ones shown it goes to first for ore
+  (`scripts/learn_caves.py`).
+* **Fixed:** a house marked a block too high (its door's lower half left out) was built with a hole a block high for a
+  door, and the Xen shut itself in: the door and the bottom row are put back now.
+* **Fixed:** grass in a build could be put back again and again (grass under a block turns to dirt): any dirt counts
+  now, and a block that won't stay is left out after a few tries. A build it was shown with no door block has its door
+  on its front edge.
+* **Fixed:** a Xen building in creative could end up hovering in a window hole of its own wall, where its way out
+  was looked for from the one block of its body that was shut in: it stood there skipping a block every half minute
+  (10 minutes for the back of a roof). Now its way is looked for from every block its body is in, and when it really is
+  shut in by its own build it takes a block of it out (a window first), gets out and puts it back at the end. Garden
+  trees made a Xen stumble (a plan with no inside): fixed.
+* **`/xen perf`:** where the server's time goes for the Xens (ms a tick in all, for each Xen, and by part). With 8 free
+  Xens: 12 ms a tick (a quarter of the 50 ms a tick has), 1.5 ms each, 8.7 ms of it planning their ways. That's what
+  the next update works on.
+* Tested in game (1.21.11): Pip, told "build a place", pictured its place (1,445 ways in 106 ms, shown in the world),
+  then built its own house (430 blocks), a road dug through a rise (71), a pool with a rim (101: dug in, water on the
+  ground, the rim from outside) and a garden of 3 spruces it grew its own way (127, none left out); an earlier run had
+  a sitting area and a three-wide road with lamps too. 8 free Xens by a frozen river named it and ravines within 2
+  minutes. 26.1, 26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.18: see the Build Axe's box, Xens pick up what they mine, bored fidgets
 

@@ -101,8 +101,42 @@ final class Taste {
 			case "shutters:true", "bushes:true" -> p.curiosity > 0.5f ? 0.2f : 0f;
 			case "porch:true", "chimney:true" -> p.diligence > 0.5f ? 0.1f : -0.1f;
 			case "copy:village" -> 0.3f - 0.6f * p.curiosity;                   // (curious Xens like their own ideas better)
+			// a whole place it lays out (Imagined): what goes in it, and how
+			case "place:shown house" -> 0.25f - 0.3f * p.curiosity;
+			case "place:own house" -> 0.05f + 0.2f * p.curiosity;
+			case "place:pool" -> p.tone.equals("silly") || p.tone.equals("cheerful") ? 0.4f : p.kindness > 0.5f ? 0.2f : 0.05f;
+			case "place:seat" -> p.chattiness > 0.5f ? 0.3f : 0.05f;
+			case "place:wall" -> fort ? 0.5f : p.kindness < 0.4f ? 0.2f : -0.05f;
+			case "place:lamps" -> p.diligence > 0.4f ? 0.3f : 0.05f;
+			case "place:garden" -> p.curiosity > 0.4f ? 0.25f : 0.05f;
+			case "place:winding" -> p.curiosity > 0.5f ? 0.25f : -0.2f;
+			case "place:neat" -> p.diligence - 0.4f;
+			case "place:spread" -> p.curiosity - 0.5f;
 			default -> 0f;
 		};
+	}
+
+	// ------------------------------------------------------------------------------ places (Imagined)
+	/** Its last place laid out: what it chose for it, where, when it was done (for what people say about it). */
+	String[] lastPlace;
+	net.minecraft.core.BlockPos lastPlaceAt;
+	long lastPlaceDone = -1;
+
+	/** How much it likes something in a place it lays out: "pool", "seat", "wall", "lamps", "garden", "winding", "neat", "spread", "shown house". */
+	float placeLike(String what) {
+		return like("place:" + what);
+	}
+
+	/** It finished laying out a place (what it chose): what people say about it now is about that. */
+	void placed(String[] chose, net.minecraft.core.BlockPos at) {
+		lastPlace = chose;
+		lastPlaceAt = at;
+		lastPlaceDone = c.player == null ? 0 : c.player.level().getGameTime();
+	}
+
+	private void rewardPlace(float r) {
+		for (String k : lastPlace) liking.put("place:" + k, Math.max(-1f, Math.min(1f, like("place:" + k) + 0.25f * (r - like("place:" + k)))));
+		c.journal("learns", String.format(Locale.ROOT, "taste for places: %s -> %+.1f", String.join(", ", lastPlace), r));
 	}
 
 	/** Pick one of two by liking (softmax, with more chance for curious Xens). */
@@ -277,7 +311,8 @@ final class Taste {
 	 * like that, criticism makes it try other things. What it says back, or null if it wasn't about the house.
 	 */
 	String heard(String words, net.minecraft.world.entity.player.Player from) {
-		if (last == null || lastAt == null) return null;
+		String aboutPlace = heardPlace(words, from);
+		if (last == null || lastAt == null) return aboutPlace;
 		long since = c.player.level().getGameTime() - lastDone;
 		boolean near = from != null && from.blockPosition().closerThan(lastAt, 20);
 		if (since > 12000 && !near) return null;
@@ -291,6 +326,24 @@ final class Taste {
 			reward(last, 0.9f);
 			if (lastCopied) rewardCopy(0.9f);
 			return random.nextBoolean() ? "Thanks! I'll build more like that." : "Thank you! I like the " + favourite() + " too.";
+		}
+		return null;
+	}
+
+	/** The same about its last place (the parts it chose, how it laid them out), or null. */
+	private String heardPlace(String words, net.minecraft.world.entity.player.Player from) {
+		if (lastPlace == null || lastPlaceAt == null || c.player == null) return null;
+		long since = c.player.level().getGameTime() - lastPlaceDone;
+		boolean near = from != null && from.blockPosition().closerThan(lastPlaceAt, 32);
+		if (since > 12000 && !near) return null;
+		String w = words.toLowerCase(Locale.ROOT);
+		if (w.contains("not ") && PRAISE.matcher(w).find() || CRITICISM.matcher(w).find()) {
+			rewardPlace(-0.6f);
+			return "Hm, okay. I'll lay the next one out differently.";
+		}
+		if (PRAISE.matcher(w).find()) {
+			rewardPlace(0.9f);
+			return "Thanks! I pictured it like that before I built it.";
 		}
 		return null;
 	}

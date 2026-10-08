@@ -87,13 +87,61 @@ final class Caves {
 		known.add(spot.immutable());
 		long key = spot.asLong();
 		oreChecked.put(key, now);
-		if (orePocket(level, spot)) orePockets.add(key);
+		if (orePocket(level, spot) || shownLike(level, spot)) orePockets.add(key);   // (a cave like the ones it was shown: a big one, worth going to)
 		if (known.size() > 12) {
 			long removed = known.remove(0).asLong();
 			orePockets.remove(removed);
 			oreChecked.remove(removed);
 		}
 		return true;
+	}
+
+	/** What a cave is like, learned from the caves it was shown with the Build Axe (scripts/learn_caves.py: assets/xen/taught/caves.json). */
+	private static int learnedAir = 150, learnedPocket = 11, learnedRoof = 19;
+	private static float learnedRock = 0.95f;
+	private static boolean learnedRead;
+
+	private static synchronized void readLearned() {
+		if (learnedRead) return;
+		learnedRead = true;
+		try (var in = Caves.class.getResourceAsStream("/assets/xen/taught/caves.json")) {
+			if (in == null) return;
+			var o = com.google.gson.JsonParser.parseString(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			learnedAir = o.get("windowAir").getAsInt();
+			learnedRock = o.get("rockShare").getAsFloat();
+			learnedPocket = o.get("pocketAir").getAsInt();
+			learnedRoof = o.get("roofWithin").getAsInt();
+			XenMod.LOG.info("Xen knows what a cave is like from {} spots in the caves it was shown ({} in the window, rock {}, a roof within {})",
+					o.get("caveSpots").getAsInt(), learnedAir, learnedRock, learnedRoof);
+		} catch (Exception e) {
+			XenMod.LOG.warn("Xen: couldn't read what caves are like: {}", e.toString());
+		}
+	}
+
+	/**
+	 * Is it like the caves it was shown (a big open cave or a ravine: lots of air round the spot, rock nearly all the
+	 * solid there, room close round, a rock roof over it)? Those it goes to first for ore: the walls show the most.
+	 */
+	static boolean shownLike(ServerLevel level, BlockPos q) {
+		readLearned();
+		int air = 0, solid = 0, rock = 0, near = 0;
+		for (BlockPos b : BlockPos.betweenClosed(q.offset(-4, -1, -4), q.offset(4, 3, 4))) {
+			var st = level.getBlockState(b);
+			if (st.isAir()) {
+				air++;
+				if (Math.abs(b.getX() - q.getX()) <= 1 && Math.abs(b.getZ() - q.getZ()) <= 1 && b.getY() >= q.getY() && b.getY() <= q.getY() + 2) near++;
+			} else if (!st.getCollisionShape(level, b).isEmpty()) {
+				solid++;
+				if (Eyes.deepStone(st) || Eyes.kind(st) != null && !"log".equals(Eyes.kind(st)) && !"built".equals(Eyes.kind(st))) rock++;
+			}
+		}
+		if (air < learnedAir || solid == 0 || rock < learnedRock * solid || near < learnedPocket) return false;
+		for (int up = 1; up <= learnedRoof; up++) {                                 // a roof of rock over it
+			var st = level.getBlockState(q.above(up));
+			if (st.isAir()) continue;
+			return Eyes.deepStone(st) || Eyes.kind(st) != null && !"log".equals(Eyes.kind(st)) && !"built".equals(Eyes.kind(st));
+		}
+		return false;
 	}
 
 	private String caveLine(BlockPos spot) {

@@ -420,6 +420,10 @@ final class VillageHouses {
 		}
 		steps.sort((s1, s2) -> s1.phase() != s2.phase() ? Integer.compare(s1.phase(), s2.phase())
 				: s1.phase() == Architect.DIG ? Integer.compare(s2.pos().getY(), s1.pos().getY()) : Integer.compare(s1.pos().getY(), s2.pos().getY()));
+		if (door == null && h.door() != null) {                                    // (no door block, a doorway: where the door would be, on its front edge)
+			int[] q = rotated(h.door().getX(), h.door().getZ(), r);
+			door = new BlockPos(bx + q[0] - minX, h.door().getY() + dy, bz + q[1] - minZ);
+		}
 		BlockPos middle = new BlockPos(bx + wx / 2, corner.getY() + 1, bz + wz / 2);
 		AABB inside = new AABB(bx + 1, corner.getY() + 1, bz + 1, bx + wx - 1, corner.getY() + 3, bz + wz - 1);
 		return new Architect.Plan(h.kind().equals("taught") ? h.name() : "village house", steps, door == null ? middle : door, middle, front, inside);

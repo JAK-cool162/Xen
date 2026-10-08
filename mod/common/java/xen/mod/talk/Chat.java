@@ -245,7 +245,7 @@ public final class Chat {
 			String asked = led && !notAsked ? lead.group("rest").replaceAll("[?!.\\s]+$", "") : null;
 			if (!notAsked && (asked != null || !QUESTION.matcher(words).lookingAt())) {
 				String look = asked != null ? asked : words;
-				if (BUILD_IT.matcher(look).find() && xen.mod.Taught.nameIn(look) != null) intent = "build";   // ("build a pool": one it was shown, first)
+				if (BUILD_IT.matcher(look).find() && (xen.mod.Taught.nameIn(look) != null || PLACE.matcher(look).find()) || Pattern.compile("\\blay (it )?out\\b").matcher(look).find()) intent = "build";   // ("build a pool": one it was shown, first; "build a place": its own layout)
 				else for (int i = 0; i < RULE.length; i++) {
 					if (RULE[i].matcher(look).find()) {
 						intent = RULES[i][0];
@@ -258,6 +258,9 @@ public final class Chat {
 	}
 
 	private static final Pattern BUILD_IT = Pattern.compile("\\b(build|make|put|place|set up|add)\\b");
+	/** Words for a whole place a Xen lays out itself ("build a place", "set up your own place", "a compound", "a homestead", "lay out an estate"). */
+	public static final Pattern PLACE = Pattern.compile("\\b(a|an|your|my|our|the|whole|own|new|nice|big|little) (place|compound|estate|homestead|property|yard|layout|grounds|mansion|ranch|villa)\\b"
+			+ "|^(place|compound|estate|homestead|layout)$|\\blay (it )?out\\b");
 
 	/** Starts with a verb that orders something ("go", "get", "build"...). */
 	private static final Pattern ORDER = Pattern.compile("^(go|get|come|follow|build|make|mine|dig|craft|explore|stay|stop|give|bring|find|hunt|chop|collect|gather|"
@@ -309,6 +312,7 @@ public final class Chat {
 					: Pattern.compile("\\bfarm\\b").matcher(words).find() ? "farm"
 					: Pattern.compile("\\b(pen|barn|animal)\\b").matcher(words).find() ? "pen"
 					: Pattern.compile("\\b(underground|base|bunker|hideout|dig)\\b").matcher(words).find() ? "base"
+					: PLACE.matcher(words).find() ? "place"
 					: xen.mod.Taught.nameIn(words) != null ? "taught:" + xen.mod.Taught.nameIn(words) : houseStyle(words);
 			amount = 0;
 		}
@@ -708,7 +712,7 @@ public final class Chat {
 			{"\\b(so|and|but|because|if|when) you\\b", "$1 I"}, {"\\b(tree|block|ore|lava|water|mob|mobs|it) you\\b", "$1 I"},
 			{"\\byou'll\\b", "I'll"}, {"\\byou've\\b", "I've"}, {"\\byou'd\\b", "I'd"}, {"\\bYou'll\\b", "I'll"},   // ("me'll come back to it": no)
 			{"\\byou (need|have|know|saw|see)\\b", "I $1"},
-			{"\\byou (can|can't|could|should|would|might|must|do|did|don't|didn't|get|got|go|want|like|make|feel|think|hate|love|found|made|built)\\b", "I $1"},   // ("before you can make tools": "I can", not "me can")
+			{"\\byou (can|can't|could|should|would|might|must|do|did|don't|didn't|get|got|go|want|like|make|feel|think|hate|love|found|made|built|pictured|picture|imagined|planned)\\b", "I $1"},   // ("before you can make tools": "I can", not "me can")
 			{"\\byourself\\b", "myself"}, {"\\bYour\\b", "My"}, {"\\byour\\b", "my"},
 			{"\\bYou\\b", "I"}, {"\\byou\\b", "me"}};
 	private static final Pattern PLAN = Pattern.compile("\\bPlan: (.+)$");

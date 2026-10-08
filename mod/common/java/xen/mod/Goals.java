@@ -263,7 +263,7 @@ final class Goals {
 					exploreTo = null;
 					yield "You can't: " + neighbor.name + "'s base is right here. You'll find land of your own first.";
 				}
-				String h = plot != null ? c.builder.startNear("house", plot, t != null && t.members.size() > 1 ? t.plotFront : null) : c.builder.start("house");
+				String h = plot != null ? c.builder.startNear("house", plot, t != null && t.members.size() > 1 ? t.plotFront : null) : c.builder.start("home");   // (its own land: maybe a whole place)
 				yield h.startsWith("You will") ? h : "You can't: " + h;
 			}
 			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)

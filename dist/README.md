@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.18
+# Xen Companion (Fabric mod) 2.0.0-beta.19
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.18+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.18+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.18+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.18+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.19+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.19+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.19+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.19+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.18+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.19+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -204,6 +204,7 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "new rule: no fighting" / "from now on everyone works" | the village votes on it; passed rules are kept, broken ones punished |
 | "Pip, build a highway north" / "build an obsidian road east 200" | a tunnel highway in that direction ([more](#building)) |
 | "Pip, build a modern house" / "a house on stilts" / "a tower" / "a cottage" | builds its own design in that style |
+| "Pip, build a place" / "set up your own place" / "build a homestead" | pictures a whole place first (its house, its own pool, sitting area, road, paths and wall, in the style it learned), shows it, then builds it ([more](#a-whole-place-of-its-own-pictured-first-2000-beta19)) |
 | "Pip, decorate your house" / "upgrade your house" / "make your house nicer" | takes its house a [stage](#building) further (basic, simple, good, perfect) |
 | "Pip, help Aria build" / "help them build" | joins a friend's build: the same plan, and every block either of them puts down counts for both |
 | "Pip, where's the nearest village?" / "have you seen a stronghold?" / "what places do you know?" | where it saw one (coordinates, the biome, how far and which way) |
@@ -639,22 +640,80 @@ chat with it, it knows them):
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
 
-## What Xens were shown (2.0.0-beta.17, its own way 2.0.0-beta.18)
+## A whole place of its own, pictured first (2.0.0-beta.19)
 
-Xens were trained on builds made and marked with the Build Axe: two houses (a house and a 2 story house), furniture
-(two couches, a counter, a table, a bar, a hanging light), and things round a house (a pool, a road, an entrance, a
-wall with outdoor decorations, a glass wall, a staircase). Every Xen knows them:
+Ask "Pip, build a place" (or "set up your own place", "build a homestead", "lay out a compound"), or let a Xen decide
+on its own (when it builds its home, it sometimes lays out a whole place instead, more in creative and the more it
+likes what goes in one). There's no template, and nothing round the house is a copy: it pictures the place first,
+then builds it.
 
-* Ask for one by name: "build a pool", "build the bar", "make a couch", "build a 2 story house".
-* The houses are among the houses a Xen may build on its own (when it likes copying what it has seen).
+* **It looks over the ground** round it (about 45 x 45 blocks), the way you would before building: the lie of the
+  land, water, trees, anything someone built, and what it can't see from where it stands. It never builds on someone's
+  build, in water, or where a player is standing.
+* **It pictures it in its head:** where its house goes and which way it faces, where its pool and a sitting area go,
+  a road out from its door with paths off it to each part, and a wall round it all with a gate where the road goes
+  through. It tries thousands of ways in a moment and keeps the one it likes best. What it likes is its own: flat
+  ground, no trees in the way, the door facing the way in (toward you) with open ground in front, a pool close but not
+  in front of the door, a road that doesn't climb, the parts lined up (a tidy Xen) or not, close together or spread
+  out, a straight road or a winding one. Which parts it wants is its own taste too (silly and cheerful Xens like a
+  pool, fort builders a wall, chatty ones a sitting area, careful ones lamps), and it learns from what you say about
+  the place ("nice place!", "that's ugly").
+* **Its own, in a style it learned:** from what it was shown (the road, the walls, the pool, the outdoor decorations)
+  it learned what things are made of (the road of andesite, a wall of andesite with polished andesite posts and a slab
+  on top, a pool rimmed with glazed terracotta, a lantern on a fence post, stairs for chairs, a carpet or plate for a
+  table top, moss or leaves for a bush; for each kind of place: spruce in the snow), and it makes its own to fit the
+  ground there:
+  * **the road** goes in the ground, not on it: the grass dug out and the road laid in its place, the bumps mined down
+    and the dips filled, a slab where it climbs (no jumping), room cleared above it, three wide in creative, lamps
+    along it if it likes them, and on out past the gate. Paths go off it to the pool and the sitting area. In survival,
+    a path made with a shovel.
+  * **the pool** is dug into the ground, the size it likes and has room for: a rim all round, water two deep (a few
+    buckets by the rim, and the rest fills itself, as water does).
+  * **the sitting area:** the ground levelled, a table with a chair either side, a lamp.
+  * **the wall** follows the land all round, two high and capped, a post with a light every few blocks and at the
+    corners, and two tall posts at the gate.
+  * **a garden**, if it likes one: bushes either side of the way to its door, and trees of its own about the place,
+    shaped like the tree it was shown (its trunk, how its leaves narrow going up) but never the same twice.
+* **The house** is one it was shown (its own version: its wood, maybe mirrored) or one of its own designs (its taste
+  decides). Its furniture goes in when the house is done.
+* **You can see what it pictured:** outlines in the world, each part in its colour (gold the house, cyan the pool,
+  pink the sitting area), the road and paths dotted white, the wall grey, the gate purple and the door red, while it
+  pictures it (it looks at where each part goes) and for a minute after. `/xen layout` shows it again (and says what's
+  in it). Its journal has a map of it (H house, D door, # road, + path, P pool, S sitting area, W wall, G gate).
+* It builds it part by part, the house first (then its furniture, the road, the pool, the sitting area, the bushes,
+  the wall), and says when the whole place is done. In survival it's of what it can make (cobblestone for the stone,
+  a torch for a light) and it wants a wall less.
+
+## What Xens were shown (2.0.0-beta.17, more in 2.0.0-beta.19)
+
+Xens were trained on what was marked with the Build Axe: houses (two houses, a big house, a 2 story house, a snowy
+house, a desert house), other builds (a desert blacksmith, a jungle temple, a pillager outpost, two wells, a farm, a
+cage), furniture (two couches, a counter, a table, a bar, a hanging light), things round a house (a pool, a road, a
+path, an entrance, a wall with outdoor decorations, a glass wall, a staircase), a tree, and caves (cave entrances, the
+inside of a cave, ravines, a frozen river) with a plains river. Every Xen knows them:
+
+* Ask for one by name: "build a pool", "build the bar", "make a couch", "build a 2 story house", "build a well".
+* The houses are among the houses a Xen may build on its own (when it likes copying what it has seen). In a whole place
+  of its own it takes one shown where it is first (the snowy house in the snow, the desert house in the desert).
 * When a Xen finishes a house, it puts in a piece of that furniture if one fits inside (in survival, if it has most
   of the blocks).
 * It builds its own version, not a copy: in its own wood (the wood it has, or in creative the wood it likes), and at
   some places the other way round (mirrored, left for right). The same place always gets the same version, so a house
   it comes back to finish is the same house.
+* From all of it, it learned a style for each kind of place (what roads, walls, pools and lamps are made of; in the
+  desert what the buildings there are made of) and a tree's shape (the spruce's trunk and how its leaves narrow): for
+  the places it lays out itself.
+* The caves and the river aren't for building: they're for seeing. From them it learned to tell what it's looking at
+  (a cave entrance, the inside of a cave, a ravine, a river, a frozen river): every few seconds it takes in the spot
+  its eyes are on (the 9 x 9 ground there: water, ice, sand or rock on top, the hollow under it, how steeply it drops),
+  names it if it's one of those, remembers it in its places ("the ravine", "the river 2") and its journal, and now and
+  then says so. On what it was shown it names caves, rivers and frozen rivers right 95 to 100 times in 100, cave
+  entrances and ravines about half the time; anything else is just ground to it.
+* From the caves it also learned what a big cave is like (how much room, nearly all rock round it, a rock roof within
+  19): a cave like those it goes to first for ore. Smaller caves it still notices as before.
 
 The ground they were marked on (the grass and dirt under them) isn't part of them: they go on the ground where
-they're built.
+they're built. A house marked a block too high (the door's lower half left out) gets its bottom row back.
 
 ## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15, the box in the world 2.0.0-beta.18)
 
@@ -1250,6 +1309,8 @@ away in single player. On a server, operators use:
 | `/xen spawn <count> [radius]` | operators: many ownerless Xens, scattered on the surface up to `radius` blocks away (default 300) |
 | `/xen mode follow\|stay\|free` | the same as asking it to follow, stay or explore |
 | `/xen status` | who it is, health, hunger, mood, what it knows and what it's doing |
+| `/xen layout` | shows the place each Xen pictured (outlines in the world for 45 seconds) and says what's in it |
+| `/xen perf` | where the server's time goes for the Xens over the last half minute: ms a tick in all and for each Xen, and by part (choosing, planning ways, eyes...) |
 | `/xen style <xen> <trait> <value>` | its owner or operators: set a trait by hand, e.g. `/xen style Pip fight skirmisher`, `/xen style Pip crit 0.9`, `/xen style Pip build tower`, `/xen style Pip bravery 0.9` |
 | `/xen arena start [xens] [generations] [kit]`, `stop`, `status` | operators: [the PvP arena](#the-pvp-arena-red-against-blue) |
 | `/xen chat on\|off`, `/xen learn on\|off` | quick switches |

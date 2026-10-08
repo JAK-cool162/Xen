@@ -118,15 +118,16 @@ final class Places {
 	 * A place there can be many of (villages, strongholds, temples, caves): remembered as another one unless it's one
 	 * it knows already (within apart blocks); the first is "village", the next "village 2"...
 	 */
-	void rememberAnother(String kind, BlockPos pos, int apart) {
+	boolean rememberAnother(String kind, BlockPos pos, int apart) {
 		String dim = here();
 		int n = 0;
 		for (Place p : places.values()) {
-			if (!p.dim().equals(dim) || !(p.name().equals(kind) || p.name().startsWith(kind + " "))) continue;
-			if (p.pos().distSqr(pos) < (long) apart * apart) return;                // (knows it)
+			if (!p.dim().equals(dim) || !(p.name().equals(kind) || p.name().matches(java.util.regex.Pattern.quote(kind) + " \\d+"))) continue;   // ("cave 2", not "cave entrance")
+			if (p.pos().distSqr(pos) < (long) apart * apart) return false;          // (knows it)
 			n++;
 		}
 		remember(n == 0 ? kind : kind + " " + (n + 1), pos);
+		return true;
 	}
 
 	/** Every place it knows, nearest first (in the world it's in, then the others). */

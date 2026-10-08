@@ -1,7 +1,120 @@
-XEN COMPANION 2.0.0-beta.18: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.19: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.19
+===========================
+
+A whole place, pictured first (Imagined), all of it its own but the house. Builder.place, from "build a place"
+(Chat.PLACE: a/your/my/our/the/whole/own/new/nice/big/little + place/compound/estate/homestead/property/yard/layout/
+grounds/mansion/ranch/villa, or "lay out"; the build intent before the other rules, details "place"), or its own idea:
+Goals' HOUSE on its own land asks for "home", and Builder takes a place instead of a house when not its first house,
+not a village plot, and random < (creative 0.55, else 0.2) + 0.25 diligence + 0.3 max(liking pool, seat, wall).
+
+Imagined.survey: a 45 x 45 grid round it (R = 22). Each column from 12 above it down 30: logs and leaves passed (a log
+within 6 of its height: TREE), water (WATER), the top solid block (BUILT if not Hands.natural or something not
+replaceable on it), a mountain above or not loaded (NONE); OPEN or TREE ground it can't see from its eyes (a clip,
+COLLIDER, more than a block off) is UNSEEN; 3 x 3 round every player (not Xens, not spectators) is BUILT.
+
+Taught.Style, learned from what it was shown (not copied): road = the most common block of the pieces named road/path
+(a slab: its full block, and the slab for half steps); wall = the most common full block of the pieces named
+wall/entrance/gate, accent the next, cap its slab; light the most common lantern/glowstone/torch/sea lantern; post the
+most common fence; bench the most common stairs and top the most common plate or carpet of the outdoor pieces; bush the
+most common leaves or moss; rim the most common full block of the pool (else the pieces with water). Wooden ones in its
+own wood (VillageHouses.adaptWood); in survival VillageHouses.adapt (stone to cobblestone...) and a torch for a light.
+
+The house: Taught.houses() or its own design (Taste.design without its own yard, pond, garden, workshop), as shapes
+(each way's plan at a fixed corner: its box and door). Its own parts: a pool (creative 6-10 (+2 spread) x 5-7, survival
+4-5 x 3-4) and a sitting area (3 x 3), boxes either way round. fit(): every column in the grid, not taken, not
+WATER/BUILT/NONE; the floor one above the median top; cost = sum |top - median| + 6 a TREE + 0.8 an UNSEEN; worse
+than 3 off: no.
+
+Taste ("place:" likings, saved with the rest; prior from personality): shown house 0.25 - 0.3 curiosity, own house
+0.05 + 0.2 curiosity, pool (silly/cheerful 0.4, kind 0.2, else 0.05), seat (chatty 0.3), wall (fort 0.5, unkind 0.2,
+else -0.05; survival needs more than 0.3), lamps (diligent 0.3), garden (curious 0.25), winding (curious 0.25, else
+-0.2), neat (diligence - 0.4), spread (curiosity - 0.5). It wants a part when liking + N(0, 0.35) > 0. What people
+say near the place (32 blocks) or in the ten minutes after: praise 0.9, criticism -0.6, each chosen key moves a
+quarter of the way (Taste.heardPlace).
+
+Picturing: 700 tries of the house (any way, any spot at least 4 in from the edge, its door's front block open and
+within a block of the floor): score = -cost + 6 (door facing the way in: its owner or leader within 96, else where it
+stands) + 1.2 per open block in the 5 in front - 0.15 per block from the middle. The best 14, each with its own parts
+(90 tries each, round the house): pool 2 to 5 (spread 8) blocks off +4, sitting area 1 to 3 from the pool (else the
+house) +4; -8 in front of the door; +2.5 lined up (neat); no room -3. The road: Dijkstra over the grid from past its
+porch to the edge toward the way in (no water, builds, trees, parts or climbs of more than a block; 1 + 3 a block up +
+UNSEEN + (winding) noise 0 to 1.4; -0.1 a block, winding 0.05; no road -25). Paths: from the middle of the side of each
+part nearest the road, the shortest way to it. The wall: the box round all the parts, 3 out (in the grid), its ring;
+the gate where the road crosses it (2 either side); no wall if a quarter of it is water, builds or parts. The best
+layout wins; its map goes in the journal and the log ("<name> pictures its place round x z (N ways tried in M ms)").
+
+Building it (Imagined.plans), each part of its own: the road: its height along the way the median of the 5 round it,
+a block at a time at most; every block of it (three wide in creative where the ground beside is open) dug down to that
+height with 2 above cleared, a dip filled with dirt, the surface the style's road block (survival: dirt_path), a slab
+on it where the next is a block up; the paths one wide on the ground's top; lamps (if it likes them) every 7 blocks,
+a side then the other: 2 posts and the light. The pool: sunk at the ground's level, every column dug out 2 deep (the ground
+under it its bottom: a block it stands on can't be swapped), the rim (2 high) laid from outside, water 2 deep (bottom
+first: a few buckets and the rest becomes source water by itself). The sitting area: levelled, the post and
+top in the middle, a bench either side (backs away), a post and light at a corner. The garden: bushes (persistent
+leaves, or moss) 2 and 4 either side of the way out of the door. The wall: on the ground all round, 2 of the wall
+block and its cap; posts (accent, 3 high, a light on top) at corners, every 5th and by the gate (4 high). In order:
+the house (VillageHouses.plan of Taught.vary, or Architect.designed seeded by its corner) as its home, its furniture
+(Taught.furnish), then the road, the pool, the sitting area, the garden, the wall. Builder.begin keeps the queue
+(cancel clears it otherwise); finish() takes the next (partOfPlace: not a home, no "Done!" till the last), and at the
+end says the place is done, Taste.placed, lore. Picturing: Builder.next holds still 20 ticks a part (2 + parts) looking
+at each part (Hands.holdLook). Showing: XenMod.tickWorld every 12 ticks, Builder.showLayout for 60 s after (45 s after
+/xen layout): Imagined.show to each player within 112 (DustParticleOptions 2.5: each part's box, the road and paths,
+the wall, the gate, the door).
+
+New Build Axe data (21 builds, 5 decorations, a tree: assets/xen/taught; 8 caves and a river: data/buildaxe, for
+training). Taught.Piece keeps its biome (VillageHouses.kindOf). Taught.style(kind): each role from the pieces of that
+kind of place first (with no wall shown there: the most common blocks of the buildings there), else all; snow layers
+and ice aren't blocks of a wall; a wall torch is a torch. Taught.houses(kind): the houses shown there first; a place
+tries up to three of them (shuffled), then its own design, till one fits. Taught.trees(): a tree's shape (its log and
+leaves, the trunk's height in its tallest log column, the leaves' reach from it at each height); the garden plants 2
+(spread 3) on open ground clear of the parts, road, paths and wall by 3 and of each other by 6: the trunk the shape's
+height -1 to +1, the leaves at each height up with it, corners left off 60% and other edge leaves 12%; the tree shown
+there in its own log and leaves, else its own wood's. "build a tree" doesn't copy one. Taught.mendDoor: a door with only
+its upper half in the bottom layer (marked a block too high) gets its lower half and the bottom row of solid blocks
+under it (the house was built with a hole a block high for its door: no way out).
+
+Caves (scripts/learn_caves.py -> assets/xen/taught/caves.json): at air under a rock roof in each cave shown (500 a
+cave, each counts the same), the 9 x 5 x 9 window round it (as Caves.rocky): its air, the rock share of its solids, the
+air in the 3 x 3 x 3 round it, and how far up its rock roof is; against open air over the caves and the river. Learned:
+the least of each in 9 of 10 cave spots (150 air, 95% rock, 11 close round) and a roof within 19 (95 in 100): 75% of
+the cave spots, 1% of the others. Caves.shownLike: a cave like those is a preferred one (orePockets: it goes there
+first for ore); the old test still finds the small ones.
+
+Sights (scripts/learn_sights.py -> assets/xen/taught/sights.json): the caves and the river are for seeing, not
+building. From each capture, 150 random 9 x 9 regions, each column from the top down: the first block that isn't air,
+a plant, leaves or a log, then the air under it (to 10) and its longest run. 8 numbers: share of water, ice or snow,
+sand or gravel, rock on top; the air under it and the tallest hollow (/10); how steep (mean step between neighbours
+/5, to 1); the height range (/16, to 1). A region is its capture's kind (cave entrance, cave, ravine, river, frozen
+river) only if it shows what makes it that (hollow > 0.25 for a cave, > 0.08 for an entrance, steep > 0.25 or range >
+0.5 for a ravine, water or ice > 0.25 for a river or a frozen one); else it's ground. Standardised (mean, std at least
+0.05), a centre per kind and its reach (9 in 10 of its regions, at least 1.5). 1184 regions, nearest centre right 70%
+(cave 96%, river 95%, frozen river 100%, ravine 59%, cave entrance 52%, ground 56%). Sights.look, every 160 ticks a Xen
+isn't fighting or building: clip 56 blocks along its look (blocks and fluids), the spot hit if 6 or more away, measured from 16
+above to 24 below; the nearest centre within reach and showing its kind names it (a river or a frozen one must also run on: water or ice at 4, 8 and 12 blocks out both
+ways along one of 4 lines, 2 up to 2 down, so a pond or a pool isn't one); a new one (none of that kind within
+48: Places.rememberAnother, "cave 2" not "cave entrance") is a place, a journal line ("sees") and 35% a chat line.
+
+Builder (creative flying): findRoute starts from every block the Xen's body is in (Mth.floor of its box, feet and the
+block over) that it fits in, not only its feet's block: hovering half in a window hole of its own wall, the hole could
+be shut on all sides (searched 1) though the room next to it was open, and it idled a block a half minute. No way and
+4 or fewer blocks searched: breakOut takes out a block of its own plan beside it (feet or head height, a glass first,
+with room above or below to go through), adds that step back at the end of what's left and goes on. Plans with no
+inside (garden, road, pool...) are fine in standSpots and the water check (an NPE made garden leaves fail).
+Perf (/xen perf): System.nanoTime round each Xen's tick (XenMod) and its parts (Companion: hands, walking, eyes,
+looking around, watching players, choosing, of which the Ex1 net, instincts and Walker.plan), summed over 30 s
+windows. 8 free survival Xens on 1.21.11: 12.3 ms a tick, 1.54 each; choosing 11.7, instincts 9.5, planning ways 8.7,
+eyes 0.17, hands 0.17, Ex1 0.15, walking 0.08.
+
+Builder: a grass block step is done with any dirt (grass under a block turns to dirt: it was put back again and
+again); a spot placed more than 4 times in a plan is left out ("it won't stay"). VillageHouses.plan: a build with no
+door block has its door where the door would be (on its front edge), not its middle. Chat.FIRST_PERSON: "you
+pictured/picture/imagined/planned" is "I ...".
 
 
 WHAT'S NEW IN 2.0.0-beta.18

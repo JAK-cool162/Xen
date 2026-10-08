@@ -1,0 +1,20 @@
+{
+ "windowAir": 150,
+ "rockShare": 0.95,
+ "pocketAir": 11,
+ "roofWithin": 19,
+ "caveSpots": 1790,
+ "otherSpots": 2296,
+ "caughtCaves": 0.75,
+ "falseCaves": 0.01,
+ "names": [
+  "cave entrance hills",
+  "cave entrance",
+  "ravine hills side open big",
+  "cave entrance",
+  "inside cave",
+  "ravine + river",
+  "surface cave snowy",
+  "sfrozen river"
+ ]
+}

@@ -251,6 +251,15 @@ final class Builder {
 	record Project(UUID owner, String name, Architect.Plan plan, String look) {}
 
 	static final Map<UUID, Project> PROJECTS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** A whole place it pictured (Imagined): the layout (kept to show), what's still to build of it after this, part by part. */
+	Imagined.Layout layout;
+	private record Queued(Architect.Plan plan, VillageHouses.House copied, String look) {}
+	private final java.util.ArrayDeque<Queued> layoutLeft = new java.util.ArrayDeque<>();
+	/** Building a part of its place (not its home); starting a plan (cancel then keeps the rest of the place). */
+	private boolean partOfPlace, beginning;
+	/** Picturing it (a look at where each part goes) till then; showing what it pictured to players near till then. */
+	private long imagineUntil, showUntil;
 	/** Whose build it's helping with (null: its own, or none). */
 	UUID helping;
 	private String helpingName = "";
@@ -321,6 +330,10 @@ final class Builder {
 			c.journal("build", "stops building its house at " + startedCorner.toShortString() + " (" + left.size() + " steps to go): it'll finish it later");
 		}
 		if (c.player != null) PROJECTS.remove(c.player.getUUID());
+		if (!beginning) {                                                       // (stopped: the rest of its place too)
+			layoutLeft.clear();
+			partOfPlace = false;
+		}
 		helping = null;
 		plan = null;
 		left.clear();
@@ -366,6 +379,7 @@ final class Builder {
 		BlockPos feet = c.player.blockPosition();
 		VillageHouses.House shown = Taught.find(what);                          // something it was shown, asked for by name
 		if (shown != null) return buildShown(level, shown, near, front, feet);
+		if (xen.mod.talk.Chat.PLACE.matcher(what).find()) return place(level, near, feet, true);   // a whole place, the way it pictures it
 		boolean base = what.contains("base") || what.contains("underground") || what.contains("bunker");
 		boolean mobs = what.contains("mob") || what.contains("grinder") || what.contains("xp");
 		boolean farm = !mobs && (what.contains("farm") || what.contains("crop") || what.contains("wheat"));
@@ -398,6 +412,10 @@ final class Builder {
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
 			String resumed = resume(level, near != null ? near : feet);           // a house it started and didn't finish: that one first
 			if (resumed != null) return resumed;
+			if (what.equals("home") && !starter && asked == null && near == null && wantsPlace()) {   // its own idea: a whole place, not just a house
+				String placed = place(level, null, feet, false);
+				if (placed != null) return placed;
+			}
 			// a village house it saw (asked for one, or its taste for copying says so: not for its very first house, which is what a few trees give)
 			boolean village = what.contains("village");
 			VillageHouses.House copy = village || !starter && asked == null && c.taste.copies()
@@ -434,6 +452,74 @@ final class Builder {
 		}
 		String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
 		return begin(made, of, p.name());
+	}
+
+	/** On its own idea, a whole place rather than a house: more in creative, and the more it likes what goes in one. */
+	private boolean wantsPlace() {
+		float like = Math.max(c.taste.placeLike("pool"), Math.max(c.taste.placeLike("seat"), c.taste.placeLike("wall")));
+		return random.nextFloat() < (creative ? 0.55f : 0.2f) + 0.25f * c.personality.diligence + 0.3f * like;
+	}
+
+	/**
+	 * A whole place of its own (Imagined): it pictures it first, with no template (its house, what it was shown round
+	 * it, a road from the way in to its door), then builds it part by part, the house first. Null (its own idea) or why
+	 * not (asked) when there's no room for it.
+	 */
+	private String place(ServerLevel level, BlockPos near, BlockPos feet, boolean asked) {
+		Architect.Palette p = palette(level, feet);
+		Taste.Design d0 = c.taste.design(false, creative, null, area(level, feet));
+		Taste.Design ds = new Taste.Design(d0.w(), d0.d(), d0.wallH(), d0.roof(), d0.ridgeAlongWidth(), d0.base(), d0.frame(), d0.lowerStone(), d0.shutters(),
+				d0.porch(), d0.chimney(), d0.bushes(), d0.loft(), false, false, d0.style(), false, false);   // (its yard, pond and garden: the place has its own)
+		int stage = stageFor(false);
+		if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
+			p = Architect.ofWood(p.name(), true, p.window().equals("glass_pane"));
+		String biome = VillageHouses.kindAt(level, feet);
+		Imagined.Layout l = Imagined.picture(c, level, near != null ? near : feet, creative, ds, p, stage, new Random(), biome);
+		if (l == null) return asked ? "You can't lay out a place here: there isn't flat dry ground enough for a house. Somewhere more open would work." : null;
+		String wood = woodType();
+		Imagined.Part h = l.house();
+		Architect.Plan house = h.shown() != null ? VillageHouses.plan(Taught.vary(h.shown(), h.corner()), h.corner(), h.front(), creative, wood)
+				: Architect.designed(h.corner(), h.front(), ds, p, new Random(h.corner().asLong()), stage);
+		List<Queued> after = new ArrayList<>();                                // (after the house and its furniture: its road, pool, seats, wall)
+		for (Architect.Plan pl : Imagined.plans(l, Taught.style(biome), creative, wood, biome, new Random())) after.add(new Queued(pl, null, pl.name()));
+		int total = (int) house.steps().stream().filter(st -> !st.dig()).count();
+		for (Queued q : after) total += (int) q.plan().steps().stream().filter(st -> !st.dig()).count();
+		String said = l.describe();
+		c.journal("build", "pictures a whole place of its own: " + said.replace("you were shown", "it was shown").replace("your own", "its own"));
+		c.journal("imagines", "its place (north up; H house, D door, # road, + path, P pool, S sitting area, W wall, G gate, X itself):\n" + l.map());
+		begin(house, "", h.shown() != null ? wood : p.name());
+		if (h.shown() != null) {
+			copied = h.shown();
+			started(h.corner(), h.front(), wood);
+		} else {
+			design = ds;
+			building = new Home(h.corner(), h.front(), ds, p, stage);
+			started(h.corner(), h.front(), null);
+		}
+		layout = l;
+		layoutLeft.addAll(after);
+		imagineUntil = now() + 20L * (2 + l.parts().size());
+		showUntil = now() + 20L * 60;
+		return "You will lay out a whole place here, just as you pictured it: " + said + (creative ? "" : ", out of " + wood + " wood and what you can make")
+				+ ". About " + total + " blocks in all, one at a time: the house first.";
+	}
+
+	/** Show what it pictured to the players near (for a while after it pictures it, and when asked: /xen layout). */
+	void showLayout() {
+		if (layout == null || c.player == null || now() > showUntil) return;
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (ServerPlayer p : level.players()) {
+			if (p instanceof XenPlayer || !p.blockPosition().closerThan(layout.center(), 112)) continue;
+			Imagined.show(p, level, layout);
+		}
+	}
+
+	/** Show it again for a while; what it pictured, in words (or that it has pictured nothing yet). */
+	String showLayoutAgain() {
+		if (layout == null) return c.name + " hasn't pictured a place yet (ask it to \"build a place\").";
+		showUntil = now() + 20L * 45;
+		return c.name + "'s place at " + layout.center().getX() + " " + layout.center().getZ() + ": " + layout.describe().replace("you were shown", "it was shown")
+				.replace("your own", "its own") + (layoutLeft.isEmpty() && !partOfPlace && plan == null ? " (built)" : " (" + (layoutLeft.size() + (plan != null ? 1 : 0)) + " parts to go)");
 	}
 
 	/** One of the things it was shown (see Taught): a pool, a bar, a road, a house, built where there's room for it. */
@@ -569,7 +655,9 @@ final class Builder {
 
 	/** Start on a plan (a house, a farm, a statue...): what it tells itself it will do. */
 	private String begin(Architect.Plan made, String of, String look) {
+		beginning = true;
 		cancel();
+		beginning = false;
 		modeBefore = c.mode;
 		prepared = creative;
 		plan = made;
@@ -577,9 +665,11 @@ final class Builder {
 		var box = new net.minecraft.world.phys.AABB(made.middle());
 		for (Architect.Step st : made.steps()) box = box.minmax(new net.minecraft.world.phys.AABB(st.pos()));
 		bounds = box.inflate(6);
+		brokeOut.clear();
 		notNow.clear();
 		skipped.clear();
 		tries.clear();
+		placedAt.clear();
 		scaffold.clear();
 		removingScaffold = false;
 		toldList = false;
@@ -745,8 +835,8 @@ final class Builder {
 			return !here.canBeReplaced();                                     // filling a hole: any ground will do
 		}
 		if (s.state().is(net.minecraft.world.level.block.Blocks.WATER)) return here.getFluidState().isSource();
-		if (s.state().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK) && s.phase() == Architect.SUPPORT) {
-			return here.is(net.minecraft.tags.BlockTags.DIRT);                 // (grass or dirt: grass grows back)
+		if (s.state().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)) {
+			return here.is(net.minecraft.tags.BlockTags.DIRT);                 // (grass or dirt: grass under a block turns to dirt, and grows back in the light)
 		}
 		return here.getBlock() == s.state().getBlock();
 	}
@@ -762,6 +852,14 @@ final class Builder {
 			c.mode = Companion.Mode.STAY;
 			c.anchor = plan.middle();
 			c.chatter("Back to building!", false);
+		}
+		if (now() < imagineUntil && layout != null && helping == null) {    // picturing it first: a look at where each part goes
+			List<Imagined.Part> parts = layout.parts();
+			Imagined.Part look = parts.get((int) (((imagineUntil - now()) / 20) % parts.size()));
+			c.hands.holdLook(Vec3.atCenterOf(look.middle()).add(0, 1, 0), 25);
+			doing = "picturing its place: the " + look.what() + " there";
+			c.goals.instant = doing;
+			return Action.IDLE;
 		}
 		if (c.crafter.hasOrder()) return null;                               // making what it needs first
 		if (!prepared && !creative) return prepare();                        // everything it needs, first
@@ -863,7 +961,9 @@ final class Builder {
 			plan = null;
 			return Action.IDLE;
 		}
-		boolean extra = furnishing;                                                // (the furniture in a house: not a home)
+		boolean wasPart = partOfPlace, placeGoesOn = !layoutLeft.isEmpty();
+		partOfPlace = false;
+		boolean extra = furnishing || wasPart;                                     // (the furniture in a house, a part of its place: not a home)
 		furnishing = false;
 		boolean shownThing = copied != null && copied.kind().equals("taught") && !what.matches(".*\\bhouse\\b.*");   // (a pool, a bar, a road it was shown)
 		boolean houseDone = !extra && !shownThing && plan.inside() != null
@@ -893,7 +993,15 @@ final class Builder {
 		BlockPos at = plan.middle();
 		c.lore(c.name + " built " + ("aeiou".indexOf(what.charAt(0)) >= 0 ? "an " : "a ") + what + " at " + at.getX() + " " + at.getZ()
 				+ (helpers.isEmpty() ? "" : ", with help from " + String.join(" and ", helpers)));
-		c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
+		if (placeGoesOn) {
+			c.journal("build", "finished the " + what + " of its place; " + layoutLeft.size() + " parts to go");
+		} else if (wasPart && layout != null) {                                    // the last of its place: all done
+			c.say(c.pick3("Done! Come see my place!", "Finished! The whole place is just how I pictured it.", "All done! Come have a look round my place."));
+			c.taste.placed(layout.chose(), layout.center());
+			c.lore(c.name + " finished laying out a place of its own at " + layout.center().getX() + " " + layout.center().getZ());
+		} else {
+			c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
+		}
 		switch (plan.name()) {
 			case "farm" -> c.goals.farm = plan.middle();
 			case "mob farm" -> c.goals.mobFarm = plan.middle();
@@ -905,7 +1013,7 @@ final class Builder {
 				if (!plan.name().startsWith("statue") && !extra && !shownThing) c.goals.home = plan.middle();   // a house or a base: home
 			}
 		}
-		c.antics.celebrate();
+		if (!placeGoesOn) c.antics.celebrate();
 		c.mode = modeBefore == Companion.Mode.FREE ? Companion.Mode.FREE : Companion.Mode.STAY;   // its own house: back to its life
 		c.anchor = plan.middle();
 		Architect.Plan done = plan;
@@ -921,6 +1029,14 @@ final class Builder {
 				modeBefore = after;
 				c.journal("build", "puts a " + f.name() + " in its house");
 			}
+		}
+		if (!furnishing && !layoutLeft.isEmpty()) {                               // the next part of its place
+			Queued q = layoutLeft.poll();
+			begin(q.plan(), "", q.look());
+			copied = q.copied();
+			partOfPlace = true;
+			modeBefore = after;
+			c.journal("build", "goes on with its place: the " + q.plan().name());
 		}
 		return Action.IDLE;
 	}
@@ -1196,7 +1312,7 @@ final class Builder {
 			double best = Double.MAX_VALUE;
 			for (BlockPos q : BlockPos.betweenClosed(feet.offset(-24, -6, -24), feet.offset(24, 4, 24))) {
 				var f = level.getFluidState(q);
-				if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || plan != null && plan.inside().contains(Vec3.atCenterOf(q))) continue;
+				if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || plan != null && plan.inside() != null && plan.inside().contains(Vec3.atCenterOf(q))) continue;
 				if (!level.getBlockState(q.above()).isAir()) continue;               // (open water it can see)
 				double d = q.distSqr(feet);
 				if (d < best) {
@@ -1219,11 +1335,15 @@ final class Builder {
 		return Action.PLACE;
 	}
 
+	/** How often it has put a block at each spot of this plan (one that won't stay is left out after a few: not put back for ever). */
+	private final Map<BlockPos, Integer> placedAt = new HashMap<>();
+
 	private void progress(boolean digging) {
 		lastProgress = now();
 		if (digging) dug++;
 		else {
 			placed++;
+			if (current != null && !current.dig() && placedAt.merge(current.pos(), 1, Integer::sum) > 4) skip(current.pos(), "it won't stay");
 			c.skills.practice(Skills.BUILD, 0.001f);
 		}
 		if ((placed + dug) % 60 == 0 && placed + dug > 0) {
@@ -1324,6 +1444,7 @@ final class Builder {
 				if (clearFlight(level, here, at)) spot = at;                  // straight there
 			}
 			if (spot == null) spot = nextOnRoute(level, s, spots);            // round the walls, in by the door, over the roof
+			if (spot == null && searched <= 4 && breakOut(level)) return Action.MINE;   // shut in by its own build: out through it
 			if (spot == null) {                                              // no way there (yet): something else first
 				if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} can't get to {} yet ({} spots, first {}, searched {} from {})", c.name, s.pos(), spots.size(),
 						spots.isEmpty() ? "-" : spots.get(0), searched, c.player.blockPosition());
@@ -1350,6 +1471,48 @@ final class Builder {
 			return c.walkTo(Vec3.atBottomCenterOf(spots.get(0)));
 		}
 		return climb(level, s);                                              // out of reach from the ground: a pillar
+	}
+
+	/** Blocks of the plan it took out to get out (put back last). */
+	private final Set<BlockPos> brokeOut = new HashSet<>();
+
+	/**
+	 * Shut in by what it built (its body in a hole of its own wall, no way out from there): like a player, it takes out
+	 * a block of its own build next to it (a window first) to get out, and puts it back at the end. False: nothing of its
+	 * own to take out there (or it did that here already).
+	 */
+	private boolean breakOut(ServerLevel level) {
+		BlockPos feet = c.player.blockPosition();
+		Map<BlockPos, Architect.Step> mine = new HashMap<>();
+		for (Architect.Step st : plan.steps()) if (!st.dig() && st.state() != null) mine.put(st.pos(), st);
+		BlockPos best = null;
+		int bestScore = Integer.MIN_VALUE;
+		for (int dy = 0; dy <= 1; dy++) {
+			for (Direction d : Direction.Plane.HORIZONTAL) {
+				BlockPos q = feet.above(dy).relative(d);
+				Architect.Step st = mine.get(q);
+				if (st == null || brokeOut.contains(q) || level.getBlockState(q).canBeReplaced()) continue;
+				BlockPos other = feet.above(1 - dy).relative(d);              // (the block over or under it, for its body to go through)
+				if (!passable(level, other) && mine.get(other) == null) continue;
+				String n = BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath();
+				int score = (n.contains("glass") ? 4 : 0) + (passable(level, other) ? 2 : 0) + (dy == 1 ? 1 : 0);
+				if (score > bestScore) {
+					bestScore = score;
+					best = q;
+				}
+			}
+		}
+		if (best == null) return false;
+		boolean ok = c.hands.mine(best);
+		if (!ok) return false;
+		c.acted = true;
+		if (level.getBlockState(best).canBeReplaced()) {
+			brokeOut.add(best);
+			left.add(mine.get(best));                                        // (back in at the end, from outside)
+			XenMod.LOG.info("{} was shut in by its own build: takes out {} at {} to get out", c.name, mine.get(best).state().getBlock(), best);
+		}
+		lastProgress = now();
+		return true;
 	}
 
 	private long excusedAt = -10000;
@@ -1391,7 +1554,7 @@ final class Builder {
 				for (int dy = -4; dy <= 2; dy++) {
 					BlockPos feet = t.offset(dx, dy, dz);
 					if (planned.contains(feet) || planned.contains(feet.above()) || feet.equals(t) || feet.above().equals(t)) continue;
-					if (s.phase() == Architect.ROOF && plan.inside().inflate(0.6).contains(Vec3.atCenterOf(feet))) continue;   // the roof: from outside
+					if (s.phase() == Architect.ROOF && plan.inside() != null && plan.inside().inflate(0.6).contains(Vec3.atCenterOf(feet))) continue;   // the roof: from outside
 					if (!passable(level, feet) || !passable(level, feet.above())) continue;
 					if (!creative && !solid(level, feet.below())) continue;
 					if (creative && !floats(level, feet)) continue;
@@ -1472,9 +1635,19 @@ final class Builder {
 		Map<BlockPos, BlockPos> came = new HashMap<>();
 		Map<BlockPos, Integer> cost = new HashMap<>();
 		java.util.PriorityQueue<Object[]> open = new java.util.PriorityQueue<>(java.util.Comparator.comparingInt(o -> (Integer) o[1]));
-		came.put(from, from);
-		cost.put(from, 0);
-		open.add(new Object[] {from, from.distManhattan(aim)});
+		// from each block its body is in (it can be half in a window hole and half in the room: one of them may be shut in)
+		var body = c.player.getBoundingBox().deflate(0.05);
+		List<BlockPos> starts = new ArrayList<>(List.of(from));
+		for (BlockPos q : BlockPos.betweenClosed(net.minecraft.util.Mth.floor(body.minX), net.minecraft.util.Mth.floor(body.minY), net.minecraft.util.Mth.floor(body.minZ),
+				net.minecraft.util.Mth.floor(body.maxX), net.minecraft.util.Mth.floor(body.minY) + 1,
+				net.minecraft.util.Mth.floor(body.maxZ))) {
+			if (!starts.contains(q) && floats(level, q)) starts.add(q.immutable());
+		}
+		for (BlockPos start : starts) {
+			came.put(start, start);
+			cost.put(start, 0);
+			open.add(new Object[] {start, start.distManhattan(aim)});
+		}
 		BlockPos found = null;
 		int expanded = 0;
 		while (!open.isEmpty() && expanded++ < 40000) {
@@ -1506,8 +1679,9 @@ final class Builder {
 		searched = came.size();
 		if (found == null) return null;
 		List<BlockPos> way = new ArrayList<>();
-		for (BlockPos at = found; !at.equals(from); at = came.get(at)) way.add(0, at);
-		way.add(0, from);
+		BlockPos at = found;
+		for (; !came.get(at).equals(at); at = came.get(at)) way.add(0, at);
+		way.add(0, at);                                                      // (the block of its body it set off from)
 		return way;
 	}
 

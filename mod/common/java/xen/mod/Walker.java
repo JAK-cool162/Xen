@@ -166,7 +166,9 @@ final class Walker {
 			}
 			bold();
 			Move was = path != null && index < path.size() ? path.get(index) : null;
+			long t0 = Perf.now();
 			path = plan((ServerLevel) p.level(), p.blockPosition(), to, want);
+			Perf.add("choosing: planning ways", t0);
 			index = 0;
 			stage = 0;
 			boolean same = was != null && path != null && !path.isEmpty() && path.get(0).from().equals(was.from()) && path.get(0).to().equals(was.to());

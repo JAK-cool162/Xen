@@ -470,17 +470,21 @@ public class XenMod implements ModInitializer {
 		if (s.getTickCount() % 40 == 0) chatModelNews();
 		if (s.getTickCount() % 20 == 0) avatar.tick();
 		if (s.getTickCount() % 8 == 0) BuildAxe.show(s);                       // (the Build Axe's box, for whoever holds one)
+		if (s.getTickCount() % 12 == 0) for (Companion c : companions) c.builder.showLayout();   // (a place a Xen pictured, for the players near)
 		arena.tick();
 		runLater();
 		gameplayLog.quietly(() -> gameplayLog.tick(s));
 		List<Companion> order = new ArrayList<>(companions);
 		java.util.Collections.shuffle(order, random);                  // nobody always gets to act first
+		Perf.tick(s.getTickCount());
 		for (Companion c : order) {
+			long t0 = Perf.now();
 			try {
 				c.tick();
 			} catch (Throwable e) {
 				LOG.warn("{} stumbled: {}", c.name, e.toString(), e);
 			}
+			Perf.xen(c.name, t0);
 		}
 		if (brain != null && System.currentTimeMillis() - lastSave > config.saveMinutes * 60_000L) {
 			lastSave = System.currentTimeMillis();
@@ -1028,6 +1032,13 @@ public class XenMod implements ModInitializer {
 						})))
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
+				.then(Commands.literal("layout").executes(ctx -> each(ctx, c -> c.builder.showLayoutAgain())))
+				.then(Commands.literal("perf").executes(ctx -> {                    // where the server's time goes for the Xens
+					String out = Perf.report();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					LOG.info("xen perf: {}", out.replace('\n', ' '));
+					return 1;
+				}))
 				.then(Commands.literal("knows").executes(ctx -> each(ctx, c -> c.knowledge.status())))
 
 				.then(Commands.literal("tribes").executes(ctx -> {

@@ -284,12 +284,18 @@ public final class Companion {
 		crew.tick();
 		lifeTicks++;
 		genTicks++;
+		long t0 = Perf.now();
 		hands.tick();
+		Perf.add("hands", t0);
+		t0 = Perf.now();
 		walker.tick();                                                  // on its way somewhere: the keys for the next step
+		Perf.add("walking", t0);
 		rider.tick();                                                   // in a boat or on a horse: steering
 		habits.tick();                                                  // its first look around (eyes on things), frustration fading
 		pace.tick();                                                    // a tool that just broke; its eyes on its hands
+		t0 = Perf.now();
 		eyes.tick();                                                    // a yes or no for every block it can see
+		Perf.add("eyes", t0);
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
 		if (player.tickCount % 20 == 7) noticeSheep();                  // (where the sheep were: for wool, for a bed)
@@ -297,14 +303,17 @@ public final class Companion {
 			float fade = 0.02f + 0.05f * personality.kindness - 0.02f * personality.sin(xen.mod.core.Sins.WRATH);
 			if (fade > 0) trust.replaceAll((k, v) -> v < 0 ? Math.min(0f, v + fade) : v);
 		}
+		t0 = Perf.now();
 		if (player.tickCount % 10 == 0) {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			places.tick();                                               // the way it walked, remembered
 			totems();
 			rumors.look();                                               // who's that? (a shock, a warning to pass on)
 			caves.scan();                                                // a cave in sight?
+			Sights.look(this);                                           // what's that over there? (a ravine, a river: it was shown)
 			structures.look();                                           // a village, a mineshaft, a temple?
 		}
+		Perf.add("looking around", t0);
 		skills.checkSpar();
 		life.tick();                                                    // a nod, a shake of the head, a wave; a new day
 		if (player.tickCount % 1200 == 600) {
@@ -336,10 +345,12 @@ public final class Companion {
 			wearArmor();
 			hands.shieldToOffhand(fighting);                             // a shield lives in the off hand
 		}
+		t0 = Perf.now();
 		mimic.watch();                                                  // what are the players it sees doing?
 		solver.watch();                                                 // and how they get out of holes
 		antics.watch();
 		reactions.look();                                               // someone new in view? (it reacts, in its own way)
+		Perf.add("watching players", t0);
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
 		if (tactics.pearlTick()) return;                               // flung, or off the edge: an ender pearl
@@ -358,7 +369,9 @@ public final class Companion {
 		if (player.tickCount % 40 == 0) watched = watchedByAPlayer();
 		int every = Math.max(1, mod.config.decisionTicks / 5) * (watched || inArena || hurtNow ? 1 : 3);   // far from any player: it thinks less often
 		if (++decisions % every != 0 && !fighting) return;   // in a fight, every tick
+		t0 = Perf.now();
 		decide();
+		Perf.add("choosing", t0);
 	}
 
 	private Perception.Body body() {
@@ -418,7 +431,9 @@ public final class Companion {
 			ex1Recent.clear();
 		}
 		if (++ex1Ticks % 2 != 0) return;
+		long tEx = Perf.now();
 		ex1Out = ex1.run(Ex1Senses.sense(this));
+		Perf.add("choosing: Ex1 net", tEx);
 		ex1Recent.addLast(ex1Out);
 		if (ex1Recent.size() > 5) {
 			var old = ex1Recent.removeFirst();                              // (two and a half seconds on, nothing hurt: that moment was safe)
@@ -461,7 +476,9 @@ public final class Companion {
 		if (!inArena) goals.everyDecision();
 		perceived = next;
 		ex1Step(Math.max(0f, lastHealthBefore - player.getHealth()));
+		long tIn = Perf.now();
 		Action instinct = instinct();
+		Perf.add("choosing: instincts (building, chores, ways)", tIn);
 		Brain.Thought thought = mod.brain.decide(next, emotions, mod.config.learn);
 		Action sensible = instinct == null ? sensible(Action.values()[thought.action]) : null;
 		if (sensible != null && sensible.ordinal() == thought.action) sensible = null;
