@@ -1,7 +1,28 @@
-**Xen Companion 2.0.0-beta.17**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.18**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.18: see the Build Axe's box, Xens pick up what they mine, bored fidgets
+
+* **The Build Axe's box, in the world:** while you hold the axe, the box shows as gold dust along its edges (seen from
+  far off), the blocks you left out are marked in red, and its size is above the hotbar ("5 x 5 x 4, left out: 1").
+  After the first hit, a cyan box goes from that corner to wherever you look, with its size, so you see how big it
+  will be before the second hit (red when it's too big).
+* **Fixed:** hitting the block that was the last corner did nothing (it now starts a new box); a right-click on a far
+  block also brought the screen back up (the game repeats a held click: one click is one use now).
+* **Xens pick up what they mine:** everything, not only ore and wood (the cobblestone from digging too), walking over
+  to it when there's room in the bag; after chopping a tree, the saplings, sticks and apples its leaves drop for a few
+  minutes after.
+* **Bored fidgets:** a Xen with nothing to do for a while fidgets like a player: a jiggle side to side (often
+  crouching, at you), a hop, a few crouches, a look all around, punching the air, flicking through its hotbar, a spin.
+  Silly ones sooner and more, grumpy ones hardly; never in danger or with a job to do.
+* **Its own version of what it was shown, not a copy:** a taught build comes out in its own wood (in creative, the
+  wood it likes) and at some places the other way round (mirrored). The same place always gets the same version.
+* Tested in the game: a Xen chopped a tree and dug 20 stone with nothing left lying on the ground; a silly Xen standing
+  about looked around, hopped, jiggled and spun; in a real game client the axe drew the cyan box with its size, then
+  the gold box (5 x 5 x 4) with the left-out glowstone in red; a Xen built the couch it was shown as shown in birch and
+  the pool it was shown mirrored in birch.
 
 ### 2.0.0-beta.17: Xens know what they were shown
 

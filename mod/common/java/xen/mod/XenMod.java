@@ -170,6 +170,7 @@ public class XenMod implements ModInitializer {
 		net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, be) -> {
 			gameplayLog.quietly(() -> gameplayLog.broke(player, pos, state));
 			watchedBreak(player, pos, state);
+			if (player instanceof XenPlayer xp && xp.companion != null) xp.companion.broke(pos, state.is(net.minecraft.tags.BlockTags.LOGS));   // (what it mines, it picks up)
 		});
 		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
 			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.swing(player, entity));
@@ -468,6 +469,7 @@ public class XenMod implements ModInitializer {
 		}
 		if (s.getTickCount() % 40 == 0) chatModelNews();
 		if (s.getTickCount() % 20 == 0) avatar.tick();
+		if (s.getTickCount() % 8 == 0) BuildAxe.show(s);                       // (the Build Axe's box, for whoever holds one)
 		arena.tick();
 		runLater();
 		gameplayLog.quietly(() -> gameplayLog.tick(s));

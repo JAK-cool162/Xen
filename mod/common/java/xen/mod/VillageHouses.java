@@ -322,6 +322,19 @@ final class VillageHouses {
 
 	private static final String[] WOODS = {"dark_oak", "pale_oak", "oak", "spruce", "birch", "jungle", "acacia", "mangrove", "cherry", "bamboo", "crimson", "warped"};
 
+	/** Only the wood: its own kind instead (a build it was shown, in creative: its own version, not a copy). */
+	static String adaptWood(String n, String wood) {
+		for (String w : WOODS) {
+			if (n.startsWith(w + "_")) {
+				String rest = n.substring(w.length());
+				if (rest.equals("_log") || rest.equals("_planks") || rest.equals("_stairs") || rest.equals("_slab") || rest.equals("_fence") || rest.equals("_door")
+						|| rest.equals("_trapdoor") || rest.equals("_fence_gate") || rest.equals("_pressure_plate") || rest.equals("_button") || rest.equals("_wood")) return wood + rest;
+				break;
+			}
+		}
+		return n;
+	}
+
 	/**
 	 * In survival: a block of the house as it can make it, the way a player copies a house with what they have: its own
 	 * wood for any wood; stone for the sandstone, the bricks and smooth stone (cobblestone and its stairs and slabs);
@@ -394,7 +407,7 @@ final class VillageHouses {
 				if (b.y() >= doorY) steps.add(new Architect.Step(p, null, Architect.DIG, false));
 				continue;
 			}
-			String n = creative ? b.name() : adapt(b.name(), wood);
+			String n = creative ? (h.kind().equals("taught") ? adaptWood(b.name(), wood) : b.name()) : adapt(b.name(), wood);
 			BlockState st = Architect.state(n + (b.props().isEmpty() ? "" : "[" + b.props() + "]"));
 			if (st == null) continue;
 			st = st.rotate(r);

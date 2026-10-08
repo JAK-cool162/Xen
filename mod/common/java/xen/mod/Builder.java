@@ -408,7 +408,7 @@ final class Builder {
 				BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, fp[0] + 1, fp[1] + 1);
 				if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 				String wood = woodType();
-				made = VillageHouses.plan(copy, corner, front, creative, wood);
+				made = VillageHouses.plan(Taught.vary(copy, corner), corner, front, creative, wood);
 				boolean taught = copy.kind().equals("taught");
 				c.journal("build", taught ? "builds the " + copy.name() + " it was shown" : "copies a village house it saw: a " + copy.name());
 				String planned = begin(made, (creative ? "" : " out of " + wood + " wood and cobblestone")
@@ -442,8 +442,11 @@ final class Builder {
 		BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, fp[0] + 1, fp[1] + 1);
 		if (corner == null) return "You can't build the " + h.name() + " here: there isn't flat dry ground enough for it. Somewhere more open would work.";
 		String wood = woodType();
-		Architect.Plan made = VillageHouses.plan(h, corner, front, creative, wood);
-		c.journal("build", "builds the " + h.name() + " it was shown");
+		VillageHouses.House own = Taught.vary(h, corner);
+		Architect.Plan made = VillageHouses.plan(own, corner, front, creative, wood);   // (its own version: its wood, maybe the other way round)
+		String how = (own != h ? "the other way round" : "the way it was shown") + ", in " + wood.replace('_', ' ');
+		c.journal("build", "builds the " + h.name() + " it was shown, its own way: " + how);
+		XenMod.LOG.info("{} builds its own {}: {}", c.name, h.name(), how);
 		String planned = begin(made, (creative ? "" : " out of what you have and can make") + " (the " + h.name() + " it was shown)", wood);
 		copied = h;
 		if (h.name().matches(".*\\bhouse\\b.*")) started(corner, front, wood);       // (a house: kept if it stops half way)
@@ -496,7 +499,7 @@ final class Builder {
 				return null;
 			}
 			String wood = u.wood() != null ? u.wood() : woodType();
-			made = keepWhatsThere(VillageHouses.plan(h, u.corner(), u.front(), creative, wood));
+			made = keepWhatsThere(VillageHouses.plan(Taught.vary(h, u.corner()), u.corner(), u.front(), creative, wood));
 			of = h.kind().equals("taught") ? " (the " + h.name() + " it was shown)" : " (a copy of a " + h.name() + ")";
 			String planned = begin(made, of, wood);
 			copied = h;
@@ -714,7 +717,13 @@ final class Builder {
 			else if (n.endsWith("_log") && !n.startsWith("stripped_")) w = n.substring(0, n.length() - 4);
 			if (w != null) woods.merge(w, s.getCount() * (n.endsWith("_log") ? 4 : 1), Integer::sum);
 		}
-		return woods.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("oak");
+		return woods.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(creative ? likedWood() : "oak");
+	}
+
+	/** In creative, with no wood on it: the wood it likes (its own taste, the same every time). */
+	private String likedWood() {
+		String[] w = {"oak", "spruce", "birch", "dark_oak", "cherry", "acacia", "jungle", "mangrove", "pale_oak"};
+		return w[Math.floorMod(c.name.hashCode() * 31 + 7, w.length)];
 	}
 
 	private int count(java.util.function.Predicate<String> which) {

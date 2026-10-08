@@ -75,6 +75,8 @@ public final class BuildAxe {
 	private static final class Box {
 		BlockPos a, b;
 		ServerLevel level;
+		/** When it was last hit (holding the button down hits the same block again and again: that's not a new corner). */
+		long hitAt = -100;
 		String kind = "build";
 		final java.util.Set<Long> out = new java.util.HashSet<>();
 		final java.util.Set<String> outKinds = new java.util.TreeSet<>();
@@ -222,7 +224,14 @@ public final class BuildAxe {
 		}
 		Box box = boxes.computeIfAbsent(p.getUUID(), k -> new Box());
 		BlockPos at = pos.immutable();
-		if (box.level == level && (at.equals(box.b) || box.b == null && at.equals(box.a))) return;   // (the same block again: holding the button)
+		long now = level.getGameTime();
+		boolean same = box.level == level && (at.equals(box.b) || box.b == null && at.equals(box.a));
+		if (same && now - box.hitAt < 10) {                                         // (the same block again right away: holding the button)
+			box.hitAt = now;
+			return;
+		}
+		box.hitAt = now;
+		if (box.level == level && box.b == null && at.equals(box.a)) return;           // (corner 1 again: still corner 1)
 		boolean first = box.a == null || box.b != null || box.level != level;
 		if (first && (box.b != null || box.level != level)) {                       // (a box done: a new one, nothing left out yet)
 			box.out.clear();
@@ -263,6 +272,75 @@ public final class BuildAxe {
 		int blocks = box.out.size();
 		String all = box.outKinds.isEmpty() ? "" : "; every " + String.join(", ", box.outKinds);
 		p.sendSystemMessage(Component.literal("[Xen] " + said + " Left out: " + blocks + (blocks == 1 ? " block" : " blocks") + all + ".").withStyle(ChatFormatting.GOLD));
+	}
+
+	// ------------------------------------------------------------------------------ the box, as the holder sees it
+	/** Gold: the box marked; cyan: corner 1 to the block looked at (not marked yet); red: a block left out (or too big). */
+	private static final int GOLD = 0xFFAA00, PALE = 0x33DDFF, RED = 0xFF3030;
+
+	/**
+	 * Every few ticks, for each player holding the axe: the box drawn in the world (its 12 edges in dust, seen from far
+	 * off), with only one corner a box to wherever it looks (so its size shows before the second hit), the blocks it
+	 * leaves out in red, and the size above the hotbar. Only the holder sees it.
+	 */
+	static void show(net.minecraft.server.MinecraftServer s) {
+		for (ServerPlayer p : s.getPlayerList().getPlayers()) {
+			Box box = boxes.get(p.getUUID());
+			if (box == null || box.a == null || box.level != p.level() || !holding(p)) continue;
+			BlockPos b = box.b;
+			boolean marked = b != null;
+			if (!marked) {
+				var eye = p.getEyePosition();
+				var hit = box.level.clip(new net.minecraft.world.level.ClipContext(eye, eye.add(p.getLookAngle().scale(REACH)),
+						net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+				b = hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK ? hit.getBlockPos() : box.a;
+			}
+			Box shown = new Box();
+			shown.a = box.a;
+			shown.b = b;
+			outline(p, box.level, box.a, b, marked ? GOLD : PALE, fits(shown));
+			if (marked) {
+				int red = 0;
+				var dust = new net.minecraft.core.particles.DustParticleOptions(RED, 1.0f);
+				for (long k : box.out) {                                         // (its corners and edges, just outside it: a block's middle is out of sight)
+					BlockPos q = BlockPos.of(k);
+					if (!inside(box, q) || red++ >= 30) continue;
+					for (int i = 0; i < 27; i++) {
+						int ix = i % 3, iy = i / 3 % 3, iz = i / 9;
+						if ((ix == 1 ? 1 : 0) + (iy == 1 ? 1 : 0) + (iz == 1 ? 1 : 0) > 1) continue;   // (8 corners, 12 edge middles)
+						box.level.sendParticles(p, dust, true, true, q.getX() - 0.04 + 0.54 * ix, q.getY() - 0.04 + 0.54 * iy, q.getZ() - 0.04 + 0.54 * iz,
+								1, 0, 0, 0, 0);
+					}
+				}
+			}
+			String left = box.out.isEmpty() && box.outKinds.isEmpty() ? "" : ", left out: " + box.out.size() + (box.outKinds.isEmpty() ? "" : " + every " + String.join(", ", box.outKinds));
+			String what = marked ? size(shown) + (fits(shown) ? left : "  too big") : b.equals(box.a) ? "corner 1: hit another block" : size(shown) + (fits(shown) ? "  (hit to mark)" : "  too big");
+			p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket(Component.literal(what)
+					.withStyle(!fits(shown) ? ChatFormatting.RED : marked ? ChatFormatting.GOLD : ChatFormatting.YELLOW)));
+		}
+	}
+
+	/** A box's 12 edges, from block a to block b (both in it), in dust: denser on a small box, bigger specks on a big one. */
+	private static void outline(ServerPlayer p, ServerLevel level, BlockPos a, BlockPos b, int color, boolean fits) {
+		double x0 = Math.min(a.getX(), b.getX()), y0 = Math.min(a.getY(), b.getY()), z0 = Math.min(a.getZ(), b.getZ());
+		double x1 = Math.max(a.getX(), b.getX()) + 1, y1 = Math.max(a.getY(), b.getY()) + 1, z1 = Math.max(a.getZ(), b.getZ()) + 1;
+		double longest = Math.max(x1 - x0, Math.max(y1 - y0, z1 - z0));
+		var dust = new net.minecraft.core.particles.DustParticleOptions(fits ? color : RED, (float) Math.max(1.5, Math.min(4.0, longest / 16)));
+		double[][] ends = {{x0, y0, z0}, {x1, y1, z1}};
+		for (int axis = 0; axis < 3; axis++) {
+			for (int i = 0; i < 4; i++) {                                           // (the 4 edges along this axis)
+				double[] from = new double[3];
+				int o1 = (axis + 1) % 3, o2 = (axis + 2) % 3;
+				from[o1] = ends[i & 1][o1];
+				from[o2] = ends[(i >> 1) & 1][o2];
+				double len = ends[1][axis] - ends[0][axis];
+				int n = (int) Math.max(2, Math.min(28, Math.ceil(len * 2)));
+				for (int k = 0; k <= n; k++) {
+					from[axis] = ends[0][axis] + len * k / n;
+					level.sendParticles(p, dust, true, true, from[0], from[1], from[2], 1, 0, 0, 0, 0);
+				}
+			}
+		}
 	}
 
 	private static String size(Box b) {

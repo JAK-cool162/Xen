@@ -32,6 +32,10 @@ public class XenClient implements ClientModInitializer {
 			net.minecraft.core.BlockPos pos, int which) {
 		if (!level.isClientSide() || !xen.mod.BuildAxe.holding(player)
 				|| !net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(xen.mod.BuildAxe.Corner.TYPE)) return net.minecraft.world.InteractionResult.PASS;
+		long now = level.getGameTime();
+		if (which == 1 ? now - farHitAt < 6 : now - farUseAt < 6) {             // (the game's own repeat of a click held down: {@link #axeFar} took it already)
+			return which == 1 ? net.minecraft.world.InteractionResult.SUCCESS : net.minecraft.world.InteractionResult.FAIL;
+		}
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(new xen.mod.BuildAxe.Corner(pos.immutable(), which));
 		// (a hit held back with SUCCESS sends nothing more; a right-click with SUCCESS still goes to the server as a use,
 		// and the server would take it again: a block left out, then put back. FAIL holds it back and sends nothing.)
@@ -43,14 +47,22 @@ public class XenClient implements ClientModInitializer {
 	 * takes them and looks along where the player looks for the first block. A hit marks a corner; a right-click leaves
 	 * that block out, or into the sky brings the screen back. (Without this, a hand's reach of about five blocks.)
 	 */
+	/** When the axe's last click (a hit, a use) was taken, kept while the button stays down. */
+	private static long farHitAt = -100, farUseAt = -100;
+
 	private static void axeFar(net.minecraft.client.Minecraft client) {
 		var player = client.player;
 		if (player == null || client.level == null || Screens.current(client) != null || !xen.mod.BuildAxe.holding(player)
 				|| !net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(xen.mod.BuildAxe.Corner.TYPE)) return;
+		long now = client.level.getGameTime();
+		if (client.options.keyUse.isDown() && now - farUseAt < 6) farUseAt = now;     // (held down: the game repeats it every few ticks; one click is one use)
+		if (client.options.keyAttack.isDown() && now - farHitAt < 6) farHitAt = now;
 		boolean hit = false, use = false;
 		while (client.options.keyAttack.consumeClick()) hit = true;
 		while (client.options.keyUse.consumeClick()) use = true;
 		if (!hit && !use) return;
+		if (hit) farHitAt = now;
+		if (use) farUseAt = now;
 		net.minecraft.world.phys.Vec3 eye = player.getEyePosition(), end = eye.add(player.getViewVector(1f).scale(xen.mod.BuildAxe.REACH));
 		var aim = client.level.clip(new net.minecraft.world.level.ClipContext(eye, end, net.minecraft.world.level.ClipContext.Block.OUTLINE,
 				net.minecraft.world.level.ClipContext.Fluid.NONE, player));

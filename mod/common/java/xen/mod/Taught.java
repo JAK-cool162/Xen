@@ -148,6 +148,27 @@ public final class Taught {
 		return VillageHouses.house("taught/" + p.name(), "taught", p.blocks(), p.sx(), p.sy(), p.sz(), true);
 	}
 
+	/**
+	 * Its own version of a build it was shown, not a copy: at some sites the other way round (mirrored: left is right),
+	 * always the same at the same site (so a house it comes back to finish is the same house). Its wood is its own too
+	 * (see VillageHouses.adaptWood).
+	 */
+	static VillageHouses.House vary(VillageHouses.House h, BlockPos corner) {
+		if (h == null || !h.kind().equals("taught") || ((corner.asLong() * 31 + h.name().hashCode()) & 2) == 0) return h;
+		List<VillageHouses.Block> out = new ArrayList<>();
+		for (VillageHouses.Block b : h.blocks()) {
+			String props = b.props();
+			BlockState st = b.name().equals("air") ? null : Architect.state(b.name() + (props.isEmpty() ? "" : "[" + props + "]"));
+			if (st != null) {
+				String t = st.mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK).toString();   // Block{minecraft:oak_stairs}[facing=west,...]
+				int i = t.indexOf("}["), j = t.lastIndexOf(']');
+				props = i < 0 || j <= i ? "" : t.substring(i + 2, j);
+			}
+			out.add(new VillageHouses.Block(h.sx() - 1 - b.x(), b.y(), b.z(), b.name(), props));
+		}
+		return VillageHouses.house(h.id(), h.kind(), out, h.sx(), h.sy(), h.sz(), true);
+	}
+
 	/** The name of a thing it was shown that the words ask for ("build a pool", "make the 2 story house"), else null. */
 	public static String nameIn(String words) {
 		String w = words.toLowerCase(Locale.ROOT), best = null;

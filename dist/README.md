@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.17
+# Xen Companion (Fabric mod) 2.0.0-beta.18
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.17+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.17+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.17+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.17+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.18+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.18+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.18+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.18+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.17+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.18+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -461,7 +461,10 @@ slow a server away. Turn **Redstone** off to disable it.
   down next to one and it dances along (Xens nearby join in); now and then it
   shows off a trick ("Watch this!": a sprint, a jump and a spin) that doesn't
   always work ("I meant to do that."); in a fight it may take a snack break in
-  front of a foe that's nearly beaten, taunt it, or fake a retreat. Silly and
+  front of a foe that's nearly beaten, taunt it, or fake a retreat. Standing
+  about with nothing to do for a while, it fidgets like a bored player: a
+  jiggle side to side (often crouching, at you), a hop, a few crouches, a look
+  all around, punching the air, flicking through its hotbar, a spin. Silly and
   cheerful Xens do it most, grumpy ones least; never in danger.
 
 ## Experimental: custom instructions and your own script
@@ -636,7 +639,7 @@ chat with it, it knows them):
 Your requests always come first. Turn short goals off with **Own goals**
 (`wants`).
 
-## What Xens were shown (2.0.0-beta.17)
+## What Xens were shown (2.0.0-beta.17, its own way 2.0.0-beta.18)
 
 Xens were trained on builds made and marked with the Build Axe: two houses (a house and a 2 story house), furniture
 (two couches, a counter, a table, a bar, a hanging light), and things round a house (a pool, a road, an entrance, a
@@ -646,11 +649,14 @@ wall with outdoor decorations, a glass wall, a staircase). Every Xen knows them:
 * The houses are among the houses a Xen may build on its own (when it likes copying what it has seen).
 * When a Xen finishes a house, it puts in a piece of that furniture if one fits inside (in survival, if it has most
   of the blocks).
+* It builds its own version, not a copy: in its own wood (the wood it has, or in creative the wood it likes), and at
+  some places the other way round (mirrored, left for right). The same place always gets the same version, so a house
+  it comes back to finish is the same house.
 
 The ground they were marked on (the grass and dirt under them) isn't part of them: they go on the ground where
 they're built.
 
-## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15)
+## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15, the box in the world 2.0.0-beta.18)
 
 A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe:
 
@@ -659,6 +665,9 @@ A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe:
 * **Right-click** a block: leave it out (it's saved as air: the grass round a tree, a torch you placed). Right-click it
   again to put it back. **Crouch and right-click**: leave out every block of that kind in the box.
 * **Right-click the air**: the screen again.
+* **See the box** while you hold the axe: its edges in gold dust (seen from far off), the blocks you left out marked
+  in red, and its size above the hotbar ("12 x 6 x 9, left out: 3"). With one corner hit, a cyan box goes from it to
+  the block you're looking at, with its size, so you see how big it will be before the second hit. Red: too big.
 
 The screen shows the box's size and what's left out, its type (tap Build, Tree or Cave, or type your own: house, farm,
 bridge...), its name (a must), and Save or Cancel. (With Xen only on the server and not in your game, there's no
@@ -668,6 +677,12 @@ a palette of the blocks in it (with their states) and one palette index per bloc
 and how dark it is and how far under the surface. Up to 256 blocks a side and 4,194,304 blocks in all (256 x 64 x
 256: a village). The axe never breaks or strips anything, and
 nothing about you or where it was is kept. Xens don't learn from it in the game: it's data for training them.
+
+## Picking up what it mined, fidgeting (2.0.0-beta.18)
+
+Whatever a Xen mines, it walks over and picks up (when there's room in its bag): the cobblestone and dirt from
+digging too, not only ore and wood. After chopping a tree it keeps an eye on it for a few minutes and picks up the
+saplings, sticks and apples its leaves drop. Standing about with nothing to do, it fidgets (see Antics).
 
 ## Mining like a player (2.0.0-beta.13)
 

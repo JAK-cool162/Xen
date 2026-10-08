@@ -263,6 +263,105 @@ final class Antics {
 		}
 	}
 
+	// ------------------------------------------------------------------------------- fidgets
+	/** A fidget going on (a jiggle, a hop, crouches, a look about, punching the air, its hotbar, a spin), its step and length, and the slot it held. */
+	private String fidget = "";
+	private int fidgetStep, fidgetLength, slotBefore = -1;
+	private boolean fidgetWatches;
+	/** The last idle moment, since when it's had nothing to do, and when it may fidget again. */
+	private long idleSeen = -1000, idleFrom, fidgetAgain;
+
+	/**
+	 * Standing about with nothing to do for a while: what a player does then. Nobody stands like a statue: they jiggle
+	 * side to side (at a friend, often crouching), hop about, crouch a few times, look all around, punch the air, flick
+	 * through their hotbar, spin. Which and how soon is its own: playful and bored ones sooner and more, grumpy ones
+	 * hardly; never in danger, in water, in a boat or with something in hand. Null: not now (it just looks about).
+	 */
+	Action fidget(ServerPlayer near) {
+		var p = c.player;
+		long now = now();
+		if (now - idleSeen > 30) {                                            // (something else in between: a new stretch of standing about)
+			idleFrom = now;
+			if (!fidget.isEmpty()) endFidget();
+		}
+		idleSeen = now;
+		if (!c.mod.config.antics || c.inArena || busy() || p.isPassenger() || p.isInWater() || p.isSleeping() || p.isUsingItem()
+				|| c.emotions.fear > 0.4f || c.waving()) {
+			if (!fidget.isEmpty()) endFidget();
+			return null;
+		}
+		if (fidget.isEmpty()) {
+			float play = playful(), bored = c.whims.boredom;
+			long wait = (long) (20 * (5 + 15 * (1 - play)) * (1.2f - 0.6f * bored));   // 5 s (silly, bored) to 20 s (grumpy) of standing about first
+			if (now - idleFrom < wait || now < fidgetAgain || !p.onGround()) return null;
+			fidgetAgain = now + (long) (20 * (9 + 24 * (1 - play)) * (0.6f + 0.8f * random.nextFloat()));
+			if (random.nextFloat() > 0.3f + 0.6f * play + 0.3f * bored) return null;   // not in the mood: it just stands there
+			String[] kinds = near != null ? new String[] {"jiggle", "jiggle", "crouch", "hop", "swing", "hotbar", "look"}
+					: new String[] {"jiggle", "hop", "look", "look", "swing", "hotbar", "spin"};
+			fidget = kinds[random.nextInt(kinds.length)];
+			fidgetStep = 0;
+			fidgetLength = switch (fidget) {
+				case "jiggle" -> 6 + random.nextInt(7);
+				case "crouch" -> 5 + random.nextInt(2);                         // (3 crouches at most: 4 is a hello, to another Xen)
+				case "hop" -> 2 * (1 + random.nextInt(3));
+				case "spin" -> 4;
+				case "hotbar" -> 4 + random.nextInt(6);
+				default -> 4 + random.nextInt(5);
+			};
+			slotBefore = p.getInventory().getSelectedSlot();
+			fidgetWatches = near != null && (fidget.equals("jiggle") || fidget.equals("crouch"));
+			if (fidgetWatches) c.hands.watching = near;
+			if (fidget.equals("jiggle") && random.nextBoolean()) p.setShiftKeyDown(true);   // (a crouch-jiggle, like players do at a friend)
+			if (Mimic.DEBUG || c.mod.config.journal) c.journal("does", "fidgets (" + fidget + "): nothing to do");
+		}
+		if (fidgetStep >= fidgetLength) return endFidget();
+		int k = fidgetStep++;
+		c.goals.instant = "fidgeting";
+		switch (fidget) {
+			case "jiggle" -> {
+				return k % 2 == 0 ? Action.LEFT : Action.RIGHT;
+			}
+			case "crouch" -> {
+				p.setShiftKeyDown(k % 2 == 0);
+				return Action.IDLE;
+			}
+			case "hop" -> {
+				return k % 2 == 0 && p.onGround() ? Action.JUMP : Action.BACK;
+			}
+			case "spin" -> {
+				c.hands.glance = null;
+				return Action.TURN_LEFT;
+			}
+			case "swing" -> {
+				c.hands.glance = p.getEyePosition().add(p.getLookAngle().multiply(1, 0, 1).normalize().scale(3)).add(0, -1.2, 0);   // (at the ground: never at someone)
+				Compat.swing(p);
+				return Action.IDLE;
+			}
+			case "hotbar" -> {
+				int slot = Math.floorMod(p.getInventory().getSelectedSlot() + (random.nextInt(4) == 0 ? -1 : 1), 9);
+				p.getInventory().setSelectedSlot(slot);
+				return Action.IDLE;
+			}
+			default -> {                                                         // a look all about: up, down, behind
+				double a = Math.toRadians(p.getYRot() + (random.nextFloat() - 0.5f) * 300f);
+				c.hands.glance = p.getEyePosition().add(-Math.sin(a) * 6, (random.nextFloat() - 0.45f) * 9, Math.cos(a) * 6);
+				return Action.IDLE;
+			}
+		}
+	}
+
+	/** A fidget done (or cut short): standing up, the slot it held, its eyes its own again. */
+	private Action endFidget() {
+		var p = c.player;
+		if (fidget.equals("crouch") || fidget.equals("jiggle")) p.setShiftKeyDown(false);
+		if (fidget.equals("hotbar") && slotBefore >= 0) p.getInventory().setSelectedSlot(slotBefore);
+		if (fidgetWatches) c.hands.watching = null;
+		fidget = "";
+		fidgetWatches = false;
+		slotBefore = -1;
+		return null;
+	}
+
 	// ------------------------------------------------------------------------------- fights
 	/**
 	 * A surprise in a fight, or null: a snack in front of a foe that's nearly beaten, a crouch taunt, or a fake

@@ -1,7 +1,42 @@
-XEN COMPANION 2.0.0-beta.17: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.18: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.18
+===========================
+
+Build Axe: BuildAxe.show (XenMod.tickWorld, every 8 ticks) for each player holding the axe whose Box is in its level:
+the 12 edges in DustParticleOptions (ServerLevel.sendParticles to that player only, force and always shown: seen from
+far off), 2 to 28 specks an edge, scale 1.5 to 4 by size; gold for the box, cyan from corner 1 to the block looked at
+(a server clip along the look, REACH, OUTLINE, no fluids), red when it doesn't fit; the left-out blocks (Box.out, 30
+at most) as red specks on their corners and edge middles just outside them; the size on the action bar
+(ClientboundSetActionBarTextPacket). corner(): the same block again counts as holding the button only within 10 ticks
+(Box.hitAt); after that a hit on the last corner starts a new box. XenClient: axeFar keeps farHitAt/farUseAt while the
+button stays down, and axeClick holds back the game's own repeats of a held click (SUCCESS for a hit, FAIL for a use,
+nothing sent) within 6 ticks.
+
+Pickups: PlayerBlockBreakEvents.AFTER -> Companion.broke(pos, a log?) (the last 64). minedIt: lying within 3.5 of a
+block it broke in the last minute (and no older than that), or within 5 across (12 down to 3 up) of a log it broke in
+the last five minutes (no older than five minutes: what the leaves drop as they decay); with room for it (a free slot
+or a stack of it not full). pickUpNearby takes those as well as WORTH, tools and what a friend tossed (score at least
+1), and steps straight to it (stepTo).
+
+Fidgets: Antics.fidget, from Companion.humanIdle (nothing to do this moment, no instinct, not in a fight). After a
+stretch of idle moments (5 s for a silly, bored Xen to 20 s for a grumpy one: (5 + 15 (1 - playful)) (1.2 - 0.6
+boredom) s; a gap of 30 ticks starts a new stretch) and a wait between them (9 to 33 s, by playful, times 0.6 to 1.4),
+in the mood (0.3 + 0.6 playful + 0.3 boredom): jiggle (LEFT/RIGHT, half the time crouching, eyes on whoever is near),
+crouch (3 at most: 4 is a hello), hop (JUMP then BACK), look (glances all round), swing (Compat.swing at the ground),
+hotbar (setSelectedSlot, back to the slot it held after), spin (TURN_LEFT x 4). Not with antics off, in the arena, in
+water, a boat or bed, using an item, afraid (fear > 0.4) or waving; cut short by anything else.
+
+Taught builds: Taught.vary(house, corner) mirrors a taught build (Mirror.FRONT_BACK on each block state, x -> sx - 1 -
+x) when ((corner.asLong() * 31 + name.hashCode()) & 2) != 0: the same site, the same version. VillageHouses.plan in
+creative: VillageHouses.adaptWood (only the wood: logs, planks, stairs, slabs, fences, doors, trapdoors, gates, plates,
+buttons, wood) for a taught build. Builder.woodType in creative with no wood on it: likedWood (from its name: oak,
+spruce, birch, dark oak, cherry, acacia, jungle, mangrove, pale oak). The log says how: "<name> builds its own pool:
+the other way round, in birch".
 
 
 WHAT'S NEW IN 2.0.0-beta.17

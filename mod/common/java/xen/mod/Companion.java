@@ -479,7 +479,7 @@ public final class Companion {
 			Action human = humanIdle(Action.values()[thought.action]);
 			if (human.ordinal() != action || human == Action.IDLE) {
 				action = human.ordinal();
-				if (human == Action.IDLE) lastThought = idleThought;
+				if (human == Action.IDLE || goals.instant.equals("fidgeting")) lastThought = idleThought;
 			}
 		}
 		if (goals.instant.isEmpty()) goals.instant = mode == Mode.FREE ? "exploring" : "looking around";
@@ -641,7 +641,9 @@ public final class Companion {
 			idleThought = "Nothing to do this moment: looking around.";
 		}
 		hands.glance = idleLook;
-		return Action.IDLE;
+		Action fidget = antics.fidget(near);                          // standing about a while: a jiggle, a hop, its hotbar...
+		if (fidget != null) idleThought = "Nothing to do for a while: fidgeting.";
+		return fidget != null ? fidget : Action.IDLE;
 	}
 
 	/** Who a player standing here would look at: its friend first, else whoever is closest (and in sight). */
@@ -1878,15 +1880,51 @@ public final class Companion {
 	private UUID goingFor;
 	private long goingSince;
 
+	/** Blocks it broke lately (where, when): what drops there is its own, and it picks it up, like a player. */
+	/** The blocks it broke lately: where, when, and whether it was a tree (a log: its leaves drop saplings and sticks for minutes after). */
+	private final java.util.ArrayDeque<long[]> broke = new java.util.ArrayDeque<>();
+
+	void broke(BlockPos pos, boolean log) {
+		broke.addLast(new long[] {pos.asLong(), player == null ? 0 : player.level().getGameTime(), log ? 1 : 0});
+		while (broke.size() > 64) broke.removeFirst();
+	}
+
+	/**
+	 * Its own, to pick up, if there's room for it: lying where it mined a block in the last minute (cobblestone and
+	 * all), or under a tree it chopped in the last five minutes (the saplings, sticks and apples its leaves let fall).
+	 */
+	private boolean minedIt(net.minecraft.world.entity.item.ItemEntity e) {
+		long now = player.level().getGameTime();
+		if (e.getAge() > 20 * 300 || !room(e.getItem())) return false;
+		for (long[] b : broke) {
+			boolean tree = b[2] == 1;
+			if (now - b[1] > 20 * (tree ? 300 : 60) || !tree && e.getAge() > 20 * 60) continue;
+			BlockPos p = BlockPos.of(b[0]);
+			double dx = e.getX() - p.getX() - 0.5, dy = e.getY() - p.getY() - 0.5, dz = e.getZ() - p.getZ() - 0.5;
+			if (tree ? dx * dx + dz * dz <= 5 * 5 && dy > -12 && dy < 3 : dx * dx + dy * dy + dz * dz <= 3.5 * 3.5) return true;
+		}
+		return false;
+	}
+
+	private boolean room(net.minecraft.world.item.ItemStack s) {
+		var inv = player.getInventory();
+		if (inv.getFreeSlot() >= 0) return true;
+		for (int i = 0; i < 36; i++) {
+			var have = inv.getItem(i);
+			if (net.minecraft.world.item.ItemStack.isSameItemSameComponents(have, s) && have.getCount() < have.getMaxStackSize()) return true;
+		}
+		return false;
+	}
+
 	private Action pickUpNearby() {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
 		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
 		double bestScore = 0, currentScore = 0;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
 				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
-						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem())))) {   // (a tool or armor lying there too; what a friend just tossed to it)
+						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem()) || minedIt(x)))) {   // (a tool or armor lying there too; what a friend just tossed to it; what it mined)
 			if (!player.hasLineOfSight(e)) continue;
-			double score = pickValue(e.getItem()) / (1 + 0.25 * e.distanceTo(player));   // the best first, then the nearest
+			double score = Math.max(pickValue(e.getItem()), minedIt(e) ? 1 : 0) / (1 + 0.25 * e.distanceTo(player));   // the best first, then the nearest
 			if (e.getUUID().equals(goingFor)) {
 				current = e;
 				currentScore = score;
@@ -1907,7 +1945,7 @@ public final class Companion {
 			return null;
 		}
 		goals.instant = "picking up " + BuiltInRegistries.ITEM.getKey(best.getItem().getItem()).getPath().replace('_', ' ');
-		return walkTo(best.position());
+		return stepTo(best.position());                                   // (right by it: a step or two straight there; further: the usual way)
 	}
 
 	/** A creaking coming (only its heart can hurt it): back off, looking at it (it freezes when looked at). */
