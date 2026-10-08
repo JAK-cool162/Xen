@@ -25,6 +25,13 @@ final class Perf {
 		parts.merge(part, System.nanoTime() - t0, Long::sum);
 	}
 
+	/** A count (plans made, blocks thought about...) over the window. */
+	static void count(String what, long n) {
+		counts.merge(what, n, Long::sum);
+	}
+
+	private static Map<String, Long> counts = new HashMap<>(), lastCounts = new HashMap<>();
+
 	/** Time since t0 goes to that Xen (its whole tick). */
 	static void xen(String name, long t0) {
 		xens.merge(name, System.nanoTime() - t0, Long::sum);
@@ -37,6 +44,8 @@ final class Perf {
 		if (gameTick - windowStart >= WINDOW) {
 			lastParts = parts;
 			lastXens = xens;
+			lastCounts = counts;
+			counts = new HashMap<>();
 			lastTicks = ticks;
 			parts = new HashMap<>();
 			xens = new HashMap<>();
@@ -61,6 +70,13 @@ final class Perf {
 		var worst = x.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue(), a.getValue())).limit(5).toList();
 		sb.append("\nBusiest:");
 		for (var e : worst) sb.append(String.format(java.util.Locale.ROOT, " %s %.2f,", e.getKey(), e.getValue() / 1e6 / n));
-		return sb.substring(0, sb.length() - 1) + " (ms a tick)";
+		Map<String, Long> k = lastTicks > 0 ? lastCounts : counts;
+		long plans = k.getOrDefault("plans", 0L);
+		sb.setLength(sb.length() - 1);
+		sb.append(" (ms a tick)");
+		if (plans > 0) sb.append(String.format(java.util.Locale.ROOT, "\nWays: %.1f plans a second, %.0f blocks thought about each, %.2f ms each; %.0f%% only part of the way, %.0f%% no way",
+				plans * 20.0 / n, k.getOrDefault("plan nodes", 0L) / (double) plans, p.getOrDefault("choosing: planning ways", 0L) / 1e6 / plans,
+				100.0 * k.getOrDefault("plans partial", 0L) / plans, 100.0 * k.getOrDefault("plans none", 0L) / plans));
+		return sb.toString();
 	}
 }

@@ -1,7 +1,28 @@
-XEN COMPANION 2.0.0-beta.19: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.20: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.20
+===========================
+
+Walker (the Xen's own A* over a player's moves), same moves and costs, faster. Profiled with Java Flight Recorder on 8
+free Xens: a fifth of planning went to FluidState.is(FluidTags.LAVA), a quarter to HashMap<Long, Node> (packed block
+positions as Long keys hash badly: tree bins), a sixth to the per-tick state cache, an eighth to danger()/lava().
+Now: Walker.kind(BlockState) works out once per state (Reference2IntOpenHashMap) lava, water, blocked (fire, cobweb,
+powder snow, berry bush, cactus), portal, openable, climbable, low (no collision or under 3/16), firm (a top of 1 or
+less), full block, bad floor (magma, campfires, cactus), farmland, falling, natural (diggable ground), dynamic shape
+(then shapes are asked of the world as before) and sickening (potent sulfur, wither rose, magma), from the shape with
+EmptyBlockGetter. While a plan runs, a box 80 x 48 x 80 round its start (static, one plan at a time on the server
+thread, a stamp per plan so nothing is cleared; stamp and kind side by side in one int array) holds each block's kind
+as it's first asked and what digging it costs (breaks()). Nodes in a Long2ObjectOpenHashMap; the failed moves and the
+blocks walked lately in fastutil maps, skipped when empty. A spot goal within 2 blocks it can't stand in (not passable,
+water or climbable) is no way at once; within 3 the search doesn't go on to four times its limit. 8 free Xens, the same
+hills: 21.1 ms a plan (2,221 blocks) before, 10.7 (1,715) after; planning 4.25 -> 1.33 ms a tick in the first runs.
+/xen goto <name> ...: just that Xen. /xen perf: plans a second, blocks a plan, ms a plan, part of the way, no way.
+Obstacle course (8 lanes, stone bricks it won't dig): u-trap 51 -> 30 s, maze 33 -> 15, long wall 33 -> 15, river 72
+-> 51, cliff 36 -> 18, pit 30 -> 15, pillars 36 -> 18, lava 36 -> 15; 8 of 8 both.
 
 
 WHAT'S NEW IN 2.0.0-beta.19

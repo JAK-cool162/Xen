@@ -56,14 +56,14 @@ final class Walker {
 	private long bestAt, daringUntil;
 	private boolean stepped;
 	/** Moves that went wrong lately (it tries other ways): from-to, and how often. */
-	private final Map<Long, Integer> bad = new HashMap<>();
+	private final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap bad = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
 	private long badSince;
 	/** For /xen status and the journal: what it's doing on its way, and what went wrong last. */
 	String doing = "", lastProblem = "";
 	private String journaled = "";
 
 	/** The blocks it walked on lately, and when: a new plan doesn't go back over them unless it has to (no back and forth). */
-	private final Map<Long, Long> walked = new HashMap<>();
+	private final it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap walked = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
 	/** Where it stood every second lately: to tell when it's pacing back and forth. */
 	private final java.util.ArrayDeque<Vec3> trail = new java.util.ArrayDeque<>();
 	private long lastTrail, lockedUntil;
@@ -381,6 +381,14 @@ final class Walker {
 	private BlockPos eyes;
 
 	private List<Move> plan(ServerLevel level, BlockPos start, Vec3 to, Goal want) {
+		try {
+			return search(level, start, to, want);
+		} finally {
+			gridOn = false;                                                  // (the box is for this one plan only)
+		}
+	}
+
+	private List<Move> search(ServerLevel level, BlockPos start, Vec3 to, Goal want) {
 		this.level = level;
 		this.eyes = start;
 		BlockPos target = BlockPos.containing(to);
@@ -393,13 +401,16 @@ final class Walker {
 		mobWay = false;
 		if (want == null && mobPaths() && now() >= noMobWayUntil && reachable(target)) {   // the mobs' way first (the setting): quick, sure, no digging
 			List<Move> m = mobPath.plan(c, level, start, to, 1600);
+			Perf.count("mob way tries", 1);
 			if (m != null) {
+				Perf.count("plans", 1);
 				mobWay = true;
 				return m;
 			}
 		}
-		Map<Long, Node> nodes = new HashMap<>();
+		var nodes = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Node>(4096);
 		PriorityQueue<Node> open = new PriorityQueue<>();
+		gridStart(start);
 		Node first = new Node(start);
 		first.placedFloor = c.player.onGround();                            // it's standing (maybe on the very edge of a block)
 		first.f = h(aim, start);
@@ -408,10 +419,19 @@ final class Walker {
 		Node best = first;
 		double bestH = first.f;
 		int expanded = 0;
+		// A spot right by it that's no place to stand (an item in a log, on leaves): it's as close as it gets. It used to
+		// think about 10,000 blocks round it (a fifth of a tick) to find that out, again and again.
+		boolean near = want == null && start.distManhattan(target) <= 3;
+		if (near && start.distManhattan(target) <= 2 && !passable(target) && !water(target) && !climbable(target)) {
+			gridOn = false;
+			Perf.count("plans", 1);
+			Perf.count("plans none", 1);
+			return null;
+		}
 		// Nothing better yet than where it stands (at the foot of a wall that takes digging, the cheap ways all lead
 		// further from the goal): it thinks harder, up to four times as long, before it says there's no way (then the
 		// solver would back it off to look again: walking back and forth).
-		while (!open.isEmpty() && (expanded < LIMIT || best == first && expanded < LIMIT * 4)) {
+		while (!open.isEmpty() && (expanded < LIMIT || best == first && !near && expanded < LIMIT * 4)) {
 			Node n = open.poll();
 			if (n.closed) continue;
 			n.closed = true;
@@ -426,9 +446,11 @@ final class Walker {
 				best = n;
 			}
 			for (Move m : moves(n.pos, n.placedFloor, blocks - n.placed)) {
-				double cost = m.cost() * (1 + bad.getOrDefault(key(m), 0) * 4) * back(m.to(), target);
+				double cost = m.cost() * (bad.isEmpty() ? 1 : 1 + bad.get(key(m)) * 4) * back(m.to(), target);
 				if (cost >= INF) continue;
-				Node next = nodes.computeIfAbsent(m.to().asLong(), k -> new Node(m.to()));
+				long nk = m.to().asLong();
+				Node next = nodes.get(nk);
+				if (next == null) nodes.put(nk, next = new Node(m.to()));
 				if (next.closed || n.g + cost >= next.g && next.parent != null) continue;
 				next.g = n.g + cost;
 				next.f = next.g + h(aim, m.to());
@@ -439,12 +461,18 @@ final class Walker {
 				open.add(next);
 			}
 		}
+		gridOn = false;                                                      // (what's next isn't planning)
+		Perf.count("plans", 1);
+		Perf.count("plan nodes", expanded);
+		if (best == first) Perf.count("plans none", 1);
+		else if (!aim.isIn(best.pos) && !(want == null && h(aim, best.pos) < 0.01)) Perf.count("plans partial", 1);
 		if (best == first) {
 			if (WALK_DEBUG) {
 				StringBuilder w = new StringBuilder();
 				for (Move m : moves(start, first.placedFloor, blocks)) w.append(m.kind()).append('>').append(m.to().toShortString()).append(String.format(" %.0f; ", m.cost()));
-				XenMod.LOG.info("[walk] {} no way from {} (expanded {}, open {}, h {}, dig {}, onGround {}): {}", c.name, start.toShortString(), expanded, open.size(),
-						String.format("%.1f", bestH), dig, c.player.onGround(), w);
+				XenMod.LOG.info("[walk] {} no way from {} to {} ({}, {} away; expanded {}, open {}, h {}, dig {}, onGround {}, doing {}): {}", c.name, start.toShortString(),
+						target.toShortString(), want == null ? "a spot" : want, (int) Math.sqrt(start.distSqr(target)), expanded, open.size(),
+						String.format("%.1f", bestH), dig, c.player.onGround(), c.goals.instant, w);
 			}
 			return null;
 		}
@@ -458,8 +486,9 @@ final class Walker {
 
 	/** Going back over blocks it walked on in the last 20 seconds costs more (much more while it's been pacing). */
 	private double back(BlockPos to, BlockPos target) {
-		Long at = walked.get(to.asLong());
-		if (at == null || to.equals(target) || now() - at > 400) return 1;
+		if (walked.isEmpty()) return 1;
+		long at = walked.getOrDefault(to.asLong(), Long.MIN_VALUE);
+		if (at == Long.MIN_VALUE || to.equals(target) || now() - at > 400) return 1;
 		return now() < lockedUntil ? 6 : 2.5;
 	}
 
@@ -487,7 +516,7 @@ final class Walker {
 	private void pace() {
 		var p = c.player;
 		walked.put(p.blockPosition().asLong(), now());
-		if (walked.size() > 400) walked.values().removeIf(t -> now() - t > 400);
+		if (walked.size() > 400) walked.long2LongEntrySet().removeIf(e -> now() - e.getLongValue() > 400);
 		if (now() - lastTrail < 20) return;
 		lastTrail = now();
 		trail.addLast(p.position());
@@ -704,13 +733,106 @@ final class Walker {
 
 	/** Room for a body: nothing solid (a carpet or a snow layer is fine, an open door or gate too), no lava, no fire. */
 	private boolean passable(BlockPos p) {
-		BlockState s = state(p);
-		if (s.getFluidState().is(FluidTags.LAVA) || s.is(Blocks.FIRE) || s.is(Blocks.SOUL_FIRE) || s.is(Blocks.COBWEB)
-				|| s.is(Blocks.POWDER_SNOW) || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.CACTUS)) return false;
-		if ((s.is(Blocks.NETHER_PORTAL) || s.is(Blocks.END_PORTAL) || s.is(Blocks.END_GATEWAY)) && (portalOk == null || p.distManhattan(portalOk) > 3)) return false;   // not by accident
-		if (openable(s) || s.is(BlockTags.CLIMBABLE)) return true;
-		VoxelShape shape = s.getCollisionShape(level, p);
-		return shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.1875;
+		int k = cell(p);
+		if ((k & (K_LAVA | K_BLOCKED)) != 0) return false;
+		if ((k & K_PORTAL) != 0 && (portalOk == null || p.distManhattan(portalOk) > 3)) return false;   // not by accident
+		if ((k & (K_OPENABLE | K_CLIMBABLE)) != 0) return true;
+		if ((k & K_DYNAMIC) != 0) {
+			VoxelShape shape = state(p).getCollisionShape(level, p);
+			return shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.1875;
+		}
+		return (k & K_LOW) != 0;
+	}
+
+	/** Something firm to stand on at b (a full block, a slab, stairs; not a fence or a wall, not magma or a campfire). */
+	private boolean firm(BlockPos b) {
+		int k = cell(b);
+		if ((k & K_BADFLOOR) != 0) return false;
+		if ((k & K_DYNAMIC) != 0) {
+			VoxelShape shape = state(b).getCollisionShape(level, b);
+			return !shape.isEmpty() && shape.max(Direction.Axis.Y) <= 1.0;
+		}
+		return (k & K_STEP) != 0;
+	}
+
+	// ---------------------------------------------------------------------------- fast lookups (planning asks a lot)
+	/**
+	 * What a kind of block is to a walker, worked out once for each block state (states are shared objects, a few
+	 * thousand in all): planning used to ask Minecraft's fluid tags, block tags and the block registry for every block it
+	 * thought about, over and over (a fifth of its time went to "is this lava?").
+	 */
+	private static final int K_LAVA = 1, K_WATER = 1 << 1, K_BLOCKED = 1 << 2, K_PORTAL = 1 << 3, K_OPENABLE = 1 << 4, K_CLIMBABLE = 1 << 5,
+			K_LOW = 1 << 6, K_STEP = 1 << 7, K_BADFLOOR = 1 << 8, K_FULL = 1 << 9, K_FARMLAND = 1 << 10, K_FALLING = 1 << 11, K_NATURAL = 1 << 12,
+			K_DYNAMIC = 1 << 13, K_SICK = 1 << 14, K_BREAKS = 1 << 29, K_SET = 1 << 30;
+	private static final it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap<BlockState> KINDS = new it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap<>();
+
+	static int kind(BlockState s) {
+		int k = KINDS.getInt(s);
+		if (k != 0) return k;
+		k = K_SET;
+		var f = s.getFluidState();
+		if (f.is(FluidTags.LAVA)) k |= K_LAVA;
+		if (f.is(FluidTags.WATER)) k |= K_WATER;
+		if (s.is(Blocks.FIRE) || s.is(Blocks.SOUL_FIRE) || s.is(Blocks.COBWEB) || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.SWEET_BERRY_BUSH)
+				|| s.is(Blocks.CACTUS)) k |= K_BLOCKED;
+		if (s.is(Blocks.NETHER_PORTAL) || s.is(Blocks.END_PORTAL) || s.is(Blocks.END_GATEWAY)) k |= K_PORTAL;
+		if (openable(s)) k |= K_OPENABLE;
+		if (s.is(BlockTags.CLIMBABLE)) k |= K_CLIMBABLE;
+		if (s.getBlock().hasDynamicShape()) k |= K_DYNAMIC;
+		VoxelShape shape = s.getCollisionShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+		if (shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.1875) k |= K_LOW;
+		if (!shape.isEmpty() && shape.max(Direction.Axis.Y) <= 1.0) k |= K_STEP;
+		if (s.isCollisionShapeFullBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO)) k |= K_FULL;
+		if (s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.CAMPFIRE) || s.is(Blocks.SOUL_CAMPFIRE) || s.is(Blocks.CACTUS)) k |= K_BADFLOOR;
+		if (s.is(Blocks.FARMLAND)) k |= K_FARMLAND;
+		if (s.getBlock() instanceof net.minecraft.world.level.block.FallingBlock) k |= K_FALLING;
+		if (natural(s)) k |= K_NATURAL;
+		String n = BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+		if (n.equals("potent_sulfur") || n.equals("wither_rose") || n.equals("magma_block")) k |= K_SICK;
+		KINDS.put(s, k);
+		return k;
+	}
+
+	/**
+	 * While it plans: what each block round it is (and what digging it costs), in a box round where it starts, filled in
+	 * as it asks (one plan at a time on the server thread, so one box for all the Xens). Each plan has its own stamp, so
+	 * nothing needs clearing between plans.
+	 */
+	private static final int GX = 80, GY = 48, GZ = 80;
+	private static final int[] grid = new int[2 * GX * GY * GZ];          // (each block's stamp, then its kind: one cache line, not two)
+	private static final float[] gridBreak = new float[GX * GY * GZ];
+	private static int stamp;
+	private int gox, goy, goz;
+	private boolean gridOn;
+
+	private void gridStart(BlockPos start) {
+		if (++stamp == Integer.MAX_VALUE) {
+			java.util.Arrays.fill(grid, 0);
+			stamp = 1;
+		}
+		gox = start.getX() - GX / 2;
+		goy = start.getY() - GY / 2;
+		goz = start.getZ() - GZ / 2;
+		gridOn = true;
+	}
+
+	/** Where p is in the box (filled in for this plan), or -1 outside it or when it isn't planning. */
+	private int gridIndex(BlockPos p) {
+		if (!gridOn) return -1;
+		int x = p.getX() - gox, y = p.getY() - goy, z = p.getZ() - goz;
+		if (x < 0 || y < 0 || z < 0 || x >= GX || y >= GY || z >= GZ) return -1;
+		int i = (x * GZ + z) * GY + y;
+		if (grid[2 * i] != stamp) {
+			grid[2 * i] = stamp;
+			grid[2 * i + 1] = kind(state(p));
+		}
+		return i;
+	}
+
+	/** What kind of block it knows is at p. */
+	private int cell(BlockPos p) {
+		int i = gridIndex(p);
+		return i >= 0 ? grid[2 * i + 1] & ~K_BREAKS : kind(state(p));
 	}
 
 	/** A wooden door or a fence gate: it opens it on the way. */
@@ -725,12 +847,7 @@ final class Walker {
 
 	/** Can it stand with its feet here: room for its body and something to stand on (not a fence: too high)? */
 	private boolean floor(BlockPos p) {
-		if (!passable(p) || !passable(p.above())) return false;
-		BlockPos b = p.below();
-		BlockState s = state(b);
-		VoxelShape shape = s.getCollisionShape(level, b);
-		if (shape.isEmpty() || shape.max(Direction.Axis.Y) > 1.0) return false;
-		return !s.is(Blocks.MAGMA_BLOCK) && !s.is(Blocks.CAMPFIRE) && !s.is(Blocks.SOUL_CAMPFIRE) && !s.is(Blocks.CACTUS);
+		return passable(p) && passable(p.above()) && firm(p.below());
 	}
 
 	/** Something it can jump up onto (a full block, a slab, stairs; not a fence or a wall). */
@@ -742,37 +859,36 @@ final class Walker {
 	private boolean floorOnceDug(BlockPos p) {
 		if (floor(p)) return true;
 		if (breaks(p) >= INF || breaks(p.above()) >= INF) return false;
-		BlockPos b = p.below();
-		BlockState s = state(b);
-		VoxelShape shape = s.getCollisionShape(level, b);
-		if (shape.isEmpty() || shape.max(Direction.Axis.Y) > 1.0) return false;
-		return !s.is(Blocks.MAGMA_BLOCK) && !s.is(Blocks.CAMPFIRE) && !s.is(Blocks.SOUL_CAMPFIRE) && !s.is(Blocks.CACTUS);
+		return firm(p.below());
 	}
 
 	private boolean step(BlockPos p) {
-		VoxelShape shape = state(p).getCollisionShape(level, p);
-		return !shape.isEmpty() && shape.max(Direction.Axis.Y) <= 1.0 || breaks(p) < INF;
+		int k = cell(p);
+		boolean firm = (k & K_DYNAMIC) != 0 ? !state(p).getCollisionShape(level, p).isEmpty() && state(p).getCollisionShape(level, p).max(Direction.Axis.Y) <= 1.0
+				: (k & K_STEP) != 0;
+		return firm || breaks(p) < INF;
 	}
 
 	private boolean fullBlock(BlockPos p) {
-		return state(p).isCollisionShapeFullBlock(level, p);
+		int k = cell(p);
+		return (k & K_DYNAMIC) != 0 ? state(p).isCollisionShapeFullBlock(level, p) : (k & K_FULL) != 0;
 	}
 
 	private boolean water(BlockPos p) {
-		return state(p).getFluidState().is(FluidTags.WATER);
+		return (cell(p) & K_WATER) != 0;
 	}
 
 	private boolean lava(BlockPos p) {
-		return state(p).getFluidState().is(FluidTags.LAVA);
+		return (cell(p) & K_LAVA) != 0;
 	}
 
 	private boolean climbable(BlockPos p) {
-		return state(p).is(BlockTags.CLIMBABLE);
+		return (cell(p) & K_CLIMBABLE) != 0;
 	}
 
 	/** Standing there, it would be on farmland (a field: walk on it gently, never land on it). */
 	private boolean farmland(BlockPos p) {
-		return state(p.below()).is(Blocks.FARMLAND);
+		return (cell(p.below()) & K_FARMLAND) != 0;
 	}
 
 	/** Swimming with its head under water: it would rather keep its head up (out of breath: much rather). */
@@ -790,8 +906,7 @@ final class Walker {
 	private double danger(BlockPos p) {
 		double d = 0;
 		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 40;
-		String below = BuiltInRegistries.BLOCK.getKey(state(p.below()).getBlock()).getPath();
-		if (below.equals("potent_sulfur") || below.equals("wither_rose") || below.equals("magma_block")) d += 30;   // sulfur gas makes you sick
+		if ((cell(p.below()) & K_SICK) != 0) d += 30;                       // sulfur gas makes you sick
 		return d;
 	}
 
@@ -802,8 +917,19 @@ final class Walker {
 	private double breaks(BlockPos p) {
 		if (passable(p)) return 0;
 		if (!dig) return INF;
+		int i = gridIndex(p);
+		if (i >= 0 && (grid[2 * i + 1] & K_BREAKS) != 0) return gridBreak[i];
+		double b = breaksNow(p);
+		if (i >= 0) {
+			grid[2 * i + 1] |= K_BREAKS;
+			gridBreak[i] = (float) Math.min(b, INF);
+		}
+		return b >= INF ? INF : b;
+	}
+
+	private double breaksNow(BlockPos p) {
 		BlockState s = state(p);
-		if (s.getDestroySpeed(level, p) < 0 || !natural(s)) return INF;
+		if ((cell(p) & K_NATURAL) == 0 || s.getDestroySpeed(level, p) < 0) return INF;
 		if (Hands.holdsSomeone(level, p, c.player)) return INF;                  // (someone stands on it: not that way)
 		for (Direction d : Direction.values()) {
 			if (d == Direction.DOWN) continue;
@@ -811,7 +937,7 @@ final class Walker {
 			if (f.is(FluidTags.LAVA)) return INF;
 			if (f.is(FluidTags.WATER) && f.isSource()) return INF;
 		}
-		if (state(p.above()).getBlock() instanceof net.minecraft.world.level.block.FallingBlock && !passable(p.above())) return INF;
+		if ((cell(p.above()) & K_FALLING) != 0 && !passable(p.above())) return INF;
 		if (c.player.isCreative()) return 2;
 		float speed = c.hands.digSpeed(s, level, p);
 		if (speed < 1f / 200) return INF;                                     // more than ten seconds: not that way
@@ -895,7 +1021,7 @@ final class Walker {
 		lastProblem = why;
 		if (mobWay) noMobWayUntil = now() + 100;                              // the mobs' way didn't work here: its own for a bit
 		c.troubles++;
-		bad.merge(key(m), 1, Integer::sum);
+		bad.addTo(key(m), 1);
 		badSince = now();
 		fails++;
 		if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} on its way: {} ({})", c.name, why, m.kind());

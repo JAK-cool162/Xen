@@ -1071,7 +1071,17 @@ public class XenMod implements ModInitializer {
 								}).executes(ctx -> each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: "
 										+ c.builder.start(StringArgumentType.getString(ctx, "what")), "")))))
 				.then(Commands.literal("goto").then(Commands.argument("where", StringArgumentType.greedyString())
-						.executes(ctx -> each(ctx, c -> c.name + ": " + c.goTo(StringArgumentType.getString(ctx, "where"))))))
+						.executes(ctx -> {
+							String where = StringArgumentType.getString(ctx, "where");
+							String first = where.split(" ")[0];
+							for (Companion one : companions) {                       // "/xen goto Pip 100 200": just that one
+								if (one.name.equalsIgnoreCase(first) && one.player() != null) {
+									String rest = where.substring(first.length()).trim();
+									return each(ctx, c -> c == one ? c.name + ": " + c.goTo(rest) : null);
+								}
+							}
+							return each(ctx, c -> c.name + ": " + c.goTo(where));
+						})))
 				.then(Commands.literal("style")
 						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
 									for (Companion c : companions) b.suggest(c.name);
@@ -1729,6 +1739,7 @@ public class XenMod implements ModInitializer {
 			if (p != null && c.owner == null && !op(ctx)) continue;
 			if (c.player() == null) continue;
 			String msg = f.apply(c);
+			if (msg == null) continue;                                    // (not this one)
 			ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
 			n++;
 		}

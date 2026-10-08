@@ -1,7 +1,28 @@
-**Xen Companion 2.0.0-beta.19**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.20**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.20: faster way finding (part 1 of the pathfinder upgrade)
+
+* **Way finding about twice as fast:** each block a Xen thinks about on its way now costs a fraction of what it did.
+  What a kind of block is (lava? water? something to stand on? diggable?) is worked out once for each block state, not
+  asked of the game's tags and registry again and again; what it learned about each block while it plans is kept in
+  one box for the plan; the moves it weighs are kept in maps that don't fall into slow buckets. Measured with 8 free
+  Xens in the same hills: a plan took 21 ms and now about 11 ms, and the Xens' share of the server dropped from 9.8 to
+  4.8 ms a tick in the first comparison (runs vary with what they choose to do).
+* **No more long thinking for a spot it can't stand on:** a Xen right next to something it wanted (an item lying in a
+  log or on leaves) thought about 10,000 blocks round it before giving up, again and again. Now it knows at once that
+  it's as close as it gets.
+* **`/xen goto <name> x y z`** sends just that Xen (without a name, all of them, as before).
+* **`/xen perf`** also says how many ways are planned a second, how many blocks each one thinks about, how long one
+  takes, and how many get only part of the way or find none.
+* Tested on a new obstacle course (a U-shaped dead end, a maze, a long wall, a river, a cliff with one ramp, a pit
+  with a ladder, a forest of pillars, a lava strip with one bridge): 8 of 8 there, as before, and faster (the dead end
+  in 30 s instead of 51, the maze in 15 instead of 33). 1.21.11 in game; 26.1, 26.2 and 26.3 built and checked (their
+  path tests too).
+* Next: a way over the land first for long trips (as a player reads the landscape), then the steps, so it doesn't
+  walk into dead-end valleys.
 
 ### 2.0.0-beta.19: a whole place of its own, pictured first
 
