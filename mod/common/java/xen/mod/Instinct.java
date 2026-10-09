@@ -14,6 +14,8 @@ import net.minecraft.world.phys.Vec3;
  *   <li><b>Out of air</b>: under water, air under 60%, open water above: up, holding space, not pushing into a wall.</li>
  *   <li><b>In lava</b>: out to the nearest block it can stand on that isn't lava, jumping (or straight up).</li>
  *   <li><b>Standing in fire</b>: a step to the nearest block without fire.</li>
+ *   <li><b>At the edge of a deadly drop</b>: about to step off where the fall would kill it or take half its health (no
+ *   water to land in): it stops and steps back. Its mind can argue with its gut about a ledge; not about that.</li>
  * </ul>
  * While it acts the gut keeps quiet and whatever else the Xen was doing waits (its keys are its instinct's). It runs
  * last in a Xen's tick, so nothing else this tick undoes it.
@@ -35,7 +37,7 @@ final class Instinct {
 		var p = c.player;
 		if (p == null || !p.isAlive() || p.isCreative() || p.isSpectator()) return false;
 		return p.isInLava() || p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply() * 0.6 && openAbove((ServerLevel) p.level())
-				|| inFire((ServerLevel) p.level(), p.blockPosition());
+				|| inFire((ServerLevel) p.level(), p.blockPosition()) || deadlyEdge((ServerLevel) p.level());
 	}
 
 	/** Every tick, after everything: the keys for staying alive, if it has to. */
@@ -50,6 +52,7 @@ final class Instinct {
 		if (p.isInLava()) now = outOfLava(level);
 		else if (p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply() * 0.6 && openAbove(level)) now = upForAir();
 		else if (inFire(level, p.blockPosition())) now = outOfFire(level);
+		else if (deadlyEdge(level)) now = backFromEdge();
 		doing = now;
 		if (now.isEmpty()) {
 			if (p.tickCount - lastAt > 20) last = "";                    // (bobbing out of it for a moment is still the same danger)
@@ -144,6 +147,45 @@ final class Instinct {
 		}
 		toward(Vec3.atBottomCenterOf(to));
 		return "stepping out of the fire";
+	}
+
+	/**
+	 * Walking on, on the ground, toward an edge (the block it's heading into has nothing under it) where the fall would
+	 * kill it or take half its health, with no water down there. (Going down on purpose, its way's own drop, is never
+	 * that far: Walker's falls are 3 to 6.)
+	 */
+	private boolean deadlyEdge(ServerLevel level) {
+		var p = c.player;
+		if (!p.onGround() || p.isInWater() || p.isPassenger() || p.getAbilities().flying || p.isShiftKeyDown() || c.walker.leaping()) return false;   // (sneaking it can't fall; a jump across is on purpose)
+		var v = p.getDeltaMovement();
+		double speed = Math.hypot(v.x, v.z);
+		Vec3 dir;
+		if (speed > 0.03) dir = new Vec3(v.x / speed, 0, v.z / speed);
+		else if (p.zza > 0) dir = Vec3.directionFromRotation(0, p.getYRot());
+		else return false;
+		BlockPos ahead = BlockPos.containing(p.getX() + dir.x * 0.7, p.getY() + 0.1, p.getZ() + dir.z * 0.7);
+		if (ahead.equals(p.blockPosition())) return false;
+		if (!level.getBlockState(ahead).getCollisionShape(level, ahead).isEmpty()) return false;     // a wall, a step: no edge
+		int drop = 0;
+		for (BlockPos q = ahead.below(); drop < 64 && q.getY() > level.getMinY(); q = q.below(), drop++) {
+			var st = level.getBlockState(q);
+			if (!st.getFluidState().isEmpty() && st.getFluidState().is(net.minecraft.tags.FluidTags.WATER)) return false;   // (water down there: a soft landing)
+			if (!st.getCollisionShape(level, q).isEmpty()) break;
+		}
+		float hurt = drop - 3;                                          // (a fall hurts a heart for each block past three)
+		return hurt >= p.getHealth() || hurt >= p.getMaxHealth() / 2;
+	}
+
+	private String backFromEdge() {
+		var p = c.player;
+		p.zza = 0;
+		p.xxa = 0;
+		p.setSprinting(false);
+		p.setJumping(false);
+		p.setShiftKeyDown(true);                                        // (sneaking: it can't walk off an edge)
+		var v = p.getDeltaMovement();
+		p.setDeltaMovement(v.x * 0.2, v.y, v.z * 0.2);
+		return "stopping at the edge of a deadly drop";
 	}
 
 	/** Faces it and goes, at once (no time for a careful turn). */

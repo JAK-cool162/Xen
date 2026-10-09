@@ -231,6 +231,14 @@ public final class Companion {
 		}
 	}
 
+	/** How much it believes in itself (see {@link SelfBelief}). */
+	final SelfBelief belief = new SelfBelief(this);
+
+	/** How much food it likes to keep on it: 4 to 10 (a glutton and a hard worker more). */
+	int foodReserve() {
+		return Math.max(3, Math.min(10, Math.round(4 + 4 * personality.sin(xen.mod.core.Sins.GLUTTONY) + 3 * personality.diligence)));
+	}
+
 	/** Its instinct: a clear danger (no air, lava, fire), every tick, before everything (see {@link Instinct}). */
 	final Instinct instinct = new Instinct(this);
 
@@ -312,6 +320,8 @@ public final class Companion {
 		t0 = Perf.now();
 		if (player.tickCount % 10 == 0) {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
+			noteKills();                                                 // (something it hit died: its drops are its own)
+			belief.tick(player.level().getGameTime());                   // (a bad day fades)
 			places.tick();                                               // the way it walked, remembered
 			totems();
 			rumors.look();                                               // who's that? (a shock, a warning to pass on)
@@ -1435,6 +1445,20 @@ public final class Companion {
 			chatter(plan.startsWith("You don't see") ? "I'm starving... I need to find some animals." : "I'm starving. Time to hunt.", true);
 			return chores.next();
 		}
+		// Food for later: little on it and a food animal right there (not a baby, not the last of them): a player takes it.
+		int carried = items.getOrDefault("food", 0), reserve = foodReserve();
+		if (carried < reserve && player.getHealth() >= 10 && !personality.believes("animals_kindness")) {
+			var prey = chores.nearestAnimal();
+			if (prey != null && prey.distanceTo(player) < 14) {
+				neededAt = now;
+				chores.forWool = false;
+				chores.hunt(Math.min(3, reserve - carried));
+				chores.own = true;
+				journal("does", "hunts for food for later (" + carried + " on it, it likes " + reserve + ")");
+				if (random.nextFloat() < 0.3f) chatter(pick3("Food for later.", "Dinner for later, sorry.", "Stocking up on food."), false);
+				return chores.next();
+			}
+		}
 		long time = Compat.timeOfDay(player.level()) % 24000;
 		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || goals.home != null && bedAt != null;
 		int wool = 0;
@@ -1890,7 +1914,11 @@ public final class Companion {
 			"feather", "gunpowder", "flint", "heavy_core", "breeze_rod", "wind_charge", "obsidian", "name_tag", "saddle", "book", "enchanted_book",
 			"music_disc_bounce", "bread", "cooked_beef", "cooked_porkchop", "nether_wart", "gold_nugget", "iron_nugget", "coal", "wheat", "wheat_seeds",
 			"carrot", "potato", "beetroot", "beetroot_seeds", "bone_meal", "elytra", "firework_rocket", "lapis_lazuli", "sugar_cane", "leather",
-			"paper", "experience_bottle", "shulker_shell", "netherite_scrap", "ancient_debris");
+			"paper", "experience_bottle", "shulker_shell", "netherite_scrap", "ancient_debris",
+			// (what animals and monsters drop: food for later, bone meal, beds, slime for pistons)
+			"beef", "porkchop", "chicken", "mutton", "rabbit", "cod", "salmon", "cooked_chicken", "cooked_mutton", "cooked_rabbit", "cooked_cod",
+			"cooked_salmon", "apple", "bone", "egg", "rabbit_hide", "slime_ball", "ink_sac", "glow_ink_sac", "spider_eye", "honeycomb",
+			"white_wool", "black_wool", "gray_wool", "light_gray_wool", "brown_wool", "pink_wool");
 	/** How much a thing lying there is worth going for: diamonds before a sword, a sword before iron, iron before bread, bread before string. */
 	static int pickValue(ItemStack s) {
 		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
@@ -1920,7 +1948,40 @@ public final class Companion {
 	 * Its own, to pick up, if there's room for it: lying where it mined a block in the last minute (cobblestone and
 	 * all), or under a tree it chopped in the last five minutes (the saplings, sticks and apples its leaves let fall).
 	 */
+	/** Where things it killed died lately (where, when): what dropped there is its own, and it picks it up, like a player. */
+	private final java.util.ArrayDeque<long[]> killed = new java.util.ArrayDeque<>();
+
+	/** Every few ticks: did what it hit last die (it killed it)? Then where it fell is noted. */
+	private void noteKills() {
+		var e = hands.lastHit;
+		if (e == null) return;
+		long now = player.level().getGameTime();
+		if (!e.isAlive() || e.isRemoved()) {
+			if (now - hands.lastHitAt < 60) {
+				if (e instanceof net.minecraft.world.entity.monster.Monster || e instanceof ServerPlayer) belief.up(0.03f, "beat " + e.getName().getString());
+				killed.addLast(new long[] {e.blockPosition().asLong(), now});
+				while (killed.size() > 16) killed.removeFirst();
+			}
+			hands.lastHit = null;
+		} else if (now - hands.lastHitAt > 200) {
+			hands.lastHit = null;
+		}
+	}
+
+	private boolean killedIt(net.minecraft.world.entity.item.ItemEntity e) {
+		long now = player.level().getGameTime();
+		if (e.getAge() > 20 * 120 || !room(e.getItem())) return false;
+		for (long[] k : killed) {
+			if (now - k[1] > 20 * 120) continue;
+			BlockPos p = BlockPos.of(k[0]);
+			double dx = e.getX() - p.getX() - 0.5, dy = e.getY() - p.getY(), dz = e.getZ() - p.getZ() - 0.5;
+			if (dx * dx + dz * dz <= 4 * 4 && dy > -4 && dy < 3) return true;
+		}
+		return false;
+	}
+
 	private boolean minedIt(net.minecraft.world.entity.item.ItemEntity e) {
+		if (killedIt(e)) return true;                                   // (what it killed dropped: its own too)
 		long now = player.level().getGameTime();
 		if (e.getAge() > 20 * 300 || !room(e.getItem())) return false;
 		for (long[] b : broke) {
@@ -2186,15 +2247,44 @@ public final class Companion {
 		return Action.MINE;
 	}
 
+	/**
+	 * In a hole: no way to walk out on any side (the block beside its feet and the one over it open, with ground to stand
+	 * on a few blocks down at most, or a step up with room over it).
+	 */
+	private static boolean boxedIn(ServerLevel level, BlockPos feet) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos q = feet.relative(d);
+			boolean open = level.getBlockState(q).getCollisionShape(level, q).isEmpty() && level.getBlockState(q.above()).getCollisionShape(level, q.above()).isEmpty();
+			if (open) {
+				for (int k = 1; k <= 4; k++) {
+					BlockPos g = q.below(k);
+					var st = level.getBlockState(g);
+					if (st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) break;
+					if (!st.getCollisionShape(level, g).isEmpty() || !st.getFluidState().isEmpty()) return false;   // ground (or water) to land on
+				}
+				continue;
+			}
+			BlockPos up = q.above();                                        // a step up, with room over it and over its head
+			if (level.getBlockState(up).getCollisionShape(level, up).isEmpty() && level.getBlockState(up.above()).getCollisionShape(level, up.above()).isEmpty()
+					&& level.getBlockState(feet.above(2)).getCollisionShape(level, feet.above(2)).isEmpty()) return false;
+		}
+		return true;
+	}
+
 	/** The old way on foot: straight at it through what it knows, digging through, pillaring up. Null if lava is in the way. */
 	Action digToward(Vec3 goal) {
 		double dx = goal.x - player.getX(), dz = goal.z - player.getZ();
 		ServerLevel level = (ServerLevel) player.level();
 		BlockPos feet = player.blockPosition();
 		boolean below = goal.y - player.getY() >= 1.5;
-		if (below && Math.hypot(dx, dz) < 3 && player.onGround() && hands.startPillar()) {   // straight up: pillar
-			pillaring = true;
-			return Action.JUMP;
+		// straight up: pillar, but only out of a hole. Out in the open, towering up to a log or an item on the leaves
+		// with no way there looked like placing blocks for no reason: it lets that one go.
+		if (below && Math.hypot(dx, dz) < 3 && player.onGround()) {
+			if (boxedIn(level, feet) && hands.startPillar()) {
+				pillaring = true;
+				return Action.JUMP;
+			}
+			if (!boxedIn(level, feet)) return null;
 		}
 		// Stuck (walked or jumped but didn't move): like a player, dig at head height, then at the feet, then step aside.
 		boolean tried = lastAction == Action.FORWARD.ordinal() || lastAction == Action.JUMP.ordinal();
@@ -2273,7 +2363,7 @@ public final class Companion {
 			}
 		}
 		// Blocked, like in a hole: stand on something (pillar) or dig a staircase out, the way a player would.
-		if (below && player.onGround() && hands.startPillar()) {
+		if (below && player.onGround() && boxedIn(level, feet) && hands.startPillar()) {
 			pillaring = true;
 			return Action.JUMP;
 		}
@@ -3070,10 +3160,12 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
+		gut.died();                                                    // (if it had just gone against its gut: the gut was right)
 		habits.died();
 		prepared.died();
 		if (goals.option >= 0) goals.finishOption(true);                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
+		belief.down(source.getEntity() != null ? 0.06f : 0.04f, "died");
 		if (skills.partner != null) skills.endSpar(false);
 		if (obs != null && !inArena) {
 			float harm = lastHealth / 20f + 1f;

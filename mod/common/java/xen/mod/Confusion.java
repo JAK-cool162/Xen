@@ -96,7 +96,7 @@ final class Confusion {
 		}
 		if (now < nextLook) return null;
 		nextLook = now + 20L * (6 + random.nextInt(10)) - (long) (level * 80);
-		if (random.nextFloat() > level) return null;
+		if (random.nextFloat() > level * (1.3f - c.belief.get())) return null;   // (sure of itself, it hesitates less)
 		hesitations++;
 		lookUntil = now + 10 + random.nextInt(10 + (int) (level * 30));     // half a second to two
 		lookYaw = p.getYRot() + (random.nextBoolean() ? 1 : -1) * (40 + random.nextInt(100));

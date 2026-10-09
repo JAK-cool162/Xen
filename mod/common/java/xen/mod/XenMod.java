@@ -845,6 +845,7 @@ public class XenMod implements ModInitializer {
 
 	private void hear(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
+		for (Companion c : companions) if (c.player() != null && c.gut.answer(sender, text)) return;   // (the answer to what a Xen asked them)
 		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
 		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
@@ -1033,6 +1034,34 @@ public class XenMod implements ModInitializer {
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
 				.then(Commands.literal("layout").executes(ctx -> each(ctx, c -> c.builder.showLayoutAgain())))
+				.then(Commands.literal("terrain").requires(XenMod::mayRun)           // the world as it really is (a dev tool: WorldTruth)
+						.then(Commands.literal("sample").then(Commands.argument("n", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 20000))
+								.then(Commands.argument("radius", com.mojang.brigadier.arguments.IntegerArgumentType.integer(8, 2000)).executes(ctx -> {
+									String out;
+									try {
+										out = WorldTruth.sample(ctx.getSource().getLevel(), BlockPos.containing(ctx.getSource().getPosition()),
+												com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "n"), com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "radius"));
+									} catch (java.io.IOException e) {
+										out = "couldn't write: " + e;
+									}
+									String said = out;
+									ctx.getSource().sendSuccess(() -> Component.literal(said), false);
+									LOG.info("xen terrain: {}", said);
+									return 1;
+								}))))
+						.then(Commands.literal("caves").then(Commands.argument("radius", com.mojang.brigadier.arguments.IntegerArgumentType.integer(8, 2000)).executes(ctx -> {
+							String out;
+							try {
+								out = WorldTruth.caves(ctx.getSource().getLevel(), BlockPos.containing(ctx.getSource().getPosition()),
+										com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "radius"));
+							} catch (java.io.IOException e) {
+								out = "couldn't write: " + e;
+							}
+							String said = out;
+							ctx.getSource().sendSuccess(() -> Component.literal(said), false);
+							LOG.info("xen terrain: {}", said);
+							return 1;
+						}))))
 				.then(Commands.literal("perf").executes(ctx -> {                    // where the server's time goes for the Xens
 					String out = Perf.report();
 					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
@@ -1340,6 +1369,7 @@ public class XenMod implements ModInitializer {
 			part.accept("adventure", () -> c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean());
 			part.accept("band", () -> { if (known.has("band")) c.band = known.get("band").getAsString(); });
 			part.accept("gutTrust", () -> { if (known.has("gutTrust")) c.gut.faith = known.get("gutTrust").getAsFloat(); });
+			part.accept("selfBelief", () -> { if (known.has("selfBelief")) c.belief.value = known.get("selfBelief").getAsFloat(); });
 			part.accept("trust", () -> {
 				if (known.has("trust")) for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
 			});

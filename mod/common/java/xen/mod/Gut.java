@@ -43,6 +43,22 @@ final class Gut {
 	private Action against;
 	private long againstUntil, decidedUntil, judgeAt;
 	private float healthThen;
+	/** The last argument's two cases (how close a call it was). */
+	private float lastMind, lastGut;
+	/**
+	 * A close call (or it isn't sure of itself): it asks someone close what they think. Who (a player answers in chat;
+	 * another Xen answers from its own gut), about which feeling, when, the answer (1 go on, -1 don't, 0 none yet), and
+	 * whose advice it took (to see if it was good).
+	 */
+	private java.util.UUID askedWho, advisor;
+	private String askedName = "";
+	private boolean askedXen;
+	private Action askedAbout;
+	private long askedAt, nextAsk;
+	private int answer;
+	int asks, advised;
+	private static final java.util.regex.Pattern YES = java.util.regex.Pattern.compile("\\b(yes|yeah|yep|yup|sure|go|go on|go for it|do it|ok|okay|safe|fine|you can|keep going)\\b"),
+			NO = java.util.regex.Pattern.compile("\\b(no|nope|nah|don'?t|do not|stop|wait|careful|danger|dangerous|not safe|unsafe)\\b");
 
 	Gut(Companion c) {
 		this.c = c;
@@ -110,6 +126,7 @@ final class Gut {
 		var p = c.player;
 		if (p == null || c.inArena || p.isCreative() || p.isSpectator() || c.perceived == null || c.mod.brain == null) return null;
 		judge();                                                                 // (it went against its gut: was the gut right?)
+		hearAnswer(p.level().getGameTime());                                     // (it asked someone: what did they say?)
 		// Instinct first (a clear danger), and under water short of air: air first, whatever the gut says. Drowning hurts
 		// whatever it does there, so every move felt wrong and it "held still, that feels wrong" till it drowned.
 		if (c.instinct.clear() || p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply()) {
@@ -136,6 +153,11 @@ final class Gut {
 		if (move != last || now >= decidedUntil) {                              // a new feeling: does its mind go along?
 			decidedUntil = now + 60;
 			String why = argue(move, fear, danger);
+			boolean close = Math.abs(lastMind - lastGut) < 0.12f || c.belief.get() < 0.35f;   // (a close call, or unsure of itself)
+			if (askedAbout == null && close && now >= nextAsk && danger < 0.6f && p.getHealth() > 8 && ask(move, fear, danger)) {
+				decidedUntil = now + 320;                                       // it waits for the answer (its gut has its way meanwhile)
+				why = null;
+			}
 			if (why != null) {
 				against = move;
 				againstUntil = now + 60;
@@ -148,7 +170,8 @@ final class Gut {
 				XenMod.LOG.info("{} argues with its gut (it says {}) and goes on anyway: {}", c.name, move.verb, why);
 				boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
 				if (asked || java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.25f) {
-					c.chatter(c.pick3("My gut says no... going anyway.", "This feels wrong, but okay.", "Eh, I'll risk it."), asked);
+					c.chatter(c.belief.get() >= 0.7f ? c.pick3("I've got this.", "Trust me, I know what I'm doing.", "I can do this.")
+							: c.pick3("My gut says no... going anyway.", "This feels wrong, but okay.", "Eh, I'll risk it."), asked);
 				}
 				return null;
 			}
@@ -177,6 +200,34 @@ final class Gut {
 		return move;
 	}
 
+	/** It asked someone: their answer (or none, after 15 s), taken in first thing, whatever the gut feels now. */
+	private void hearAnswer(long now) {
+		var p = c.player;
+		if (askedAbout != null) {                                               // it asked someone: an answer?
+			if (answer > 0) {
+				against = askedAbout;
+				againstUntil = now + 100;
+				judgeAt = now + 110;
+				healthThen = p.getHealth();
+				advisor = askedWho;
+				overruled++;
+				advised++;
+				last = askedAbout;
+				askedAbout = null;
+				c.say(c.pick3("Okay, here goes!", "Alright, thanks " + askedName + "!", "If you say so."));
+				XenMod.LOG.info("{} asked {} and goes on, as they said", c.name, askedName);
+				return;
+			}
+			if (answer < 0 || now - askedAt > 300) {
+				if (answer == 0) c.chatter(c.pick3("No answer... I'll go with my gut.", "Okay, I'll trust my gut then.", "Nobody? My gut it is."), false);
+				else c.say(c.pick3("Okay, I'll be careful.", "Right, not that way.", "Thanks, " + askedName + "."));
+				XenMod.LOG.info("{} asked {} and {}", c.name, askedName, answer < 0 ? "listens to them: its gut wins" : "had no answer: its gut wins");
+				askedAbout = null;
+				decidedUntil = now + 200;                                       // (its gut, for a while)
+			}
+		}
+	}
+
 	/**
 	 * Its mind's case against its gut, now that the gut says "move" (fear: what each of MOVES is expected to cost). The
 	 * reason it goes on anyway, or null: the gut wins (most of the time, more so the surer the gut and the more it
@@ -195,8 +246,8 @@ final class Gut {
 		String why = "";
 		boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
 		float[] parts = {asked ? 0.35f : 0f, (p.getHealth() / p.getMaxHealth() - 0.5f) * 0.4f,
-				(pe.bravery - 0.5f) * 0.5f + 0.5f * pe.risk(), 0.35f * (1 - sure)};
-		String[] reasons = {"it was asked to", "it can take a hit", "it's braver than that", "the feeling is faint"};
+				(pe.bravery - 0.5f) * 0.5f + 0.5f * pe.risk(), 0.35f * (1 - sure), 0.4f * (c.belief.get() - 0.5f)};
+		String[] reasons = {"it was asked to", "it can take a hit", "it's braver than that", "the feeling is faint", "it believes in itself"};
 		for (int i = 0; i < parts.length; i++) {
 			mind += parts[i];
 			if (parts[i] > top) {
@@ -205,6 +256,8 @@ final class Gut {
 			}
 		}
 		float gut = faith * (0.3f + 0.7f * sure) + 0.5f * danger;
+		lastMind = mind;
+		lastGut = gut;
 		float chance = (float) (1 / (1 + Math.exp(-(mind - gut) * 5)));
 		boolean goes = java.util.concurrent.ThreadLocalRandom.current().nextFloat() < chance;
 		if (DEBUG || !goes && arguments % 10 == 1) {
@@ -212,6 +265,97 @@ final class Gut {
 					move.verb, mind, gut, sure, faith, 100 * danger, 100 * chance, goes ? "goes on" : "listens"));
 		}
 		return goes ? String.format(java.util.Locale.ROOT, "%s (mind %.2f against gut %.2f)", why, mind, gut) : null;
+	}
+
+	/**
+	 * Asks someone close what they think: a player (in chat; they answer yes or no), or another Xen, who answers from its
+	 * own gut (the same feeling, weighed with its own caution and belief in itself). False: nobody to ask.
+	 */
+	private boolean ask(Action move, float[] fear, float danger) {
+		var p = c.player;
+		net.minecraft.server.level.ServerPlayer person = null;
+		double best = 24 * 24;
+		for (var o : p.level().players()) {
+			if (o == p || o instanceof XenPlayer || o.isSpectator() || !o.isAlive() || !(o instanceof net.minecraft.server.level.ServerPlayer sp)) continue;
+			double d = o.distanceToSqr(p);
+			if (d < best && c.trust(o.getUUID()) >= -0.1f) {
+				best = d;
+				person = sp;
+			}
+		}
+		Companion xen = null;
+		best = 24 * 24;
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.player() == null || !o.player().isAlive() || o.player().level() != p.level()) continue;
+			double d = o.player().distanceToSqr(p);
+			if (d < best) {
+				best = d;
+				xen = o;
+			}
+		}
+		var r = java.util.concurrent.ThreadLocalRandom.current();
+		if (person != null && (xen == null || r.nextFloat() < 0.6f)) {
+			askedWho = person.getUUID();
+			askedName = person.getName().getString();
+			askedXen = false;
+			answer = 0;
+		} else if (xen != null) {
+			askedWho = xen.player().getUUID();
+			askedName = xen.name;
+			askedXen = true;
+			Action theirs = weigh(fear, danger, xen.personality.cautionScale() * (1.3f - xen.belief.get()));   // (its own gut, on the same spot)
+			answer = theirs == null ? 1 : -1;
+		} else {
+			return false;
+		}
+		long now = p.level().getGameTime();
+		askedAt = now;
+		askedAbout = move;
+		nextAsk = now + 20 * 60 * 2;
+		asks++;
+		c.say(c.pick3(askedName + ", my gut says " + move.verb + "... should I keep going?", "Hey " + askedName + ", is it safe to go on here?",
+				askedName + ", what do you think? Go on or not?"));
+		XenMod.LOG.info("{} isn't sure (its gut says {}) and asks {}", c.name, move.verb, askedName);
+		if (askedXen) {
+			Companion them = xen;
+			boolean go = answer > 0;
+			them.say(go ? them.pick3("Looks fine to me, go for it.", "Go on, you'll be fine.", "I'd go.")
+					: them.pick3("I wouldn't, that looks bad.", "Don't. Trust your gut.", "Nope, careful there."));
+		}
+		return true;
+	}
+
+	/** A player said something: the answer to what it asked them? True if it took it as one. */
+	boolean answer(net.minecraft.server.level.ServerPlayer from, String text) {
+		if (askedAbout == null || askedXen || answer != 0 || !from.getUUID().equals(askedWho)) return false;
+		String t = text.toLowerCase(java.util.Locale.ROOT);
+		if (NO.matcher(t).find()) answer = -1;
+		else if (YES.matcher(t).find()) answer = c.trust(askedWho) < -0.3f ? -1 : 1;     // (someone it doesn't trust: "go" isn't enough)
+		else return false;
+		return true;
+	}
+
+	/** Advice it took: good (fine after) or bad (hurt): it trusts that one more or less. */
+	private void advice(boolean good) {
+		if (advisor == null) return;
+		c.trust(advisor, good ? 0.05f : -0.1f);
+		c.journal("gut", (good ? "took " : "took bad ") + "advice from " + askedName + (good ? " and it was right" : " and got hurt"));
+		advisor = null;
+	}
+
+	/** It died: if it had just gone against its gut, the gut was right (and how): it trusts it a good deal more. */
+	void died() {
+		if (advisor != null) {
+			c.trust(advisor, -0.2f);
+			advisor = null;
+		}
+		if (judgeAt == 0) return;
+		judgeAt = 0;
+		gutRight++;
+		faith = Math.min(0.95f, Math.max(faith, 0.5f) + 0.25f);
+		c.belief.down(0.1f, "went against its gut and died");
+		c.journal("gut", String.format(java.util.Locale.ROOT, "went against its gut and died: it trusts its gut much more now (%.2f)", faith));
+		XenMod.LOG.info("{} went against its gut and died: trusts it much more ({})", c.name, String.format(java.util.Locale.ROOT, "%.2f", faith));
 	}
 
 	/** A while after it went against its gut: hurt since? Then the gut was right, and it trusts it more. */
@@ -222,6 +366,8 @@ final class Gut {
 		if (p.getHealth() < healthThen - 0.9f) {
 			gutRight++;
 			faith = Math.min(0.95f, faith + 0.12f);
+			c.belief.down(0.06f, "went against its gut and got hurt");
+			advice(false);
 			c.journal("gut", String.format(java.util.Locale.ROOT, "went against its gut and got hurt: it trusts its gut more now (%.2f)", faith));
 			XenMod.LOG.info("{} went against its gut and got hurt: trusts it more ({})", c.name, String.format(java.util.Locale.ROOT, "%.2f", faith));
 			if (java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
@@ -230,6 +376,8 @@ final class Gut {
 		} else {
 			gutWrong++;
 			faith = Math.max(0.1f, faith - 0.04f);
+			c.belief.up(0.05f, "went against its gut and was right");
+			advice(true);
 			c.journal("gut", String.format(java.util.Locale.ROOT, "went against its gut and was fine (trust in it %.2f)", faith));
 			XenMod.LOG.info("{} went against its gut and was fine: trusts it less ({})", c.name, String.format(java.util.Locale.ROOT, "%.2f", faith));
 		}

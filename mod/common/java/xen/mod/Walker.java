@@ -84,6 +84,11 @@ final class Walker {
 		return path != null;
 	}
 
+	/** Is the move it's on a jump across a gap (it runs at the edge on purpose)? */
+	boolean leaping() {
+		return path != null && index < path.size() && path.get(index).kind() == Kind.PARKOUR;
+	}
+
 	void stop() {
 		if (path == null) return;
 		path = null;

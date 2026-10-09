@@ -98,6 +98,7 @@ final class Roster {
 		if (c.adventure.on) o.addProperty("adventure", true);
 		if (c.band != null) o.addProperty("band", c.band);
 		if (c.gut.faith >= 0) o.addProperty("gutTrust", c.gut.faith);   // (how much it trusts its gut, learned)
+		if (c.belief.value >= 0) o.addProperty("selfBelief", c.belief.value);   // (how much it believes in itself, earned)
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

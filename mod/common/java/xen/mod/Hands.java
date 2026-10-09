@@ -1210,6 +1210,10 @@ public final class Hands {
 	}
 
 	/** Hit a creature in reach (the normal attack, with the normal cooldown), with its best weapon. */
+	/** What it hit last, and when (dead soon after: it killed it, and what it drops is its own). */
+	LivingEntity lastHit;
+	long lastHitAt;
+
 	void hit(LivingEntity e) {
 		stop();
 		lowerShield();
@@ -1219,6 +1223,8 @@ public final class Hands {
 		XenMod.INSTANCE.gameplayLog.quietly(() -> XenMod.INSTANCE.gameplayLog.swing(p, e));
 		p.attack(e);                                                   // attack, then swing: a swing resets the charge
 		Compat.swing(p);
+		lastHit = e;
+		lastHitAt = p.level().getGameTime();
 		current = Action.ATTACK;
 		ticks = 0;
 		limit = 2;

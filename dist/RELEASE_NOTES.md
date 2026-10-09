@@ -1,7 +1,39 @@
-**Xen Companion 2.0.0-beta.22**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.23**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.23: believing in itself, asking others, food for later, and seeing the world as it is
+
+* **It believes in itself:** each Xen has a self-belief, from who it is at first (brave and proud: more), then earned:
+  its own calls that work out raise it (it went against its gut and was right, it finished what it set out to do, it
+  built something, it beat a monster), the ones that don't lower it (hurt after going against its gut, a death). Bad
+  days fade back toward who it is. It backs its mind against its gut, it hesitates less, and it says so ("I've got
+  this.", "I'm getting good at this.").
+* **It asks for an opinion:** a close call, or not sure of itself, and someone close: it asks. A player answers in chat
+  ("yes, go for it" / "no, careful") and it goes with them, if it trusts them; another Xen answers from its own gut
+  ("I'd go." / "Don't. Trust your gut."). Then it learns whose advice is good: advice that got it hurt, it trusts that
+  one less; good advice, more. No answer in 15 seconds: its gut.
+* **A deadly drop is instinct:** about to walk off an edge where the fall would kill it or take half its health (no water
+  below), it stops, whatever its mind says (a Xen argued with its gut at a 24 block drop and died). A death after going
+  against its gut now teaches it to trust its gut much more.
+* **Food for later:** it wanted no animal when it wasn't hungry, so it never hunted for later, and "hunt for food" found
+  none. Now it keeps some food on it (4 to 10, a glutton more): not busy, little food, a cow close, it hunts it
+  ("Stocking up on food."), never a baby, a pet, a penned one or the last two of a herd.
+* **It picks up what it kills:** raw meat, fish, bones, eggs, wool and other drops weren't worth picking up; and what
+  drops where something it killed died is its own now, like what it mines.
+* **No more towering up for nothing:** with no way to something above it (an item on the leaves, a log up a tree) it
+  pillared straight up on dirt; now only out of a hole it's really in.
+* **It sees the world as it is (the world generator as the simulator):** `/xen terrain sample` labels spots in land
+  Minecraft generated from all their blocks (the inside of a cave, an entrance, a ravine, a river, ground), and the
+  Xens learned from 15,000 of them in 6 places (`scripts/learn_terrain.py`). On land it never saw: caves named right
+  66% (was 0%), plain ground left alone 95%, and when it names something it's right 71% (was 9%: it called oceans
+  rivers). Cave entrances (12%), rivers and ravines need more land sampled. `/xen terrain caves` lists caves with a deep
+  point, for a cave-diving test next.
+* Tested: a Xen at the bottom of a 12 deep waterfall was out on top in 8 s; one told to go up a stream was there in 8 s;
+  a full Xen with no food hunted a cow for later and took the beef; 8 Xens with a player for 6 minutes asked 7 times
+  (each other and the player) and went with the answers; 8 free Xens for 4 minutes: no errors. 26.1, 26.2 and 26.3
+  built and checked.
 
 ### 2.0.0-beta.22: Xens argue with their gut; instinct comes first
 

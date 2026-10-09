@@ -481,9 +481,14 @@ final class Choices {
 		boolean shearable = sheep && ((Sheep) a).readyForShearing() && shears;
 		float woolNeed = sheep && !bed && wool < 3 ? 0.7f : sheep && wool < 3 ? 0.15f : 0f;
 		float woolDrop = drops.mean("wool");                                          // (a sheared sheep drops none: nothing in it for a bed)
-		w.want = need * Math.min(1f, food / 12f) + woolNeed * (shearable ? 1f : woolDrop <= 0 ? 0f : Math.min(1f, woolDrop / 3f + 0.5f));
+		// Not only now: food for later (less on it than it likes to keep), and a hunt it was asked for. Before, a Xen that
+		// wasn't hungry wanted no animal at all ("I'll want it when I'm hungry"), so even "hunt for food" found none.
+		int carried = c.items().getOrDefault("food", 0), reserve = c.foodReserve();
+		float stock = carried >= reserve ? 0f : 0.7f * (reserve - carried) / reserve, asked = c.chores.huntingAsked() ? 0.9f : 0f;
+		float wants = Math.max(need, Math.max(stock, asked));
+		w.want = wants * Math.min(1f, food / 12f) + woolNeed * (shearable ? 1f : woolDrop <= 0 ? 0f : Math.min(1f, woolDrop / 3f + 0.5f));
 		w.doer = woolNeed >= 0.7f ? "wool for a bed" : need >= 0.5f ? String.format(Locale.ROOT, "food: about %.0f hunger cooked", food)
-				: "not hungry";
+				: asked > 0 ? "I was asked to hunt" : stock > 0 ? String.format(Locale.ROOT, "food for later (%d on me, I like %d)", carried, reserve) : "not hungry";
 		w.gut = shearable ? String.format(Locale.ROOT, "shearing: about %.0f wool, and it lives", Facts.SHEAR_WOOL)
 				: "it drops " + drops.says() + (drops.rolled ? "" : " (from what I know)");
 		int same = c.player.level().getEntitiesOfClass(Animal.class, a.getBoundingBox().inflate(16), x -> x.isAlive() && !x.isBaby() && Facts.kind(x).equals(kind)).size();
@@ -492,7 +497,7 @@ final class Choices {
 		if (c.player.level().getEntitiesOfClass(Monster.class, a.getBoundingBox().inflate(6), LivingEntity::isAlive).size() > 0) {
 			w.risk(0.3f, "a monster next to it", true, 20 * 30);
 		}
-		if (need < 0.25f && woolNeed < 0.15f) {
+		if (need < 0.25f && woolNeed < 0.15f && stock <= 0 && asked <= 0) {
 			w.wantLater = 0.4f;
 			w.later = 20 * 60 * 10;
 			if (w.doubter.isEmpty()) w.doubter = "I'll want it when I'm hungry";

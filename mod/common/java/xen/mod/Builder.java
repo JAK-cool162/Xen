@@ -988,6 +988,8 @@ final class Builder {
 			design = null;
 		}
 		XenMod.LOG.info("{} finished the {} ({} placed, {} dug, {} left out) in {} s", c.name, what, placed, dug, miss, (now() - started) / 20);
+		if (placed > 20 && miss * 5 < placed) c.belief.up(0.03f, "built a " + what);           // (a build it got done, near enough as planned)
+		else if (placed > 0 && miss * 2 > placed) c.belief.down(0.02f, "a " + what + " that didn't come out");
 		java.util.List<String> helpers = new ArrayList<>();
 		for (Companion o : c.mod.companions) if (o != c && c.player != null && c.player.getUUID().equals(o.builder.helping)) helpers.add(o.name);
 		BlockPos at = plan.middle();
@@ -997,6 +999,7 @@ final class Builder {
 			c.journal("build", "finished the " + what + " of its place; " + layoutLeft.size() + " parts to go");
 		} else if (wasPart && layout != null) {                                    // the last of its place: all done
 			c.say(c.pick3("Done! Come see my place!", "Finished! The whole place is just how I pictured it.", "All done! Come have a look round my place."));
+			c.belief.up(0.05f, "built a whole place of its own");
 			c.taste.placed(layout.chose(), layout.center());
 			c.lore(c.name + " finished laying out a place of its own at " + layout.center().getX() + " " + layout.center().getZ());
 		} else {

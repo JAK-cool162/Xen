@@ -244,6 +244,11 @@ final class Chores {
 		this.oreWay = null;
 	}
 
+	/** Is it on a hunt someone asked for? */
+	boolean huntingAsked() {
+		return busy() && kind == Kind.HUNT && !own;
+	}
+
 	/** Hunting for wool (a bed): sheep first. */
 	boolean forWool;
 
@@ -783,6 +788,9 @@ final class Chores {
 
 	private void finish(String say) {
 		cancel();
+		String s = say.toLowerCase(java.util.Locale.ROOT);
+		if (s.startsWith("got") || s.startsWith("done") || s.startsWith("here")) c.belief.up(0.015f, say);   // (what it set out to do: done)
+		else if (s.startsWith("i can't") || s.startsWith("no ") || s.startsWith("couldn't")) c.belief.down(0.015f, say);
 		c.chatter(say, !own);
 	}
 

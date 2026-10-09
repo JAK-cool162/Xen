@@ -1,7 +1,47 @@
-XEN COMPANION 2.0.0-beta.22: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.23: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.23
+===========================
+
+SelfBelief: 0.05 to 0.95, first 0.5 + 0.3 (bravery - 0.5) + 0.15 pride - 0.1 sloth; up(by) adds by x (1 - v), down(by)
+takes by x v; every 5 minutes a tenth of the way back to that. Up: went against its gut and was fine 0.05, a finished
+chore ("Got", "Done", "Here") 0.015, a build with 20+ placed and under a fifth left out 0.03, a whole place 0.05, a
+monster or player it hit dying within 3 s 0.03. Down: hurt after going against its gut 0.06, died after it 0.1, died
+0.04 (0.06 killed by something), a failed chore 0.015, a build with over half left out 0.02. Gut.argue: the mind gets
+0.4 (belief - 0.5) ("it believes in itself"); Confusion.step hesitates with chance level x (1.3 - belief). Saved
+("selfBelief"). Says "I've got this." going against its gut at 0.7 or more.
+Asking (Gut.ask): a new feeling, |mind - gut| < 0.12 or belief < 0.35, Ex1 danger under 0.6, health over 8, 2 minutes
+since it last asked, a player (not a Xen, trust -0.1 or more) or a Xen within 24 (a player 60% when both): it asks
+(said, not chatter). A Xen answers from Gut.weigh on the same fears with its own caution x (1.3 - its belief): no move,
+"go". A player's next line with yes/go/sure/ok... or no/don't/stop/careful... (XenMod.hear hands it over first); "go"
+from one it trusts under -0.3 is a no. Gut.hearAnswer, first thing: go: it goes on 5 s and judges 5.5 s later
+(advisor's trust +0.05 fine, -0.1 hurt, -0.2 dead); no, or 15 s with none: its gut for 10 s.
+Instinct, a deadly edge: on the ground (not sneaking, not on a parkour move, not flying, not in water or riding),
+moving (or pressing forward), the block 0.7 ahead open with nothing under it for (drop) blocks and no water: drop - 3
+>= health or >= half its max health: forward and strafe off, sneak on, speed x 0.2. Gut.died: if it went against its
+gut lately, trust in the gut max(trust, 0.5) + 0.25.
+Food: Companion.foodReserve = 4 + 4 gluttony + 3 diligence (3 to 10). Choices.animal wants max(hunger, 0.7 x (reserve -
+carried) / reserve, 0.9 when hunting was asked for) x food value (before: hunger alone; full, it wanted nothing, and
+nearestAnimal skipped every animal); "later" only with none of those. Companion.needs, not busy, health 10+, not
+"animals deserve kindness", under its reserve and a food animal within 14: hunt(min(3, reserve - carried)).
+Drops: raw meat, fish, apples, bones, eggs, rabbit hide, slime, ink, spider eyes, honeycomb and some wool are worth
+picking up; Hands.hit notes what it hit; Companion.noteKills (every 10 ticks): dead within 3 s of a hit, where it fell
+is noted (16 kept, 2 minutes): a drop within 4 (and 4 down, 3 up) is its own (minedIt), if there's room.
+digToward pillars toward a goal 1.5+ above only when boxedIn (no side with room to walk out onto ground within 4 down
+or a step up with head room); else it lets that goal go (null).
+WorldTruth (/xen terrain sample <n> <radius> | caves <radius>, operators): flood of the air beside a spot (4,000
+blocks, 32 out, 40 up or down; surface = MOTION_BLOCKING_NO_LEAVES): river / frozen river (the biome, water or ice on
+top, within 3 of it), cave (5+ under the surface, 150+ air under it), cave entrance (the flood reaches the sky, 60+
+under, 6+ deep), ravine (an entrance 15+ deep, its deep part 9 or less across and 16+ along), else ground. Spots: 6 in
+10 the top of a column, else a cave floor under it (a random height, the first air over solid within 24 down). With
+Sights.measure's 8 numbers, to xen-terrain/<seed>.jsonl. learn_terrain.py: k-means centres per kind (up to 8, 40
+spots each), reach the 90th percentile (at least 1), tested on every fourth 256 x 256 square left out: 15,000 spots in
+6 places (data/worldtruth): cave 66%, entrance 12%, ground 95%, ravine 0% (29), river 0% (40); named right 71%. The old
+sights (Build Axe captures) on the same spots: 9% right when it named something.
 
 
 WHAT'S NEW IN 2.0.0-beta.22
