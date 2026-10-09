@@ -1,7 +1,30 @@
-XEN COMPANION 2.0.0-beta.21: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.22: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.22
+===========================
+
+Instinct (Instinct.java), Companion.tick after everything else, every tick (not creative or spectator): in lava, the
+nearest block within 4 (and a block up or down) with room for its body, no lava or fire, firm under it and not lava or
+magma: faced at once and gone for, jump held (none: jump held); under water with air under 60% and water then air
+straight up within 8: jump held, no sneak or sprint, no forward or strafe against a wall; feet in fire or soul fire:
+the nearest such block (none: a jump). A takeover stops the walker and the hands (if interruptible) and goes in the
+journal and the log (once per danger: 20 ticks out of it count as the same one). Instinct.clear(): Companion.instinct
+returns IDLE (nothing new starts) and Gut.override returns nothing.
+Gut.argue, when the gut has a move (Gut.weigh or keepAway) that's new or 3 s after it last decided: the mind is the sum
+of asked (0.35: a /xen goto or a chore someone asked for), health ((health/max - 0.5) x 0.4), boldness ((bravery - 0.5) x
+0.5 + 0.5 x risk) and doubt (0.35 x (1 - sure), sure = (max(stay, on) - least fear) x caution / 0.36, 0 to 1); the gut is
+trust x (0.3 + 0.7 x sure) + 0.5 x Ex1 danger; it goes on with chance 1 / (1 + e^(-5 (mind - gut))), and then for 3 s,
+and never when Ex1 danger is 0.8 or more with under 10 health. Trust starts at 0.55 + 0.25 x (caution - 1) (0.2 to 0.9);
+3.5 s after going on: health down by 1 or more, +0.12 (to 0.95; "should've listened"); else -0.04 (to 0.1). Saved per
+Xen in companions.json ("gutTrust"). Logged: "<name> argues with its gut (it says ...) and goes on anyway: ...",
+"<name>'s gut takes over: ...", "<name> went against its gut and got hurt / was fine".
+Tests: 21 deep 1 x 1 water shaft: takeover at air 180, at the top with air 163; 3 x 3 lava pool (1 deep), dropped in the
+middle at 20 health: out on the stone at 1.2 s; 8 free Xens, 200 s: 1 gut takeover, 1 argument won by the mind
+(faint feeling, mind 0.30 against gut 0.35), fine after, trust 0.58.
 
 
 WHAT'S NEW IN 2.0.0-beta.21

@@ -16,6 +16,11 @@ import xen.mod.core.Action;
  * move, a reaction time after it feels it, before anything it was asked. Nothing about lava, fire, drops or monsters
  * is written here: it steps back from lava because stepping into lava hurt (in SimLife, or here). A Xen that has
  * never been burnt may go too close the first time; the hurt teaches it (and every Xen with it).
+ * <p>A Xen can argue with its gut. When the gut says no, its mind makes its case (it was asked to, it can take a hit,
+ * it's braver than that, the feeling is faint) against how sure the gut is, how dangerous it all looks (Ex1) and how
+ * much it trusts its gut, and now and then it goes on anyway. Then it watches what happens: hurt, and it trusts its gut
+ * more ("should've listened"); fine, and a little less. Instinct (a clear danger: no air, lava, fire) isn't argued
+ * with: it comes first ({@link Instinct}), and the gut keeps quiet meanwhile.
  */
 final class Gut {
 	static final Action[] MOVES = {Action.IDLE, Action.FORWARD, Action.BACK, Action.LEFT, Action.RIGHT, Action.JUMP};
@@ -30,6 +35,14 @@ final class Gut {
 	String doing = "";
 	int overrides;
 	private Action last;
+	/** How much it trusts its gut, 0.1 to 0.95 (from its caution at first; then from what happened when it went against it). -1: not yet. */
+	float faith = -1;
+	/** Times it argued with its gut, went against it, and found it right or wrong. */
+	int arguments, overruled, gutRight, gutWrong;
+	/** Going against its gut: what it said no to, till when it sticks to that, when to see how it went, its health then. */
+	private Action against;
+	private long againstUntil, decidedUntil, judgeAt;
+	private float healthThen;
 
 	Gut(Companion c) {
 		this.c = c;
@@ -96,9 +109,10 @@ final class Gut {
 	Action override() {
 		var p = c.player;
 		if (p == null || c.inArena || p.isCreative() || p.isSpectator() || c.perceived == null || c.mod.brain == null) return null;
-		// Under water and short of air: air first, whatever the gut says. Drowning hurts whatever it does there, so every
-		// move felt wrong and it "held still, that feels wrong" till it drowned (a player's recording).
-		if (p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply()) {
+		judge();                                                                 // (it went against its gut: was the gut right?)
+		// Instinct first (a clear danger), and under water short of air: air first, whatever the gut says. Drowning hurts
+		// whatever it does there, so every move felt wrong and it "held still, that feels wrong" till it drowned.
+		if (c.instinct.clear() || p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply()) {
 			last = null;
 			return null;
 		}
@@ -117,6 +131,28 @@ final class Gut {
 			last = null;
 			return null;
 		}
+		long now = p.level().getGameTime();
+		if (move == against && now < againstUntil) return null;                 // it made up its mind: it goes on
+		if (move != last || now >= decidedUntil) {                              // a new feeling: does its mind go along?
+			decidedUntil = now + 60;
+			String why = argue(move, fear, danger);
+			if (why != null) {
+				against = move;
+				againstUntil = now + 60;
+				judgeAt = now + 70;
+				healthThen = p.getHealth();
+				overruled++;
+				last = move;
+				doing = "";
+				c.journal("gut", "argues with its gut (it says " + move.verb + ") and goes on anyway: " + why);
+				XenMod.LOG.info("{} argues with its gut (it says {}) and goes on anyway: {}", c.name, move.verb, why);
+				boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
+				if (asked || java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.25f) {
+					c.chatter(c.pick3("My gut says no... going anyway.", "This feels wrong, but okay.", "Eh, I'll risk it."), asked);
+				}
+				return null;
+			}
+		}
 		if (!c.reflexes.ready("gut", false)) return null;                       // (it feels it a reaction time later)
 		overrides++;
 		doing = switch (move) {
@@ -127,6 +163,7 @@ final class Gut {
 		};
 		c.goals.instant = doing;
 		if (move != last) {
+			XenMod.LOG.info("{}'s gut takes over: {}", c.name, move.verb);
 			c.journal("gut", String.format(java.util.Locale.ROOT, "takes over: %s (fear: stay %.2f, on %.2f, %s %.2f; danger %.0f%%)", move.verb,
 					fear[0], fear[1], move.verb, all[move.ordinal()], 100 * danger));
 			boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
@@ -138,5 +175,63 @@ final class Gut {
 		last = move;
 		c.walker.stop();
 		return move;
+	}
+
+	/**
+	 * Its mind's case against its gut, now that the gut says "move" (fear: what each of MOVES is expected to cost). The
+	 * reason it goes on anyway, or null: the gut wins (most of the time, more so the surer the gut and the more it
+	 * trusts it). A weighed chance, not a rule: the same Xen in the same spot may go either way.
+	 */
+	private String argue(Action move, float[] fear, float danger) {
+		var p = c.player;
+		var pe = c.personality;
+		if (faith < 0) faith = Math.max(0.2f, Math.min(0.9f, 0.55f + 0.25f * (pe.cautionScale() - 1f)));
+		if (danger >= DREAD && p.getHealth() < 10) return null;                 // (scared and hurt: no arguing)
+		arguments++;
+		float keep = Math.max(fear[0], fear[1]), low = fear[0];
+		for (float f : fear) low = Math.min(low, f);
+		float sure = Math.max(0f, Math.min(1f, (keep - low) * pe.cautionScale() / (RELIEF * 3)));   // how sure the gut is
+		float mind = 0, top = -1;
+		String why = "";
+		boolean asked = c.commandedTo != null || c.chores.busy() && !c.chores.own;
+		float[] parts = {asked ? 0.35f : 0f, (p.getHealth() / p.getMaxHealth() - 0.5f) * 0.4f,
+				(pe.bravery - 0.5f) * 0.5f + 0.5f * pe.risk(), 0.35f * (1 - sure)};
+		String[] reasons = {"it was asked to", "it can take a hit", "it's braver than that", "the feeling is faint"};
+		for (int i = 0; i < parts.length; i++) {
+			mind += parts[i];
+			if (parts[i] > top) {
+				top = parts[i];
+				why = reasons[i];
+			}
+		}
+		float gut = faith * (0.3f + 0.7f * sure) + 0.5f * danger;
+		float chance = (float) (1 / (1 + Math.exp(-(mind - gut) * 5)));
+		boolean goes = java.util.concurrent.ThreadLocalRandom.current().nextFloat() < chance;
+		if (DEBUG || !goes && arguments % 10 == 1) {
+			c.journal("gut", String.format(java.util.Locale.ROOT, "argues with its gut (%s): mind %.2f, gut %.2f (sure %.2f, trust %.2f, danger %.0f%%): %.0f%% to go on -> %s",
+					move.verb, mind, gut, sure, faith, 100 * danger, 100 * chance, goes ? "goes on" : "listens"));
+		}
+		return goes ? String.format(java.util.Locale.ROOT, "%s (mind %.2f against gut %.2f)", why, mind, gut) : null;
+	}
+
+	/** A while after it went against its gut: hurt since? Then the gut was right, and it trusts it more. */
+	private void judge() {
+		var p = c.player;
+		if (judgeAt == 0 || p.level().getGameTime() < judgeAt) return;
+		judgeAt = 0;
+		if (p.getHealth() < healthThen - 0.9f) {
+			gutRight++;
+			faith = Math.min(0.95f, faith + 0.12f);
+			c.journal("gut", String.format(java.util.Locale.ROOT, "went against its gut and got hurt: it trusts its gut more now (%.2f)", faith));
+			XenMod.LOG.info("{} went against its gut and got hurt: trusts it more ({})", c.name, String.format(java.util.Locale.ROOT, "%.2f", faith));
+			if (java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.5f) {
+				c.chatter(c.pick3("Ow. Should've listened to my gut.", "Okay, my gut was right.", "Next time I listen to my gut."), false);
+			}
+		} else {
+			gutWrong++;
+			faith = Math.max(0.1f, faith - 0.04f);
+			c.journal("gut", String.format(java.util.Locale.ROOT, "went against its gut and was fine (trust in it %.2f)", faith));
+			XenMod.LOG.info("{} went against its gut and was fine: trusts it less ({})", c.name, String.format(java.util.Locale.ROOT, "%.2f", faith));
+		}
 	}
 }

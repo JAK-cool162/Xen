@@ -97,6 +97,7 @@ final class Roster {
 		o.add("crops", c.farmer.toJson());
 		if (c.adventure.on) o.addProperty("adventure", true);
 		if (c.band != null) o.addProperty("band", c.band);
+		if (c.gut.faith >= 0) o.addProperty("gutTrust", c.gut.faith);   // (how much it trusts its gut, learned)
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);
 	}
 

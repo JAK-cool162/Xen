@@ -1,7 +1,25 @@
-**Xen Companion 2.0.0-beta.21**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.22**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.22: Xens argue with their gut; instinct comes first
+
+* **Instinct, first of all:** when the danger is clear and the way out plain, a Xen's instinct takes over everything
+  it's doing, every tick: out of air under water (up, holding space, not into the wall), in lava (out to the nearest
+  block it can stand on, up to 4 away, jumping), standing in fire (a step out of it). Nothing argues with it, not its
+  gut and not its mind, and nothing new starts till it's safe.
+* **Arguing with its gut:** when its gut (the fear it learned) says no, its mind makes its case: it was asked to, it
+  can take a hit, it's braver than that, the feeling is faint. Against that: how sure the gut is, how dangerous it all
+  looks, and how much it trusts its gut. It's a weighed chance, so now and then it goes on anyway ("My gut says no...
+  going anyway."). Scared and badly hurt, it doesn't argue.
+* **It learns from it:** after going against its gut it watches what happens. Hurt: it trusts its gut more ("Ow.
+  Should've listened to my gut."). Fine: a little less. Each Xen keeps its own trust (saved with the world), so a bold
+  one that keeps getting away with it grows bolder, and one that keeps getting burnt listens.
+* Tested: from the bottom of a 21 deep shaft its instinct took over at 60% air and it came up with air left; dropped
+  in a 3 x 3 lava pool it was out in about a second and ran for water; 8 free Xens for 3 minutes: a gut took over,
+  another Xen argued with its gut ("the feeling is faint"), went on, was fine and trusts its gut a little less. 26.1,
+  26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.21: no more drowning in place
 

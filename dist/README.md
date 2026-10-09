@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.21
+# Xen Companion (Fabric mod) 2.0.0-beta.22
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,10 +12,10 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java | chat model |
 |---|---|---|---|
-| `xen-companion-2.0.0-beta.21+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.21+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.21+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.21+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| `xen-companion-2.0.0-beta.22+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.22+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
+| `xen-companion-2.0.0-beta.22+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
+| `xen-companion-2.0.0-beta.22+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
 
 Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
 and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
@@ -91,7 +91,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.21+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.22+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine; 3 GB or more if you want the chat model).
@@ -879,6 +879,10 @@ A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
   shears a sheep when it has shears, spares the last two of a kind and animals in a pen, and waits when it isn't
   hungry.
 * **Its gut takes over to survive**: a step back from lava, into water when on fire, backing off when badly hurt.
+* **Instinct comes first, the gut can be argued with** (2.0.0-beta.22): a clear danger (no air under water, in
+  lava, standing in fire) and its instinct takes over everything at once, every tick. Its gut (the fear it learned)
+  is a feeling it can argue with: asked to go on, at full health, bold, or with only a faint feeling, it sometimes
+  goes on anyway ("My gut says no... going anyway."). Hurt after that, it trusts its gut more; fine, a little less.
 * **Reaction time and confusion**: about a quarter second to notice something, more when it didn't see it coming. A
   confused Xen hesitates, looks around, sometimes changes its mind.
 * **Hidden stats**: reflexes, composure, humor, typing, appetite, pickiness, love of fishing, night owl, stubbornness.
