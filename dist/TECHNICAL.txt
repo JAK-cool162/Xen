@@ -1,7 +1,19 @@
-XEN COMPANION 2.0.0-beta.20: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.21: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.21
+===========================
+
+From a player's recordings: a Xen drowned at y 50, 1.5 below the top, against stone, for 40 s pressing nothing most of
+the time. Gut.override (learned fear) came before the water instinct in Companion.instinct, and with drowning damage
+on every move it chose "hold still". Now Gut.override returns nothing while the Xen is under water with less than full
+air. And Companion.breathe, every tick after everything else: under water, air under 60%, open water then air within
+8 straight up: jump held, no sneak or sprint, no forward or strafe while it's against a wall (the instinct's JUMP pressed
+forward and jump for 7 ticks a decision). Chores: "I haven't seen any ... yet" isn't said for an ask it answered in the
+last 5 s (Companion.saidMillis, set in say()). Mind.VERSION (written_by in recordings, the settings screen) says beta 21.
 
 
 WHAT'S NEW IN 2.0.0-beta.20

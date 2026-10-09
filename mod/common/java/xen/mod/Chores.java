@@ -873,8 +873,8 @@ final class Chores {
 		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
-			if (!saidLooking) {
-				c.chatter("I haven't seen any " + lookFor + " yet, I'll look around.", !own);
+			if (!saidLooking) {                                         // (asked, and it just answered: once is enough)
+				if (own || System.currentTimeMillis() - c.saidMillis > 5000) c.chatter("I haven't seen any " + lookFor + " yet, I'll look around.", !own);
 				saidLooking = true;
 			}
 			return lookAround();

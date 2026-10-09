@@ -225,7 +225,41 @@ public final class Companion {
 	void tick() {
 		tickInner();
 		gesture();                                                      // last: nothing this tick undoes it
-		if (player != null) hands.keepTool();                           // (mid-dig: the tool it picked is what it holds, whatever else went on this tick)
+		if (player != null) {
+			hands.keepTool();                                           // (mid-dig: the tool it picked is what it holds, whatever else went on this tick)
+			breathe();                                                  // (and air over everything)
+		}
+	}
+
+	/**
+	 * Under water and short of air, with open water over its head: it holds space every tick till its head is out, like
+	 * a player, and doesn't push into a wall meanwhile. The instinct for it came only with a decision (a few times a
+	 * second, less when nobody is near) and pressed jump and forward for a moment: against a wall a block and a half
+	 * under the top it rose a little, sank a little, and drowned there (a player's recording).
+	 */
+	private void breathe() {
+		if (!player.isAlive() || player.isCreative() || player.isSpectator() || !player.isUnderWater()
+				|| player.getAirSupply() >= player.getMaxAirSupply() * 0.6) return;
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos head = BlockPos.containing(player.getEyePosition());
+		boolean open = false;
+		for (int k = 1; k <= 8; k++) {                                // water, then air, straight up (a roof: toAir finds the way round)
+			var st = level.getBlockState(head.above(k));
+			if (!st.getCollisionShape(level, head.above(k)).isEmpty()) break;
+			if (st.getFluidState().isEmpty()) {
+				open = true;
+				break;
+			}
+		}
+		if (!open) return;
+		player.setJumping(true);
+		player.setShiftKeyDown(false);
+		player.setSprinting(false);
+		if (player.horizontalCollision) {                             // (into a wall: up, not forward)
+			player.zza = 0;
+			player.xxa = 0;
+		}
+		if (player.getAirSupply() < player.getMaxAirSupply() / 3) goals.instant = "swimming up for air";
 	}
 
 	/** Its head is in a block (sand fell on it, it was pushed in, it woke up in a wall): it breaks it, like a player. */
@@ -2925,7 +2959,11 @@ public final class Companion {
 		mod.whisperFrom(from, this, text);
 	}
 
+	/** When it last said anything (a reply, a word on its own), by the clock. */
+	long saidMillis;
+
 	public void say(String text) {
+		saidMillis = System.currentTimeMillis();
 		if (privateTo != null && player != null && privateTo.isAlive()) {   // answering a whisper: whispered back
 			whisper(privateTo, text);
 			return;

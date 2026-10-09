@@ -1,7 +1,21 @@
-**Xen Companion 2.0.0-beta.20**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.21**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.21: no more drowning in place
+
+From a player's recordings (thanks!):
+
+* **Fixed: a Xen drowned holding still.** Under water, its gut (the fear it learned) came before its instinct to swim
+  up, and drowning hurts whatever you do there, so every move "felt wrong" and it held still a block and a half under
+  the top, against a wall, until it drowned. Now, under water and short of air, air comes first: the gut waits, and
+  every tick (not only when it decides something) it holds space, like a player, and doesn't push into the wall.
+* **Fixed: two answers to one ask.** "find me wood" got "I don't know where any trees are, I'll look around" and then
+  "I haven't seen any trees yet, I'll look around." Now the second one only comes when it hasn't just answered.
+* Its recordings say which version wrote them again (they all said beta 10).
+* Tested: a Xen at the bottom of a 5 deep pit against a wall is out in 4 seconds and swims on at full air; the obstacle
+  course 8 of 8 (river 48 s). 26.1, 26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.20: faster way finding (part 1 of the pathfinder upgrade)
 

@@ -96,6 +96,12 @@ final class Gut {
 	Action override() {
 		var p = c.player;
 		if (p == null || c.inArena || p.isCreative() || p.isSpectator() || c.perceived == null || c.mod.brain == null) return null;
+		// Under water and short of air: air first, whatever the gut says. Drowning hurts whatever it does there, so every
+		// move felt wrong and it "held still, that feels wrong" till it drowned (a player's recording).
+		if (p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply()) {
+			last = null;
+			return null;
+		}
 		float[] all = c.mod.brain.fears(c.perceived);
 		float[] fear = new float[MOVES.length];
 		for (int i = 0; i < MOVES.length; i++) fear[i] = all[MOVES[i].ordinal()];
