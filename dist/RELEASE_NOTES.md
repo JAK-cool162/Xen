@@ -1,7 +1,12 @@
-**Xen Companion 2.0.0-beta.26**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.26.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.26.1 (hotfix): a shield first
+
+* **The first iron after the pickaxe goes into a shield** (one ingot and six planks), before a sword or any armor: it
+  stops nearly everything early on (arrows, creepers, zombies). Before, it came after the iron sword and the armor.
 
 ### 2.0.0-beta.26: villages and ruined portals used, iron golems, boxed villagers, a quicker start
 

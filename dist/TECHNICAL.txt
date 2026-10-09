@@ -1,7 +1,14 @@
-XEN COMPANION 2.0.0-beta.26: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.26.1: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.26.1
+=============================
+
+Crafter.wanted(): right after the iron pickaxe, a shield (iron pickaxe or better, 1+ iron ingot, 6+ planks' worth of
+wood, no shield in its bag or off hand), ahead of the iron sword and the iron armor (it was in upgrade(), after them).
 
 
 WHAT'S NEW IN 2.0.0-beta.26
