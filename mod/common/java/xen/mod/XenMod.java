@@ -1033,6 +1033,7 @@ public class XenMod implements ModInitializer {
 						})))
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
+				.then(Commands.literal("progress").executes(ctx -> each(ctx, Companion::progress)))   // (one short line each: how far along it is)
 				.then(Commands.literal("layout").executes(ctx -> each(ctx, c -> c.builder.showLayoutAgain())))
 				.then(Commands.literal("terrain").requires(XenMod::mayRun)           // the world as it really is (a dev tool: WorldTruth)
 						.then(Commands.literal("sample").then(Commands.argument("n", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 20000))

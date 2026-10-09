@@ -3408,6 +3408,18 @@ public final class Companion {
 						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing);
 	}
 
+	/** How far along it is, in one line (for a long run's log): where, health, its pickaxe, the things that mark progress, its adventure. */
+	public String progress() {
+		if (player == null) return name + " | not here";
+		var it = items();
+		var a = adventure.stage();
+		return String.format(java.util.Locale.ROOT, "%s | %s %d %d %d | hp %.0f food %d | pick %d | iron %d diamond %d obsidian %d blaze %d pearl %d eye %d | adventure %s | home %s",
+				name, Places.dim(player.level()), player.getBlockX(), player.getBlockY(), player.getBlockZ(), player.getHealth(),
+				player.getFoodData().getFoodLevel(), crafter.pickTier(), it.getOrDefault("raw_iron", 0) + it.getOrDefault("iron_ingot", 0), it.getOrDefault("diamond", 0),
+				it.getOrDefault("obsidian", 0), it.getOrDefault("blaze_rod", 0), it.getOrDefault("ender_pearl", 0), it.getOrDefault("ender_eye", 0),
+				a == null ? "-" : a.name().toLowerCase(java.util.Locale.ROOT), goals.home == null ? "-" : "yes");
+	}
+
 	/** Its notes for talking: only its own feelings, body and perception. */
 	public String notes() {
 		StringBuilder carrying = new StringBuilder();
