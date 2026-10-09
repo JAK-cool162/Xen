@@ -18,7 +18,7 @@ import java.util.Random;
 
 /**
  * Its eyes, block by block: a yes or no for every block it can see. Over its whole view (110 by 90 degrees, where
- * its head points) it sends a sight line every 3 degrees out to 48 blocks, a slice of them each tick (the whole view
+ * its head points) it sends a sight line every 3 degrees out to 96 blocks (ore it makes out to 64), a slice of them each tick (the whole view
  * about every second and a half, each sweep a little shifted so nothing slips between the lines). Every block a line
  * passes or stops at gets a yes or no: worth knowing (ore, a tree, grass for seeds, a chest, water, lava, crops, what
  * people build) or not. It sees what a player would: nothing through rock, and in the dark only what's close by (8
@@ -26,7 +26,9 @@ import java.util.Random;
  * ground is a cave, and blocks people build, close together, are a house.
  */
 final class Eyes {
-	static final int RANGE = 48, NEAR_IN_DARK = 16;                  // (in the dark: the shape of a cave 16 blocks out, as a player at normal brightness; 8 left it guessing the rest was rock)
+	static final int RANGE = 96, NEAR_IN_DARK = 16;                  // (in the dark: the shape of a cave 16 blocks out, as a player at normal brightness; 8 left it guessing the rest was rock)
+	/** Ore it can make out up to here (past that, a player sees stone: the speckles don't show); trees, water, lava, houses to RANGE. */
+	static final int ORE_SIGHT = 64;
 	private static final double H_FOV = Math.toRadians(110), V_FOV = Math.toRadians(90), STEP = Math.toRadians(3);
 	private static final int COLS = (int) (H_FOV / STEP) + 1, ROWS = (int) (V_FOV / STEP) + 1, PER_TICK = 24, CAP = 2000;
 	/** The yes or no for each kind of block (null: no, not worth knowing), worked out once per block state. */
@@ -47,6 +49,8 @@ final class Eyes {
 	}
 
 	/** The yes or no: the kind of thing a block is, if it's worth knowing. */
+	private static final java.util.Set<String> ORE_KINDS = java.util.Set.of("diamond", "emerald", "gold", "iron", "copper", "lapis", "redstone", "coal", "ore", "debris");
+
 	static String kind(BlockState s) {
 		String k = KIND.get(s);
 		if (k != null) return k.isEmpty() ? null : k;
@@ -159,7 +163,7 @@ final class Eyes {
 			}
 			if (open && s.getFluidState().isEmpty() && chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) > y) sawOpen(level);
 			String k = kind(s);
-			if (k != null) remember(k, m, t);
+			if (k != null && (t <= ORE_SIGHT || !ORE_KINDS.contains(k))) remember(k, m, t);
 			else if (darkRun > 0 && !open && deepStone(s)) remember("deepstone", m, t);   // dark stone under the grass: where ore is
 
 			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) return;               // rock, a wall: that's as far as it sees

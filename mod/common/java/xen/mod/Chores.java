@@ -1995,7 +1995,7 @@ final class Chores {
 		LivingEntity best = null;
 		double bestD = Double.MAX_VALUE;
 		Choices.Choice pick = null;
-		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(48),
+		for (Animal a : c.player.level().getEntitiesOfClass(Animal.class, c.player.getBoundingBox().inflate(Eyes.RANGE),
 				x -> x.isAlive() && !x.isBaby() && food(x))) {
 			double d = c.player.distanceTo(a) - (forWool && a instanceof net.minecraft.world.entity.animal.sheep.Sheep ? 40 : 0);   // (sheep first, for a bed)
 			if (d < bestD && WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, a)) {

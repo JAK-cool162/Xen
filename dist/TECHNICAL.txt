@@ -1,7 +1,16 @@
-XEN COMPANION 2.0.0-beta.25: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.25.1: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.25.1
+=============================
+
+Eyes.RANGE 48 -> 96 (sight lines block by block, 110 x 90 degrees every 3 degrees, 24 a tick); ore kinds remembered only
+within Eyes.ORE_SIGHT = 64. Animals for hunting and sheep for a bed are looked for within Eyes.RANGE (48 before). Entities
+were already seen to Perception.VIEW (128). /xen progress: name | dimension x y z | hp food | pick tier | iron diamond
+obsidian blaze pearl eye | adventure stage | home.
 
 
 WHAT'S NEW IN 2.0.0-beta.25

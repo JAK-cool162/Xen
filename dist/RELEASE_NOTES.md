@@ -1,7 +1,15 @@
-**Xen Companion 2.0.0-beta.25**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.25.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.25.1 (hotfix): Xens see further
+
+* **Twice as far:** a Xen's eyes now reach 96 blocks (48 before): trees, water, lava, animals, houses and villages that
+  far off, so it finds what it needs sooner and wanders less. Ore it makes out to 64 blocks (past that, a player sees
+  stone: the speckles don't show). Still only what a player would see: nothing through rock, little in the dark.
+* `/xen progress`: one line per Xen (where, health, pickaxe, iron, diamonds, obsidian, blaze rods, pearls, eyes of ender,
+  its adventure's stage) for watching a long game.
 
 ### 2.0.0-beta.25: no more reaching through walls, beds it understands, and working up to diamonds
 

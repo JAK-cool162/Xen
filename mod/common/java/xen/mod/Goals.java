@@ -1176,7 +1176,7 @@ final class Goals {
 
 	/** Sheep it can see or knows are close (within 48 blocks). */
 	private boolean sheepSeen() {
-		return !c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, c.player.getBoundingBox().inflate(48), x -> x.isAlive()).isEmpty();
+		return !c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.sheep.Sheep.class, c.player.getBoundingBox().inflate(Eyes.RANGE), x -> x.isAlive()).isEmpty();
 	}
 
 	/** Off on a trip: ready for the worst first (food, blocks, a spare pickaxe; valuables left at home before a risky one). */
