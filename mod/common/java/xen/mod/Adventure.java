@@ -443,7 +443,7 @@ final class Adventure {
 		if (bedUsed || !c.knowledge.knows("end_bed")) return null;
 		java.util.function.Predicate<net.minecraft.world.item.ItemStack> bed = st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed");
 		if (portalBed != null && level.getBlockState(portalBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
-			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(portalBed)) > c.player.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(portalBed));
+			if (!c.hands.canClick(portalBed)) return c.walkTo(Vec3.atBottomCenterOf(portalBed));
 			c.goals.instant = "using its bed by the portal";
 			c.hands.stop();
 			c.hands.use(portalBed);

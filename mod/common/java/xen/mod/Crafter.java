@@ -540,7 +540,7 @@ final class Crafter {
 	private BlockPos nearbyTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		double reach = c.player.blockInteractionRange();
-		if (table != null && isTable(level, table) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(table)) <= reach) return table;
+		if (table != null && isTable(level, table) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(table)) <= reach && c.hands.canClick(table)) return table;
 		long now = level.getGameTime();
 		if (now - lookedForTable < 40 && c.player.containerMenu == c.player.inventoryMenu) {   // looked just now
 			return tableSeen != null && isTable(level, tableSeen) ? tableSeen : null;
@@ -549,7 +549,7 @@ final class Crafter {
 		tableSeen = null;
 		BlockPos feet = c.player.blockPosition();
 		for (BlockPos p : BlockPos.betweenClosed(feet.offset(-4, -2, -4), feet.offset(4, 3, 4))) {
-			if (isTable(level, p) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) <= reach) return tableSeen = table = p.immutable();
+			if (isTable(level, p) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) <= reach && c.hands.canClick(p)) return tableSeen = table = p.immutable();   // (one it sees: not behind a wall)
 		}
 		return null;
 	}

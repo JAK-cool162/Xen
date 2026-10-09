@@ -254,7 +254,7 @@ final class Storage {
 		}
 		if (chest == null) return job == Job.STORE ? placeChest() : null;
 		ServerLevel level = (ServerLevel) c.player.level();
-		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(chest)) > c.player.blockInteractionRange() - 0.6) {
+		if (!c.hands.canClick(chest)) {                                             // (in reach and in sight: not through a wall)
 			doing = "going to the chest";
 			return c.walkTo(Vec3.atBottomCenterOf(chest));
 		}

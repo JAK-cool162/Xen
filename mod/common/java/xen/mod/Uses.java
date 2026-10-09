@@ -130,7 +130,7 @@ final class Uses {
 		}
 		c.goals.instant = doing;
 		c.acted = true;
-		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(target)) > p.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(target));
+		if (!c.hands.canClick(target)) return c.walkTo(Vec3.atBottomCenterOf(target));   // (in reach and in sight: not through a wall)
 		p.getInventory().setSelectedSlot(slot);
 		c.hands.use(target);                                                   // right-click it (fire goes on top)
 		BlockPos done = target;

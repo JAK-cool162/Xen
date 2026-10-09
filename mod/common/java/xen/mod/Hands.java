@@ -463,6 +463,12 @@ public final class Hands {
 			limit = 2;
 			return;
 		}
+		if (outOfSight(level, pos)) {                                  // (it moved, or something came between: not through it)
+			cantMine = pos.immutable();
+			cantMineUnseen = true;
+			limit = 2;
+			return;
+		}
 		selectBestTool(state);
 		if (tooSlow(state.getDestroyProgress(p, level, pos))) {       // more than 10 seconds with what it has: not worth it
 			cantMine = pos.immutable();
@@ -490,6 +496,20 @@ public final class Hands {
 		return !p.isCreative() && progressPerTick * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) < 1f / 200;
 	}
 
+	/**
+	 * Is the block it's digging out of its reach now, or out of its sight (something solid between its eyes and every
+	 * face it could see)? A player's crosshair can only be on a block it sees, within reach. (A builder boxed in by what
+	 * it built, after trying from everywhere, digs anyway.)
+	 */
+	private boolean outOfSight(ServerLevel level, BlockPos pos) {
+		if (p.isCreative()) return false;
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange() + 0.5) return true;
+		return !digBlind && seePoint(level, pos) == null;
+	}
+
+	/** Packing up its own bed in the morning: the one time it breaks a bed. */
+	boolean mayBreakBed;
+
 	private void keepMining() {
 		if (turning && aim != null && aimPoint != null) {                  // eyes to the block first, then the pickaxe
 			if (turnToward(aimPoint, 40f, 30f)) {
@@ -512,6 +532,14 @@ public final class Hands {
 			digItem = p.getInventory().getItem(digSlot).getItem();
 		}
 		if (digSlot >= 0 && p.getInventory().getSelectedSlot() != digSlot) p.getInventory().setSelectedSlot(digSlot);   // (the tool it picked, to the end)
+		if (ticks % 4 == 0 && outOfSight(level, digging)) {                  // like a player: it digs what its crosshair is on, nothing behind a wall
+			cantMine = digging.immutable();
+			cantMineUnseen = true;
+			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP, level.getMaxY(), 0);
+			digging = null;
+			limit = ticks;
+			return;
+		}
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
 		if (ticks > 60 && progress < 0.15f) {                                // (swimming, in the air: getting nowhere) it stops, and tries again from better footing
@@ -679,8 +707,16 @@ public final class Hands {
 		return false;
 	}
 
+	/** This dig may go on without seeing the block (a builder boxed in by its own walls: set from blindOk when it starts). */
+	private boolean digBlind;
+
 	boolean mine(BlockPos pos) {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
+		if (!mayBreakBed && p.level().getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {   // (a bed: slept in, never dug through)
+			cantMine = pos.immutable();
+			cantMineUnseen = false;
+			return false;
+		}
 		ServerLevel level = (ServerLevel) p.level();
 		if (holdsSomeone(level, pos, p)) {                                  // (someone stands on it)
 			cantMine = pos.immutable();
@@ -708,6 +744,7 @@ public final class Hands {
 		}
 		if (point == null) point = Vec3.atCenterOf(pos);
 		stop();
+		digBlind = blindOk;
 		aim = target.immutable();
 		aimPoint = point;
 		current = Action.MINE;
@@ -1038,21 +1075,38 @@ public final class Hands {
 		if (slot < 0) return false;
 		stop();
 		p.getInventory().setSelectedSlot(slot);
-		use(pos);
-		return true;
+		return use(pos);
 	}
 
-	/** Right-click a block, like a player (a repeater: one more tick of delay). */
-	void use(BlockPos pos) {
+	/** Could it right-click that block from here: within reach, and a face of it in sight (not through a wall)? */
+	boolean canClick(BlockPos pos) {
+		if (p.isCreative()) return p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) <= p.blockInteractionRange();
+		return p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) <= p.blockInteractionRange() - 0.3 && seePoint((ServerLevel) p.level(), pos) != null;
+	}
+
+	/**
+	 * Right-click a block, like a player (a repeater: one more tick of delay): only one it can see, within reach. False:
+	 * it couldn't (behind something, too far): nothing happened.
+	 */
+	boolean use(BlockPos pos) {
 		ServerLevel level = (ServerLevel) p.level();
-		Vec3 hit = Vec3.atCenterOf(pos).add(0, 0.4, 0);
+		Vec3 hit = p.isCreative() ? Vec3.atCenterOf(pos).add(0, 0.4, 0) : seePoint(level, pos);
+		if (hit == null || p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;
 		face(hit);
-		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, Direction.UP, pos, false));
+		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, sideToward(pos, hit), pos, false));
 		Compat.swing(p);
 		holdLook(hit, 6);
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 3;
+		return true;
+	}
+
+	/** The face of the block that point is on (the one its eyes see). */
+	private static Direction sideToward(BlockPos pos, Vec3 hit) {
+		Vec3 d = hit.subtract(Vec3.atCenterOf(pos));
+		double ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z);
+		return ay >= ax && ay >= az ? (d.y >= 0 ? Direction.UP : Direction.DOWN) : ax >= az ? (d.x > 0 ? Direction.EAST : Direction.WEST) : (d.z > 0 ? Direction.SOUTH : Direction.NORTH);
 	}
 
 	/** Do nothing for a few ticks. */

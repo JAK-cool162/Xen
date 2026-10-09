@@ -614,7 +614,10 @@ public final class Companion {
 		BlockPos known = places.get("diamonds");
 		if (crafter.pickTier() < 3) {
 			BlockPos d = eyes.nearest("diamond", 24, null);
-			if (d == null || known != null && known.closerThan(d, 12)) return;
+			if (d == null || known != null && known.closerThan(d, 12)) {
+				workUpToDiamonds(known);
+				return;
+			}
 			places.remember("diamonds", d);
 			chatter(pick3("Diamonds! I need an iron pickaxe for those. I'll be back.", "ooh diamonds... can't mine them with this pickaxe. noted",
 					"Diamonds here! Iron pickaxe first, then they're mine."), false);
@@ -630,6 +633,49 @@ public final class Companion {
 		chatter(pick3("Got an iron pickaxe: back to those diamonds!", "ok, time for those diamonds I saw", "Iron pickaxe! Now for the diamonds."), false);
 		journal("does", plan);
 	}
+
+	private long diamondPlanAt;
+
+	/**
+	 * Diamonds it knows of right here, and a pickaxe too weak for them: like a player, it doesn't walk off and forget
+	 * them; it works its way up on the spot, one step at a time: stone for a stone pickaxe, iron from round about, a
+	 * furnace and smelting, the iron pickaxe (its crafter makes that as soon as it has the ingots), then the diamonds.
+	 */
+	private void workUpToDiamonds(BlockPos known) {
+		if (known == null || mode != Mode.FREE || chores.busy() || builder.busy() || fightingNow() || asked != null
+				|| !known.closerThan(player.blockPosition(), 64) || player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		long now = player.level().getGameTime();
+		if (now - diamondPlanAt < 20 * 30) return;
+		diamondPlanAt = now;
+		var items = items();
+		int tier = crafter.pickTier(), raw = items.getOrDefault("raw_iron", 0), ingots = items.getOrDefault("iron_ingot", 0);
+		if (tier < 1) return;                                                       // (no pickaxe at all: wood first, its usual way)
+		String plan, why;
+		if (tier >= 2 && raw + ingots >= 3) {
+			if (ingots >= 3) return;                                                // (its crafter makes the pickaxe)
+			plan = chores.smelt();
+			why = "smelting iron for a pickaxe";
+		} else if (tier >= 2) {
+			plan = chores.mine(player.blockPosition().getY(), "iron", 3 - raw - ingots);
+			why = "iron for a pickaxe";
+		} else {
+			plan = chores.gather("iron", 3);                                     // (a stone pickaxe first: its gather sees to that)
+			why = "a stone pickaxe, then iron";
+		}
+		if (!plan.startsWith("You will")) {
+			journal("thinks", "diamonds at " + known.toShortString() + ", but for now: " + plan);
+			return;
+		}
+		chores.own = true;
+		journal("does", "works up to the diamonds at " + known.toShortString() + ": " + why + " (" + plan + ")");
+		if (now - diamondSaidAt > 20 * 60 * 3) {
+			diamondSaidAt = now;
+			chatter(tier >= 2 ? pick3("Iron first, right here. Then those diamonds.", "Okay: iron, furnace, iron pickaxe, diamonds.", "I'm not leaving these diamonds. Iron first.")
+					: pick3("Stone pickaxe first, then iron, then the diamonds.", "One step at a time: stone, iron, then diamonds.", "I'll work my way up to those diamonds."), false);
+		}
+	}
+
+	private long diamondSaidAt = -1_000_000;
 
 	/** A block right ahead to step up onto (with room to jump)? */
 	private boolean stepAhead() {
@@ -951,9 +997,10 @@ public final class Companion {
 		}
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
-		if (player.getFoodData().getFoodLevel() <= personality.eatAt() && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()
+		boolean toHeal = player.getHealth() <= player.getMaxHealth() - 4 && player.getFoodData().getFoodLevel() < 18;   // (two hearts down: under 18 food it doesn't heal, so a player eats)
+		if ((player.getFoodData().getFoodLevel() <= personality.eatAt() || toHeal) && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()
 				&& choices.eat().yes()) {                                 // (a monster right on it: it fights first, eats after)
-			goals.instant = "eating";
+			goals.instant = toHeal && player.getFoodData().getFoodLevel() > personality.eatAt() ? "eating to heal" : "eating";
 			return Action.EAT;
 		}
 		Action ride = rider.next();                                   // getting in a boat, on a horse, riding
@@ -1419,6 +1466,12 @@ public final class Companion {
 	 * bed before night when it has none (wool from sheep: it hunts sheep). Null when all's well.
 	 */
 	private Action needs() {
+		boolean hurtNoFood = player.getHealth() <= 10 && player.getFoodData().getFoodLevel() < 18 && items().getOrDefault("food", 0) == 0;
+		if (hurtNoFood && !fighting && chores.busy() && chores.own && asked == null && chores.kind != Chores.Kind.HUNT && chores.kind != Chores.Kind.EAT
+				&& player.level().getGameTime() - neededAt >= 1200) {
+			journal("thinks", "hurt (" + Math.round(player.getHealth()) + " health) with nothing to eat: it won't heal like this, so food first");
+			chores.cancel();                                                  // (its own errand: hurt with nothing to eat, it doesn't heal; food first)
+		}
 		if (fighting || chores.busy() || builder.busy() || inArena || player.isCreative() || mode == Mode.FOLLOW && !leaderWithin(NEARBY)) return null;
 		long now = player.level().getGameTime();
 		if (now - neededAt < 1200) return null;
@@ -1433,7 +1486,7 @@ public final class Companion {
 				return chores.next();
 			}
 		}
-		if (player.getFoodData().getFoodLevel() <= 12 && items.getOrDefault("food", 0) == 0) {
+		if ((player.getFoodData().getFoodLevel() <= 12 || hurtNoFood) && items.getOrDefault("food", 0) == 0) {
 			neededAt = now;
 			if (fisher.fancies() && fisher.start().startsWith("You will")) {
 				chatter("I'm starving. Fishing for dinner.", true);
@@ -1442,7 +1495,9 @@ public final class Companion {
 			chores.forWool = false;
 			String plan = chores.hunt(3);
 			chores.own = true;
-			chatter(plan.startsWith("You don't see") ? "I'm starving... I need to find some animals." : "I'm starving. Time to hunt.", true);
+			boolean starving = player.getFoodData().getFoodLevel() <= 12;
+			chatter(starving ? (plan.startsWith("You don't see") ? "I'm starving... I need to find some animals." : "I'm starving. Time to hunt.")
+					: plan.startsWith("You don't see") ? "I'm hurt and I've got nothing to eat. I need to find food." : "I'm hurt. Food first, then I'll heal.", true);
 			return chores.next();
 		}
 		// Food for later: little on it and a food animal right there (not a baby, not the last of them): a player takes it.
@@ -1620,7 +1675,9 @@ public final class Companion {
 						if (!free(level, foot) || player.getEyePosition().distanceTo(Vec3.atCenterOf(foot)) > player.blockInteractionRange() - 0.5) continue;
 						for (int i = 0; i < 4; i++) {
 							BlockPos head = foot.relative(FACINGS[i]);
-							if (!head.equals(feet) && !head.equals(feet.above()) && free(level, head)) return new BedRoom(foot.immutable(), i);
+							if (!head.equals(feet) && !head.equals(feet.above()) && free(level, head) && !level.getBlockState(head.above()).isSuffocating(level, head.above())
+								&& !level.getBlockState(foot.above()).isSuffocating(level, foot.above()))
+							return new BedRoom(foot.immutable(), i);   // (room over its head end too: else the game says the bed is obstructed)
 						}
 					}
 				}
@@ -1645,18 +1702,33 @@ public final class Companion {
 		}
 		long time = Compat.timeOfDay(level) % 24000;
 		boolean night = time >= 12600 && time <= 23400;
-		if (!night && campBed != null && !fighting) {                          // morning: the bed comes along
+		if ((!night || campBedBad) && campBed != null && !fighting) {         // morning (or a bad spot for it): the bed comes along
 			if (!(level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
 				campBed = null;
+				if (campBedBad) lookedForBedAt = 0;                                // (somewhere else for it, now)
+				campBedBad = false;
 			} else {
 				goals.instant = "packing up its bed";
-				if (player.getEyePosition().distanceTo(Vec3.atCenterOf(campBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(campBed));
-				if (hands.mine(campBed)) {
-					acted = true;
-					return Action.MINE;
+				if (packingSince == 0) packingSince = level.getGameTime();
+				if (level.getGameTime() - packingSince > 20 * 60) {                // (a minute and it can't get to it: it leaves it, and remembers it)
+					journal("thinks", "couldn't get to its bed at " + campBed.toShortString() + " to pack it up: leaves it there");
+					places.remember("bed", campBed);
+					campBed = null;
+					packingSince = 0;
+				} else {
+					if (!hands.canClick(campBed)) return walkTo(Vec3.atBottomCenterOf(campBed));
+					hands.mayBreakBed = true;
+					boolean ok = hands.mine(campBed);
+					hands.mayBreakBed = false;
+					if (ok) {
+						acted = true;
+						return Action.MINE;
+					}
 				}
 			}
 		}
+		if (campBed == null) packingSince = 0;
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;   // (a bed anywhere else blows up: a player learns that once)
 		if (night && !fighting && (goals.home == null || player.distanceToSqr(Vec3.atCenterOf(goals.home)) > 64 * 64) && campBed == null
 				&& mode != Mode.FOLLOW && !chores.busy() && !builder.busy() && player.onGround() && level.getGameTime() - lookedForBedAt > 600) {
 			lookedForBedAt = level.getGameTime();                                 // out in the wild with a bed on it: it puts it down and sleeps
@@ -1672,13 +1744,8 @@ public final class Companion {
 			}
 		}
 		if (campBed != null && night && !fighting && level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
-			goals.instant = "going to bed";
-			if (player.getEyePosition().distanceTo(Vec3.atCenterOf(campBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(campBed));
-			hands.stop();
-			hands.use(campBed);
-			acted = true;
-			if (player.isSleeping()) chatter(pick3("Good night!", "Zzz...", "Night night."), false);
-			return Action.IDLE;
+			Action a = sleepIn(campBed, true);
+			if (a != null) return a;
 		}
 		if (!night || fighting || goals.home == null || mode == Mode.FOLLOW || chores.busy() || builder.busy()
 				|| player.distanceToSqr(Vec3.atCenterOf(goals.home)) > 64 * 64) return null;
@@ -1694,14 +1761,85 @@ public final class Companion {
 			}
 			if (bedAt == null) return null;
 		}
+		return sleepIn(bedAt, false);
+	}
+
+	/** What the game last told it over its hotbar (a translation key, like "block.minecraft.bed.not_safe"), and when. */
+	String toldKey = "";
+	long toldAt = -1;
+	/** A bed it couldn't sleep in, and till when it leaves it be (it knows why: it read the game's message). */
+	private BlockPos noSleepBed;
+	private long noSleepUntil;
+	private String noSleepWhy = "";
+	private int bedClicks;
+	private long packingSince;
+
+	/**
+	 * Lies down in that bed, like a player: close enough for the game (3 blocks across, 2 up or down), it right-clicks it;
+	 * if it doesn't lie down, it reads what the game said (night only, monsters about, something over the bed, someone in
+	 * it) and does something about it, instead of clicking again and again. Null: not this bed now.
+	 */
+	private Action sleepIn(BlockPos bed, boolean own) {
+		var level = (ServerLevel) player.level();
+		long now = level.getGameTime();
+		if (bed.equals(noSleepBed) && now < noSleepUntil) return null;
 		goals.instant = "going to bed";
-		if (player.getEyePosition().distanceTo(Vec3.atCenterOf(bedAt)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(bedAt));
+		Vec3 at = Vec3.atBottomCenterOf(bed);
+		boolean close = Math.abs(player.getX() - at.x) <= 2.5 && Math.abs(player.getZ() - at.z) <= 2.5 && Math.abs(player.getY() - at.y) <= 1.5;
+		if (!close || !hands.canClick(bed)) return walkTo(at);
 		hands.stop();
-		hands.use(bedAt);                                             // (monsters close by: it can't, like anyone)
+		toldKey = "";
+		if (!hands.use(bed)) return walkTo(at);
 		acted = true;
-		if (player.isSleeping()) chatter(pick3("Good night!", "Time to sleep. Night night.", "Zzz..."), false);
+		if (player.isSleeping()) {
+			bedClicks = 0;
+			chatter(pick3("Good night!", "Time to sleep. Night night.", "Zzz..."), false);
+			return Action.IDLE;
+		}
+		String why = toldAt == now ? toldKey : "";
+		long wait;
+		String thought;
+		switch (why) {
+			case "block.minecraft.bed.not_safe" -> {                              // monsters close: it can't, like anyone
+				wait = 20 * 15;
+				thought = "monsters nearby";
+				if (!noSleepWhy.equals(why)) chatter(pick3("Can't sleep, there are monsters nearby.", "Monsters around... no sleeping yet.", "I can't sleep with monsters this close."), false);
+			}
+			case "block.minecraft.bed.no_sleep" -> {                              // not night yet (or a storm over)
+				wait = 20 * 30;
+				thought = "it isn't night yet";
+			}
+			case "block.minecraft.bed.obstructed" -> {                            // something over it: this bed's no good tonight
+				wait = 20 * 60 * 10;
+				thought = "something is over the bed";
+				if (own) campBedBad = true;
+			}
+			case "block.minecraft.bed.occupied" -> {
+				wait = 20 * 60 * 10;
+				thought = "someone is in it";
+				if (!own) bedAt = null;
+			}
+			case "block.minecraft.bed.too_far_away" -> {                         // a step closer
+				wait = 0;
+				thought = "too far from it";
+			}
+			default -> {                                                          // nothing said: a few tries, then it leaves it
+				wait = ++bedClicks >= 3 ? 20 * 60 * 5 : 20;
+				thought = "it doesn't know why";
+			}
+		}
+		if (wait > 0) {
+			if (!why.isEmpty()) bedClicks = 0;
+			noSleepBed = bed.immutable();
+			noSleepUntil = now + wait;
+			if (!noSleepWhy.equals(why) || wait >= 20 * 60) journal("thinks", "can't sleep in the bed at " + bed.toShortString() + ": " + thought);
+			noSleepWhy = why;
+		}
 		return Action.IDLE;
 	}
+
+	/** Its camp bed is no good where it is (something over it): it packs it up and puts it down somewhere else. */
+	private boolean campBedBad;
 
 	/** Where it died, with its things lying there, and until when they're there. */
 	private BlockPos lostAt;
@@ -3654,6 +3792,7 @@ public final class Companion {
 				case "wood", "stone", "coal", "iron", "mine" -> {
 					plan = (r.intent().equals("mine") || r.intent().equals("iron")) && caves.nearest(160) != null
 							? chores.mine(lessons.depth("iron", 16), "iron", Math.max(3, r.amount())) : chores.gather(r.intent(), r.amount());   // (a cave it knows: in there)
+					if (plan.startsWith("You can't go mining")) plan = chores.gather(r.intent().equals("mine") ? "iron" : r.intent(), Math.max(3, r.amount()));   // (its pickaxe first: gather works up to it)
 					asked = r;                                             // (remembered: if something cuts it short, it comes back to it)
 					askedBy = from;
 					askedWords = said;

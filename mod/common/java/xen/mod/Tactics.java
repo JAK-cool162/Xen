@@ -161,6 +161,9 @@ final class Tactics {
 		return Float.isNaN(best) ? null : new float[] {yaw, best};
 	}
 
+	private BlockPos waterNoBlock;
+	private long waterNoBlockUntil;
+
 	/** The next thing to do about water, lava, powder snow or a spawner close by, or null. */
 	Action next() {
 		var p = c.player;
@@ -193,6 +196,7 @@ final class Tactics {
 		boolean under = !level.canSeeSky(feet.above());
 		if (under && c.knowledge.knows("block_water")) {
 			BlockPos w = flowingIn(level, feet);
+			if (w != null && w.equals(waterNoBlock) && now < waterNoBlockUntil) w = null;   // (it tried there just now and couldn't: not again and again)
 			if (w != null && c.hands.placeAt(w, "any")) {                    // a block in the way of the water
 				c.goals.instant = "blocking the water flooding in";
 				c.journal("does", "blocked the water flowing into its tunnel");
@@ -200,7 +204,11 @@ final class Tactics {
 				c.acted = true;
 				return Action.PLACE;
 			}
-			if (w != null) c.journal("thinks", "water coming in at " + w.toShortString() + ", can't block it: " + c.hands.cantPlace);
+			if (w != null) {
+				waterNoBlock = w.immutable();
+				waterNoBlockUntil = now + 20 * 15;
+				c.journal("thinks", "water coming in at " + w.toShortString() + ", can't block it: " + c.hands.cantPlace);
+			}
 		}
 		if (under && c.knowledge.knows("cover_lava")) {
 			BlockPos l = lavaBeside(level, feet);

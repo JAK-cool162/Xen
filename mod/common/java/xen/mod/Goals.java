@@ -344,7 +344,7 @@ final class Goals {
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
 					&& (c.player.isCreative() || items.getOrDefault("cobblestone", 0) >= 300) ? 0.45f * (0.5f + p.diligence) : 0;
 			case SMELT -> (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
-					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0) ? 0.85f : 0;
+					&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0 || c.crafter.pickTier() >= 1) ? 0.85f : 0;
 			case STORE -> c.storage.wantsToStore() && (home != null || c.tribe() != null && c.tribe().center != null) ? 0.6f : 0;
 			case ADVENTURE -> c.mod.config.adventures && !dragonDown && c.crafter.pickTier() >= 3 && !evening() && !c.player.isCreative()
 					&& (dream == Long.DRAGON || c.personality.bravery > 0.6f && c.personality.generation >= 1) ? 0.5f * (0.5f + p.bravery) : 0;

@@ -87,6 +87,18 @@ public class XenPlayer extends ServerPlayer {
 		}
 	}
 
+	/**
+	 * A line over its hotbar from the game ("You may not rest now; there are monsters nearby", "This bed is obstructed"):
+	 * it reads it, as a player does, and knows why what it just tried didn't work.
+	 */
+	@Override
+	public void sendSystemMessage(net.minecraft.network.chat.Component message, boolean overlay) {
+		super.sendSystemMessage(message, overlay);
+		if (companion == null || !overlay || message == null) return;
+		companion.toldKey = message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents t ? t.getKey() : message.getString();
+		companion.toldAt = level().getGameTime();
+	}
+
 	/** Its jump key, for the gameplay log (a game client would send it). */
 	boolean jumpKey() {
 		return jumping;

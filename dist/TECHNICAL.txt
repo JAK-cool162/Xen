@@ -1,7 +1,45 @@
-XEN COMPANION 2.0.0-beta.24: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.25: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.25
+===========================
+
+Sight and reach (Hands): mining checks reach (block interaction range + 0.5) and sight (seePoint: a clear line from the
+eyes to the block's middle or a face turned its way, COLLIDER clip, small plants not counting) when the first hit goes in
+and every 4 ticks while digging; out of either, it aborts (ABORT_DESTROY_BLOCK) with cantMine/cantMineUnseen set, so the
+caller tries again from elsewhere. A builder boxed in by its own walls (blindOk after 3 tries) keeps its old leave for
+that dig. Hands.use (right-click) now returns false and does nothing unless a face is in sight and in reach; the hit is
+on the seen face. canClick(pos) is the check the chest, furnace, enchanting table, repeater, flint and steel, portal bed
+and crafting table code walks until. Beds are never mined (Hands.mine refuses a BedBlock) except packing up its own camp
+bed (mayBreakBed).
+
+Beds: XenPlayer overrides sendSystemMessage(Component, overlay) and keeps the translation key of the last overlay line
+(Companion.toldKey/toldAt). sleepIn(bed): within 2.5 across and 1.5 up or down of the bed's foot (the game's own range is
+3 and 2) and canClick, it right-clicks; not sleeping after it, the key says why: bed.not_safe (monsters: 15 s, says so
+once), bed.no_sleep (30 s), bed.obstructed (10 min; its camp bed gets packed up and put elsewhere), bed.occupied (10
+min, another bed), bed.too_far_away (closer); nothing said: 3 tries, then 5 min. bedRoom() wants room over both halves.
+No bed placed or used outside the Overworld. Packing up its camp bed gives up after a minute (and remembers the bed).
+
+Diamonds: Companion.workUpToDiamonds(known): diamonds remembered within 64, its pickaxe under iron, free and not busy,
+every 30 s: tier 1 -> gather("iron", 3) (its gather does a stone pickaxe first), tier 2 with under 3 iron -> mine at its
+height for the rest, tier 2 with 3 raw -> smelt; the crafter makes the iron pickaxe from 3 ingots, and the existing
+"back to the diamonds" (mineAt) takes over. A request to mine that its pickaxe can't do yet goes through gather (which
+works up) instead of saying no. Chores.mine for iron at tier 2 finishes at 3 raw iron (to smelt for the pickaxe).
+Smelting: smelt() and the SMELT option no longer need 8 cobblestone up front when it has a pickaxe (smeltNext gets stone
+for the furnace, cobbled deepslate and blackstone count).
+
+Healing: eats when food <= its eatAt or (health <= max - 4 and food < 18). needs(): health <= 10, food < 18 and nothing to
+eat: its own errand (not asked, not hunting) is dropped and it hunts or fishes ("I'm hurt. Food first, then I'll heal.").
+
+Tactics: a spot where water comes in that it couldn't block is left alone for 15 s (the journal line once, not every 10
+ticks).
+
+Measured: obstacle course 8/8 (16-52 s a lane); caves: being measured; diamonds test (stone pickaxe, iron ore in the wall, diamonds in
+sight): iron mined, smelted, iron pickaxe, diamonds mined; bed test: one sleeps, one by a zombie reads "monsters nearby"
+and waits; hurt test: food 17 health 14: eats, then heals.
 
 
 WHAT'S NEW IN 2.0.0-beta.24

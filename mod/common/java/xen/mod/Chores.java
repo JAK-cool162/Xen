@@ -687,9 +687,7 @@ final class Chores {
 			if (!level.getBlockState(p.pos()).canBeReplaced()) {
 				String id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(p.pos()).getBlock()).getPath();
 				if (p.kind().equals("repeater") && id.equals("repeater") && cycles < p.delay() - 1) {   // set its delay
-					if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p.pos())) > c.player.blockInteractionRange()) {
-						return c.walkTo(Vec3.atCenterOf(p.pos()));
-					}
+					if (!c.hands.canClick(p.pos())) return c.walkTo(Vec3.atCenterOf(p.pos()));
 					c.hands.use(p.pos());
 					cycles++;
 					c.acted = true;
@@ -1091,6 +1089,10 @@ final class Chores {
 			finish("I got " + got + " " + what + "! Heading back up.");
 			return null;
 		}
+		if (what.equals("iron") && c.crafter.pickTier() == 2 && count("raw_iron") + countItem("iron_ingot") >= 3 && dropToPickUp() == null) {
+			finish("That's enough iron for a pickaxe. I'll smelt it first.");     // (a player smelts the first three for the pickaxe: the rest comes quicker with it)
+			return null;
+		}
 		ItemEntity drop = dropToPickUp();
 		if (drop != null) {
 			doing = "picking up " + c.itemKey(drop.getItem()).replace('_', ' ');
@@ -1427,7 +1429,8 @@ final class Chores {
 		if (raw == 0) return "You have nothing to smelt.";
 		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
 		furnace = findFurnace();
-		if (furnace == null && countItem("furnace") == 0 && count("cobblestone") < 8) return "You need 8 cobblestone for a furnace.";
+		if (furnace == null && countItem("furnace") == 0 && countItem("cobblestone") + countItem("cobbled_deepslate") + countItem("blackstone") < 8
+				&& c.crafter.pickTier() < 1) return "You need 8 cobblestone for a furnace.";   // (with a pickaxe it gets the stone first)
 		begin(Kind.SMELT);
 		until = now() + 20 * (12L * raw + 90);
 		want = raw;
@@ -1515,7 +1518,7 @@ final class Chores {
 			}
 			return lookAround();
 		}
-		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(furnace)) > c.player.blockInteractionRange() - 0.5) {
+		if (!c.hands.canClick(furnace)) {                                    // (in reach and in sight: not through a wall)
 			doing = "going to the furnace";
 			return c.walkTo(Vec3.atBottomCenterOf(furnace));
 		}

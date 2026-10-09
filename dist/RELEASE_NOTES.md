@@ -1,7 +1,33 @@
-**Xen Companion 2.0.0-beta.24**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.25**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.25: no more reaching through walls, beds it understands, and working up to diamonds
+
+From the three new recordings and the journal:
+
+* **No reaching through walls:** a Xen could mine a block behind another one (in one recording, iron ore 5.4 blocks
+  off through stone) and click a chest, furnace, table or bed it couldn't see. Now it only digs and clicks what it can
+  see, within reach, every moment of it: if it moves, or something comes between, it stops and finds a way round (rock
+  in the way it digs first, as a player does). A crafting table behind a wall isn't "nearby" any more.
+* **Beds it understands:** when a bed doesn't work, a player reads the line over the hotbar. Now a Xen does too
+  ("monsters nearby", "you can only sleep at night", "this bed is obstructed", "occupied", "too far away") and acts on it
+  (waits, says why, puts its camp bed somewhere else) instead of clicking it over and over. It stands where the game lets
+  it sleep, never puts a bed down outside the Overworld (they blow up there), never digs a bed out while building, and
+  gives up packing its camp bed if it can't get to it.
+* **Diamonds it can't mine yet: it works up to them.** Before, it said "I need an iron pickaxe, I'll be back" and
+  never did anything about it. Now, with diamonds close by, it works its way up on the spot: stone for a stone pickaxe,
+  iron from round about, a furnace and smelting, the iron pickaxe, then the diamonds. Tested: a stone pickaxe and iron
+  ore in the wall, then mined the iron, smelted it, made the iron pickaxe and mined the diamonds.
+* **It smelts its iron:** one Xen carried 7 raw iron and 24 coal for 10 minutes and never smelted, because it had 7
+  cobblestone, not 8. With a pickaxe it now gets the stone for a furnace first. Mining for iron with stone tools, it
+  stops at 3 to smelt them for the pickaxe.
+* **It eats to heal:** two Xens spent 10 minutes on 2 to 5 health with food at 11 to 15 (under 18, nothing heals), one
+  with mutton on it. Now, two hearts down and under 18 food, it eats; hurt with nothing to eat, it drops its own errand
+  and finds food.
+* Less journal spam: "water coming in, can't block it" once, not twice a second.
+* Tested: the obstacle course 8 of 8; caves: being measured. 26.1, 26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.24: ways over the land, and into caves (pathfinder upgrade, part 2)
 

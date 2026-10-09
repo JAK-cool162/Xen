@@ -103,7 +103,7 @@ final class Enchanter {
 			on = false;
 			return null;
 		}
-		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) > c.player.blockInteractionRange() - 0.5) return c.walkTo(Vec3.atBottomCenterOf(t));
+		if (!c.hands.canClick(t)) return c.walkTo(Vec3.atBottomCenterOf(t));
 		int slot = worthSlot();
 		if (slot < 0 || c.items().getOrDefault("lapis_lazuli", 0) == 0) {
 			on = false;
