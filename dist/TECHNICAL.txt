@@ -1,7 +1,26 @@
-XEN COMPANION 2.0.0-beta.25.1: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.26: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.26
+===========================
+
+Visits (new): picked every 10 s when free (mode FREE, no chore, not building, no fight, not on an adventure or a Nether
+trip, Overworld, daytime): the nearest known village (Structures.found / Places, within 192) or ruined portal (128) not
+visited yet; 4 minutes at most; while it lasts the Mind starts no new option. Village: to within 24 of its bell, then each
+step: a chest it's looting; Storage.spotLoot; the iron golem (not player-made; wants iron = pickaxe under iron and under 3
+iron; a sword or axe, 4+ blocks, health 16+): right by it, pillar 3 (startPillar x3), hit from above when in reach and the
+swing is charged, under 8 health it stays up or gives up; a bed (no bed with it or at home: the nearest bed foot, mined
+with mayBreakBed); hay (under 8 food: hay bales, then wheat and bread via the crafter); a villager boxed (with a home, or a
+settler or builder plan; 8+ cobblestone or dirt): once it stands still, 4 blocks at its feet, 3 at its head (the side
+toward the Xen open), 1 on top, remembered as "villager"; then past up to 8 house doors so spotLoot sees inside. Scan:
+beds, hay and doors in 40 x 18 x 40 round the bell, every 5 s. Ruined portal: there, spotLoot, done.
+
+Quick start: food-for-later hunting only from stone tools on, and one animal (not a search for more). Gathering stone with
+a pickaxe and none within 12 (or none known): digDown where it stands (2 ahead, 2 down, the staircase way). Crafter logs
+"<name> made a <pickaxe> N s into its life" (player.tickCount / 20). /xen progress ends with "life N s".
 
 
 WHAT'S NEW IN 2.0.0-beta.25.1

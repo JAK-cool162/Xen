@@ -1094,6 +1094,8 @@ public final class Companion {
 		if (unsure != null) return unsure;
 		Action habit = habits.next();                                 // a look around, a detour, a breather, boredom, a full bag
 		if (habit != null) return habit;
+		Action visit = mode == Mode.FREE && mod.config.wants ? visits.next() : null;   // a village or a ruined portal it found: in, and what it's good for
+		if (visit != null) return visit;
 		if (chores.busy()) {
 			Action chore = chores.next();
 			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;
@@ -1502,12 +1504,12 @@ public final class Companion {
 		}
 		// Food for later: little on it and a food animal right there (not a baby, not the last of them): a player takes it.
 		int carried = items.getOrDefault("food", 0), reserve = foodReserve();
-		if (carried < reserve && player.getHealth() >= 10 && !personality.believes("animals_kindness")) {
+		if (carried < reserve && player.getHealth() >= 10 && !personality.believes("animals_kindness") && crafter.pickTier() >= 2) {   // (tools first: a player doesn't chase cows before a pickaxe)
 			var prey = chores.nearestAnimal();
 			if (prey != null && prey.distanceTo(player) < 14) {
 				neededAt = now;
 				chores.forWool = false;
-				chores.hunt(Math.min(3, reserve - carried));
+				chores.hunt(1);                                                // (the one right there, not a search for more)
 				chores.own = true;
 				journal("does", "hunts for food for later (" + carried + " on it, it likes " + reserve + ")");
 				if (random.nextFloat() < 0.3f) chatter(pick3("Food for later.", "Dinner for later, sorry.", "Stocking up on food."), false);
@@ -2563,6 +2565,8 @@ public final class Companion {
 	/** The caves it found (the quickest way to ore), and the places it recognizes (villages, mineshafts, temples...). */
 	final Caves caves = new Caves(this);
 	final Structures structures = new Structures(this);
+	/** Villages and ruined portals it found: in, and what they're good for (loot, a bed, hay, the golem's iron, a villager). */
+	final Visits visits = new Visits(this);
 	/** Fishing, with a rod, like a player. */
 	final Fisher fisher = new Fisher(this);
 	/** Xen Ex1: what it made of the last moment (keys, turn, look, danger), the moments before (for learning), and what it perceived last. */
@@ -3413,11 +3417,11 @@ public final class Companion {
 		if (player == null) return name + " | not here";
 		var it = items();
 		var a = adventure.stage();
-		return String.format(java.util.Locale.ROOT, "%s | %s %d %d %d | hp %.0f food %d | pick %d | iron %d diamond %d obsidian %d blaze %d pearl %d eye %d | adventure %s | home %s",
+		return String.format(java.util.Locale.ROOT, "%s | %s %d %d %d | hp %.0f food %d | pick %d | iron %d diamond %d obsidian %d blaze %d pearl %d eye %d | adventure %s | home %s | life %d s",
 				name, Places.dim(player.level()), player.getBlockX(), player.getBlockY(), player.getBlockZ(), player.getHealth(),
 				player.getFoodData().getFoodLevel(), crafter.pickTier(), it.getOrDefault("raw_iron", 0) + it.getOrDefault("iron_ingot", 0), it.getOrDefault("diamond", 0),
 				it.getOrDefault("obsidian", 0), it.getOrDefault("blaze_rod", 0), it.getOrDefault("ender_pearl", 0), it.getOrDefault("ender_eye", 0),
-				a == null ? "-" : a.name().toLowerCase(java.util.Locale.ROOT), goals.home == null ? "-" : "yes");
+				a == null ? "-" : a.name().toLowerCase(java.util.Locale.ROOT), goals.home == null ? "-" : "yes", player.tickCount / 20);
 	}
 
 	/** Its notes for talking: only its own feelings, body and perception. */

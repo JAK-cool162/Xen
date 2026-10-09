@@ -877,6 +877,13 @@ final class Chores {
 			skip.add(Perception.Beliefs.key(k.getX(), k.getY(), k.getZ()));
 			known = null;
 		}
+		boolean forStone = cats.length > 0 && cats[0] == Blocks.STONE && c.crafter.pickTier() >= 1;
+		if (forStone && !c.player.isInWater() && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+				&& (known == null || Math.hypot(known[0] - c.player.getX(), known[2] - c.player.getZ()) > 12)) {
+			doing = "digging down for stone";                             // (none close: like a player, it digs down where it stands, stone is a few blocks under)
+			BlockPos feet = c.player.blockPosition();
+			return digDown(feet.relative(c.player.getDirection(), 2).below(2));
+		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
 			if (!saidLooking) {                                         // (asked, and it just answered: once is enough)

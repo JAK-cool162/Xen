@@ -1,7 +1,20 @@
-**Xen Companion 2.0.0-beta.25.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.26**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.26: villages and ruined portals used, iron golems, boxed villagers, a quicker start
+
+* **Villages it finds, it uses:** it goes in (by day, within 192 blocks, once each, four minutes at most) and gets what
+  a village is good for: its chests (it walks past the houses and loots what it sees), a bed off a villager if it has
+  none, hay bales (wheat, then bread), the iron golem's iron (the speedrunner's way: up three blocks by it, where it
+  can't reach, and hit it from above; only with a weapon, blocks and its health up), and a villager boxed in where it
+  stands (feet, three sides at its head, a roof: it can't get out and can still be traded with).
+* **Ruined portals:** it goes and loots the chest.
+* **A quicker start:** no hunting cows "for later" before it has stone tools, and with no stone close by it digs down
+  where it stands (stone is a few blocks under) instead of wandering off to look for some.
+* Pickaxes crafted are logged with how long into its life (game seconds), to measure the start.
+* Built and checked on 1.21.11 and 26.1 to 26.3. The village visits are new and not yet tested in a long game.
 
 ### 2.0.0-beta.25.1 (hotfix): Xens see further
 

@@ -747,6 +747,7 @@ final class Goals {
 			next = now;
 		}
 		if (option >= 0) return c.chores.busy();
+		if (c.visits.busy()) return false;                                     // (in a village it found, getting what it's good for: that first)
 		if (now < next) return false;
 		next = now + 60;                                                       // (if nothing starts, it looks again in 3 s)
 		Mind mind = c.mod.mind;
