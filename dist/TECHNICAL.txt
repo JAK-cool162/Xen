@@ -37,7 +37,7 @@ eat: its own errand (not asked, not hunting) is dropped and it hunts or fishes (
 Tactics: a spot where water comes in that it couldn't block is left alone for 15 s (the journal line once, not every 10
 ticks).
 
-Measured: obstacle course 8/8 (16-52 s a lane); caves: being measured; diamonds test (stone pickaxe, iron ore in the wall, diamonds in
+Measured: obstacle course 8/8 (16-52 s a lane); caves 23/25 (as beta.24); diamonds test (stone pickaxe, iron ore in the wall, diamonds in
 sight): iron mined, smelted, iron pickaxe, diamonds mined; bed test: one sleeps, one by a zombie reads "monsters nearby"
 and waits; hurt test: food 17 health 14: eats, then heals.
 

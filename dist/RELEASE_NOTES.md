@@ -27,7 +27,7 @@ From the three new recordings and the journal:
   with mutton on it. Now, two hearts down and under 18 food, it eats; hurt with nothing to eat, it drops its own errand
   and finds food.
 * Less journal spam: "water coming in, can't block it" once, not twice a second.
-* Tested: the obstacle course 8 of 8; caves: being measured. 26.1, 26.2 and 26.3 built and checked.
+* Tested: the obstacle course 8 of 8; down 25 real caves 23 there (as before). 26.1, 26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.24: ways over the land, and into caves (pathfinder upgrade, part 2)
 
