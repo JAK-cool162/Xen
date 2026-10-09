@@ -84,6 +84,20 @@ final class Walker {
 		return path != null;
 	}
 
+	/**
+	 * Is it on a step of its way it planned onto ground it knows (a walk, a step up, a short drop it chose)? Then it's
+	 * walking where it means to, not off an edge by mistake.
+	 */
+	boolean onPlannedStep() {
+		if (path == null || index >= path.size()) return false;
+		Move m = path.get(index);
+		return switch (m.kind()) {
+			case WALK, DIAGONAL, ASCEND, SWIM, CLIMB_UP, CLIMB_DOWN, BRIDGE, PILLAR -> true;
+			case FALL -> m.from().getY() - m.to().getY() <= maxFall;
+			default -> false;
+		};
+	}
+
 	/** Is the move it's on a jump across a gap (it runs at the edge on purpose)? */
 	boolean leaping() {
 		return path != null && index < path.size() && path.get(index).kind() == Kind.PARKOUR;
@@ -133,6 +147,8 @@ final class Walker {
 	private Action go(Goal g, Vec3 to) {
 		touched = true;
 		var p = c.player;
+		Vec3 finalTo = to;
+		if (g == null) to = viaLand(to);                                     // a long way over open land: its way over the land first
 		double gap = g != null ? g.heuristic(p.blockPosition()) / Goal.PER_BLOCK                  // (how far, by the goal's own measure)
 				: Math.hypot(p.getX() - to.x, p.getZ() - to.z) + 0.7 * Math.abs(p.getY() - to.y);
 		if (goal == null || (g == null ? goal.distanceTo(to) > 1.5 : !g.toString().equals(wantKey)) || gap < bestGap - 1) {
@@ -179,6 +195,12 @@ final class Walker {
 			boolean same = was != null && path != null && !path.isEmpty() && path.get(0).from().equals(was.from()) && path.get(0).to().equals(was.to());
 			if (!same) stepStarted = now();                                   // (the same move as before: the clock keeps running)
 			plannedAt = now();
+			if (path == null && land != null && to != finalTo) {                 // (no way to the land route's next point: the old way, for a while)
+				landOffUntil = now() + 200;
+				land = null;
+				release();
+				return null;
+			}
 			if (path == null) {
 				release();
 				return null;
@@ -196,6 +218,61 @@ final class Walker {
 		}
 		c.acted = true;
 		return Action.FORWARD;
+	}
+
+	/** Its way over the land (LandRoute), what it's for, when it was found, the point on it it's walking to, and a pause. */
+	private List<BlockPos> land;
+	private BlockPos landFor;
+	private long landAt, landOffUntil;
+	private int landWp;
+
+	/**
+	 * Where to walk now on a long way over open land: a point a couple of dozen blocks along its way over the land (found
+	 * again every 10 s, or when it's off it), not the far goal itself. Close (40), under the ground, or the goal under it:
+	 * the goal (its own planner's job).
+	 */
+	private Vec3 viaLand(Vec3 to) {
+		var p = c.player;
+		ServerLevel level = (ServerLevel) p.level();
+		double flat = Math.hypot(to.x - p.getX(), to.z - p.getZ());
+		BlockPos feet = p.blockPosition(), target = BlockPos.containing(to);
+		if (flat < 40 || now() < landOffUntil || p.isInLava()) {
+			land = null;
+			return to;
+		}
+		if (feet.getY() < level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()) - 3) return to;   // (under the ground)
+		if (level.isLoaded(target) && target.getY() < level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, target.getX(), target.getZ()) - 4) return to;
+		boolean off = land != null && !land.isEmpty() && nearestOnLand(feet) > 6;
+		if (land == null || landFor == null || landFor.distSqr(target) > 16 || now() - landAt > 200 || off) {
+			boolean fresh = landFor == null || landFor.distSqr(target) > 16;
+			landFor = target;
+			landAt = now();
+			long t0 = Perf.now();
+			land = LandRoute.find(level, feet, target);
+			Perf.add("choosing: land routes", t0);
+			landWp = 0;
+			if (land == null || land.isEmpty()) {
+				land = null;
+				landOffUntil = now() + 200;
+				return to;
+			}
+			landWp = Math.min(land.size() - 1, 24);
+			c.journal("way", "a way over the land: " + land.size() + " blocks to " + target.toShortString());
+			if (fresh || off) XenMod.LOG.info("{} plans a way over the land: {} blocks to {}{}", c.name, land.size(), target.toShortString(), off ? " (it was off its way)" : "");
+		}
+		BlockPos wp = land.get(landWp);
+		if (wp.distSqr(feet) < 8 * 8 && landWp < land.size() - 1) {           // (near it: the next point on along)
+			landWp = Math.min(land.size() - 1, landWp + 20);
+			wp = land.get(landWp);
+		}
+		return landWp >= land.size() - 1 ? to : Vec3.atBottomCenterOf(wp);
+	}
+
+	/** How far it is from its way over the land (the nearest point of the next stretch). */
+	private double nearestOnLand(BlockPos feet) {
+		double best = Double.MAX_VALUE;
+		for (int i = Math.max(0, landWp - 30); i <= Math.min(land.size() - 1, landWp + 5); i++) best = Math.min(best, Math.sqrt(land.get(i).distSqr(feet)));
+		return best;
 	}
 
 	/**

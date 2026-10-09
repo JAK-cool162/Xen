@@ -156,7 +156,8 @@ final class Instinct {
 	 */
 	private boolean deadlyEdge(ServerLevel level) {
 		var p = c.player;
-		if (!p.onGround() || p.isInWater() || p.isPassenger() || p.getAbilities().flying || p.isShiftKeyDown() || c.walker.leaping()) return false;   // (sneaking it can't fall; a jump across is on purpose)
+		if (!p.onGround() || p.isInWater() || p.isPassenger() || p.getAbilities().flying || p.isShiftKeyDown() || c.walker.leaping()
+				|| c.walker.onPlannedStep()) return false;   // (a step of its way onto ground it knows: walking along a cliff is fine)   // (sneaking it can't fall; a jump across is on purpose)
 		var v = p.getDeltaMovement();
 		double speed = Math.hypot(v.x, v.z);
 		Vec3 dir;

@@ -2236,7 +2236,7 @@ public final class Companion {
 	 */
 	private Action oreOnTheWay() {
 		if (player.tickCount - lookedOnTheWay < 10 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
-				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy()
+				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy() || commandedTo != null && visiting == null   // (sent somewhere: there first)
 				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return null;   // (out at night: keep going)
 		lookedOnTheWay = player.tickCount;
 		BlockPos ore = chores.oreWithinReach();

@@ -26,7 +26,7 @@ import java.util.Random;
  * ground is a cave, and blocks people build, close together, are a house.
  */
 final class Eyes {
-	static final int RANGE = 48, NEAR_IN_DARK = 8;
+	static final int RANGE = 48, NEAR_IN_DARK = 16;                  // (in the dark: the shape of a cave 16 blocks out, as a player at normal brightness; 8 left it guessing the rest was rock)
 	private static final double H_FOV = Math.toRadians(110), V_FOV = Math.toRadians(90), STEP = Math.toRadians(3);
 	private static final int COLS = (int) (H_FOV / STEP) + 1, ROWS = (int) (V_FOV / STEP) + 1, PER_TICK = 24, CAP = 2000;
 	/** The yes or no for each kind of block (null: no, not worth knowing), worked out once per block state. */

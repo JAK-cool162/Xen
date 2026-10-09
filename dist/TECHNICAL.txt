@@ -1,7 +1,26 @@
-XEN COMPANION 2.0.0-beta.23: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.24: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.24
+===========================
+
+LandRoute: A* over columns (8 ways, no corner cutting), the ground's top from MOTION_BLOCKING_NO_LEAVES (what's seen from
+the sky: leaves don't count, trunks do), only loaded land, the box of start and goal plus 48, 30,000 columns at most,
+heuristic octile x 1.05. A step: up 2 or more no, up 1 +0.6, down 2-3 +0.5, down 4-5 +3, down 6+ no; water 2.5 a block
+(4 when 6+ deep; 6+ deep in an ocean biome: no), lava no. The best column if it doesn't get there (8+ closer than the
+start, else none). Walker.go for a point goal (not a Goal) 40+ away, on and to land (feet and goal within 3 and 4 of
+the surface): the route (again every 10 s, for a new goal, or when it's 6+ off the next stretch), walking to the point
+24 along it, then 20 on each time it's within 8; the last stretch the goal itself. No step plan to a route point: no
+land route for 10 s (the old way). Perf: "choosing: land routes", counts "land routes", "land route columns".
+Eyes.NEAR_IN_DARK 16 (was 8): how far in the dark (no block light, under cover) open space counts as seen.
+Instinct's deadly edge: not while the walker's move is a planned step onto known ground (walk, diagonal, ascend, swim,
+climb, bridge, pillar, or a fall within its max fall).
+oreOnTheWay: not while commandedTo is set (unless visiting).
+Benchmarks (scratchpad tools, the world from seed 12345): cave_bench.py (WorldTruth caves: entrance to a deep point
+reachable through the air) 21/25 -> 23/25; 6 trips of 157-202 blocks 2/6 -> 4/6; course.py 8/8 (u-trap 27 s).
 
 
 WHAT'S NEW IN 2.0.0-beta.23

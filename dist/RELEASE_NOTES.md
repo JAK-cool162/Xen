@@ -1,7 +1,24 @@
-**Xen Companion 2.0.0-beta.23**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.24**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.24: ways over the land, and into caves (pathfinder upgrade, part 2)
+
+* **Ways over the land:** for a long trip over open land a Xen first reads the lay of the land, as a player looks at the
+  landscape: a way over the ground's top (trees and cliffs to go round, a block up at a time, water slower, never across
+  the open sea, never lava), then the steps to a point a couple of dozen blocks along it. Before, a long trip was
+  guessed a piece at a time and could lead into a valley with no way out. Trips of 157 to 202 blocks over real land:
+  4 of 6 there (2 of 6 before), the 202 block ones in 82 and 109 s; the two left both cross a frozen river by the sea.
+* **Into caves:** in the dark it makes out a cave's shape 16 blocks off (8 before, the rest was rock to it, and it went
+  back and forth working out the way). Sent down 25 real caves (found by the world truth tool): 23 there (21 before),
+  most in under 20 seconds.
+* **The edge instinct trusts its own way:** walking along a cliff, the deadly-drop instinct stopped it again and again;
+  now it only stops what it didn't plan (a chase, a flight, going against its gut), not a step of its way onto ground
+  it knows.
+* **Sent somewhere, it goes:** no stopping on the way to mine ore it passes when it was told to go somewhere.
+* Tested: the obstacle course 8 of 8 (the dead end in 27 s); 8 free Xens for 4 minutes, no errors, no deaths. 26.1,
+  26.2 and 26.3 built and checked.
 
 ### 2.0.0-beta.23: believing in itself, asking others, food for later, and seeing the world as it is
 
