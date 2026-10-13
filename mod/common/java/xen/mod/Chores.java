@@ -1308,8 +1308,84 @@ final class Chores {
 		return String.format(java.util.Locale.ROOT, "You will pick up the %s %.0f blocks away.", name, Math.sqrt(at.distSqr(c.player.blockPosition())));
 	}
 
+	/** Fetching for a plan: what drops (clay ball, redstone, raw gold...), how many, the eyes' kind and which blocks count. */
+	private String fetchDrop, fetchKind;
+	private int fetchWant;
+	private java.util.function.Predicate<String> fetchMatch;
+
+	/**
+	 * Fetch n of what a kind of block drops (for its plans: sand, gravel, clay, obsidian, an ore, sugar cane...): the
+	 * nearest one it can see, or one its eyes saw further off; mined, its drop picked up; then the next.
+	 */
+	String fetch(String kind, java.util.function.Predicate<String> match, String drop, int n) {
+		fetchMatch = match;
+		fetchKind = kind;
+		BlockPos at = findBlock(match, kind);
+		String name = kind.replace('_', ' ');
+		if (at == null) {
+			fetchMatch = null;
+			return "You haven't seen any " + name + " yet.";
+		}
+		begin(Kind.PICKUP);
+		until = now() + 20L * 60 * Math.max(2, n);
+		pickupId = drop;
+		pickupAt = at;
+		pickupGoneAt = -1;
+		fetchDrop = drop;
+		fetchWant = Math.max(1, n);
+		items = new String[] {drop};
+		what = name;
+		had = countItem(drop);
+		return String.format(java.util.Locale.ROOT, "You will get %d %s from the %s %.0f blocks away.", fetchWant, drop.replace('_', ' '), name,
+				Math.sqrt(at.distSqr(c.player.blockPosition())));
+	}
+
+	/** The nearest block that counts (a side open to the air) within 16, or the nearest its eyes saw of that kind. */
+	private BlockPos findBlock(java.util.function.Predicate<String> match, String kind) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -6, -16), feet.offset(16, 6, 16))) {
+			if (!match.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath())) continue;
+			if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)) continue;
+			boolean open = false;
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) open |= level.getBlockState(q.relative(d)).canBeReplaced();
+			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+		}
+		if (best == null) best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+		return best;
+	}
+
 	private Action pickupNext() {
 		ServerLevel level = (ServerLevel) c.player.level();
+		if (fetchMatch != null) {                                            // fetching for a plan: n of them, one block after another
+			if (countItem(fetchDrop) >= had + fetchWant) {
+				fetchMatch = null;
+				finish("Got " + fetchWant + " " + fetchDrop.replace('_', ' ') + "!");
+				return null;
+			}
+			ItemEntity drop = dropToPickUp();
+			if (drop != null) {
+				doing = "picking up " + fetchDrop.replace('_', ' ');
+				return c.stepTo(drop.position());
+			}
+			if (fetchMatch.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath())) {
+				doing = String.format(java.util.Locale.ROOT, "getting %s (%d of %d)", fetchDrop.replace('_', ' '), countItem(fetchDrop) - had, fetchWant);
+				return reach(pickupAt);
+			}
+			if (pickupGoneAt < 0) pickupGoneAt = now();
+			if (now() - pickupGoneAt < 20) return Action.IDLE;                // (a moment for the drop to land)
+			skip.add(Perception.Beliefs.key(pickupAt.getX(), pickupAt.getY(), pickupAt.getZ()));
+			BlockPos next = findBlock(fetchMatch, fetchKind);
+			if (next == null) {
+				int got = countItem(fetchDrop) - had;
+				fetchMatch = null;
+				finish(got > 0 ? "That's all the " + what + " I can find (" + got + ")." : "I can't find any more " + what + ".");
+				return null;
+			}
+			pickupAt = next;
+			pickupGoneAt = -1;
+			return Action.IDLE;
+		}
 		if (countItem(pickupId) > had || pickupId.equals("torch") && countItem("torch") > had) {
 			finish("Got the " + what + "!");
 			return null;
@@ -1474,8 +1550,27 @@ final class Chores {
 		return n;
 	}
 
+	/** Something else its plan wants smelted (sand for glass, a log for charcoal, cobblestone for stone...), or null. */
+	private String smeltInput;
+
+	/** Smelt what it has (raw ore, raw food) and, for its plan, that too. */
+	String smelt(String input) {
+		smeltInput = input;
+		String s = smelt();
+		if (!s.startsWith("You will")) smeltInput = null;
+		return s;
+	}
+
+	private int toSmelt() {
+		return count("raw_iron") + count("raw_gold") + countItem("ancient_debris") + rawFood() + (smeltInput != null ? countItem(smeltInput) : 0);
+	}
+
+	private boolean smeltable(ItemStack st) {
+		return isItem(st, "raw_iron") || isItem(st, "raw_gold") || isItem(st, "ancient_debris") || isRawFood(st) || smeltInput != null && isItem(st, smeltInput);
+	}
+
 	String smelt() {
-		int raw = count("raw_iron") + count("raw_gold") + countItem("ancient_debris") + rawFood();
+		int raw = toSmelt();
 		if (raw == 0) return "You have nothing to smelt.";
 		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
 		furnace = findFurnace();
@@ -1583,8 +1678,8 @@ final class Chores {
 		if (!(c.player.containerMenu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu menu)) return Action.IDLE;
 		// the ingots out, the ore in, fuel if the fire needs it
 		if (menu.getSlot(2).hasItem()) Compat.click(menu, 2, true, c.player);
-		int raw = count("raw_iron") + count("raw_gold") + countItem("ancient_debris") + rawFood();
-		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, st -> isItem(st, "raw_iron") || isItem(st, "raw_gold") || isItem(st, "ancient_debris") || isRawFood(st));
+		int raw = toSmelt();
+		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, this::smeltable);
 		if (!menu.getSlot(1).hasItem() && (menu.getSlot(0).hasItem() || raw > 0)) {
 			if (!moveInto(menu, 1, st -> isItem(st, "coal") || isItem(st, "charcoal"))) moveInto(menu, 1, st -> {
 				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
@@ -1595,7 +1690,8 @@ final class Chores {
 		c.player.closeContainer();
 		Compat.swing(c.player);
 		c.acted = true;
-		if (empty && count("raw_iron") + count("raw_gold") + rawFood() == 0) {
+		if (empty && toSmelt() == 0) {
+			smeltInput = null;
 			made = cooked() - had;
 			finish("Done at the furnace: " + made + " smelted and cooked!");
 			return null;

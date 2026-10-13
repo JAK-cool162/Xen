@@ -408,6 +408,15 @@ final class Goals {
 				: "You will go exploring on your own.";
 	}
 
+	/** Where its plan wants it to go and look (a biome it saw that has what it needs), for its next exploring. */
+	private Vec3 towardPending;
+	private String towardName;
+
+	void exploreToward(BlockPos at, String what) {
+		towardPending = Vec3.atBottomCenterOf(at);
+		towardName = what;
+	}
+
 	boolean exploringAsked() {
 		return c.player != null && current == Short.EXPLORE && c.player.level().getGameTime() < exploreAskedUntil;
 	}
@@ -500,6 +509,15 @@ final class Goals {
 			exploreTo = null;
 			lookUntil = now + (sawIt ? 60 + random.nextInt(60) : 30 + random.nextInt(50));
 			return Action.IDLE;
+		}
+		if (exploreTo == null && towardPending != null) {                   // its plan: the biome it saw that has what it needs
+			exploreTo = towardPending;
+			curiousOf = towardName;
+			towardPending = null;
+			exploreSince = now;
+			instant = "going to the " + curiousOf + " (for its plan)";
+			c.run(p.position().distanceTo(exploreTo) > 6);
+			return c.walkTo(exploreTo);
 		}
 		if (exploreTo == null) {                                            // something it spotted and hasn't been to: a player goes to see it
 			var poi = curiousAbout();
@@ -759,6 +777,8 @@ final class Goals {
 		Mind mind = c.mod.mind;
 		float[] f = MindSense.features(c);
 		boolean[] can = MindSense.allowed(c, f, nearby);
+		Plans.Step planNext = c.plans.advice();                                // (what its plan says next is something it can do: one of its choices, not an order)
+		if (planNext != null && (planNext.option == Mind.CRAFT || planNext.option == Mind.SMELT)) can[planNext.option] = true;
 		for (int i = 0; i < can.length && i < quickUntil.length; i++) if (now < quickUntil[i]) can[i] = false;
 		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
@@ -871,6 +891,9 @@ final class Goals {
 		float adviceW = (1.0f + 0.8f * c.personality.diligence) * (1.25f - 0.5f * belief) * c.experience.planTrust();   // (how much it goes by the usual plan: its nature, and how the plan has worked out for it)
 		float mindW = 0.6f + 0.6f * belief;                                    // (how much it goes by its own mind)
 		float expW = 2.5f;                                                     // (what happened before: a lot, when there's enough of it)
+		Plans.Step step = c.plans.advice();                                    // its own plan for something it wants (know-how): advice too, its mind weighs it
+		int stepOption = step == null ? -1 : step.option;
+		float knowW = step == null ? 0 : c.plans.weight();
 		BlockPos here = c.player.blockPosition();
 		float[] score = new float[n];
 		String[] how = new String[n];
@@ -885,8 +908,11 @@ final class Goals {
 			float past = expW * g[i].sure() * g[i].expect();
 			float advice = i == planned ? adviceW : 0;
 			float curious = i == Mind.EXPLORE ? 0.8f * c.personality.curiosity * situation[17] : 0;   // (G1X: much it hasn't seen round it: a curious one goes to look)
-			score[i] = mindW * z + thought + past + advice + curious;
+			float know = i == stepOption ? knowW : 0;
+			score[i] = mindW * z + thought + past + advice + curious + know;
 			StringBuilder sb = new StringBuilder();
+			if (i == stepOption) sb.append("its plan for ").append(c.plans.goal.replace('_', ' ')).append(": ").append(step.says())
+					.append(String.format(java.util.Locale.ROOT, " (+%.1f); ", know));
 			if (i == planned) sb.append("the plan: ").append(planWhy).append("; ");
 			sb.append(String.format(java.util.Locale.ROOT, "mind %+.1f", mindW * z + thought));
 			if (g[i].n() > 0) sb.append(String.format(java.util.Locale.ROOT, ", before %+.1f (%s)", past, g[i].says()));
@@ -1440,6 +1466,17 @@ final class Goals {
 
 	/** Start what Xen 2.0 chose. False if it can't right now. */
 	private boolean startOption(int o, boolean nearby, long now) {
+		if (c.plans.start(o)) {                                               // its mind chose what its plan's next step is: that step
+			planStep = true;
+			optionUntil = now + 20 * 60 * 8;
+			return true;
+		}
+		boolean begun = startUsual(o, nearby, now);
+		if (c.plans.takenItsWay(begun)) planStep = true;                     // (its plan's step, done its own usual way: the plan learns from it too)
+		return begun;
+	}
+
+	private boolean startUsual(int o, boolean nearby, long now) {
 		if (AS_SHORT[o] != null) {
 			if (o == Mind.ADVENTURE && dragonDown && c.voyager.wantsQuest()) {    // the dragon's beaten: next, an elytra in the End
 				c.voyager.startQuest();
@@ -1543,6 +1580,7 @@ final class Goals {
 	/** Is one of its own kind of choices (not a short goal) over? */
 	private boolean extraOver(long now) {
 		boolean late = now > optionUntil;
+		if (planStep && current == null) return late || c.plans.stepOver();
 		return switch (option) {
 			case Mind.CRAFT -> !c.crafter.hasOrder() || late;
 			case Mind.EAT -> !c.chores.busy() || late;
@@ -1621,9 +1659,16 @@ final class Goals {
 	}
 
 	/** Its choice is over (or it died): how did it go? Xen 2.0 remembers and learns from it. */
+	/** The choice going now is a step of its plan. */
+	private boolean planStep;
+
 	void finishOption(boolean died) {
 		int o = option;
 		float[] before = optionFeatures;
+		if (planStep) {
+			planStep = false;
+			c.plans.finished(died);
+		}
 		if (o >= 0) lastOption = o;
 		if (o > Mind.REST) {                                                   // (what it did lately: it can tell)
 			done.remove((Integer) o);

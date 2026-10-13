@@ -72,6 +72,20 @@ final class Caves {
 		c.chatter(caveLine(spot), false);
 	}
 
+	/** In (or seeing) a cave biome under the ground: a cave, lit or not (lush caves glow), if there's room about. */
+	void sawInBiome(BlockPos spot, String biome) {
+		if (c.player == null) return;
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		BlockPos open = spot;
+		for (int dy = 0; dy < 4 && !level.getBlockState(open).isAir(); dy++) open = open.above();
+		if (air(level, open) < 6 || !remember(level, open)) return;
+		c.eyes.caves++;
+		c.places.rememberAnother("cave", open, 48);
+		c.journal("sees", "a cave at " + open.toShortString() + " (" + biome.replace('_', ' ') + ")");
+		c.chatter(caveLine(open), false);
+	}
+
 	/** Remember a cave once; a roomy, stone-walled pocket gets a small mining preference. */
 	private boolean remember(ServerLevel level, BlockPos spot) {
 		long now = now();

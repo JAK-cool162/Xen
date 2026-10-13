@@ -159,7 +159,7 @@ final class Eyes {
 				boolean under = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) > y + 3;
 				if (t > NEAR_IN_DARK) lit = !under || level.getRawBrightness(m, 0) > 0;   // (out under the sky it's never too dark to see)
 				if (under && t <= 32 && level.getBrightness(LightLayer.SKY, m) <= 7) {
-					if (++darkRun == 5) c.caves.saw(m.immutable());             // dark room under the ground: a cave
+					if (++darkRun == (c.biomes.caveHere ? 2 : 5)) c.caves.saw(m.immutable());   // dark room under the ground: a cave (in a cave biome it knows sooner)
 				} else {
 					darkRun = 0;
 				}
@@ -176,6 +176,8 @@ final class Eyes {
 
 			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) {                     // rock, a wall: that's as far as it sees
 				g.sawStop(level, line, x, y, z, t, s, axis, sy);
+				if ((line & 7) == (sweeps & 7) && t > 6)                            // (now and then: the biome there, as a player reads the land)
+					c.biomes.saw(level, m.immutable(), chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) > y + 3);
 				return;
 			}
 			if (!open || !s.getFluidState().isEmpty()) g.sawStop(level, -1, x, y, z, t, s, axis, sy);   // (a fence, glass, water: there, and seen past)

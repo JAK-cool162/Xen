@@ -209,6 +209,13 @@ final class Sights {
 		BlockPos at = hit.getBlockPos();
 		if (at.distSqr(c.player.blockPosition()) < 6 * 6) return;                // (right in front of it: not a view)
 		String kind = name(measure(level, at.getX(), at.getZ(), at.getY() + 16, at.getY() - 24));
+		if (kind == null) {                                                    // not a shape it knows well enough: the biome there may say (a player reads the land too)
+			String b = level.getBiome(at).unwrapKey().map(k -> k.identifier().getPath()).orElse("");
+			boolean under = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()) > at.getY() + 3;
+			if (Biomes.cave(b) && under) kind = "cave";
+			else if ((b.equals("river") || b.equals("frozen_river")) && level.getBlockState(at).getFluidState().is(net.minecraft.tags.FluidTags.WATER)
+					|| b.equals("frozen_river") && name(level.getBlockState(at)).contains("ice")) kind = b.replace('_', ' ');
+		}
 		if (kind == null || kind.endsWith("river") && !runsOn(level, at)) return;
 		if (!c.places.rememberAnother(kind, at, 48)) return;                     // (one it knows already)
 		c.journal("sees", (kind.equals("cave") ? "the inside of a cave" : "a " + kind) + " at " + at.toShortString() + " (it knows what that is: it was shown)");

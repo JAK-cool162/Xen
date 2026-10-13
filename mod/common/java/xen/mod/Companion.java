@@ -322,6 +322,7 @@ public final class Companion {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			noteKills();                                                 // (something it hit died: its drops are its own)
 			tips.tick();                                                 // (a tip it took, or didn't: how did that go?)
+			biomes.tick();                                               // (the biome it's in: a cave biome is a cave)
 			belief.tick(player.level().getGameTime());                   // (a bad day fades)
 			places.tick();                                               // the way it walked, remembered
 			totems();
@@ -2563,6 +2564,10 @@ public final class Companion {
 	final Fighter fighter = new Fighter(this);
 	/** Survival tips it weighs (and learns how far to trust). */
 	final Tips tips = new Tips(this);
+	/** Know-how and its plans (what it wants, and how to get it). */
+	final Plans plans = new Plans(this);
+	/** The biomes it has seen, and what they tend to have. */
+	final Biomes biomes = new Biomes(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */
@@ -3911,7 +3916,13 @@ public final class Companion {
 				case "shelter" -> plan = chores.shelter();
 				case "eat" -> plan = chores.eat();
 				case "redstone" -> plan = chores.redstone(r.thing());
-				case "craft" -> plan = crafter.request(r.thing(), r.amount());
+				case "craft" -> {                                                  // something it can make right away; else, from what it knows, a plan
+					String id = crafter.recipeIdFor(r.thing());
+					String what = id != null ? id : r.thing();
+					Plans.Plan p = plans.make(what, Math.max(1, r.amount()));
+					plan = p.ok && p.steps.size() > 1 || id == null && p.ok ? plans.setGoal(what, Math.max(1, r.amount()), from.getGameProfile().name())
+							: crafter.request(r.thing(), r.amount());
+				}
 				case "bed" -> plan = bedAsked();
 				case "helpbuild" -> {                                              // a friend's build: help with it (shared progress)
 					Companion mate = null;

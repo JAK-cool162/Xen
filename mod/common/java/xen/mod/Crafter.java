@@ -279,6 +279,45 @@ final class Crafter {
 		return null;
 	}
 
+	// ------------------------------------------------------------------ for its plans (Plans): recipes as know-how
+	/** The recipe it would use for a thing (its own wood, the best tier it has the stuff for), or null if there's none. */
+	String recipeIdFor(String thing) {
+		return recipeFor(thing);
+	}
+
+	/** What one craft of a recipe takes, by kind of thing ("planks", "stick", "iron_ingot", "cobblestone"); null: no such recipe. */
+	java.util.Map<String, Integer> ingredients(String id) {
+		RecipeHolder<CraftingRecipe> r = recipe(id);
+		if (r == null) return null;
+		java.util.Map<String, Integer> need = new java.util.LinkedHashMap<>();
+		for (net.minecraft.world.item.crafting.Ingredient ing : r.value().placementInfo().ingredients()) {
+			if (!ing.isEmpty()) need.merge(canonical(ing), 1, Integer::sum);
+		}
+		return need;
+	}
+
+	/** Does the recipe need a crafting table (3x3)? */
+	boolean needsTable(String id) {
+		RecipeHolder<CraftingRecipe> r = recipe(id);
+		return r != null && !fitsSmallGrid(r);
+	}
+
+	/** A recipe's slot, as a kind of thing: any planks are "planks", any logs "log", any wool "wool", coal or charcoal "coal"... */
+	static String canonical(net.minecraft.world.item.crafting.Ingredient ing) {
+		var items = ing.items().toList();
+		if (items.isEmpty()) return "something";
+		String first = BuiltInRegistries.ITEM.getKey(items.get(0).value()).getPath();
+		if (items.size() > 1) {
+			if (first.endsWith("_planks")) return "planks";
+			if (isLog(first)) return "log";
+			if (first.endsWith("_wool")) return "wool";
+			if (first.equals("coal") || first.equals("charcoal")) return "coal";
+			if (isStoneMaterial(first)) return "cobblestone";
+			if (first.endsWith("_slab")) return "slab";
+		}
+		return first;
+	}
+
 	/** Asked to craft something: the plan, in words (to itself: "You will craft a spruce boat."). */
 	String request(String thing, int amount) {
 		quietOrder = false;

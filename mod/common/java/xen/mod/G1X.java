@@ -344,6 +344,7 @@ final class G1X {
 		int lines = 0, far = 0;
 		long now = c.player.level().getGameTime();
 		for (int i = 0; i < depth.length; i++) if (now - when[i] < 100) { lines++; if (hit[i] == HIT_NONE) far++; }
-		return sb.append(" | depth view: ").append(lines).append(" fresh lines, ").append(far).append(" open to the distance").toString();
+		return sb.append(" | depth view: ").append(lines).append(" fresh lines, ").append(far).append(" open to the distance")
+				.append(" | biome: ").append(c.biomes.describe()).toString();
 	}
 }

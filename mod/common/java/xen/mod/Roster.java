@@ -103,6 +103,7 @@ final class Roster {
 		if (c.experience.predicted > 0) o.add("experienceLearned", c.experience.saveLearned());   // (what it learned to weigh, and how good its guesses were)
 		o.add("moves", c.walker.saveMoves());                                // (how its own jumps, drops and bridges have gone)
 		if (!c.fighter.cost.isEmpty()) o.add("fightCosts", c.fighter.saveCosts());   // (what each kind of mob has cost it to beat)
+		o.add("plans", c.plans.save());                                      // (its know-how: what each kind of step has cost it, its goal)
 		JsonObject tips = c.tips.save();
 		if (tips.size() > 0) o.add("tips", tips);                             // (how far it trusts each survival tip)
 		byName.put(c.name.toLowerCase(Locale.ROOT), o);

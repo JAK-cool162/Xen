@@ -391,6 +391,29 @@ The model is trained by `scripts/train_talk.py` on `data/talk/corpus.txt`;
 on lines it never saw it gets the kind right about 9 times in 10, and when
 it isn't sure, the rest of Xen's chat answers instead.
 
+**It plans what it was never shown** (2.0.0-beta.29). Xen has know-how: the
+game's own crafting recipes, what a furnace makes of what, and a few player
+hints ("iron ore wants a stone pickaxe", "sand: beaches, deserts, rivers",
+"string: spiders, at night"). Give it a goal (`/xen plan bucket`, or "make
+me a shield" in chat) or let it pick its own (an iron pickaxe, a shield, a
+bucket...) and it works back from what it has to a plan: "1. chop a tree,
+2. craft planks, ... 8. mine iron ore with a stone pickaxe, 9. craft a
+furnace, 10. smelt 3 raw iron, 11. craft a bucket". The plan is advice, not
+an order: its next step weighs in with its other choices, and its mind
+decides. It's worked out again whenever what it has changes, so a skipped
+step, a find or a failed way just change the plan. What each kind of step
+has cost it is learned and shared across every plan (iron it mined for a
+bucket counts toward the plan for a shield), and where there are two ways
+(coal or planks to burn) it takes the cheaper one. `/xen plan` shows it.
+
+**It reads biomes.** Where its sight lines end it notes the biome, and it
+remembers where it saw each one: a desert or beach means sand, a swamp clay,
+badlands gold, the mountains emeralds and iron. A plan that needs sand it
+hasn't seen goes to the beach it saw. In lush caves, dripstone caves or the
+deep dark it knows it's in a cave straight away (lush caves glow, so dark
+isn't the clue), and a river biome helps it name a river it sees.
+`/xen g1x` shows the biome it's in and the ones it has seen.
+
 **It weighs survival tips** (2.0.0-beta.28). Xen gets tips the way a new
 player does ("can't win this fight? get out of reach or away, heal, then come
 back", "night's here: a roof before it gets worse", "hurt in the dark: a roof
