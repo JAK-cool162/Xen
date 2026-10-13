@@ -57,7 +57,11 @@ controls.
 * **The journal keeps each death's last moments** (the 40 lines before it, by that Xen, and every hit it took: by what,
   its health, day or night, the light, what it was doing), so a death can be read back after the journal rolls over.
 * Fixes: standing where its own hut's wall goes, it steps inside (it used to say "lazy2005 is in the way" about itself).
-* Tested: being measured (the same seed as beta.26, to day 3).
+* Tested: the same world (seed 20261009), 5 Xens, normal difficulty, to day 3, each build alone on its server:
+  beta.26.1 had 22 deaths (5 of them falls) and no iron pickaxe; beta.27 had 15 deaths (no falls) and an iron pickaxe
+  (an earlier beta.27 build: 8 deaths and an iron pickaxe). Talk: a player saying 26 everyday lines next to a Xen
+  (hello, wsg, wyd, u got iron?, died to a creeper, wanna go mining later, ur bad lol, fav block, are you a bot, a joke,
+  gg, gn...) got a fitting answer to every one; the Java talk model reads all 64 test lines exactly as the trainer does.
 
 ### 2.0.0-beta.26.1 (hotfix): a shield first
 
