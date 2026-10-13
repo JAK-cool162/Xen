@@ -1,0 +1,105 @@
+# A second held-out set, written after the first was used to find weak spots: the number reported is this one's.
+greet	heyo whats good
+greet	hello hello
+greet	yo whats up bro
+greet	hi there buddy
+greet	ayo
+how_are_you	how are things
+how_are_you	u doing ok?
+how_are_you	how are you today
+player_fine	im doing alright
+player_fine	good good
+player_bad	not great honestly
+player_bad	ive been better
+player_bad	today sucks
+player_tired	im so tired bro
+player_bored	bro im so bored
+player_bored	theres nothing to do
+player_scared	its so dark in here
+player_angry	ugh this game
+player_died	i died lol rip
+player_died	i keep dying bro
+player_died_creeper	creeper exploded my house
+player_died_lava	i dropped all my stuff in lava
+player_died_fall	i fell and died
+player_found_diamonds	yooo diamonds
+player_found_diamonds	found diamonds down here
+player_found	found a cool cave
+player_found	look at this village
+player_built	look at what i built
+player_got	i just got diamond armor
+player_new	im kinda new
+player_stuck	help im trapped
+player_away	gtg dinner
+player_away	brb 5 min
+player_back	im back now
+bye	cya later
+bye	gotta log off bye
+goodnight	gn guys
+good_morning	gm gm
+thanks	thanks bro
+thanks	thank youu
+sorry	sorry bro my bad
+laugh	lmaoo
+laugh	LOL
+laugh	😂😂
+agree	ya fr
+agree	thats true
+disagree	nahh
+ok	okok
+ok	sounds good
+wow	no wayyy
+wow	thats insane bro
+nice	ayy nice
+nice	gg wp
+fail	unlucky bro
+bruh	bruh moment
+confused	what do u mean
+confused	???
+doing	what r u up to
+doing	wyd rn
+doing	what are you doing over there
+plans	so what now
+plans	what do we do next
+invite_mine	wanna mine with me
+invite_mine	lets go get some iron
+invite_explore	wanna go explore that mountain
+invite_explore	lets go on an adventure
+invite_build	wanna build a base together
+invite_pvp	wanna 1v1
+invite_team	lets be teammates
+invite_race	race u there
+are_you_bot	are u a bot
+are_you_bot	is this an ai
+are_you_bot	you're not real right
+who_are_you	whats ur name
+age	how old are u
+where_live	where's ur base
+fav_block	what block do you like the most
+fav_mob	whats ur fav mob
+fav_food	fav food?
+fav_color	whats ur fav color
+fav_thing	what do you like doing in minecraft
+likes_me	do you like me?
+love_you	love u bro
+compliment	you're actually so good
+compliment	ur so cool
+insult	ur trash lol
+insult	you're so bad at this
+insult	noob lol
+shut_up	shut up lol
+joke	got any jokes
+joke	tell me something funny
+story	tell me a story
+real_life	are u a boy or girl
+meaning_of_life	why do we exist
+sing	sing something
+best_ore	which ore is best
+where_diamonds	how deep are diamonds
+have_items	what do you got
+have_items	do you have any diamonds
+have_items	whats in ur inventory
+time	is it day or night
+weather	its storming outside
+sus	thats kinda sus
+random_question	do you like the nether

@@ -1,0 +1,163 @@
+# Held out: never trained on (scripts/train_talk.py only measures with it). intent<TAB>what a player says.
+greet	heyyyy whats up man
+greet	hellooo
+greet	yo yo
+greet	hey dude
+greet	hi friend
+greet	hello {X}!
+wsg	wsg bro
+wsg	whats good with you
+wsg	hows everything going
+wsg	sup whats new
+how_are_you	how you been
+how_are_you	u ok bro?
+how_are_you	how r u doing today
+how_are_you	are you doing ok
+how_are_you	how's it hanging
+player_fine	im alright thanks
+player_fine	pretty good actually
+player_fine	doing great
+player_fine	all good here
+player_bad	im not doing so good
+player_bad	honestly kinda sad today
+player_bad	feeling down
+player_tired	i'm really tired
+player_tired	so sleepy rn
+player_bored	i'm so bored rn
+player_bored	nothing to do here
+player_bored	im bored what do i do
+player_scared	this cave is scary
+player_scared	im kinda scared ngl
+player_angry	this is so annoying ugh
+player_angry	im so mad rn
+player_died	i just died lmao
+player_died	bro i died again
+player_died	i lost all my items
+player_died_creeper	a creeper just blew me up
+player_died_creeper	that creeper destroyed my house
+player_died_lava	my stuff burned in lava
+player_died_lava	i fell into lava
+player_died_fall	i died from fall damage
+player_found_diamonds	found some diamonds!!
+player_found_diamonds	yo i got diamonds
+player_found_diamonds	DIAMONDS LETS GO
+player_found	found a village over here
+player_found	look i found a dungeon
+player_found	theres a chest here
+player_built	check out my house
+player_built	i just finished my base
+player_got	i got full iron armor
+player_got	look at my new sword
+player_new	im new to minecraft
+player_new	first time playing this game
+player_stuck	im stuck in a hole
+player_stuck	i got lost
+player_away	brb gotta eat
+player_away	afk for a bit
+player_away	gotta go real quick
+player_back	ok back
+player_back	i'm back guys
+bye	bye guys
+bye	see you tomorrow
+bye	alright im leaving
+goodnight	gn everyone
+goodnight	going to sleep now
+good_morning	good morning everyone
+thanks	thank you so much bro
+thanks	ty for the help
+thanks	thanks man appreciate it
+sorry	sorry my bad
+sorry	oops sorry
+laugh	LMAOOO
+laugh	hahahaha
+laugh	lol thats so funny
+laugh	💀💀
+agree	fr fr
+agree	yeah true
+agree	exactly bro
+disagree	nah not really
+disagree	thats cap
+ok	ok cool
+ok	alright then
+ok	k bet
+wow	woah thats crazy
+wow	omg no way
+nice	nice job
+nice	W bro
+nice	lets gooo
+fail	big L
+fail	oof unlucky
+bruh	bruhhh
+confused	wdym?
+confused	huh what
+confused	i dont get it
+doing	what are you doing rn
+doing	wyd
+doing	what are you up to {X}
+doing	whatcha up to
+plans	what should we do now
+plans	any ideas what to do
+plans	whats the plan today
+invite_mine	wanna go mine some diamonds
+invite_mine	lets go mining together
+invite_mine	come mining
+invite_explore	wanna explore with me
+invite_explore	lets go to the nether together
+invite_build	wanna help me build a house
+invite_build	lets build something cool
+invite_pvp	1v1 me bro
+invite_pvp	fight me rn
+invite_team	wanna be my teammate
+invite_team	can we be friends
+are_you_bot	r u a real person
+are_you_bot	are you an ai or something
+are_you_bot	ur a bot right
+are_you_bot	are you real?
+who_are_you	what is your name
+who_are_you	who are u
+age	how old r you
+where_live	where is your house
+where_live	do u have a house
+fav_block	what's your favorite block?
+fav_block	fav block
+fav_mob	what's your favorite animal
+fav_food	whats ur favorite food
+fav_biome	what's your fav biome
+fav_thing	what do u like to do
+likes_me	do u like me
+likes_me	are we friends?
+love_you	love you bro
+love_you	ur my best friend
+compliment	you're so cool
+compliment	ur actually good
+compliment	you're a pro
+insult	ur so bad
+insult	you're such a noob
+insult	trash
+insult	ez
+shut_up	shut up bro
+shut_up	stop talking pls
+joke	tell me a funny joke
+joke	say a joke
+story	tell me a fun fact
+story	say something interesting
+real_life	are you a girl
+real_life	do you go to school?
+meaning_of_life	what's the meaning of life
+sing	can you sing a song
+best_ore	what's the best ore in the game
+where_diamonds	where can i find diamonds
+where_diamonds	what y level do diamonds spawn
+have_items	what do u have
+have_items	do u have any iron
+have_items	got diamonds?
+have_items	what's in your inventory
+time	is it night time
+time	what day is it
+weather	its raining again
+sus	ur kinda sus
+random_question	cats or dogs?
+random_question	java or bedrock?
+none	asdf
+none	hmm
+none	the

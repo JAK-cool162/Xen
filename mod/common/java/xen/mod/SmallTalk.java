@@ -7,11 +7,9 @@ import java.util.Random;
 import java.util.regex.Pattern;
 
 /**
- * Everyday conversation, answered at once and in character, from what the Xen really knows (no chat model needed, and
- * nothing made up): hellos and goodbyes, thanks, compliments and insults, jokes, where it is, the time, how it feels,
+ * Everyday conversation, answered at once and in character, from what the Xen really knows (nothing made up): hellos and goodbyes, thanks, compliments and insults, jokes, where it is, the time, how it feels,
  * whether it likes you, its favorites, its skills, its dog and hobby, what it thinks of someone, what it can do, "are
- * you a bot?", and a word of comfort when you're sad. What it isn't sure about goes on to the chat model (or its plain
- * answers).
+ * you a bot?", and a word of comfort when you're sad. What it isn't sure about goes on to its plain answers.
  */
 final class SmallTalk {
 	private final Companion c;
@@ -215,7 +213,7 @@ final class SmallTalk {
 		return MindSense.count(c, n -> n.equals(t) || n.endsWith("_" + t) || n.startsWith(t + "_"));
 	}
 
-	/** A reply to these words, or null (not small talk: the chat model or its plain answers take it). */
+	/** A reply to these words, or null (not small talk: its plain answers take it). */
 	String answer(ServerPlayer from, String words) {
 		if (c.player == null) return null;
 		String w = words.toLowerCase(Locale.ROOT).trim();

@@ -1,5 +1,5 @@
-# Everything runs on both x86-64 and ARM64 (the chips in phones, Raspberry Pi, Apple Silicon): the Python tests with
-# the real chat model, both mod builds with their Java == Python checks, and the chat model in Java.
+# Everything runs on both x86-64 and ARM64 (the chips in phones, Raspberry Pi, Apple Silicon): the Python tests and
+# both mod builds with their Java == Python checks.
 name: Check (x86-64 and ARM64)
 
 on:
@@ -30,32 +30,14 @@ jobs:
           distribution: temurin
           java-version: "25"
 
-      - name: Chat model (SmolLM2-360M-Instruct, Apache-2.0)
-        uses: actions/cache@v4
-        with:
-          path: smollm2-360m-instruct-q8_0.gguf
-          key: smollm2-360m-instruct-q8_0
-
-      - name: Download the chat model
-        run: |
-          [ -f smollm2-360m-instruct-q8_0.gguf ] || curl -fL --retry 5 -o smollm2-360m-instruct-q8_0.gguf \
-            https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf
-
       - name: Python tests
-        env:
-          XEN_MODEL: ${{ github.workspace }}/smollm2-360m-instruct-q8_0.gguf
         run: |
           pip install -r requirements.txt
           python -m unittest discover -s tests -t .
 
-      - name: Mod for 1.21.11 (build, Java == Python, chat model in Java)
+      - name: Mod for 1.21.11 (build, Java == Python)
         working-directory: mod/mc1.21.11
-        run: ./gradlew build crossCheck llmCheck -PchatModel=${{ github.workspace }}/smollm2-360m-instruct-q8_0.gguf --no-daemon
-
-      - name: All-in-one jar (the mod with its chat model inside)
-        run: |
-          python scripts/bundle_chat_model.py mod/mc1.21.11/build/libs/xen-companion-*+mc1.21.11.jar smollm2-360m-instruct-q8_0.gguf
-          unzip -l mod/mc1.21.11/build/libs/*-with-chat.jar | grep -q "assets/xen/model/smollm2-360m-instruct-q8_0.gguf"
+        run: ./gradlew build crossCheck --no-daemon
 
       - name: Mod for 26.x (build, Java == Python)
         working-directory: mod/mc26

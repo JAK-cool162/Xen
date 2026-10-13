@@ -1,44 +1,18 @@
 """Xen's chat: it understands what players ask and answers, but cannot cheat.
 
 * It understands requests ("Xen, get some wood", "follow me", "build a
-  shelter") as one of a few things it can do. A small local chat model
-  (SmolLM2-360M) picks which one; without the model, keyword rules do.
-  What it then does, it does with its own hands and its own senses.
+  shelter") as one of a few things it can do, from the words (typos and
+  chat shorthand too). What it then does, it does with its own hands and
+  its own senses.
 * It only knows what Xen knows: its notes are built from Xen's own senses and
   beliefs (what it has seen, with how sure it is), its feelings and its body.
 * Its answers are one line of plain chat, never a command (a reply can't
   start with "/").
-* It doesn't make things up about the world: an answer claiming to see
-  something that isn't in its notes is not sent (it tries again, then just
-  says what it knows).
+* It doesn't make things up about the world: it says what its notes hold.
 
-Same prompts and rules as the Minecraft mod (mod/common/java/xen/mod/talk/Chat.java).
+Same rules as the Minecraft mod (mod/common/java/xen/mod/talk/Chat.java).
 """
-import os
 import re
-import urllib.request
-
-MODEL_NAME = "smollm2-360m-instruct-q8_0.gguf"
-MODEL_URL = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/" + MODEL_NAME
-MODEL_DIR = os.path.join(os.path.expanduser("~"), ".xen", "models")
-
-PERSONA = (
-    "<|im_start|>system\nYou are Xen, a player living in this Minecraft world. You only know what you have seen, remember or were "
-    "told yourself; far-away things are guesses, and it is fine not to know. You have your own goals, friends and "
-    "fears, and you can say no. Answer as Xen in one or two short, friendly sentences. Only talk about things in your "
-    "notes. Never write commands.<|im_end|>\n"
-    "<|im_start|>user\nNotes: You feel calm. You know there is a pumpkin 4 blocks from you.\n"
-    "Steve says: what do you see?<|im_end|>\n"
-    "<|im_start|>assistant\nI can see a pumpkin about 4 blocks from me.<|im_end|>\n"
-    "<|im_start|>user\nNotes: You feel afraid. You are hurt. Nothing special is around you.\n"
-    "Alex says: find any gold?<|im_end|>\n"
-    "<|im_start|>assistant\nNo, I haven't seen any gold. And I'm hurt, so let's be careful.<|im_end|>\n"
-    "<|im_start|>user\nNotes: You feel happy. You carry 12 cobblestone. You know there is water 5 blocks from you.\n"
-    "Steve says: thanks for the help!<|im_end|>\n"
-    "<|im_start|>assistant\nAnytime! That was fun.<|im_end|>\n"
-    "<|im_start|>user\nNotes: You feel curious. Nothing special is around you.\n"
-    "Alex says: are you a bot?<|im_end|>\n"
-    "<|im_start|>assistant\nNo, I'm Xen. I live out here, same as you.<|im_end|>\n")
 
 THINGS = (("diamond",), ("gold",), ("iron",), ("coal",), ("lava",), ("water", "lake", "river", "ocean"),
           ("tree", "wood", "log"), ("zombie",), ("skeleton",), ("creeper",), ("spider",), ("enderman", "endermen"),
@@ -53,19 +27,6 @@ _THING = [re.compile(r"\b(?:" + "|".join(words) + r")(?:s|es)?\b") for words in 
 _CLAIM = re.compile(r"\b(see|saw|seen|spot|spotted|found|there'?s|there is|there are|near|nearby|close|away|here|"
                     r"over there|next to|ahead|behind)\b")
 _NEGATION = re.compile(r"\b(no|not|n't|never|nothing|haven't|don't|can't|didn't|any)\b")
-
-
-def model_path(download=True, log=print):
-    """Where the 360M model lives; downloads it on first use (about 390 MB)."""
-    path = os.environ.get("XEN_MODEL") or os.path.join(MODEL_DIR, MODEL_NAME)
-    if os.path.exists(path) or not download:
-        return path
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    log(f"Downloading Xen's chat model ({MODEL_NAME}, ~390 MB) to {path} ...")
-    tmp = path + ".part"
-    urllib.request.urlretrieve(MODEL_URL, tmp)
-    os.replace(tmp, path)
-    return path
 
 
 def safe_chat(text, limit=220):
@@ -103,9 +64,6 @@ _FIRST_PERSON = ((r"\bYou are\b", "I'm"), (r"\b[Yy]ou were\b", "I was"), (r"\bYo
 
 
 _PLAN = re.compile(r"\bPlan: (.+)$")
-# Talk can't make it do things (only requests do), so it mustn't promise to.
-_PROMISE = re.compile(r"\b(i'll|i will|i'm going to|let me|i can) (go |go and )?(get|build|chop|mine|dig|find|bring|give|"
-                      r"follow|hunt|make|collect|gather|fetch|craft|check|look|explore|kill)\b")
 
 
 def first_person(text):
@@ -271,22 +229,6 @@ _GIVE_THINGS = (("log", ("wood", "log", "tree", "plank", "ไม้")), ("cobble
                 ("coal", ("coal", "ถ่าน")), ("raw_iron", ("iron", "เหล็ก")), ("diamond", ("diamond", "เพชร")),
                 ("food", ("food", "meat", "eat", "อาหาร", "ของกิน")))
 
-EARS = (
-    "<|im_start|>system\nYou are the ears of Xen, a Minecraft companion. Read what a player says to Xen and answer "
-    "with the one word for what they want Xen to do: follow, stay, explore, wood, stone, coal, iron, mine, food, give, "
-    "shelter, eat, stop, redstone, trade, or chat (only talking, thanking, praising or asking something).<|im_end|>\n"
-    + "".join(f"<|im_start|>user\n{said}<|im_end|>\n<|im_start|>assistant\n{intent}<|im_end|>\n" for said, intent in (
-        ("come with me", "follow"), ("nice one!", "chat"), ("could you chop down a few trees", "wood"),
-        ("keep guard right here", "stay"), ("hand me your stuff", "give"), ("how are you doing?", "chat"),
-        ("go wander around", "explore"), ("we need a place to hide tonight", "shelter"), ("never mind", "stop"),
-        ("go get us something to eat", "food"), ("you're funny", "chat"), ("i need smelting fuel", "coal"),
-        ("follow my lead", "follow"), ("grab me some cobblestone", "stone"), ("see you later", "chat"),
-        ("you look hurt, eat up", "eat"), ("put together a little logic thing with levers", "redstone"),
-        ("let's make a deal, my iron for your wood", "trade"), ("watch this!", "chat"))))
-SURE = 1.0          # the model's pick must beat "chat" by this much (log-probability), or it's just chat
-
-
-# Common typos, fixed word by word before Xen reads a request ("fallow me" is "follow me").
 TYPOS = {"fallow": "follow", "folow": "follow", "follw": "follow", "flw": "follow", "folllow": "follow", "follwo": "follow",
          "cmere": "come here", "comere": "come here", "c'mere": "come here", "plz": "please", "pls": "please", "stahp": "stop",
          "stp": "stop", "wod": "wood", "woood": "wood", "sheltr": "shelter", "shleter": "shelter", "explor": "explore",
@@ -382,43 +324,11 @@ def details(intent, words):
 
 
 class ChatBot:
-    """Understands players and answers them with the small local chat model."""
-
-    def __init__(self, path=None, max_tokens=40, temperature=0.5, download=True):
-        from .llm import LanguageModel
-        self.model = LanguageModel(path or model_path(download))
-        self.model.keep_prefix(PERSONA)
-        self.model.keep_prefix(EARS)
-        self.max_tokens = max_tokens
-        self.temperature = temperature
+    """Understands players and answers them in plain words from Xen's notes (no language model)."""
 
     def understand(self, message, name="xen"):
-        """Keywords first (they're reliable); when there are none, the chat model decides."""
-        request = understand(message, name)
-        if request[0] != "chat":
-            return request
-        words = request_words(message, name)
-        if just_talk(words):
-            return request
-        best, scores = self.model.choose(f"{EARS}<|im_start|>user\n{words}<|im_end|>\n<|im_start|>assistant\n",
-                                         INTENTS)
-        if scores[best] - scores[INTENTS.index("chat")] < SURE:
-            return request
-        return details(INTENTS[best], words)
-
-    def prompt(self, speaker, message, context):
-        return (f"{PERSONA}<|im_start|>user\nNotes: {context}\n{speaker} says: {message}<|im_end|>\n"
-                f"<|im_start|>assistant\n")
+        return understand(message, name)
 
     def reply(self, speaker, message, context="", seed=None):
-        """Its answer. What it was asked to do, it answers at once in plain words (exactly its plan); for talk, the
-        model answers, and if that makes something up or promises to do something, it tries once more, then just
-        says what it knows."""
-        if _PLAN.search(context):
-            return plainly(context, message)
-        for attempt in range(2):
-            text = safe_chat(self.model.generate(self.prompt(speaker, message, context), self.max_tokens,
-                                                 self.temperature, seed=None if seed is None else seed + attempt))
-            if honest(text, context) == text and not _PROMISE.search(text.lower()):
-                return text
+        """Its answer: what it was asked to do, exactly its plan; for talk, what its notes hold."""
         return plainly(context, message)

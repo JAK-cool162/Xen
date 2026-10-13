@@ -127,8 +127,6 @@ public class XenSettingsScreen extends Screen {
 						"accurate: real Minecraft accounts with their real skins, like the Carpet mod: the names in config/xen/real_names.txt and any name you summon a Xen by (/xen summon Name); when the list runs out, made-up names like real players'. real: real Minecraft accounts you list in config/xen/real_names.txt, each with that account's real skin (like the Carpet mod's fake players; only names you put there). player: like real players' names now (luvhi, MeeroSG, cold_lemon, Solen2009), made up, never someone's. mixed: all kinds. fun: SneakyWaffle, GrumpyBadger. gamer: Pickle_42, xXWaffleXx. fantasy: Zorbax, Lumika. classic: Pip, Bramble.");
 				choice("Skins", "skins", skinChoices(), s -> s,
 						"accurate: a real account's own skin for a Xen with a real name; otherwise skins real players made (mineskin.org's gallery, online; the modern ones until then). blob: Xen 2.0's look, simple skins: flat colours, two plain eyes. modern: the mod's skins in today's style (shaded hair, hoodies, jackets; many slim). random: all the mod's skins and Minecraft's 18. pack: the modern and the fun ones. fun: the funny 61 of earlier versions. folder: your own PNG skins in config/xen/skins (from NameMC, Planet Minecraft or drawn yourself; signed once through mineskin.org, so everyone sees them). mineskin: random skins from mineskin.org's gallery (online). Or a player's skin: /xen set skins player:Name.");
-				choice("AI chat (on this device)", "chatModel", List.of("auto", "on", "off"), s -> s.equals("off") ? "off (own words)" : s,
-						"The small AI chat model runs on your own device (your computer or phone), never online: a 400 MB download once, and some memory and power while it talks. auto = only when the game has about 3 GB of memory. off = it never runs: Xens talk with their own words instead (light: a word library and a tiny network, nothing to download), each in its own tone, and still do what you ask. It only wakes when someone a Xen knows is near or talks.");
 				choice("Hardcore", "hardcore", List.of("auto", "on", "off"), s -> s.equals("auto") ? "auto (as the world)" : s,
 						"One life each. A hardcore Xen that dies is gone for good: it doesn't come back, and those who knew it remember it. It lives like it, too: it minds danger more, backs off from a fight sooner, and won't go off on a risky errand while hurt, however nicely it's asked. auto: hardcore in a hardcore world.");
 			}
@@ -137,10 +135,6 @@ public class XenSettingsScreen extends Screen {
 				onOff("Local chat", "localChat", "What anyone says (players and Xens) only reaches those within the chat range, and only Xens that close hear it. Someone standing nearby can overhear, and a Xen that overhears a plot against its friend may tell them. Off: chat reaches the whole server.");
 				choice("Chat range", "chatRange", List.of(32, 16, 48, 64, 128), n -> n + " blocks" + (n == 32 ? " (2 chunks)" : ""), "How far local chat and local death messages carry.");
 				onOff("Local death messages", "localDeaths", "A death message only reaches those within the chat range of where it happened (it turns the show_death_messages game rule off and sends them itself).");
-				choice("AI chat (on this device)", "chatModel", List.of("auto", "on", "off"), s -> s.equals("off") ? "off (own words)" : s,
-						"The small AI chat model runs on your own device (your computer or phone), never online: a 400 MB download once, and some memory and power while it talks. auto = only when the game has about 3 GB of memory. off = it never runs: Xens talk with their own words instead (light: a word library and a tiny network, nothing to download), each in its own tone, and still do what you ask. It only wakes when someone a Xen knows is near or talks.");
-				choice("AI chat size", "chatModelSize", List.of("auto", "small", "normal"), s -> s.equals("small") ? "small (phones)" : s,
-						"Which chat model runs on your device. small: SmolLM2 135M, about 145 MB, three times faster, simpler answers (for phones and weaker computers). normal: SmolLM2 360M, about 390 MB, better answers. auto: small on phones and when the game has less than 3 GB of memory, else normal. It downloads the one it needs the first time.");
 				onOff("Talks on its own", "talk", "Xen says what's on its mind now and then, greets people it knows and asks things you can answer with yes or no.");
 				onOff("Talks with Xens", "talkToXens", "Xens that meet have a short chat and tell each other where they saw trees and ore.");
 				onOff("Trading", "trading", "Xen trades with villagers (on their trading screen) and bargains with players.");
@@ -188,13 +182,8 @@ public class XenSettingsScreen extends Screen {
 				onOff("Signs", "signs", "When nobody it knows is around, Xen leaves notes on signs it carries.");
 			}
 			case 6 -> {
-				String gpu = GlAccelerator.gpuName();
-				choice("Chat runs on", "gpu", List.of("auto", "on", "off"), s -> s.equals("off") ? "CPU" : (s.equals("on") ? "GPU" : "auto") + ": " + shortGpu(gpu),
-						"Run the chat model on the graphics card (much faster answers). Your graphics card: " + gpu + ". auto: when it's a real graphics card with OpenGL 3.3, in single player. Works with Sodium, Iris and Vulkan mods. Applies the next time the model loads.");
 				choice("Decisions", "decisionTicks", List.of(5, 10, 20), n -> n == 5 ? "4 a second" : n == 10 ? "2 a second" : "1 a second",
 						"Fewer decisions for slower computers and phones.");
-				choice("Chat threads", "chatThreads", List.of(1, 2, 3, 4, 6, 8), n -> n + (n == 1 ? " thread" : " threads"),
-						"How many processor cores the chat model may use (applies the next time it loads).");
 			}
 			case 7 -> {
 				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
@@ -247,9 +236,6 @@ public class XenSettingsScreen extends Screen {
 					.setTooltip(tip(Component.literal(toggles[i][2])));
 		}
 		top += 50;
-		choice("Chat model", "chatModelPick", List.of("auto", "135m", "360m", "off"),
-				v -> v.equals("135m") ? "SmolLM2 135M (small, fast)" : v.equals("360m") ? "SmolLM2 360M (better)" : v.equals("off") ? "off" : "auto (Talk tab)",
-				"The AI chat model, on your device. 135M: 145 MB, three times faster, for phones. 360M: 390 MB, better answers. A model picked here loads whatever the memory (it downloads once). auto: the Talk tab's settings. Everyday talk (hellos, jokes, \"do you like me\", where it is...) works without any model.");
 		// the journal: copy it, or save it as a file (bottom left, next to Reset and Done)
 		int by = height - 28, bw = Math.min(80, (panelWidth - 2 * Math.min(90, (panelWidth - 8) / 2) - 24) / 2);
 		StringWidget journalStatus = new StringWidget(left, by - 13, panelWidth, 12, Component.empty(), font);
@@ -280,7 +266,7 @@ public class XenSettingsScreen extends Screen {
 		instructions.setValue(settings.value("instructions"));
 		instructions.setValueListener(v -> settings.set("instructions", v));
 		instructions.setTooltip(tip(Component.literal("Every Xen's personality and what it should know. A line that starts with a Xen's name and a colon "
-				+ "(\"Pip: ...\") is only for that Xen. The chat model reads it when it answers and talks.")));
+				+ "(\"Pip: ...\") is only for that Xen. It reads it when it answers and talks.")));
 		inPanel(addRenderableWidget(instructions));
 		y += instructionsHeight + 6;
 
@@ -335,12 +321,6 @@ public class XenSettingsScreen extends Screen {
 		int col = row % columns, line = row / columns;
 		row++;
 		return new int[] {left + col * (buttonWidth + 8), top + line * 24};
-	}
-
-	/** A graphics card's name short enough for a button ("Adreno (TM) 740" -> "Adreno 740"). */
-	private static String shortGpu(String gpu) {
-		String s = gpu.replaceAll("\\(TM\\)|\\(R\\)|/PCIe/SSE2|/PCIe|/SSE2| \\(.*\\)$", "").replaceAll("\\s+", " ").trim();
-		return s.length() > 22 ? s.substring(0, 21) + "…" : s;
 	}
 
 	private void onOff(String label, String key, String help) {

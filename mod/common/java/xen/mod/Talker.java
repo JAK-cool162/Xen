@@ -112,7 +112,7 @@ final class Talker {
 			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.talkative()) * (0.7f + 0.6f * random.nextFloat())));
 			String r = random.nextFloat() < (FAST ? 0.7f : 0.35f) ? question() : null;
 			boolean asking = r != null;
-			if (r == null) r = !c.mod.chat.hasModel() && random.nextFloat() < 0.3f ? c.voice.remark() : remark();   // (now and then something in its own words)
+			if (r == null) r = random.nextFloat() < 0.3f ? c.voice.remark() : remark();   // (now and then something in its own words)
 			if (r == null) r = remark();
 			if (r != null && r.equals(lastRemark)) r = null;                  // not the same thing twice in a row
 			if (r != null && (System.currentTimeMillis() - c.mod.lastRemarkAt < (FAST ? 0 : 6000) || !c.fresh(r))) r = null;   // nor what another Xen just said

@@ -601,6 +601,7 @@ final class Crafter {
 			c.chatter("I made " + (name.endsWith("s") ? "" : "aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name.replace('_', ' ') + "!", false);
 			if (name.endsWith("_pickaxe")) XenMod.LOG.info("{} made a {} {} s into its life", c.name, name.replace('_', ' '), c.player.tickCount / 20);   // (how quick a start: for the tests)
 			XenMod.LOG.info("{} made a {}", c.name, name);
+			if (name.endsWith("_pickaxe") || name.endsWith("_sword") || name.equals("shield") || name.endsWith("_chestplate")) c.did("made a " + name.replace('_', ' '));
 		}
 		making = null;
 		return made;

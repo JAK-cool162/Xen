@@ -73,7 +73,6 @@ public class XenClient implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
-		xen.mod.talk.Chat.gpu = GlAccelerator::create;                 // in a game client, the chat model can use the GPU
 		// the Build Axe's screen, when the server says a box is marked
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(xen.mod.BuildAxe.Open.TYPE,
 				(payload, context) -> Screens.open(context.client(), new BuildAxeScreen(payload)));
@@ -82,13 +81,6 @@ public class XenClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> axeClick(player, level, hit.getBlockPos(), 2));
 		net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, level, hand) -> axeClick(player, level, player.blockPosition(), 0));
 		ClientTickEvents.START_CLIENT_TICK.register(XenClient::axeFar);
-		String gpuTest = System.getProperty("xen.gpuTest");
-		if (gpuTest != null) {                                       // -Dxen.gpuTest=<model>: CPU vs GPU, then quit
-			ClientTickEvents.END_CLIENT_TICK.register(client -> {
-				if (++ticks == 100) new Thread(() -> GpuCheck.run(gpuTest, client), "xen-gpu-test").start();
-			});
-			return;
-		}
 		if (!Boolean.getBoolean("xen.uiTest")) return;
 		XenSettingsScreen.noTooltips = true;                          // (they'd cover the screenshots)
 		ScreenEvents.AFTER_INIT.register((client, opened, width, height) -> screen = opened);

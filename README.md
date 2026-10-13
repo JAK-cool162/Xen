@@ -18,9 +18,10 @@ On top of survival it has skills: it **builds** from templates (roofs, arches,
 houses, towers, bridges), **rates** builds and learns your taste in buildings,
 and **learns redstone** by experimenting. It **chats**: ask it for things in
 plain words ("Xen, get me some wood", "build a shelter", "follow me") and it
-does them, with its own hands and senses. A small local chat model
-(SmolLM2-360M) helps it understand and answer, and it only knows what Xen
-knows. In real Minecraft you can bring in as many Xens as the server allows.
+does them, with its own hands and senses. Its own small talk model, trained on
+how players really type ("wsg", "u got iron??", "bro i just died to a creeper"),
+answers like a player would, with only what's true of it, and it only knows
+what Xen knows. In real Minecraft you can bring in as many Xens as the server allows.
 Each one is a real player with its own name, skin and personality, and they
 all share one brain. With evolution, the ones that do well pass their nature
 on.
@@ -223,13 +224,9 @@ settings:
 | `dist/xen-companion-2.0.0-beta.26.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
 | `dist/xen-companion-2.0.0-beta.26.1+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
-The [Releases](https://github.com/JAK-cool162/Xen/releases) page also has
-**all-in-one** jars (`...-with-chat.jar`, about 400 MB): the mod with its
-chat model (SmolLM2-360M) inside, so Xen talks with nothing else to download.
-The mod unpacks the model once into `config/xen/` and checks its SHA-256.
-(`python scripts/bundle_chat_model.py <mod jar> <model>` makes one.)
+Everything Xen needs is inside the jar: nothing to download, nothing online.
 
-The mod and its chat model are plain Java with no native code, so the same jar
+The mod is plain Java with no native code, so the same jar
 runs on x86-64 and ARM64 (phones, Raspberry Pi, Apple Silicon). Every push is
 checked on both an x86-64 and an ARM64 machine
 ([`.github/workflows/check.yml`](.github/workflows/check.yml)).
@@ -377,32 +374,40 @@ greets you, says how its dream is going, and asks yes-or-no questions it acts
 on ("I have lots of wood. Want some?" "yes"). Two Xens that meet chat and tell
 each other where they saw trees and ore, and the other one then knows it.
 Everyday questions ("what are you doing?", "what do you have?") are answered
-straight from what it knows, not by the chat model.
+straight from what it knows.
+
+**It talks like a player** (2.0.0-beta.27). Its talk model reads what was
+said the way players type it (lowercase, "u", "ur", "wsg", "wyd", typos,
+stretched letters, its name or none) and knows about 90 kinds of lines:
+hellos, "how r u", "wyd", "u got any iron?", "bro i just died to a creeper",
+"i found diamonds!!", "wanna go mining later", "are you a bot", "whats ur fav
+block", jokes, roasts, compliments, "gn", "brb"... It answers from a library
+of about 800 player-style lines, in its own tone, filled in only with what's
+true of it ("no iron yet, just 4 wood lol", "getting wood rn", "rip. creepers
+have no chill", "copper for sure. yours?" and it remembers your answer). It
+learns which answers land: a laugh after one, it says it more; a "what?",
+less. A chat goes on as long as it's fun (laughs and thanks keep it going).
+The model is trained by `scripts/train_talk.py` on `data/talk/corpus.txt`;
+on lines it never saw it gets the kind right about 9 times in 10, and when
+it isn't sure, the rest of Xen's chat answers instead.
 
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by
 hand. Capped at 24 parts by default so nothing big slows the server.
 
-**The chat model can run on your graphics card** (setting `gpu`, auto by
-default): its own hidden OpenGL 3.3 context and plain shaders, so it works with
-vanilla, Sodium, Iris or Vulkan renderer mods alike, and falls back to the CPU
-by itself.
-
-**The chat model only wakes when it's needed**: when someone the Xen knows is
-within 32 blocks, or someone talks to it. It unloads after 10 quiet minutes.
-When nobody it knows is around, Xen leaves notes on signs instead ("Day 12:
-Diamonds here! -Pip").
+When nobody it knows is around, Xen leaves notes on signs ("Day 12: Diamonds
+here! -Pip").
 
 **Settings in Mod Menu** (or `/xen set` on servers), with the categories down
-the left: Talk (chat, the chat model, talking on its own and with Xens,
+the left: Talk (chat, talking on its own and with Xens,
 trading, saying no), Xens (how many, names, personalities, skins), Goals (own
 goals, antics, learning by watching, evolution), PvP, Build (redstone, signs),
-Speed (GPU, decisions, threads) and **Experimental**:
+Speed (decisions) and **Experimental**:
 
 * **Custom instructions**: who your Xens are ("You love cats and hate the
   rain. Pip: you're a pirate and talk like one."). A line starting with a
-  Xen's name is only for that Xen. The chat model reads them; without it, Xen
-  still answers from them ("do you like cats?" "I love cats.").
+  Xen's name is only for that Xen. Xen answers from them ("do you like
+  cats?" "I love cats.").
 * **Custom script**: your own rules, `when <something>: <what to do>`, one per
   line: `when night: do build a shelter`, `when someone comes: wave`,
   `when hears hello: say Hi {player}!`, `when sees creeper: say RUN!`,
@@ -515,30 +520,25 @@ Chat is how you ask Xen for things, and it answers. The mod does all of it (see
 above). With the bridge, start Xen with `--chat` (`python -m xen play --chat`,
 `python -m xen swarm --chat`) to have it answer in its own words.
 
-It understands in two steps (`xen/talk/chat.py`, the same rules in the mod's
-`Chat.java`): clear keywords first, and when there are none, the chat model
-(SmolLM2-360M-Instruct, on the CPU, no GPU) picks one of the things it can do,
-but only when that's clearly likelier than just talking. Questions and thanks
-are always just talk. On 46 test phrases, keywords alone understood 32 and the
-two steps together 41. None of the 10 plain-chat phrases turned into an
-action. The rest of the misses became plain talk instead of a wrong action.
+It understands requests from the words (`xen/talk/chat.py`, the same rules in
+the mod's `Chat.java`), typos and chat shorthand too. Questions and thanks are
+always just talk, and so is an idea for later ("wanna go mining later").
 
 It **can talk but can't cheat**:
 
-* its prompt is Xen's own notes: its feelings, body and inventory, and what it
-  perceives, worded with how sure it is ("You know there is lava 3 blocks from
-  you. You think there was iron about 40 blocks away, but you're not sure.");
-* a sentence that claims something that isn't in its notes (ores, lava, mobs,
-  villages...) is dropped before it's sent, and so is a promise to do
-  something (talk can't make it act, only requests can);
-* for a request it says its plan in plain words, never the model's version of
-  it, so it can't misstate what it's doing;
+* what it says comes from Xen's own notes: its feelings, body and inventory,
+  and what it perceives, worded with how sure it is ("You know there is lava 3
+  blocks from you. You think there was iron about 40 blocks away, but you're
+  not sure.");
+* an answer that would claim something that isn't true of it (iron it doesn't
+  have, a death it never had, a place it never found) is never picked;
+* for a request it says its plan in plain words, so it can't misstate what
+  it's doing;
 * it only chats: one line, up to two sentences, never a command (a reply can't
   start with `/`).
 
-The model downloads once (about 390 MB) to `~/.xen/models`, or set
-`XEN_MODEL` to a GGUF file you have. Without it, Xen still understands
-keywords and answers in plain words from its notes.
+There is no language model to download (the optional SmolLM2 chat model was
+removed in 2.0.0-beta.27): everything is in the mod.
 
 ```
 $ python -m xen chat "Xen, what do you see?" "go see what's out there"   # in a SimCraft world
@@ -719,9 +719,8 @@ xen/
     mineflayer.py     real Minecraft via the bridge (one Xen)
     screen.py         real Minecraft via keyboard, mouse and screen pixels
   swarm.py            many Xens, one brain
-  skills.py           chat commands: build, design, rate, redstone, spawn (and the chat model)
+  skills.py           chat commands: build, design, rate, redstone, spawn
   talk/
-    llm.py            GGUF reader, tokenizer and Llama forward pass in numpy (SmolLM2-360M)
     chat.py           understanding requests, notes from its own senses, honesty filter, safe chat
   building/           blueprints, templates, rating, taste, designer
   redstone/           simulator and learner
@@ -738,20 +737,20 @@ mod/                  Fabric mod: Xen Companion
                       core/Mind + core/SimLife (Xen 2.0 and its trainer), MindSense, Laws (village rules,
                       jobs, punishments), Needs, Enchanter, Voyager (worlds, elytra), Highway
   common/java/.../client/  the Mod Menu settings screen (tabs)
-  common/test/        crossCheck: Java == Python for senses, brain, memories, paths and chat rules
+  common/test/        crossCheck: Java == Python for senses, brain, memories, paths, chat rules and the talk model
   mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
   mc26/               build for Minecraft 26.x (Java 25); Compat looks up what differs in 26.1 - 26.3
 dist/                 the built mod jars, with install notes and requirements
 docs/screenshots/     the settings screen in a real game client
 .github/workflows/    check.yml: tests and builds on x86-64 and ARM64; release.yml: a pushed version tag
-                      publishes a release (jars, brains, chat model)
-scripts/              real-server verification, mod test fixtures, circuits for the mod
+                      publishes a release (jars, brains)
+data/talk/            the talk model's corpus (kinds of lines, ways to say them, answers) and held-out lines
+scripts/              real-server verification, mod test fixtures, circuits for the mod, train_talk.py (the talk model)
 tests/                python -m unittest discover -s tests -t .
 ```
 
 ## Credits
 
-* Chat model: [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) by Hugging Face (Apache-2.0).
 * End fight lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
   [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft),
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Turned into Xen's own rules and lessons; no data from it is in the repository.
@@ -771,17 +770,14 @@ field of view, occlusion, beliefs and their confidence), the simulator,
 fear conditioning (Xen learns to fear walking into lava, and only that),
 shared-brain swarms, the real-world protocol against a fake bridge, the
 keyboard/mouse backend against a fake screen, building, taste, redstone rules
-and learning, the chat (understanding requests, tokenizer, honesty filter,
-safe chat; generation and the model's choices when the model file is there)
+and learning, the chat (understanding requests, honesty filter, safe chat)
 and the command line.
 
 The mod has its own check, which compares the Java port with the Python Xen
-(senses, brain, fear, memories, paths and chat rules), and one for the chat
-model in Java:
+(senses, brain, fear, memories, paths, chat rules and the talk model):
 
 ```
 cd mod/mc1.21.11 && ./gradlew crossCheck
-./gradlew llmCheck -PchatModel=/path/to/smollm2-360m-instruct-q8_0.gguf
 ./gradlew runClient -PuiTest     # opens Mod Menu and the settings screen by itself, then closes
 ```
 

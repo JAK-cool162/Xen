@@ -327,7 +327,7 @@ def cmd_chat(args):
         world.step(Action.TURN_RIGHT if _ % 2 else Action.IDLE)
     context = notes("calm", False, world.health, world.hunger, carrying(world.inventory), world.senses.describe())
     print(f"Xen's notes: {context}")
-    bot = ChatBot(path=args.model)
+    bot = ChatBot()
     for message in args.message or ["Xen, what do you see?"]:
         intent, thing, amount = bot.understand(message)
         print(f"<{args.speaker}> {message}")
@@ -365,7 +365,7 @@ def main(argv=None):
         p.add_argument("--build-mode", choices=("commands", "hands"), default="commands",
                        help="commands: /setblock (Xen needs op); hands: place blocks like a player (creative)")
         p.add_argument("--chat", action="store_true",
-                       help="answer chat with Xen's chat model (a 360M local language model; downloads ~390 MB once)")
+                       help="answer chat in Xen's plain words")
 
     p = sub.add_parser("train", help="grow up in the SimCraft world")
     p.add_argument("--brain", default="xen_brain.npz")
@@ -437,10 +437,9 @@ def main(argv=None):
     p.add_argument("--out", help="write the circuit as a .mcfunction")
     p.set_defaults(func=cmd_redstone)
 
-    p = sub.add_parser("chat", help="chat with Xen (its chat model downloads, ~390 MB, on first use)")
+    p = sub.add_parser("chat", help="chat with Xen (what it understands, and its plain answer)")
     p.add_argument("message", nargs="*", help="what you say")
     p.add_argument("--speaker", default="You")
-    p.add_argument("--model", default=None, help="path to a GGUF model (default ~/.xen/models)")
     p.set_defaults(func=cmd_chat)
 
     p = sub.add_parser("evaluate", help="measure what Xen has learned (no exploring, fixed worlds)")

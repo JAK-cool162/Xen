@@ -1,9 +1,6 @@
-import os
 import unittest
 
-from xen.talk.chat import MODEL_DIR, MODEL_NAME, carrying, honest, notes, plainly, safe_chat, understand
-
-MODEL = os.environ.get("XEN_MODEL") or os.path.join(MODEL_DIR, MODEL_NAME)
+from xen.talk.chat import carrying, honest, notes, plainly, safe_chat, understand
 
 
 class TestChatRules(unittest.TestCase):
@@ -59,24 +56,6 @@ class TestChatRules(unittest.TestCase):
         self.assertIn("You are hungry.", n)
         self.assertIn("5 dirt, 2 log", n)
         self.assertNotIn("0 coal", n)
-
-
-@unittest.skipUnless(os.path.exists(MODEL), "chat model not downloaded (python -m xen chat fetches it)")
-class TestLanguageModel(unittest.TestCase):
-    def test_it_picks_what_is_asked(self):
-        from xen.talk.chat import ChatBot
-        bot = ChatBot(MODEL)
-        self.assertEqual(bot.understand("go see what's out there")[0], "explore")    # no keyword: the model decides
-        self.assertEqual(bot.understand("thanks xen")[0], "chat")
-
-    def test_tokenizer_and_a_short_answer(self):
-        from xen.talk.llm import LanguageModel
-        lm = LanguageModel(MODEL)
-        ids = lm.tokenizer.encode("I found 12 diamonds at y=-58.")
-        self.assertEqual(lm.tokenizer.decode(ids), "I found 12 diamonds at y=-58.")
-        out = lm.generate("<|im_start|>user\nWhat is the capital of France?<|im_end|>\n<|im_start|>assistant\n",
-                          max_tokens=8, temperature=0)
-        self.assertIn("Paris", out)
 
 
 if __name__ == "__main__":

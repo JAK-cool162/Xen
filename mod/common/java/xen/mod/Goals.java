@@ -1652,7 +1652,7 @@ final class Goals {
 	}
 
 	// -------------------------------------------------------------------------------- words
-	/** For its notes (the chat model): all three, and only what's true. */
+	/** For its notes: all three, and only what's true. */
 	String describe() {
 		StringBuilder sb = new StringBuilder();
 		if (!instant.isEmpty()) sb.append("Right now you are ").append(instant).append(". ");

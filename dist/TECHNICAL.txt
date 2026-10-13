@@ -7,6 +7,36 @@ Everything about how Xens work, what changed, the settings and the commands. The
 WHAT'S NEW IN 2.0.0-beta.27
 ===========================
 
+Talk model (talk/Banter.java, new; trained by scripts/train_talk.py on data/talk/corpus.txt): 94 kinds of lines (6 of
+them handed on: requests, recipes, facts, tips), 1082 written lines typed 26184 ways (lowercase or caps, 36 shorthand
+swaps such as you->u, your->ur, what's->whats, going to->gonna, a typo: swapped, dropped, doubled or stretched letters,
+punctuation dropped, its name before or after, a filler before or after: "bro", "lol", "ngl", "fr", "??"...). A line
+is lowercased, its own name made "@x", letters stretched past two cut to two, cut into tokens (letters and digits, '
+dropped inside; "?" and "!" once each; symbols and emoji one each); features: "w|" each token, "c|" each letter
+triple of "<token>", "b|" each pair with <s> and </s>; FNV-1a (32-bit, UTF-8) & 32767 rows of a 64-number embedding,
+the mean, then logits = W h + b over the kinds, softmax. Adam (lr 0.01, batch 64, 8 epochs, sparse rows); the
+embedding ships as int8 with one scale per row (talk.bin, 2.2 MB). Held out: 88% (104 lines written after the first
+set was used to find weak spots) and 93-94% (162 lines). Answers: 805 in talk.json, each with optional tones and
+conditions ([has:iron] [no:food] [pick] [night] [hurt] [busy] [home] [died] [place] [friend] [dream] [did]
+[underground]...) and words filled in from the Xen ({doing} {mood} {n:iron} {pick} {fav:block} {death} {place} {xyz}
+{answer}...); an answer whose words aren't all true now is never picked. Weights: tone-only answers x2.2 for that tone,
+x(1 + 0.6 per condition), x0.05 if among its last 12, x exp(0.6 sum/sqrt(n)) from reactions (clamped to e^+-1.5): a
+laugh, nice, compliment, thanks, agree or love after it within 30 s is +1, confused, insult, shut up or bruh -1
+(config/xen/talk-learned.json). An answer that asks back (ask:fav_block) reads the next line (within 90 s, unless it's
+clearly something else) as the answer, cut down to four words. A line naming a thing (iron, diamonds, food, wood,
+coal, gold, emeralds, stone, a pickaxe) gets an answer about that thing when one fits. Sure (p >= 0.85) of a social
+kind: it answers before the keyword handlers (sleep, teams, highways...); p >= 0.5: in the chat branch; below: the
+older chat (Voice, Words, SmallTalk). "later/sometime/tomorrow" with a request: talk, not a request.
+Chat keenness: each line costs 0.02 (a question) / 0.05 (filler) / 0.035 x (1.3 - chattiness) x (1 - 0.4 trust),
++0.015 busy, -0.03 when it's fun (a laugh, thanks, nice, gg); it winds up below 0.15 (was 0.08 / 0.2 / 0.14, +0.1).
+
+Removed: the SmolLM2 chat model (Llm, GlAccelerator, GpuCheck, LlmCheck, the download, the all-in-one jars, settings
+chatModel, chatModelSize, chatModelPick, gpu, downloadChatModel, chatThreads, chatWakeDistance, chatIdleMinutes; old
+values in xen.json are ignored). Chat.ask still runs on its own thread; answers are plain words from the notes.
+
+Fighter: against mobs, retreat = max(retreat, min(0.6, retreat + (0.12 per mob past the first within 10, at most 0.3,
++ 0.08 at night in light under 7) x (0.5 for "warrior never runs", else 1))).
+
 Decision core (Goals.thinkMind/decide): the agenda (the usual plan) no longer starts its choice; every allowed option
 gets score = mindW * z + thought + 2.5 * sure * expect + advice + curious, where z is the option's mind utility (striatum
 value - caution * amygdala harm + bias) standardised over the allowed options (sd at least 0.5), thought +0.5 for the

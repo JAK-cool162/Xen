@@ -3,8 +3,20 @@ own houses, farm, trade, form villages with their own rules, make friends and en
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
 
-### 2.0.0-beta.27: Xen decides for itself (the decision core), G1X vision, and chat that says what it means
+### 2.0.0-beta.27: Xen talks like a player (its own trained talk model), decides for itself, G1X vision
 
+* **It talks like a player.** Xen has its own talk model now, trained on how players really type: "wsg", "wyd",
+  "u got iron??", "bro i just died to a creeper", "LMAOOO", "whats ur fav block", typos and stretched letters, with
+  its name or without. It knows about 90 kinds of lines and answers from a library of about 800 player-style lines, in
+  its own tone, with only what's true of it ("no iron yet, just 4 wood lol", "getting wood rn", "rip. creepers have no
+  chill", "copper for sure. yours?" and then it reacts to your answer). It learns which answers land (a laugh after
+  one, it says it more), and a chat goes on as long as it's fun instead of ending after four lines. "im gonna go to
+  sleep" isn't an order to sleep any more, and "wanna go mining later" is an idea, not a request it refuses.
+  "Where are you?" gets its real coordinates. On lines it never trained on it reads the kind right about 9 times in 10.
+* **The optional AI chat model is gone** (SmolLM2, its 145-390 MB download, the GPU option and its settings): it was
+  buggy and slow, and the new talk model is in the jar (2 MB) and answers at once. No more -with-chat jars.
+* **It backs off from mobs sooner** when it's outnumbered or in the dark (most of its deaths were two or three mobs at
+  night, at 2 to 6 health, while it went on chopping or picking things up).
 * **Xen decides.** Before, a hand-written plan made most of its choices (79 of 115 in one game) and its learned mind
   only filled the gaps. Now every choice is its own, weighed from three things: what its mind makes of each choice, the
   usual plan (as advice: how much it listens is learned from how the plan has worked out for it), and what happened the

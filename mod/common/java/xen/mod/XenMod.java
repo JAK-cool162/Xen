@@ -67,9 +67,8 @@ public class XenMod implements ModInitializer {
 	/** Where skins come from: the pack, your folder, mineskin.org, players. */
 	final Skins skins = new Skins();
 	final java.util.Random random = new java.util.Random();
-	private long lastChatNeed, lastEvolvedDay = -1;
+	private long lastEvolvedDay = -1;
 	/** Players who were told why Xens' answers are simple (once each). */
-	private final java.util.Set<java.util.UUID> toldAboutModel = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
 	XenConfig config;
 	Brain brain;
@@ -118,12 +117,6 @@ public class XenMod implements ModInitializer {
 		INSTANCE = this;
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
-		Chat.gpuSetting = () -> config.gpu;
-		Chat.sizeSetting = () -> switch (config.chatModelPick) {             // (the Experimental tab's pick comes first)
-			case "135m" -> "small";
-			case "360m" -> "normal";
-			default -> config.chatModelSize;
-		};
 		skins.prepare(configDir, config.skins);
 		if (config.realNameStyle()) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
@@ -131,15 +124,11 @@ public class XenMod implements ModInitializer {
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
+			xen.mod.talk.Banter.init(configDir.resolve("xen"));              // its talk model: what kind of line players say, and the answers (and which land)
 		} catch (RuntimeException e) {
 			LOG.warn("Xen's word engine couldn't start: {}", e.toString());
 		}
-		chat = new Chat(configDir.resolve("xen").resolve(Chat.MODEL), () -> switch (config.chatModelPick) {
-			case "135m", "360m" -> "on";
-			case "off" -> "off";
-			default -> config.chatModel;
-		}, () -> config.downloadChatModel,
-				config.chatThreads, LOG::info);
+		chat = new Chat(LOG::info);
 		CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> commands(dispatcher));
 		ServerLifecycleEvents.SERVER_STARTED.register(this::started);
 		ServerLifecycleEvents.SERVER_STOPPING.register(this::stopping);
@@ -421,6 +410,7 @@ public class XenMod implements ModInitializer {
 		roster.save();
 		lore.save();
 		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
+		xen.mod.talk.Banter.save();
 	}
 
 	private void stopping(MinecraftServer s) {
@@ -433,6 +423,7 @@ public class XenMod implements ModInitializer {
 		roster.save();
 		lore.save();
 		xen.mod.talk.Voice.save();
+		xen.mod.talk.Banter.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
 		running = false;
 		if (trainer != null) trainer.interrupt();
@@ -467,7 +458,6 @@ public class XenMod implements ModInitializer {
 			for (Companion c : companions) c.applyPersonality();
 			LOG.info("Xens are {}", life > 1 ? "hardcore: one life each, gone for good when they die" : "not hardcore: they respawn");
 		}
-		if (s.getTickCount() % 40 == 0) chatModelNews();
 		if (s.getTickCount() % 20 == 0) avatar.tick();
 		if (s.getTickCount() % 8 == 0) BuildAxe.show(s);                       // (the Build Axe's box, for whoever holds one)
 		if (s.getTickCount() % 12 == 0) for (Companion c : companions) c.builder.showLayout();   // (a place a Xen pictured, for the players near)
@@ -492,11 +482,6 @@ public class XenMod implements ModInitializer {
 		}
 		if (s.getTickCount() % 100 == 0) {
 			try {
-				wakeChat();                                                   // (the chat model: loaded when needed, unloaded when not)
-			} catch (RuntimeException e) {
-				LOG.warn("Xen's chat model stumbled: {}", e.toString(), e);
-			}
-			try {
 				Tribe.tickAll(this);                                          // tribes: who's in which, sharing, the night watch
 			} catch (RuntimeException e) {
 				LOG.warn("Xen tribes stumbled: {}", e.toString(), e);
@@ -520,21 +505,6 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
-	/**
-	 * The chat model only runs when it may be needed: someone a Xen knows is near it (or someone just talked). With
-	 * nobody around for a while it's unloaded again, and Xen writes on signs instead.
-	 */
-	private void wakeChat() {
-		long now = System.currentTimeMillis();
-		for (Companion c : companions) {
-			if (c.player() != null && c.someoneListening(config.chatWakeDistance)) {
-				lastChatNeed = now;
-				break;
-			}
-		}
-		if (config.chat && now - lastChatNeed < 5000) chat.warmUp();
-		else if (chat.hasModel() && now - lastChatNeed > config.chatIdleMinutes * 60_000L) chat.sleep();
-	}
 
 	/**
 	 * Evolution. Every few days the Xens without an owner are ranked by how they did this generation (what they
@@ -774,8 +744,6 @@ public class XenMod implements ModInitializer {
 	void whisperFrom(ServerPlayer sender, Companion c, String text) {
 		if (!config.chat || c.player() == null) return;
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "whispers to " + c.name, text);
-		lastChatNeed = System.currentTimeMillis();
-		chat.warmUp();
 		chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.privately(sender, () -> c.request(request, sender, text))),
 				reply -> server.execute(() -> c.whisper(sender, reply)));
 	}
@@ -808,15 +776,8 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
-	private boolean deathRuleOff, toldModelReady;
+	private boolean deathRuleOff;
 
-	/** Once, when the chat model is loaded: players are told (so they know it works). */
-	private void chatModelNews() {
-		if (toldModelReady || chat == null || !chat.hasModel()) return;
-		toldModelReady = true;
-		Component line = Component.literal("[Xen] The chat model is " + chat.status() + ": Xens can talk freely now.").withStyle(net.minecraft.ChatFormatting.GRAY);
-		for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer)) p.sendSystemMessage(line);
-	}
 	/** A Xen is coming back after dying (its "joined the game" isn't said). */
 	static volatile boolean quietJoin;
 
@@ -848,17 +809,6 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) if (c.player() != null && c.gut.answer(sender, text)) return;   // (the answer to what a Xen asked them)
 		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
-		lastChatNeed = System.currentTimeMillis();                     // someone is talking: wake the chat model up
-		chat.warmUp();
-		boolean toXen = false;
-		for (Companion c : companions) {
-			if (hears(c, sender) && java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b",
-					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) toXen = true;
-		}
-		if (toXen && !chat.hasModel() && toldAboutModel.add(sender.getUUID())) {   // once: why its answers are simple
-			sender.sendSystemMessage(Component.literal("[Xen] The chat model is " + chat.status()
-					+ ". Until it's ready, Xens understand requests and talk with their own words (lighter, simpler).").withStyle(net.minecraft.ChatFormatting.GRAY));
-		}
 		Companion named = null;                                               // the one named first ("Bex, help Aria build": Bex)
 		int namedAt = Integer.MAX_VALUE;
 		for (Companion c : companions) {
@@ -1083,7 +1033,7 @@ public class XenMod implements ModInitializer {
 				.then(Commands.literal("chat").then(Commands.literal("on").executes(ctx -> setting(ctx, "chat", true)))
 						.then(Commands.literal("off").executes(ctx -> {
 							int r = setting(ctx, "chat", false);
-							ctx.getSource().sendSuccess(() -> Component.literal("(Xens won't listen to chat at all now. To keep them listening but turn off only the AI chat model: /xen chat on, then /xen set chatModel off.)")
+							ctx.getSource().sendSuccess(() -> Component.literal("(Xens won't listen to chat at all now: /xen chat on to talk with them again.)")
 									.withStyle(net.minecraft.ChatFormatting.GRAY), false);
 							return r;
 						})))
@@ -1734,7 +1684,7 @@ public class XenMod implements ModInitializer {
 	}
 
 	private int showSettings(CommandContext<CommandSourceStack> ctx) {
-		StringBuilder sb = new StringBuilder("Xen settings (the chat model runs on the " + chat.runsOn + "):");
+		StringBuilder sb = new StringBuilder("Xen settings:");
 		for (var f : XenConfig.class.getFields()) {
 			try {
 				sb.append("\n  ").append(f.getName()).append(" = ").append(f.get(config));
@@ -1757,14 +1707,13 @@ public class XenMod implements ModInitializer {
 		return 1;
 	}
 
-	/** After settings change (command or settings screen): teams, and the chat model. */
+	/** After settings change (command or settings screen): teams and death messages. */
 	void applySettings() {
 		skins.prepare(FabricLoader.getInstance().getConfigDir(), config.skins);
 		if (server == null) return;
 		server.execute(() -> {
 			for (Companion c : companions) if (c.player() != null) joinTeam(c);
 			deathMessages();
-			if (!config.chat || config.chatModel.equalsIgnoreCase("off")) chat.sleep();
 		});
 	}
 

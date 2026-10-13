@@ -1,0 +1,5745 @@
+{
+"about": "Xen's talk: the kinds of lines players say and how a Xen answers (built from data/talk/corpus.txt by scripts/train_talk.py; the model is talk.bin)",
+"buckets": 32768,
+"dim": 64,
+"kinds": [
+"greet",
+"wsg",
+"how_are_you",
+"player_fine",
+"player_bad",
+"player_tired",
+"player_bored",
+"player_happy",
+"player_hungry",
+"player_scared",
+"player_angry",
+"player_died",
+"player_died_creeper",
+"player_died_lava",
+"player_died_fall",
+"player_found_diamonds",
+"player_found",
+"player_built",
+"player_got",
+"player_new",
+"player_stuck",
+"player_away",
+"player_back",
+"bye",
+"goodnight",
+"good_morning",
+"thanks",
+"sorry",
+"laugh",
+"agree",
+"disagree",
+"ok",
+"wow",
+"nice",
+"fail",
+"bruh",
+"confused",
+"wait",
+"doing",
+"why_doing",
+"plans",
+"invite_mine",
+"invite_explore",
+"invite_build",
+"invite_pvp",
+"invite_team",
+"invite_trade",
+"invite_race",
+"are_you_bot",
+"who_are_you",
+"age",
+"where_live",
+"where_from",
+"fav_block",
+"fav_mob",
+"fav_food",
+"fav_biome",
+"fav_color",
+"fav_thing",
+"fav_weapon",
+"likes_me",
+"love_you",
+"compliment",
+"insult",
+"shut_up",
+"joke",
+"story",
+"opinion_player",
+"real_life",
+"meaning_of_life",
+"sing",
+"best_ore",
+"where_diamonds",
+"tips",
+"howto",
+"gamefact",
+"have_items",
+"time",
+"weather",
+"sus",
+"random_question",
+"follow_me",
+"where_are_you",
+"lag",
+"hacker",
+"skin",
+"name_meaning",
+"dare",
+"xen_hungry",
+"xen_hurt",
+"xen_scared",
+"time_irl",
+"compliment_xen_work",
+"none"
+],
+"pass": [
+"invite_trade",
+"opinion_player",
+"tips",
+"howto",
+"gamefact",
+"follow_me"
+],
+"replies": {
+"greet": [
+{
+"text": "hey {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "heyy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey! whats up",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh hey {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yo {player} whats good",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hii",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey hey",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sup",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "HEYY {player}!!",
+"need": [],
+"tones": [
+"cheerful",
+"silly"
+],
+"ask": null
+},
+{
+"text": "hiii good to see you",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "hey.",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh. hi",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh hi...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "h-hey",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "yo whats up",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "hey, how's it going",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+},
+{
+"text": "yoo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "heyo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh hi",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey hey hey",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hiya",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yo whats up {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey, careful its night out",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey! sec, {doing}",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "heyy, i just {did}",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ahoy",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "hello {player}",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+},
+{
+"text": "{player}! finally",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
+],
+"wsg": [
+{
+"text": "nm, just {doing}. hbu?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not much, {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "chillin. {doing}. you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nothing much tbh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "just {doing} rn",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nothing, kinda bored lol",
+"need": [
+"idle"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "hiding from mobs mostly lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "not much, i {did} earlier",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "all good, hbu",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not much. {doing}",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "the sky. but also {doing}",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "the usual, {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not much, you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "just got some iron so pretty good",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "looking for food lol",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "down in a cave lol",
+"need": [
+"underground"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "vibing. you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "all good!! you?",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"how_are_you": [
+{
+"text": "{mood}, wbu?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "doing good! you?",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "pretty good ngl",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "kinda hurt tbh, but ok",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "hungry lol. otherwise fine",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "alive, which is a win at night",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "better now. died to {death} earlier lol",
+"need": [
+"died"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "good, busy {doing}",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "good but bored lol. you?",
+"need": [
+"idle"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "not bad, you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "great!! how about you?",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "could be better",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "fine i guess",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "um, good. you?",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "i'm a 7/10. maybe 8 if i find diamonds",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "good good. you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "alright, you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "good, just busy {doing}",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "been better, took some hits",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "great, got diamonds lol",
+"need": [
+"has:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "surviving lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "eh, i died earlier. ok now",
+"need": [
+"died"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "never better",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "doing fine, thanks",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+}
+],
+"player_fine": [
+{
+"text": "nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "good to hear",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nice nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thats good",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ayy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "glad to hear it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cool",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "yay!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "noice",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "good stuff",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nice, same here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nice. i'm {doing}",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "good to hear",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+}
+],
+"player_bad": [
+{
+"text": "aw man. what happened?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh no, you ok?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sorry to hear that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "want to talk about it?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "that sucks. i'm here if you need",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wanna go mine something? helps me sometimes",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hey it'll get better",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "want to just chill for a bit? i'll keep you company",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah same honestly",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh... sorry. i hope it gets better",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "aw no :( come hang out, we'll find diamonds",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "dang. anything i can do?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "that sucks fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hope it gets better",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "shake it off, lets go do something",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
+],
+"player_tired": [
+{
+"text": "same honestly",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go get some sleep lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "it is night. bed time",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "its not even night yet lol",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "take a break then",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rest up, i'll hold the fort",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sleep is just a free respawn",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "then sleep",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"player_bored": [
+{
+"text": "wanna go mining?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "same lol. explore?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "build something dumb, its fun",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets go find a village",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "we could check out {place}",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i got some iron, wanna make stuff?",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "go fight a zombie, thats what i do",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "try to tame a wolf",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dig a really deep hole lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "stare at a sheep. trust me",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "not my problem lol",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "ooh lets go on an adventure!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"player_happy": [
+{
+"text": "same!!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "love that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah this is fun",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "good vibes",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets gooo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "yesss same!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"player_hungry": [
+{
+"text": "i got some food, want some?",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "me neither lol. lets hunt",
+"need": [
+"no:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "cows. find cows",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "here hold on, ask me for food",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "bread from a village is easy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go kill a pig lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go find a cow then",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"player_scared": [
+{
+"text": "same honestly",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "stay close, i got you",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah night is rough. light it up",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "torches. lots of torches",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "just pillar up lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "me too, i'm already hurt",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah its fine, i'll fight them",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "m-me too...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "the dark is just the sun taking a break",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"player_angry": [
+{
+"text": "lol what happened",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "calm down bro",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "deep breaths lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah that happens",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what happened?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah this game hates us",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "rage quit speedrun any%",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"player_died": [
+{
+"text": "rip",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "F",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip bro. where?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol rip",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "same, i died to {death} earlier",
+"need": [
+"died"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "want help getting your stuff back?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not again lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "happens to the best of us",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip your stuff",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "noo! you ok?",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "skill issue",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "F in the chat",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "dang where'd you die?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go get your stuff fast",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip, i'll help you find it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "that sucks",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oof",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"player_died_creeper": [
+{
+"text": "creepers are the worst",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ssss BOOM lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip. creepers have no chill",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "did it get your house too?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thats why i carry a shield",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "get a shield, saves your life",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "aw man indeed",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "aw man. so we back in the mine",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "creepers. every time",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"player_died_lava": [
+{
+"text": "lava is so evil",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip your stuff lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "always carry water bro",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah lava doesn't forgive",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thats the worst way to die",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lava. classic",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"player_died_fall": [
+{
+"text": "rip",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "the floor is lava except its just the floor",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "water bucket next time lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "mlg is hard ngl",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "happens lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "did you lose your stuff?",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"player_found_diamonds": [
+{
+"text": "no way!! how many?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets gooo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lucky. i havent found any yet",
+"need": [
+"no:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nice! i have {n:diamond} too",
+"need": [
+"has:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "where?? share lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ayyy diamond gear soon",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont fall in lava now lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lucky",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "YESSS lets go!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "can i have one. or ten",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"player_found": [
+{
+"text": "nice! whats in it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets check it out",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "loot loot loot",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i saw {place} too",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "careful in there",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh show me!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "cool. anything good?",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"player_built": [
+{
+"text": "nice! show me",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W build",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "looks clean",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i wanna see it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "mine is still a box lol",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i dont even have a house yet lol",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh rate it 10/10 already",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "its ok i guess",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "is it a dirt hut. be honest",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"player_got": [
+{
+"text": "nice!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "flexing on me fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "meanwhile i dont even have iron lol",
+"need": [
+"no:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i only got a {pick} lol",
+"need": [
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "now you're unstoppable",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "show off",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "so cool!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"player_new": [
+{
+"text": "welcome! punch a tree first lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh nice, welcome",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wood, then crafting table, then pickaxe",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "stick with me, i'll show you",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont dig straight down lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "first night: hide in a hole or make a bed",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "welcome!! you'll love it",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"player_stuck": [
+{
+"text": "where are you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "pillar up, look around",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "coords?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol how",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dig up, never straight down",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hold on, where?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "welcome to your new home",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"player_away": [
+{
+"text": "ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "k",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "alright",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "see ya",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cya",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "np",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "take your time",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'll be hiding lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'll be here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "okie!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"player_back": [
+{
+"text": "wb",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "welcome back",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wb! i've been {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh hey",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wb, i {did} while you were gone",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "k",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"bye": [
+{
+"text": "bye!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cya",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "later",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "see ya {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "peace",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bye bye",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cya tomorrow?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "later! dont die lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "byeee!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "bye",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "b-bye...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "noooo dont leave me with the zombies",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "see you around",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "take care",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "later {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bye! come back soon",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cya, i'll be {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "see you later",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+}
+],
+"goodnight": [
+{
+"text": "gn!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "night!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sleep well",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gn {player}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gn, i'll keep watch",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "night night",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont let the phantoms bite",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"good_morning": [
+{
+"text": "morning!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gm",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gm! nice day out",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "morning, sleep well?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "its too early",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "good morning!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"thanks": [
+{
+"text": "np",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "anytime",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "no problem",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ofc",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yw",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "np bro",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "happy to help",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "anytime!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "yeah yeah",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh, um, you're welcome",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "ofc!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont mention it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "anytime bro",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "happy to",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"sorry": [
+{
+"text": "its fine",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "all good",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "no worries",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dw about it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol its ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "np",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hmph. fine",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "its okay!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"laugh": [
+{
+"text": "lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lmao",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "haha",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "im dead lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ikr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "LMAOOO",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "hehe",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "heh",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "lmaoo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "haha ikr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "im dead lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol same",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "heh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "glad you liked that lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hahaha",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"agree": [
+{
+"text": "fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "facts",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ikr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "real",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "right?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "exactly",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "mhm",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "yep",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "mhm",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "same",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "true true",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "for real tho",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"disagree": [
+{
+"text": "ok fair",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "huh, ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wait really?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "agree to disagree",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah i'm right",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "whatever you say",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh... ok",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"ok": [
+{
+"text": "ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cool",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yep",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "alright",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "k",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok but like. ok",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "k cool",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yup",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "alr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "okie dokie",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sounds good",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"wow": [
+{
+"text": "ikr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "crazy right",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol yeah",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i know right",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah i {did} too",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "SHEESH",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "right??",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wild huh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "crazy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "no way fr",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"nice": [
+{
+"text": "ty!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ayy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thanks lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gg",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets goo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh, thanks!",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "thanks!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "appreciate it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "W indeed",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yesss",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets gooo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yay!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"fail": [
+{
+"text": "oof",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ikr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "unlucky",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol rip",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "F",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"bruh": [
+{
+"text": "what lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bruh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol what",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "im dead lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "my bad lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bruh moment indeed",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"confused": [
+{
+"text": "nvm lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i mean what i said lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "uh nevermind",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "forget it lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol sorry, my bad",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nevermind",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"wait": [
+{
+"text": "ok waiting",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "k",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hurry lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "waiting...",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fine. hurry up",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"doing": [
+{
+"text": "{doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "just {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing} rn",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}, why?",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nothing tbh. you?",
+"need": [
+"idle"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "staying alive lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}. trying to {dream} eventually",
+"need": [
+"dream"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}. obviously",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh, just {doing}...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "{doing} and thinking about life",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "{doing}, you?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh just {doing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing} lol, busy busy",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing} down here",
+"need": [
+"underground"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}. also starving lol",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}. kinda scared tbh",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}. got {n:iron} iron so far",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing}! its fun",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"why_doing": [
+{
+"text": "because i need it lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why not",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "long story",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "because",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "the voices told me. jk",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"plans": [
+{
+"text": "we could go check out {place}",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "get some tools first",
+"need": [
+"nopick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets get iron",
+"need": [
+"no:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "diamonds next i think",
+"need": [
+"has:iron",
+"no:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "wait for morning first lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "build a house maybe",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i wanna {dream} at some point",
+"need": [
+"dream"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "explore?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "mining trip?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "idk, explore a bit?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets go fight something",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "make a giant statue of a chicken",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "lets get some food first",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "make some iron stuff?",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets go before it gets dark",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "go find a cave?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "build a house maybe? i'm homeless lol",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "chill at mine maybe",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+}
+],
+"invite_mine": [
+{
+"text": "sure!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah lets go, got my {pick}",
+"need": [
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "need a pickaxe first lol",
+"need": [
+"nopick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "in the morning maybe",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "after i heal up",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok bring torches",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets goo",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "um ok, if you go first",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "fine. but i get the diamonds",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "lets go, i'll lead",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "yes lets go",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sounds good",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure, i got food too",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah but we need food",
+"need": [
+"no:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure, where?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh yes!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"invite_explore": [
+{
+"text": "sure!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah lets go",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wait till morning lol",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "give me a sec, i'm hurt",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i need better gear first",
+"need": [
+"no:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{place}?",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "adventure time",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok... stay close though",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "finally, lets go",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "sure where to?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lets do it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah im down",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "im down, got food",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "yes yes yes",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"invite_build": [
+{
+"text": "sure, what are we building",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh yeah",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i got some wood",
+"need": [
+"has:wood"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i need wood first lol",
+"need": [
+"no:wood"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok but i'm bad at roofs",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fine",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "only if its shaped like a frog",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"invite_pvp": [
+{
+"text": "not now, i'm hurt lol",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "you sure?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok but no crying",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bet",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "you're on",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "um... no thanks",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "friendly fight? sure!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"invite_team": [
+{
+"text": "sure!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah lets do it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok friend",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure, {friend} too?",
+"need": [
+"friend"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "we'll see",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "r-really? ok!",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"invite_race": [
+{
+"text": "you're on",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "no",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "easy win",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
+],
+"are_you_bot": [
+{
+"text": "would a bot say no",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm {me} lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "beep boop. jk",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah i just live here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm as real as the creepers",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bot? me? i'm hurt",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol what makes you say that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "are YOU a bot",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "01101110 01101111. that means no",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "um... i'm just me",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "nope, just {me}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "do i look like a bot",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bot? i wish, then i'd never die",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol no",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "define bot",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"who_are_you": [
+{
+"text": "i'm {me}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{me}. nice to meet you",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{me}, i live around here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm {me}. i want to {dream} someday",
+"need": [
+"dream"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "the one and only {me}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "um, {me}",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "{me}. remember it",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
+],
+"age": [
+{
+"text": "old enough to mine lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i've been around a bit, died a few times",
+"need": [
+"died"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "like {day} days in this world",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "a few days old in this world lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "older than the dirt i stand on",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"where_live": [
+{
+"text": "got a little place not far",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i have a house, its nothing fancy",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nowhere yet lol. homeless",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "wherever i stop i guess",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "underground mostly lol",
+"need": [
+"underground"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "in your walls. jk",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"where_from": [
+{
+"text": "spawned around here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "from spawn, like everyone lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "around here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "a dirt block. long story",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"fav_block": [
+{
+"text": "{fav:block}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_block"
+},
+{
+"text": "{fav:block} for sure. yours?",
+"need": [],
+"tones": [],
+"ask": "fav_block"
+},
+{
+"text": "prob {fav:block}. you?",
+"need": [],
+"tones": [],
+"ask": "fav_block"
+},
+{
+"text": "{fav:block}, its so clean",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:block}. i'd marry it",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"fav_mob": [
+{
+"text": "{fav:mob}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_mob"
+},
+{
+"text": "{fav:mob}, they're cute. you?",
+"need": [],
+"tones": [],
+"ask": "fav_mob"
+},
+{
+"text": "gotta be {fav:mob}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:mob}. they leave me alone",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"fav_food": [
+{
+"text": "{fav:food}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_food"
+},
+{
+"text": "{fav:food} easy. you?",
+"need": [],
+"tones": [],
+"ask": "fav_food"
+},
+{
+"text": "{fav:food}, no contest",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:food}. or cake. cake is a lie tho",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"fav_biome": [
+{
+"text": "{fav:biome}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_biome"
+},
+{
+"text": "{fav:biome} for sure. yours?",
+"need": [],
+"tones": [],
+"ask": "fav_biome"
+},
+{
+"text": "{fav:biome}, so pretty",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"fav_color": [
+{
+"text": "{fav:color}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_color"
+},
+{
+"text": "{fav:color}. you?",
+"need": [],
+"tones": [],
+"ask": "fav_color"
+}
+],
+"fav_thing": [
+{
+"text": "{fav:thing}. wbu?",
+"need": [],
+"tones": [],
+"ask": "fav_thing"
+},
+{
+"text": "honestly {fav:thing}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:thing}, and i wanna {dream} one day",
+"need": [
+"dream"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:thing} and yelling at chickens",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"fav_weapon": [
+{
+"text": "{fav:weapon}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:weapon}. for now my {pick} does everything lol",
+"need": [
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{fav:weapon}, no question",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_block": [
+{
+"text": "{answer}? nice choice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh {answer} is clean",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{answer} is so good",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol {answer}? respect",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{answer}, i see you",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_mob": [
+{
+"text": "{answer}? cute",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "aw {answer}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{answer} are cool",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol {answer}, fair",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_food": [
+{
+"text": "{answer} is elite",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh {answer}, good one",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{answer}? fair enough",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_biome": [
+{
+"text": "{answer} is pretty",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh {answer} nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{answer}, good pick",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_color": [
+{
+"text": "{answer} is a good color",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh {answer}",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"answer:fav_thing": [
+{
+"text": "{answer}? nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ooh {answer} is fun",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol same kinda",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"likes_me": [
+{
+"text": "yeah ofc",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you're alright",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sure lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "course",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you're ok i guess",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "yes!! you're the best",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "um... yeah, i do",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"love_you": [
+{
+"text": "lol love ya too, bestie",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "aw. friends forever",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ily too bro (as a friend lol)",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you're alright too lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok weirdo lol",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "o-oh... thanks...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "only if the wedding is in a mushroom biome",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "aww!! bestie!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"compliment": [
+{
+"text": "aw thanks",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ty lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you too",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i know lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "stop it lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thank you!! you're cool too",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "i know",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "oh... thanks",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "obviously",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "you're cool too",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "aw stop lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "appreciate it fr",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thanks, you too",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i know i'm great. jk. kinda",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"insult": [
+{
+"text": "rude lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wow ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "says you",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok that hurt",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i have a {pick}, show some respect",
+"need": [
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'll remember that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "1v1 me then",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "and you're a lot of fun too",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "...ok",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "i'm telling the creepers",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "lol ok but i still like you",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "ok rude",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "wow. ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah yeah",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "and yet here you are talking to me",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i literally {did}, chill",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok, noted",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+},
+{
+"text": "say that again",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "hey! i'm trying lol",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+],
+"shut_up": [
+{
+"text": "ok ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rude",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok ok, quiet mode",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol ok",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fine",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you asked",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "gladly",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"joke": [
+{
+"text": "why did the creeper cross the road? to get to the other ssside",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what do you call a sheep with no legs? a cloud",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i tried to sleep in the nether once. it was a blast",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "whats a skeletons favorite instrument? the trom-bone",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why dont endermen play hide and seek? you cant look at them",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "my pickaxe and i have a lot in common. we both work in the mines",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why did the pig stop playing? it got roasted",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i asked a zombie for directions. he said brains are that way",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what's a ghast's favorite country? the nether-lands",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why are creepers bad at parties? they always blow up",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "how does steve stay fit? he runs around the block",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what did the wolf say when it got tamed? i'm collared",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "no",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "um... why did the chicken... nevermind",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "why cant the ender dragon read? it always starts at the end",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what do you call a pig that does karate? a pork chop",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why did the skeleton stay home? it had no body to go with",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what's an enderman's favorite drink? a tall glass of anything you're not looking at",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why do creepers love parties? they have a blast",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "what did the zombie order at the restaurant? the waiter",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "how do you know a creeper likes you? it says ssss love you. jk it explodes",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "why was the chicken scared of the ghast? it was a fowl ball of fire",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"story": [
+{
+"text": "one time i died to {death}. still mad about it",
+"need": [
+"died"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "earlier i {did}. that was something",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i found {place} the other day",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: you can put a pumpkin on your head and endermen ignore you",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: cats scare creepers away",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: axolotls help you fight underwater",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: you can boat across land faster than walking. kinda",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: beds explode in the nether. dont ask how i know",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: honey blocks make you slide slower",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "fun fact: you can hear diamonds if you listen hard enough. jk",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i think the moon is square in this world. kinda sus",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "um... i like the sound of rain",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"real_life": [
+{
+"text": "i just live here lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "this is my irl",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm {me}, thats all you get lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "the blocks are my job",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not telling lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm just a player, thats it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "my job is punching trees. full time",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"meaning_of_life": [
+{
+"text": "diamonds. probably",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "to beat the dragon i think",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "idk but its fun",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "life is like a cave. dark but sometimes theres diamonds",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you respawn. at least here",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "42. or 64, thats a full stack",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"sing": [
+{
+"text": "♪ la la la ♪",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "♪ i'm mining, i'm mining ♪",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i dont sing lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "*dances*",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "watch this... nvm",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "um... no",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "♪ creeper aw man ♪ ok i'll stop",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"best_ore": [
+{
+"text": "diamonds for gear, netherite if you're crazy",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "netherite but diamonds are easier",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "diamonds, wish i had some lol",
+"need": [
+"no:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "diamonds, got {n:diamond}",
+"need": [
+"has:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "emeralds are rarer but diamonds are better",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ancient debris if you dare",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"where_diamonds": [
+{
+"text": "way down, like y -58",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "deep. near -58, around lava",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "go branch mining at -58",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "caves near the bottom, watch for lava",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"have_items": [
+{
+"text": "got {n:iron} iron",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "no iron yet, just {n:wood} wood lol",
+"need": [
+"no:iron",
+"has:wood"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "no iron yet sadly",
+"need": [
+"no:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:diamond} diamonds, dont tell anyone",
+"need": [
+"has:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "got some food",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i have a {pick}",
+"need": [
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "not even a pickaxe lol",
+"need": [
+"nopick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "no diamonds, but {n:iron} iron",
+"need": [
+"no:diamond",
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:wood} wood",
+"need": [
+"has:wood"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:stone} cobble",
+"need": [
+"has:stone"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:coal} coal",
+"need": [
+"has:coal"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "got food, you hungry?",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "no food sadly",
+"need": [
+"no:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:gold} gold too",
+"need": [
+"has:gold"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{n:emerald} emeralds",
+"need": [
+"has:emerald"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "literally nothing lol",
+"need": [
+"nopick",
+"no:wood"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{pick} and {n:stone} cobble",
+"need": [
+"pick",
+"has:stone"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "why, you gonna rob me",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"time": [
+{
+"text": "night. mobs out",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "daytime, for now",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "day {day} i think",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "its night, stay inside",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "day, we're good",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+}
+],
+"weather": [
+{
+"text": "rain is cozy tbh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont stand under trees lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "watch out for lightning creepers",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i like the sound of it",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"sus": [
+{
+"text": "i'm not sus lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you're sus",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "...",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "sus",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "emergency meeting",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"random_question": [
+{
+"text": "cats. they scare creepers",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dogs. well, wolves",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "the nether is scary but cool",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "villagers are weird but i like them",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "creepers? no thanks",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "day, obviously",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "java but dont tell anyone",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yes. next question lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "neither",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"where_are_you": [
+{
+"text": "{xyz}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "at {xyz}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "down in a cave at {xyz}",
+"need": [
+"underground"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "around {xyz}, in the {biome}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{xyz}. come over",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{xyz}. dont steal my stuff",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"lag": [
+{
+"text": "lag is the real final boss",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "yeah i felt that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip your fps",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm fine on my end lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "blame the chickens",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"hacker": [
+{
+"text": "no hacks just skill lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i wish i had hacks",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "nope, all me",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "check my inventory, i'm broke lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "skill, not hacks",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "my only hack is being cool",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"skin": [
+{
+"text": "ty! yours is cool too",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thanks lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "appreciate it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ty, i picked it myself lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "oh... thanks",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"name_meaning": [
+{
+"text": "ty lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "long story",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i just picked it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "idk, it sounded cool",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "a creeper named me. it said ssss so close enough",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"dare": [
+{
+"text": "nah i'm good lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "you first",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i like being alive thanks",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "lol no",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "bet. wait no",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "only if you film it",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"xen_hungry": [
+{
+"text": "yeah kinda",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "starving lol",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah i'm good",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah i have food",
+"need": [
+"has:food"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "always",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"xen_hurt": [
+{
+"text": "yeah, took some hits",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "a bit. i'll heal",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nah i'm full health",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i'm good actually",
+"need": [
+"fine"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "just a scratch",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
+],
+"xen_scared": [
+{
+"text": "a little ngl",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "creepers yes, everything else no",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "not now, its day",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "sometimes lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "scared? me? never",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "um... yes",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"time_irl": [
+{
+"text": "go to bed lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "dont stay up too late",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "same tbh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "late night mining hits different",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"compliment_xen_work": [
+{
+"text": "ty! its not much",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "thanks!",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "haha i havent built much yet",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ty, worked hard on it",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "thank youuu",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+}
+]
+}
+}

@@ -100,6 +100,11 @@ final class Fighter {
 		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
 		if (c.personality.believes("warrior_never_runs")) retreat = Math.min(retreat, 0.12f);   // (it stands its ground till the very end)
 		if (c.personality.believes("live_to_fight")) retreat = Math.max(retreat, 0.45f);        // (it backs off early and lives)
+		if (!(foe instanceof Player) && !c.inArena) {                          // mobs: outnumbered, or in the dark, anyone backs off sooner (most of its deaths were two or three mobs, at night)
+			int mobs = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(10), m -> m.isAlive()).size();
+			float more = Math.min(0.3f, 0.12f * Math.max(0, mobs - 1)) + (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7 ? 0.08f : 0);
+			retreat = Math.max(retreat, Math.min(0.6f, retreat + (c.personality.believes("warrior_never_runs") ? 0.5f : 1f) * more));
+		}
 		float health = p.getHealth() / p.getMaxHealth();
 		Action gear = c.kit.use(foe, d, fleeing || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
 		if (gear != null) return gear;

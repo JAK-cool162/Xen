@@ -10,22 +10,17 @@ nature on. It plays fair: it only knows what it can sense, and it acts only
 through a player's inputs. Since 1.1.0 main Xens think with **Xen 2.0**, a
 learned mind that weighs what it wants against what it fears (below).
 
-| file | Minecraft | Java | chat model |
-|---|---|---|---|
-| `xen-companion-2.0.0-beta.26.1+mc1.21.11-with-chat.jar` | 1.21.11 | 21 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.26.1+mc26.x-with-chat.jar` | 26.1, 26.2, 26.3 | 25 or newer | **inside** (all in one, about 400 MB) |
-| `xen-companion-2.0.0-beta.26.1+mc1.21.11.jar` | 1.21.11 | 21 or newer | downloads when needed (9 MB jar; best for phones) |
-| `xen-companion-2.0.0-beta.26.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer | downloads when needed (9 MB jar) |
+| file | Minecraft | Java |
+|---|---|---|
+| `xen-companion-2.0.0-beta.26.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.26.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
-Use **one** of them. The **with-chat** jars are all in one: the mod, its brain
-and its chat model (SmolLM2-360M), so Xen talks without downloading anything.
-Get them from the GitHub **Releases** page (they're too big for this folder,
-which has the light jars). This is a prototype, so expect rough edges.
+Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
+nothing runs online. This is a prototype, so expect rough edges.
 
 **Every device**: the mod is plain Java with no native code, so the same jar
-runs on x86-64 PCs and ARM64 (phones, Raspberry Pi, Apple Silicon Macs). The
-chat model is plain Java too. Every change is checked on both an x86-64 and an
-ARM64 machine (GitHub Actions: the tests, both builds, and the chat model).
+runs on x86-64 PCs and ARM64 (phones, Raspberry Pi, Apple Silicon Macs). Every change is checked on both an x86-64 and
+an ARM64 machine (GitHub Actions: the tests and both builds).
 
 How it all works inside (the networks, the training, the numbers) is in
 `TECHNICAL.txt` on the Releases page.
@@ -58,20 +53,7 @@ It only sees what a player could see. Minions keep the lighter classic brain
   0.155.3+26.1.2, 0.161.0+26.3): <https://modrinth.com/mod/fabric-api>
 * **Mod Menu** (optional) for the settings screen: <https://modrinth.com/mod/modmenu>
 * **Java**: 21 for Minecraft 1.21.11, 25 for 26.x.
-* **Memory**: 2 GB is enough for Xen itself. For the chat model, give the game
-  3 GB or more; it takes about 500 MB. With less, Xen still chats and
-  understands requests, only more simply.
-* **Chat model**: `smollm2-360m-instruct-q8_0.gguf`, about 390 MB. The
-  with-chat jar has it inside: the first time it's needed, the mod unpacks it
-  once into `config/xen/` (it's read from a file there, which saves memory).
-  With the light jar it downloads by itself into `config/xen/`, or take it from
-  the release page and put it there yourself. Either way the mod checks the
-  file's SHA-256 and never loads a damaged copy. It takes a minute or two to
-  warm up; until then Xen answers in plain words.
-
-Players don't need the mod on a server: it runs on the server, and vanilla
-clients can join and play with Xen. For single player, put it (with Fabric API)
-in your `mods` folder and the built-in server runs it.
+* **Memory**: 2 GB is enough.
 
 ## Install
 
@@ -94,7 +76,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
    `fabric-api-...jar`, then `xen-companion-2.0.0-beta.26.1+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
-   is fine; 3 GB or more if you want the chat model).
+   is fine).
 4. Play, make a world with cheats on if you want `/xen spawn`, and type
    `/xen summon`.
 
@@ -108,11 +90,6 @@ version list.
 
 **On a phone:**
 
-* Use the **light** jar, not `-with-chat`. On a phone the chat model is the **small** one (SmolLM2-135M, 145 MB,
-  about 3x faster than the 360M one; it runs on the CPU), and it downloads by itself the first time (or put
-  `SmolLM2-135M-Instruct-Q8_0.gguf` from the release in `config/xen/`). It needs about 1.1 GB of Minecraft's memory;
-  with less, chat stays on its keyword rules (Xen still understands requests and answers in plain words). You
-  choose: **AI chat (on this device)** auto/on/off and **AI chat size** auto/small/normal in the Talk tab.
 * Slow phone? In Mod Menu (or `config/xen.json`) set **Decisions** to
   "2 a second" and turn **Learning** off.
 * It was tested on PC servers, in a real (virtual) game client, and in the Java
@@ -130,47 +107,10 @@ Measured on a 4-core cloud PC (x86-64):
   limit is 50), with a catch-up pause of several seconds about every 25
   seconds; 0.4.1 measured the same, so the new goals, trading, talking and
   watching cost little (under 3% of the server's time).
-* **The chat model** (SmolLM2-360M, 8-bit, 360 million parameters):
-  * loading takes 1-4 seconds; then it reads its two fixed prompts once (242
-    and 367 tokens) at about 4, 7 or 9 tokens a second with 1, 2 or 3 threads,
-    so it's ready after 1-2 minutes (until then Xen answers in plain words);
-  * an answer reads about 50 new tokens (its notes and your message) and
-    writes up to 40: 8 seconds with 3 threads, 10 with 2, 16 with 1;
-  * `chatThreads` sets its threads (default: half your cores, 1-4). Its
-    vocabulary is 49,152 tokens; the mod gives it a 1024-token window (the
-    model can take 8192).
-* **Phones** weren't measured. Their cores are slower: the brain is light
-  enough, and the chat model stays off below about 3 GB anyway.
+* **Its talk model**: reading a line and picking an answer takes well under a millisecond (a few thousand
+  multiplications); it's 2 MB inside the jar.
+* **Phones** weren't measured. Their cores are slower, but the brain and the talk model are light.
 
-### The chat model on the graphics card
-
-In single player (and on a LAN world you host) the chat model can run on your
-graphics card: setting **Chat on GPU** (`gpu`), in the Talk tab. `auto`
-(the default) uses it when there's a real graphics card with OpenGL 3.3;
-`on` uses it even with a software renderer; `off` never does.
-
-* **How**: Xen opens its own small hidden OpenGL 3.3 context, puts the model's
-  weights there once (about 390 MB of graphics memory), and does the big
-  matrix products with ordinary shaders (no compute shaders, so Macs and older
-  cards work too). It reads the prompt 32 words at a time. The game's own
-  rendering isn't touched, so it works the same with **vanilla, Sodium, Iris or
-  a Vulkan renderer mod**: all it needs is a graphics driver with OpenGL 3.3
-  (almost every PC and Mac). It uses the game's window library (GLFW up to
-  26.2, SDL in 26.3).
-* **When it can't** (no OpenGL 3.3, only a software renderer, not enough
-  graphics memory, a dedicated server, or anything else going wrong), it says
-  why in the log and the model stays on the CPU. `/xen settings` shows where
-  it runs.
-* **How fast**: measured here only on Mesa's software renderer (no graphics
-  card in the test machine): reading a 285-token prompt took 39-42 s on it
-  against 73-79 s on the CPU path, so a real graphics card should be a lot
-  faster. Both give the same next word; the numbers differ a little
-  (at most 0.53 of about 19) because the CPU path rounds its inputs to 8 bits.
-  Checked in real 1.21.11 and 26.1.2 clients. The 26.3 path (SDL) couldn't be
-  tried here: 26.3 itself wouldn't open a window on the test machine.
-* **Phones**: PojavLauncher's usual renderer (GL4ES) has no OpenGL 3.3, so it
-  stays on the CPU; a renderer with OpenGL 3.3 or newer (on Zink/Vulkan) may
-  work, but it's untested.
 
 ## Talking to Xen: it understands and does it
 
@@ -196,7 +136,7 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "Pip, stop" / "cancel that" | stops what it's doing |
 | "Pip, trade with the villager" | walks up to a villager, opens its trades and takes the good ones ([trading](#trading-villagers-and-you)) |
 | "Pip, how much for your logs?" / "I'll give you 2 iron for 16 logs" | names a price, bargains, and trades with you |
-| "Pip, what are you doing?" / "how are you?" / "what's your dream?" / "what do you have?" / "who are you?" | answers straight from what it knows (no chat model, so nothing made up) |
+| "Pip, what are you doing?" / "how are you?" / "what's your dream?" / "what do you have?" / "who are you?" | answers straight from what it knows (nothing made up) |
 | "Pip, what do you see?" / "thanks!" | just talks |
 | "dax come here" (the first 3 letters of its name are enough) | answers from any distance |
 | "I'm hungry" / "can I have some bread?" / "I need a pickaxe" | shares if it can spare it (a kind one more readily) |
@@ -213,10 +153,34 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 | "yes" / "no" (no name needed) | answers a question it just asked you, or its trade offer |
 | "Pip, watch this!" / "watch me" / "copy me" | keeps its eyes on you for a minute, to [learn from you](#learning-by-watching) |
 
-How it understands: clear keywords decide first. When there are none ("go see
-what's out there"), the chat model picks one of the things above, and only if
-it's clearly more likely than just talking. Questions and thanks are always
-just talk. `/xen status` shows what it's doing right now.
+How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
+later", is talk too). `/xen status` shows what it's doing right now.
+
+### It talks like a player (2.0.0-beta.27)
+
+Its talk model reads a line the way players type it ("wsg", "wyd", "u got iron??", "bro i just died to a creeper",
+"LMAOOO", "whats ur fav block", typos, stretched letters, with its name or without) and knows about 90 kinds of lines:
+hellos and "how r u", what it's doing and what it has, your news (you died, you found diamonds, you built something),
+invitations ("wanna go mining later"), "are you a bot", favorites, jokes and fun facts, roasts and compliments, "brb",
+"gn", "where are you" (its real coordinates), lag, "are you hacking"... It answers from a library of about 800
+player-style lines, in its own tone, filled in with what's true of it right now:
+
+```
+<Alex> u got any iron?            <Xen> no iron yet, just 4 wood lol
+<Alex> bro i just died to a creeper   <Xen> rip. creepers have no chill
+<Alex> whats ur fav block          <Xen> copper for sure. yours?
+<Alex> probably moss lol           <Xen> ooh moss is clean
+<Alex> are you a bot               <Xen> would a bot say no
+```
+
+An answer that would claim something untrue (iron it doesn't have, a death it never had, a place it never found) is
+never picked. It learns which answers land: a laugh or a thanks after one, it says it more; a "what?" or an insult,
+less (config/xen/talk-learned.json). A chat goes on as long as it's fun: laughs and thanks keep it going, and a busy or
+quiet Xen still winds it up after a while. When the model isn't sure what a line means, the rest of Xen's chat answers.
+
+The model was trained (scripts/train_talk.py) on data/talk/corpus.txt: every kind of line, many ways to say each, each
+typed the ways players type. On lines it never trained on it gets the kind right about 9 times in 10 (88% and 93% on
+two held-out sets). The optional AI chat model (SmolLM2) was removed in 2.0.0-beta.27.
 
 It does it fairly:
 
@@ -480,8 +444,7 @@ You love cats and hate the rain. You're scared of the dark.
 Pip: you're a pirate and talk like one.
 ```
 
-A line that starts with a Xen's name and a colon is only for that Xen. The chat
-model reads them when it answers and talks. Without the chat model, Xen still
+A line that starts with a Xen's name and a colon is only for that Xen. Xen
 answers from them: "Pip, do you like cats?" "I love cats." "who are you?" ends
 with "I'm a pirate and talk like one."
 
@@ -764,9 +727,8 @@ it doesn't come back, nothing of it is kept, and the Xens that knew it remember 
 sooner, and won't go off on a risky errand while hurt, however nicely it's asked. `auto` (the default) follows the
 world: hardcore in a hardcore world.
 
-**Who Xen is**: to the chat model, a player living in this world, who knows only what it has seen, remembers or was
-told, with goals, friends and fears of its own. A reply that talks about itself as an AI, a bot or a program is thrown
-away.
+**Who Xen is**: a player living in this world, who knows only what it has seen, remembers or was told, with goals,
+friends and fears of its own.
 
 **Village houses**: a Xen that comes to a village looks at its houses (their style rubs off on its designs) and may
 build a copy of one, out of what it has; "build a village house" asks for one. They're read from the game's own
@@ -909,7 +871,6 @@ A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
 * **Chat remembers**:
   * "do you like pigs?" then "what about cows?", "how do I make a bed?" then "and a chest?".
   * "and you?", "wbu", and "is it hard?" about what you were just talking about.
-  * The AI chat model is told what was just said.
 * **Grudges fade**: say sorry after hitting it; old grudges fade by themselves.
 
 ## The right tool, useful nights, chat that counts (1.9.2)
@@ -936,8 +897,7 @@ A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
 
 ## Its own words (1.9.1)
 
-Without the AI chat model (turned off, or a phone without the memory for it), a Xen doesn't just answer simply: it
-talks with its own words. It reads what you said (a hello, a question, what it's about, whether it sounds nice or
+A Xen talks with its own words. It reads what you said (a hello, a question, what it's about, whether it sounds nice or
 mean, chat shorthand), a tiny network picks what kind of reply fits it, and it builds the sentence from a word library,
 in its tone: shy ones stammer, cheerful ones shout, grumpy ones mutter, bold ones don't hedge, silly ones joke. What it
 thinks of things is its own ("Ugh, creepers. They're sneaky."; "I adore diamonds, they're rare!"). It still does what
@@ -1025,13 +985,9 @@ How often it talks depends on how chatty it is (every minute or two for a
 chatty one), with a limit for all Xens together so chat never floods. Only
 players within 48 blocks hear it.
 
-## The chat model only wakes when it's needed
+## Notes on signs
 
-The chat model loads only when someone a Xen knows (its owner, or anyone who
-has talked to it) is within 32 blocks, or when someone talks to it. After 10
-minutes with nobody around, it's unloaded again to free memory and CPU.
-Meanwhile Xen talks in plain words. When nobody it knows is around to hear, it
-leaves notes on signs instead (if it carries signs): "Day 12: Diamonds here!
+When nobody it knows is around to hear, it leaves notes on signs (if it carries signs): "Day 12: Diamonds here!
 -Pip", "Day 13: Careful, lava! -Pip", and a morning note saying what it's up to.
 
 ## Its own life
@@ -1252,13 +1208,6 @@ away in single player. On a server, operators use:
 | setting | default | meaning |
 |---|---|---|
 | `chat` | `true` | Xen answers and understands chat |
-| `chatModel` | `"auto"` | the chat model, run on this device: `"auto"` (with about 3 GB or more), `"on"` or `"off"` |
-| `chatModelSize` | `"auto"` | `"small"` (SmolLM2-135M, 145 MB, about 3x faster: phones and low memory), `"normal"` (SmolLM2-360M) or `"auto"` (small on phones and with little memory) |
-| `chatWakeDistance` | `32` | wake the chat model when someone Xen knows is this close |
-| `chatIdleMinutes` | `10` | unload it after this long with nobody around |
-| `downloadChatModel` | `true` | download the chat model the first time it's needed |
-| `chatThreads` | half the CPU cores (1-4) | CPU threads for the chat model |
-| `gpu` | `"auto"` | the chat model on the graphics card: `"auto"`, `"on"` or `"off"` ([more](#the-chat-model-on-the-graphics-card)) |
 | `brain` | `"xen2"` | how main Xens decide: `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides)) or `"dmm"` (the classic small brain) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
@@ -1291,7 +1240,6 @@ away in single player. On a server, operators use:
 | `localDeaths` | `true` | death messages only reach those within `chatRange` |
 | `hardcore` | `auto` | `on`: one life each (a Xen that dies is gone for good, and minds danger more); `off`; `auto`: as the world |
 | `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
-| `chatModelPick` | `"auto"` | Experimental tab: `"135m"`, `"360m"`, `"off"` or `"auto"` (the Talk tab decides) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
@@ -1371,18 +1319,12 @@ Troubleshooting: start the game with `-Dxen.debug=true` to log every decision.
 ```
 cd mod/mc1.21.11     # or mod/mc26
 ./gradlew build      # needs JDK 25 to run Gradle; the jar lands in build/libs/
-./gradlew crossCheck # the Java brain, senses, chat rules, paths and memories against the Python ones
-./gradlew llmCheck -PchatModel=smollm2-360m-instruct-q8_0.gguf   # the chat model in Java against Python
+./gradlew crossCheck # the Java brain, senses, chat rules, paths, memories and talk model against the Python ones
 ./gradlew runClient -PuiTest   # a game client that opens Mod Menu and the settings by itself
 ```
 
-The chat model is [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct)
-by Hugging Face, Apache-2.0 license.
-
 ## Credits
 
-* The chat model: [SmolLM2-360M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct) by Hugging Face
-  (Apache-2.0).
 * The End lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
   [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft)
   ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). What its End fight showed was turned into Xen's own

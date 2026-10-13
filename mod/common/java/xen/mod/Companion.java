@@ -2595,7 +2595,7 @@ public final class Companion {
 	final Aversions aversions = new Aversions(this);
 	/** Teaching (Xens and players), and the talk of a fight (a crouch after a hit: a sorry it may take or not). */
 	final Teaching teaching = new Teaching(this);
-	/** Everyday conversation, in character (no chat model needed). */
+	/** Everyday conversation, in character. */
 	final SmallTalk smallTalk = new SmallTalk(this);
 	/** The little human things: gestures, forgiveness, gifts, a dog, a hobby, milestones. */
 	final Life life = new Life(this);
@@ -3033,7 +3033,7 @@ public final class Companion {
 
 	/** When nobody it knows is around to hear, it leaves a note on a sign (one it carries), signed with its name. */
 	void note(String text) {
-		if (!mod.config.signs || player == null || inArena || someoneListening(mod.config.chatWakeDistance)) return;
+		if (!mod.config.signs || player == null || inArena || someoneListening(32)) return;
 		long now = player.level().getGameTime();
 		if (now - lastNote < 3000) return;                            // at most one note every two and a half minutes
 		if (hands.hotbar(s -> { String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath(); return n.endsWith("_sign") && !n.contains("hanging"); }) < 0) {
@@ -3235,7 +3235,9 @@ public final class Companion {
 		boolean question = words.trim().endsWith("?") || words.matches("(?i)^(what|where|why|how|who|when|do|does|did|are|is|can|will|would)\\b.*");
 		boolean filler = words.trim().split("\\s+").length <= 3 && !question;   // "lol", "ok", "cool": not much to answer
 		boolean busy = fightingNow() || builder.busy() || chores.busy();
-		m[0] -= (question ? 0.08 : filler ? 0.2 : 0.14) * (1.3 - personality.chattiness) * (1 - 0.4 * Math.max(0, trust(u))) + (busy ? 0.1 : 0);
+		boolean fun = xen.mod.talk.Texting.banter(words) || words.matches("(?i).*\\b(lol|lmao|haha|thanks|ty|nice|gg|w)\\b.*");   // (a laugh, a thanks: it's fun, it stays)
+		m[0] -= (question ? 0.02 : filler ? 0.05 : 0.035) * (1.3 - personality.chattiness) * (1 - 0.4 * Math.max(0, trust(u))) + (busy ? 0.015 : 0) - (fun ? 0.03 : 0);
+		m[0] = Math.min(1, m[0]);
 		if (m[0] < 0.15) {                                                   // enough: it winds it up
 			m[2] = now + 1200 + (long) (2400 * (1 - personality.chattiness));
 			m[0] = 0.6;
@@ -3563,6 +3565,17 @@ public final class Companion {
 	 * words, or why it won't. Only its owner can tell it what to do (anyone, if it has no owner), and it can say no.
 	 * Trading is its own business: anyone can make it an offer. Just talk: returns its notes for the chat to answer from.
 	 */
+	private static final java.util.regex.Pattern LATER = java.util.regex.Pattern.compile("\\b(later|sometime|some time|tomorrow|tmr|tmrw|another time|one day|someday|after this)\\b");
+	/** What its talk model answers first when it's sure (talk, not orders: "gonna go to sleep" isn't "go to sleep"). */
+	private static final java.util.Set<String> EARLY_TALK = java.util.Set.of("greet", "wsg", "how_are_you", "player_fine", "player_bad", "player_tired",
+			"player_bored", "player_happy", "player_scared", "player_angry", "player_died", "player_died_creeper", "player_died_lava", "player_died_fall",
+			"player_found_diamonds", "player_found", "player_built", "player_got", "player_new", "player_away", "player_back", "bye", "goodnight",
+			"good_morning", "thanks", "sorry", "laugh", "agree", "disagree", "ok", "wow", "nice", "fail", "bruh", "confused", "doing", "are_you_bot",
+			"who_are_you", "age", "where_live", "where_from", "fav_block", "fav_mob", "fav_food", "fav_biome", "fav_color", "fav_thing", "fav_weapon",
+			"likes_me", "love_you", "compliment", "shut_up", "joke", "story", "real_life", "meaning_of_life", "sing", "best_ore", "where_diamonds",
+			"have_items", "time", "weather", "sus", "random_question", "where_are_you", "lag", "hacker", "skin", "name_meaning", "dare", "xen_hungry",
+			"xen_hurt", "xen_scared", "time_irl", "compliment_xen_work");
+
 	/** Requests that are about fetching things (what a statement like "I found diamonds" is mistaken for). */
 	private static final java.util.Set<String> GATHERING = java.util.Set.of("mine", "gather", "wood", "stone", "iron", "coal", "food", "diamonds", "ore");
 
@@ -3624,6 +3637,23 @@ public final class Companion {
 			if (heated != null) {
 				say(heated);
 				return null;
+			}
+		}
+		if (said != null) banter.reaction(said, player.level().getGameTime());   // (how its last answer went down: a laugh, a "what?")
+		boolean later = LATER.matcher(words).find() && !r.intent().equals("chat");   // "wanna go mining later": an idea for later, not a request now
+		if (later) r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		if (said != null && r.intent().equals("chat") && !talker.waitingFor(u)) {   // talk it's sure of: its talk model answers, before any keyword reads it as an order
+			xen.mod.talk.Banter.Read rd = xen.mod.talk.Banter.read(said, name);
+			if (rd.p() >= 0.85f && EARLY_TALK.contains(rd.kind()) || later && rd.kind().startsWith("invite_")) {
+				talkingWith = u;                                              // (a conversation: for the next half minute, no name needed)
+				talkingUntil = player.level().getGameTime() + 600;
+				if (!wantsToAnswer(u, words)) return null;
+				xen.mod.talk.Banter.Answer a = banter.answer(who, said, player.level().getGameTime());
+				journal("thinks", "talk model: " + banter.lastHeard + (a == null ? " (nothing true to say)" : " -> " + a.id()));
+				if (a != null) {
+					say(a.text());
+					return null;
+				}
 			}
 		}
 		String lesson = teaching.heard(from, words);                    // "lava burns", "teach me mining", "any tips?"
@@ -3890,8 +3920,16 @@ public final class Companion {
 				default -> {}
 			}
 		}
+		if (plan == null && r.intent().equals("chat") && said != null && !(grammar != null && aboutAThing(grammar))) {   // its talk model: a player's answer to a player
+			xen.mod.talk.Banter.Answer a = banter.answer(who, said, player.level().getGameTime());
+			journal("thinks", "talk model: " + banter.lastHeard + (a == null ? " (not sure: the rest of its chat answers)" : " -> " + a.id()));
+			if (a != null) {
+				say(a.text());
+				return null;
+			}
+		}
 		if (plan == null) {
-			boolean ownWords = !mod.chat.hasModel();                         // no chat model: it talks with its own words
+			boolean ownWords = true;                                          // (its own words: there's no language model)
 			xen.mod.talk.Voice.Heard heard = told;
 			String straight = talker.answer(words);                   // everyday questions: from what it knows, nothing made up
 			if (straight == null && r.intent().equals("chat") && said != null && grammar != null) {   // Xen 2.0 beta 6: facts it's told, questions its memory (or the game) answers
@@ -4003,7 +4041,171 @@ public final class Companion {
 
 	/** Talking on its own: remarks, questions and chats with other Xens. */
 	final Talker talker = new Talker(this);
-	/** Its own words (no chat model): it reads what's said, picks what kind of reply fits it, builds the sentence (see {@link xen.mod.talk.Voice}). */
+	/** Something it did lately, in words ("made a stone pickaxe"), and when: it may mention it. */
+	private String did = "";
+	private long didAt = -1_000_000;
+
+	void did(String what) {
+		did = what;
+		didAt = player == null ? 0 : player.level().getGameTime();
+	}
+
+	/** Its talk model: what kind of line a player said, and a player's answer, true to it (see {@link xen.mod.talk.Banter}). */
+	final xen.mod.talk.Banter banter = new xen.mod.talk.Banter(new BanterSelf(), new java.util.Random());
+
+	/** What its talk knows of it, all true, all now. */
+	private final class BanterSelf implements xen.mod.talk.Banter.Self {
+		@Override public String name() {
+			return name;
+		}
+
+		@Override public String tone() {
+			return personality.tone == null ? "calm" : personality.tone;
+		}
+
+		@Override public String doing() {
+			if (player == null) return "nothing";
+			String d = !chores.doing.isEmpty() && chores.busy() ? chores.doing : goals.instant;
+			if (d == null || d.isEmpty() || d.startsWith("thinking about")) return chores.busy() || goals.option > xen.mod.core.Mind.REST ? "working on stuff" : "just chilling";
+			d = Talker.mine(xen.mod.talk.Chat.firstPerson(d)).replaceAll("\\s*\\([^)]*\\)", "").replaceAll(",\\s*\\d+ of \\d+.*$", "").trim();
+			int comma = d.indexOf(", ");
+			if (comma > 0 && d.substring(0, comma).split(" ")[0].endsWith("ing")) d = d.substring(0, comma);
+			if (!d.split(" ")[0].endsWith("ing")) return chores.busy() ? "working on stuff" : "just chilling";
+			return d.substring(0, 1).toLowerCase(java.util.Locale.ROOT) + d.substring(1);
+		}
+
+		@Override public String mood() {
+			if (player == null) return "ok";
+			if (player.getHealth() < 8) return "kinda hurt tbh";
+			if (player.getFoodData().getFoodLevel() < 7) return "hungry lol";
+			return switch (emotions.mood()) {
+				case "terrified" -> "scared ngl";
+				case "afraid" -> "kinda scared";
+				case "uneasy" -> "a bit on edge";
+				case "pleased" -> "pretty good";
+				case "bored" -> "bored lol";
+				case "curious" -> "good";
+				case "hurt" -> "kinda hurt";
+				default -> "good";
+			};
+		}
+
+		@Override public int count(String what) {
+			if (player == null) return 0;
+			var it = items();
+			return switch (what) {
+				case "iron" -> it.getOrDefault("raw_iron", 0) + it.getOrDefault("iron_ingot", 0);
+				case "gold" -> it.getOrDefault("raw_gold", 0) + it.getOrDefault("gold_ingot", 0);
+				case "wood" -> it.getOrDefault("log", 0) + MindSense.count(Companion.this, n -> n.endsWith("_planks"));
+				case "stone" -> it.getOrDefault("cobblestone", 0);
+				default -> it.getOrDefault(what, 0);
+			};
+		}
+
+		@Override public String pick() {
+			if (player == null) return "";
+			return switch (crafter.pickTier()) {
+				case 1 -> "wooden pickaxe";
+				case 2 -> "stone pickaxe";
+				case 3 -> "iron pickaxe";
+				case 4 -> "diamond pickaxe";
+				case 5 -> "netherite pickaxe";
+				default -> "";
+			};
+		}
+
+		@Override public boolean night() {
+			return player != null && player.level().isDarkOutside();
+		}
+
+		@Override public boolean hurt() {
+			return player != null && player.getHealth() < 12;
+		}
+
+		@Override public boolean hungry() {
+			return player != null && player.getFoodData().getFoodLevel() < 10;
+		}
+
+		@Override public boolean busy() {
+			return chores.busy() || builder.busy() || fightingNow();
+		}
+
+		@Override public boolean home() {
+			return goals.home != null;
+		}
+
+		@Override public boolean underground() {
+			return player != null && !player.level().canSeeSky(player.blockPosition()) && player.getY() < 50;
+		}
+
+		@Override public String death() {
+			if (diedOf.isEmpty()) return "";
+			String d = diedOf.replace("in fire", "fire").replace("on fire", "fire");
+			return d.matches("(zombie|skeleton|creeper|spider|drowned|witch|enderman|slime|pillager|husk|stray|phantom|piglin|blaze|wolf|bee|iron golem|cave spider|zombie villager).*")
+					? "a " + d : d.equals("fall") ? "fall damage" : d.contains("lava") ? "lava" : d.contains("drown") ? "drowning" : d;
+		}
+
+		@Override public String place() {
+			if (player == null) return "";
+			BlockPos here = player.blockPosition(), best = null;
+			String kind = null;
+			for (var e : structures.found.entrySet()) {
+				if (e.getKey().equals("house") || e.getKey().equals("old ruins")) continue;
+				double dd = Math.sqrt(e.getValue().distSqr(here));
+				if (dd < 20 || dd > 800) continue;
+				if (best == null || dd < Math.sqrt(best.distSqr(here))) {
+					best = e.getValue();
+					kind = e.getKey();
+				}
+			}
+			if (best == null) return "";
+			long dist = Math.round(Math.sqrt(best.distSqr(here)) / 10.0) * 10;
+			return ("aeiou".indexOf(kind.charAt(0)) >= 0 ? "an " : "a ") + kind + " about " + dist + " blocks " + Ideas.direction(here, best);
+		}
+
+		@Override public String dream() {
+			return goals.dream == null ? "" : goals.dream.what;
+		}
+
+		@Override public String friend() {
+			for (Companion o : mod.companions) {
+				if (o == Companion.this || o.player() == null) continue;
+				if (trust(o.player().getUUID()) >= 0.4f) return o.name;
+			}
+			return "";
+		}
+
+		@Override public String biome() {
+			return player == null ? "" : places.biome().replace('_', ' ');
+		}
+
+		@Override public String did() {
+			return player != null && player.level().getGameTime() - didAt < 20 * 60 * 20 ? did : "";
+		}
+
+		@Override public int day() {
+			return player == null ? 0 : (int) (player.level().getGameTime() / 24000) + 1;
+		}
+
+		@Override public String where() {
+			return player == null ? "" : player.getBlockX() + " " + player.getBlockY() + " " + player.getBlockZ();
+		}
+
+		@Override public String fav(String kind) {
+			int h = Math.floorMod(name.hashCode(), 7);
+			return switch (kind) {
+				case "block" -> new String[] {"spruce planks", "deepslate bricks", "moss", "copper", "cherry wood", "glass", "bookshelves"}[h];
+				case "food" -> new String[] {"steak", "bread", "golden carrots", "cooked salmon", "pumpkin pie", "baked potatoes", "cookies"}[h];
+				case "mob" -> new String[] {"axolotls", "foxes", "wolves", "cats", "allays", "sniffers", "bees"}[h];
+				case "color" -> new String[] {"blue", "green", "red", "purple", "orange", "cyan", "yellow"}[h];
+				case "biome" -> new String[] {"cherry groves", "taigas", "mushroom fields", "jungles", "badlands", "snowy plains", "meadows"}[h];
+				case "weapon" -> new String[] {"a sword", "an axe", "a sword", "a mace", "a bow", "a trident", "a crossbow"}[h];
+				default -> new String[] {"mining", "exploring", "building", "farming", "caving", "fighting mobs", "finding loot"}[h];
+			};
+		}
+	}
+
+	/** Its own words: it reads what's said, picks what kind of reply fits it, builds the sentence (see {@link xen.mod.talk.Voice}). */
 	final xen.mod.talk.Voice voice = new xen.mod.talk.Voice(new VoiceSelf(), System.nanoTime());
 
 	/** What its voice knows of it: its nature, how it feels, what it does and wants, and what it thinks of things. */

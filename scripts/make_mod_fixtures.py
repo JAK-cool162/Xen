@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from xen import Xen, XenConfig                                   # noqa: E402
 from xen import blocks as B                                      # noqa: E402
 from xen.perception import (CUBE_SHAPE, N_RAYS, RAY_DIRS, Beliefs, Body, Sight, encode)  # noqa: E402
-from xen.talk.chat import EARS, PERSONA, honest, plainly, safe_chat, understand
+from xen.talk.chat import honest, plainly, safe_chat, understand
 
 OUT = os.path.join(os.path.dirname(__file__), "..", "mod", "common", "test", "fixtures")
 
@@ -139,8 +139,7 @@ def main():
         json.dump({"answers": [{"text": text, "notes": n, "message": message, "safe": safe_chat(text),
                                 "honest": honest(safe_chat(text), n), "plainly": plainly(n, message)}
                                for text, n, message in VOICE_CASES],
-                   "requests": [[m, *understand(m)] for m in REQUESTS],
-                   "persona": PERSONA, "ears": EARS}, f, indent=1)
+                   "requests": [[m, *understand(m)] for m in REQUESTS]}, f, indent=1)
     print(f"fixtures written to {os.path.normpath(OUT)}")
 
 

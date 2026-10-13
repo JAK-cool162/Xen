@@ -166,13 +166,6 @@ public final class CrossCheck {
 			same += ok ? 1 : 0;
 			total++;
 		}
-		for (String prompt : new String[] {"persona", "ears"}) {
-			String java = prompt.equals("persona") ? xen.mod.talk.Chat.persona() : xen.mod.talk.Chat.ears();
-			boolean ok = java.equals(chat.get(prompt).getAsString());
-			check(ok, "the " + prompt + " prompt differs from Python's");
-			same += ok ? 1 : 0;
-			total++;
-		}
 		System.out.println("chat rules: " + same + "/" + total + " cases match");
 
 		// A world closes and the next opens in the same game (single player): the chat still takes requests. (1.7.0
@@ -183,6 +176,9 @@ public final class CrossCheck {
 
 		// Its own words: the reply network learns its teacher, reads what's said, answers in every tone, learns from reactions.
 		check(wordsTest(), "the word engine failed");
+
+		// The talk model (Banter): the same tokens, hashes and answers as scripts/train_talk.py, and answers that fill in only what's true.
+		check(talkTest(dir), "the talk model differs from Python's");
 
 		// Finding a way on foot through what it knows.
 		check(pathTest(), "path finding failed");
@@ -230,6 +226,73 @@ public final class CrossCheck {
 
 		System.out.println(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
 		if (failures > 0) System.exit(1);
+	}
+
+	static boolean talkTest(Path dir) throws IOException {
+		xen.mod.talk.Banter.init(null);
+		if (!xen.mod.talk.Banter.ready()) {
+			System.out.println("talk model: not loaded");
+			return false;
+		}
+		JsonObject fx = new Gson().fromJson(Files.readString(dir.resolve("talk.json")), JsonObject.class);
+		String name = fx.get("name").getAsString();
+		int same = 0, total = 0;
+		boolean ok = true;
+		for (var e : fx.getAsJsonArray("cases")) {
+			JsonObject c = e.getAsJsonObject();
+			String text = c.get("text").getAsString();
+			java.util.List<String> toks = xen.mod.talk.Banter.tokens(text, name), want = new java.util.ArrayList<>();
+			for (var t : c.getAsJsonArray("tokens")) want.add(t.getAsString());
+			int[] ids = xen.mod.talk.Banter.ids(text, name);
+			boolean idsSame = ids.length == c.getAsJsonArray("ids").size();
+			for (int i = 0; idsSame && i < ids.length; i++) idsSame = ids[i] == c.getAsJsonArray("ids").get(i).getAsInt();
+			var rd = xen.mod.talk.Banter.read(text, name);
+			boolean one = toks.equals(want) && idsSame && rd.kind().equals(c.get("top").getAsString()) && Math.abs(rd.p() - c.get("p").getAsFloat()) < 2e-3f;
+			if (!one) System.out.println("talk model: \"" + text + "\": " + toks + " " + rd.kind() + " " + rd.p() + ", Python " + want + " " + c.get("top") + " " + c.get("p"));
+			ok &= one;
+			same += one ? 1 : 0;
+			total++;
+		}
+		var self = new xen.mod.talk.Banter.Self() {                                   // a Xen with a stone pickaxe and 3 iron, by day, never died
+			public String name() { return "Pip"; }
+			public String tone() { return "cheerful"; }
+			public String doing() { return "chopping some trees"; }
+			public String mood() { return "pretty good"; }
+			public int count(String what) { return what.equals("iron") ? 3 : what.equals("wood") ? 12 : 0; }
+			public String pick() { return "stone pickaxe"; }
+			public boolean night() { return false; }
+			public boolean hurt() { return false; }
+			public boolean hungry() { return false; }
+			public boolean busy() { return true; }
+			public boolean home() { return false; }
+			public boolean underground() { return false; }
+			public String death() { return ""; }
+			public String place() { return ""; }
+			public String dream() { return ""; }
+			public String friend() { return ""; }
+			public String biome() { return "plains"; }
+			public String did() { return ""; }
+			public int day() { return 2; }
+			public String where() { return "10 64 -20"; }
+			public String fav(String kind) { return "deepslate"; }
+		};
+		var talk = new xen.mod.talk.Banter(self, new java.util.Random(5));
+		String[][] asks = {{"u got any iron?", "3 iron|no iron|stone pickaxe|wood|diamond|food"}, {"wyd", "chopping some trees|nothing"}, {"yo Pip", ""},
+				{"whats ur fav block", "deepslate"}, {"bro i just died to a creeper", ""}, {"are you a bot", ""}, {"tell me a joke", ""}};
+		int answered = 0;
+		for (String[] a : asks) {
+			var ans = talk.answer("Alex", a[0], 100);
+			boolean good = ans != null && !ans.text().contains("{") && (a[1].isEmpty() || java.util.Arrays.stream(a[1].split("\\|")).anyMatch(ans.text()::contains));
+			boolean lies = ans != null && (ans.text().contains("diamonds, dont") || ans.text().contains("died to") || ans.text().contains("got some food"));
+			if (!good || lies) System.out.println("talk answer: \"" + a[0] + "\" -> " + (ans == null ? "nothing" : ans.text()));
+			answered += good && !lies ? 1 : 0;
+		}
+		for (int i = 0; i < 12 && !talk.asking(); i++) talk.answer("Alex", "whats your favorite block", 110);
+		var after = talk.answer("Alex", "probably moss lol", 120);                 // the answer to what it asked back
+		boolean followed = after != null && after.text().contains("moss");
+		System.out.println("talk model: " + same + "/" + total + " lines read as in Python; " + answered + "/" + asks.length + " answered, true to it"
+				+ (followed ? "; follows up on its question" : "; NO follow-up: " + (after == null ? "nothing" : after.text())));
+		return ok && answered == asks.length && followed;
 	}
 
 	static boolean wordsTest() {
@@ -380,13 +443,12 @@ public final class CrossCheck {
 
 	/** Three worlds in one game: in each a question is answered, then the chat rests and the world closes. */
 	static boolean chatSurvivesWorlds() {
-		var chat = new xen.mod.talk.Chat(java.nio.file.Path.of("no-such-model.gguf"), () -> "off", () -> false, 1, line -> {});
+		var chat = new xen.mod.talk.Chat(line -> {});
 		try {
 			for (int world = 0; world < 3; world++) {
 				var answered = new java.util.concurrent.CountDownLatch(1);
 				chat.ask("Steve", "xen, hello", "xen", request -> "It's a nice day.", reply -> answered.countDown());
 				if (!answered.await(10, java.util.concurrent.TimeUnit.SECONDS)) return false;
-				chat.sleep();
 				chat.close();                                               // the world closes
 			}
 			return true;

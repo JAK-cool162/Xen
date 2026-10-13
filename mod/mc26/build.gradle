@@ -50,15 +50,6 @@ tasks.register('crossCheck', JavaExec) {
 	args file('../common/test/fixtures').absolutePath
 }
 
-// The chat model in Java == Python's: ./gradlew llmCheck -PchatModel=path/to/smollm2-360m-instruct-q8_0.gguf
-tasks.register('llmCheck', JavaExec) {
-	classpath = sourceSets.crossCheck.runtimeClasspath
-	mainClass = 'xen.mod.core.LlmCheck'
-	args((project.findProperty('chatModel') ?: System.getenv('XEN_MODEL') ?: 'smollm2-360m-instruct-q8_0.gguf').toString(),
-			file('../common/test/fixtures').absolutePath)
-	maxHeapSize = '2g'
-}
-
 // ./gradlew runClient -PuiTest (settings screenshots) or -PgpuTest=<model file> (the chat model on CPU and GPU, compared)
 loom {
 	runs {
