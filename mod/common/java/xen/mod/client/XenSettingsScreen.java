@@ -198,10 +198,6 @@ public class XenSettingsScreen extends Screen {
 			}
 			case 7 -> {
 				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
-				choice("Reaction time", "reaction", List.of("human", "fast", "slow", "instant"), s -> s.equals("human") ? "human (~0.23 s)" : s,
-						"How long a Xen takes to react to something new: a monster in view, a bobber going under, lava at its feet. human: about a quarter second, slower for what it didn't see coming (it has to turn first), when tired or confused, quicker when it's focused in a fight. Its turns are a hand on a mouse: quick in the middle, slowing into the target.");
-				choice("Confusion", "confusion", List.of("human", "low", "high", "off"), s -> s,
-						"Xens get confused like players: close calls, the dark, a crowd of monsters, a hit from behind, coming back from death. Confused, they hesitate, look around, sometimes go with their second choice, and may ask out loud. Their survival plan never waits on it.");
 				choice("Says on its own", "talkAmount", List.of("normal", "quiet", "chatty"), s -> s.equals("normal") ? "normal (45 s apart)" : s.equals("quiet") ? "quiet (2 min apart)" : "chatty (20 s apart)",
 						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");
 				choice("Gameplay logs", "gameplayLog", List.of("off", "xens", "players", "both"), s -> s,

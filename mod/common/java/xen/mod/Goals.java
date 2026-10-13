@@ -393,6 +393,7 @@ final class Goals {
 		if (useMind()) {
 			option = Mind.EXPLORE;
 			optionFeatures = MindSense.features(c);
+			optionSituation = c.experience.situation();
 			optionAt = now;
 			optionUntil = now + ticks;
 			optionHow = "to see new ground";
@@ -749,46 +750,145 @@ final class Goals {
 		if (option >= 0) return c.chores.busy();
 		if (c.visits.busy()) return false;                                     // (in a village it found, getting what it's good for: that first)
 		if (now < next) return false;
-		next = now + 60;                                                       // (if nothing starts, it looks again in 3 s)
 		Mind mind = c.mod.mind;
 		float[] f = MindSense.features(c);
 		boolean[] can = MindSense.allowed(c, f, nearby);
 		for (int i = 0; i < can.length && i < quickUntil.length; i++) if (now < quickUntil[i]) can[i] = false;
 		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
-		int planned = agenda(f, can);                                          // the obvious next step, like any player: that first
-		if (planned >= 0) {
-			if (startOption(planned, nearby, now)) {
-				c.chores.own = true;                                           // (its own idea: what it's asked for comes first)
-				option = planned;
-				c.habits.started(option);
-				optionFeatures = f;
-				optionAt = now;
-				optionHow = "the plan: " + agendaWhy;
-				c.purpose.goal = agendaWhy.replaceAll(" \\(.*", "");
-				c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (the plan: " + agendaWhy + ")");
-				return c.chores.busy();
-			}
-			can[planned] = false;                                              // it couldn't: its mind picks from the rest
+		int planned = agenda(f, can);                                          // the usual next step, like any player: advice, not an order
+		String planWhy = agendaWhy;
+		float[] situation = c.experience.situation();
+		next = now + thinkTicks(situation, f);                                 // (if nothing starts, it looks again when it's its own kind of quick)
+		Tribe t = c.tribe();
+		Mind.Choice ch = mind.choose(f, can, caution, 0, random, bias(t));      // what its mind makes of each (and, unsure, thinks through)
+		Decision d = decide(f, can, caution, ch, planned, planWhy, situation);
+		if (d.order.length == 0) return false;
+		int first = d.order[0];
+		if (random.nextFloat() < explore && d.order.length > 1) {               // now and then something else, to find out
+			first = d.order[1 + random.nextInt(d.order.length - 1)];
+			d.how[first] = "let me try something different";
 		}
-		for (int tries = 0; tries < 5; tries++) {
-			Tribe t = c.tribe();
-			Mind.Choice ch = mind.choose(f, can, caution, explore, random, bias(t));
-			if (!startOption(ch.option, nearby, now)) {                       // it couldn't after all: the next best
-				can[ch.option] = false;
-				continue;
-			}
-			c.chores.own = true;
-			option = ch.option;
+		java.util.List<Integer> order = new java.util.ArrayList<>();
+		order.add(first);
+		for (int o : d.order) if (o != first) order.add(o);
+		for (int tries = 0; tries < 5 && tries < order.size(); tries++) {
+			int o = order.get(tries);
+			if (!startOption(o, nearby, now)) continue;                          // it couldn't after all: the next best
+			c.chores.own = true;                                               // (its own idea: what it's asked for comes first)
+			option = o;
 			c.habits.started(option);
 			optionFeatures = f;
+			optionSituation = situation;
 			optionAt = now;
-			optionHow = ch.how;
-			c.purpose.goal = Mind.SAYS[option];
-			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + ch.how + ")");
+			optionHow = d.how[o];
+			c.purpose.goal = o == planned ? planWhy.replaceAll(" \\(.*", "") : Mind.SAYS[o];
+			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + d.how[o] + ")");
+			if (planned >= 0 && o != planned && d.against != null && now - saidAgainstAt > 20 * 60 * 2) {   // against the usual plan, from what happened before: it says so
+				saidAgainstAt = now;
+				c.chatter("I'd usually " + Mind.SAYS[planned] + " now, but " + d.against + ". I'll " + Mind.SAYS[o] + " instead.", false);
+			}
 			return c.chores.busy();
 		}
 		return false;
+	}
+
+	private long saidAgainstAt = -1_000_000;
+	/** The situation it chose the current option in (for its outcome memory). */
+	private float[] optionSituation;
+
+	/** A decision: every choice it could make, best first; why each scored as it did; why it went against the plan (or null). */
+	private record Decision(int[] order, String[] how, String against) {}
+
+	/**
+	 * Xen 2.0 decides (the code gives it what it sees and what it can do; the choice is its own). Three things weigh in,
+	 * each in its own say:
+	 * <ul>
+	 *   <li><b>its mind</b>: what its learned critics make of each choice (what it brings, what it costs in harm, and,
+	 *   when it was unsure, the one its world model thought through), as how far above or below the others it is;</li>
+	 *   <li><b>the usual plan</b> (how players get on: tools, iron, a roof at night...): advice, as much as it listens to
+	 *   advice (a diligent one more, a proud one sure of itself less);</li>
+	 *   <li><b>what happened before</b>: the times it chose that in a situation like this one (outcome memory), as much
+	 *   as there are such times. Twice dead mining at night here outweighs the plan saying mine.</li>
+	 * </ul>
+	 */
+	private Decision decide(float[] f, boolean[] can, float caution, Mind.Choice ch, int planned, String planWhy, float[] situation) {
+		int n = Mind.N;
+		float[] util = new float[n];
+		double sum = 0, sumSq = 0;
+		int k = 0;
+		Tribe t = c.tribe();
+		float[] b = bias(t);
+		for (int i = 0; i < n; i++) {
+			if (!can[i]) continue;
+			util[i] = ch.value[i] - caution * ch.fear[i] + b[i];
+			sum += util[i];
+			sumSq += util[i] * util[i];
+			k++;
+		}
+		if (k == 0) return new Decision(new int[0], new String[n], null);
+		double mean = sum / k, sd = Math.sqrt(Math.max(1e-6, sumSq / k - mean * mean));
+		float belief = c.belief.get();
+		float adviceW = (1.0f + 0.8f * c.personality.diligence) * (1.25f - 0.5f * belief);   // (how much it goes by the usual plan)
+		float mindW = 0.6f + 0.6f * belief;                                    // (how much it goes by its own mind)
+		float expW = 2.5f;                                                     // (what happened before: a lot, when there's enough of it)
+		BlockPos here = c.player.blockPosition();
+		float[] score = new float[n];
+		String[] how = new String[n];
+		Experience.Guess[] g = new Experience.Guess[n];
+		for (int i = 0; i < n; i++) {
+			if (!can[i]) continue;
+			float z = (float) ((util[i] - mean) / Math.max(sd, 0.5));
+			float thought = i == ch.option && ch.how.startsWith("thinking it through") ? 0.5f : 0;   // (the one its world model thought best)
+			g[i] = c.experience.guess(situation, i, here);
+			float past = expW * g[i].sure() * g[i].expect();
+			float advice = i == planned ? adviceW : 0;
+			score[i] = mindW * z + thought + past + advice;
+			StringBuilder sb = new StringBuilder();
+			if (i == planned) sb.append("the plan: ").append(planWhy).append("; ");
+			sb.append(String.format(java.util.Locale.ROOT, "mind %+.1f", mindW * z + thought));
+			if (g[i].n() > 0) sb.append(String.format(java.util.Locale.ROOT, ", before %+.1f (%s)", past, g[i].says()));
+			if (i == planned) sb.append(String.format(java.util.Locale.ROOT, ", plan %+.1f", advice));
+			how[i] = sb.toString();
+		}
+		Integer[] idx = new Integer[k];
+		int j = 0;
+		for (int i = 0; i < n; i++) if (can[i]) idx[j++] = i;
+		java.util.Arrays.sort(idx, (x, y) -> Float.compare(score[y], score[x]));
+		int[] order = new int[k];
+		for (int i = 0; i < k; i++) order[i] = idx[i];
+		String against = null;
+		if (planned >= 0 && can[planned] && order[0] != planned) {
+			Experience.Guess pg = g[planned];
+			if (pg != null && pg.n() > 0 && pg.expect() < -0.2f) {
+				against = pg.says().contains("died") ? "the last time" + (pg.n() > 1 ? "s" : "") + " like this didn't end well (" + pg.says() + ")"
+						: "it hasn't gone well before (" + pg.says() + ")";
+				c.journal("thinks", "goes against the plan (" + Mind.SAYS[planned] + "): " + pg.says());
+				c.belief.up(0.01f, "its own call over the usual plan");
+			} else {
+				c.journal("thinks", "goes against the plan (" + Mind.SAYS[planned] + "): its mind thinks " + Mind.SAYS[order[0]] + " is better");
+			}
+		}
+		return new Decision(order, how, against);
+	}
+
+	/**
+	 * How long it takes to make up its mind, its own way (not a setting): ticks till it decides (or looks again). Quick:
+	 * in danger (no time: the gut), when it's been in a spot like this many times, sure of itself, hot-headed, quick by
+	 * nature. Slow: somewhere new, unsure of itself, careful and thorough, rattled, lazy. Half a second to five.
+	 */
+	int thinkTicks(float[] situation, float[] f) {
+		var p = c.personality;
+		if (f[Mind.DANGER] > 0.5f) return 6;                                  // (no time to think)
+		float familiar = c.experience.familiar(situation);
+		float t = 40;
+		t *= 1.4f - 0.6f * familiar;                                          // somewhere new: longer
+		t *= 1.3f - 0.6f * c.belief.get();                                    // sure of itself: quicker
+		t *= 0.8f + 0.5f * p.diligence;                                       // thorough: longer
+		t *= 1.25f - 0.5f * p.hidden(Personality.REFLEXES);                   // quick by nature: quicker
+		t *= 1 + 0.4f * p.sin(xen.mod.core.Sins.SLOTH) - 0.3f * p.sin(xen.mod.core.Sins.WRATH);   // lazy: slower; hot-headed: snap decisions
+		t *= 1 + 0.8f * c.confusion.level;                                    // rattled: it dithers
+		return Math.max(10, Math.min(100, Math.round(t)));
 	}
 
 	/** A duel it accepted ("1v1 me"): whatever it was doing waits; it goes over to them and fights (a truce ends it). */
@@ -798,6 +898,7 @@ final class Goals {
 		long now = c.player.level().getGameTime();
 		option = Mind.FIGHT;
 		optionFeatures = MindSense.features(c);
+		optionSituation = c.experience.situation();
 		optionAt = now;
 		optionUntil = now + 20 * 60;
 		optionHow = "a duel";
@@ -1433,6 +1534,8 @@ final class Goals {
 		if (died) after[Mind.HEALTH] = 0;
 		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);
 		c.mod.mind.remember(before, o, r, h, after, died, minutes, Mind.bits(MindSense.allowed(c, after, false)));
+		c.experience.record(optionSituation, o, r, h, died, minutes, c.player.blockPosition());   // (its outcome memory: how that went, here, like that)
+		optionSituation = null;
 		c.mod.mindExperiences++;
 		if (o == Mind.MINE && c.places.get("mine hut") == null && c.places.get("mine") != null && !c.builder.busy() && !c.player.isCreative()
 				&& c.chores.mineRecordY != Integer.MIN_VALUE && c.player.blockPosition().closerThan(c.places.get("mine"), 24)) {   // its mine gets a proper entrance

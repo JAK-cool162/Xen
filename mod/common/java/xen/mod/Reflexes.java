@@ -54,7 +54,7 @@ final class Reflexes {
 	int sampleMs(boolean unseen) {
 		boolean tired = c.player != null && c.player.level().isDarkOutside() && c.player.tickCount > 20 * 60 * 15;
 		float own = 1.25f - 0.5f * c.personality.hidden(Personality.REFLEXES);       // (its hidden reflexes: 0.75x to 1.25x)
-		int ms = sampleMs(random, unseen, c.fightingNow(), tired, c.confusion.level, scale(c.mod.config.reaction) * own);
+		int ms = sampleMs(random, unseen, c.fightingNow(), tired, c.confusion.level, own);   // (its own: its reflexes, tired or not, confused or not; not a setting)
 		lastMs = ms;
 		reactions++;
 		sumMs += ms;
@@ -84,7 +84,7 @@ final class Reflexes {
 
 	/** How fast it turns, from the setting (a slower reaction is a slower hand too). */
 	float turnScale() {
-		float s = scale(c.mod.config.reaction);
+		float s = 1.25f - 0.5f * c.personality.hidden(Personality.REFLEXES);   // (its own hand: quick reflexes, a quick hand)
 		return s <= 0 ? 2f : Math.max(0.6f, Math.min(1.5f, 1f / s));
 	}
 

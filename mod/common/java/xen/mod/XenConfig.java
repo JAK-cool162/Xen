@@ -73,9 +73,9 @@ public final class XenConfig {
 	 * the default instead.
 	 */
 	public String gameplayLogFolder = "";
-	/** Xen 2.0: reaction time: "human" (about a quarter second, slower for what it didn't see coming), "fast", "slow" or "instant". */
+	/** No longer used (kept so old settings files still load): each Xen's reaction time is its own (its reflexes, tired, confused). */
 	public String reaction = "human";
-	/** Xen 2.0: how confused Xens get (hesitating, looking around, a second-best choice now and then): "human", "low", "high" or "off". */
+	/** No longer used (kept so old settings files still load): how rattled a Xen gets is its own (its composure). */
 	public String confusion = "human";
 	/** Xens near each other talk, and tell each other where things are. */
 	public boolean talkToXens = true;

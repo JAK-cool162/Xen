@@ -1371,6 +1371,7 @@ public class XenMod implements ModInitializer {
 			part.accept("band", () -> { if (known.has("band")) c.band = known.get("band").getAsString(); });
 			part.accept("gutTrust", () -> { if (known.has("gutTrust")) c.gut.faith = known.get("gutTrust").getAsFloat(); });
 			part.accept("selfBelief", () -> { if (known.has("selfBelief")) c.belief.value = known.get("selfBelief").getAsFloat(); });
+			part.accept("experience", () -> { if (known.has("experience")) c.experience.load(known.getAsJsonArray("experience")); });
 			part.accept("trust", () -> {
 				if (known.has("trust")) for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
 			});

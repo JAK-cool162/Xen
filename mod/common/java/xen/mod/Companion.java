@@ -2567,6 +2567,8 @@ public final class Companion {
 	final Structures structures = new Structures(this);
 	/** Villages and ruined portals it found: in, and what they're good for (loot, a bed, hay, the golem's iron, a villager). */
 	final Visits visits = new Visits(this);
+	/** What happened the times it chose something (Xen 2.0's outcome memory: it decides with it). */
+	final Experience experience = new Experience(this);
 	/** Fishing, with a rod, like a player. */
 	final Fisher fisher = new Fisher(this);
 	/** Xen Ex1: what it made of the last moment (keys, turn, look, danger), the moments before (for learning), and what it perceived last. */

@@ -38,7 +38,7 @@ final class Confusion {
 	}
 
 	private float scale() {
-		return scale(c.mod.config.confusion);
+		return 1f;                                                             // (how rattled it gets is its own: its composure, below; not a setting)
 	}
 
 	void add(float amount) {
