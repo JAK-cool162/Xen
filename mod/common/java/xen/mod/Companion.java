@@ -1056,6 +1056,8 @@ public final class Companion {
 			Action craft = crafter.next();
 			if (craft != null) return craft;
 		}
+		Action tidyUp = tidy.next();                                   // the pillar it climbed: down again, like most players
+		if (tidyUp != null) return tidyUp;
 		Action back = backForMyThings();                              // it died: its things are lying where it fell
 		if (back != null) return back;
 		Action spares = mode == Mode.FREE || builder.busy() ? prepared.next() : null;   // they're gone: its spares from the chest at home (building its own: then too)
@@ -2568,6 +2570,8 @@ public final class Companion {
 	final Plans plans = new Plans(this);
 	/** The biomes it has seen, and what they tend to have. */
 	final Biomes biomes = new Biomes(this);
+	/** Tidying up after itself: the pillars it climbed come down again. */
+	final Tidy tidy = new Tidy(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */
@@ -4008,6 +4012,7 @@ public final class Companion {
 					: "Just before, " + who + " said \"" + clip(talk.prevLine, 90) + "\"" + (talk.prevReply == null ? "" : " and you answered \"" + clip(talk.prevReply, 90) + "\"") + ". ";
 			return before + notes();                                  // just talk: the chat answers (knowing what was just said)
 		}
+		if (!refused && r.intent().equals("build") && plan != null && plan.startsWith("You will") && builder.busy()) goals.adoptBuild();   // (it said yes: the build is its goal now)
 		if (!refused) lastThought = "Asked by " + who + ": " + plan;
 		say(voice.ack(xen.mod.talk.Chat.plainly(notes() + " Plan: " + plan, "")));   // what it will do (or why not), right away, in its own tone
 		return null;

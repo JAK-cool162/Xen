@@ -1248,42 +1248,63 @@ final class Architect {
 
 	// ------------------------------------------------------------------------------------ sites
 	/**
-	 * Somewhere near to build a w by d cottage facing `front`: the flattest ground close by (dry, not on leaves or a
-	 * tree), as its front left corner at floor level, or null.
+	 * Somewhere near to build a w by d cottage facing `front`: the flattest open ground close by (dry, not on leaves,
+	 * and not in among trees: a player picks a clearing rather than wedge a house between trunks under the leaves), as
+	 * its front left corner at floor level, or null. All trees round about: it looks a little further out for a clearing.
 	 */
 	static BlockPos site(ServerLevel level, BlockPos near, Direction front, int w, int d) {
 		Direction right = front.getCounterClockWise(), back = front.getOpposite();
 		BlockPos best = null;
-		int bestScore = Integer.MAX_VALUE;
-		for (int dx = -8; dx <= 8; dx += 2) {
-			for (int dz = -8; dz <= 8; dz += 2) {
-				BlockPos corner = ground(level, near.offset(dx, 0, dz));
-				if (corner == null) continue;
-				List<Integer> heights = new ArrayList<>();
-				int trees = 0;
-				boolean ok = true;
-				for (int u = -1; u <= w && ok; u += 2) {
-					for (int v = -3; v <= d && ok; v += 2) {
-						BlockPos g = ground(level, corner.relative(right, u).relative(back, v));
-						if (g == null) {
-							ok = false;                                          // water, or a cliff it can't see the bottom of
-							break;
+		int bestScore = Integer.MAX_VALUE, bestTrees = 0;
+		for (int pass = 0; pass < 2; pass++) {
+			int span = pass == 0 ? 8 : 24, stepBy = pass == 0 ? 2 : 4;
+			for (int dx = -span; dx <= span; dx += stepBy) {
+				for (int dz = -span; dz <= span; dz += stepBy) {
+					if (pass == 1 && Math.abs(dx) <= 8 && Math.abs(dz) <= 8) continue;   // (looked there already)
+					BlockPos corner = ground(level, near.offset(dx, 0, dz));
+					if (corner == null) continue;
+					List<Integer> heights = new ArrayList<>();
+					int trees = 0, canopy = 0;
+					boolean ok = true;
+					for (int u = -1; u <= w && ok; u += 2) {
+						for (int v = -3; v <= d && ok; v += 2) {
+							BlockPos g = ground(level, corner.relative(right, u).relative(back, v));
+							if (g == null) {
+								ok = false;                                      // water, or a cliff it can't see the bottom of
+								break;
+							}
+							heights.add(g.getY());
+							for (int up = 1; up <= 7; up++) {                    // what's over the ground there, as high as the house goes
+								BlockState over = level.getBlockState(g.above(up));
+								if (over.is(net.minecraft.tags.BlockTags.LOGS)) {
+									trees++;
+									break;
+								}
+								if (over.is(net.minecraft.tags.BlockTags.LEAVES)) {
+									canopy++;
+									break;
+								}
+								if (!over.canBeReplaced()) {
+									trees++;                                       // (something else standing there)
+									break;
+								}
+							}
 						}
-						heights.add(g.getY());
-						if (!level.getBlockState(g.above()).canBeReplaced()) trees++;
+					}
+					if (!ok) continue;
+					// the floor goes where the most ground already is (the least to dig and fill), like a player levelling a spot
+					java.util.Collections.sort(heights);
+					int level0 = heights.get(heights.size() / 2), bumps = 0;
+					for (int y : heights) bumps += Math.abs(y - level0);
+					int score = bumps * 4 + trees * 8 + canopy * 2 + (Math.abs(dx) + Math.abs(dz)) / 2;
+					if (score < bestScore) {
+						bestScore = score;
+						bestTrees = trees + canopy;
+						best = new BlockPos(corner.getX(), level0 + 1, corner.getZ());   // floor level: one above the ground
 					}
 				}
-				if (!ok) continue;
-				// the floor goes where the most ground already is (the least to dig and fill), like a player levelling a spot
-				java.util.Collections.sort(heights);
-				int level0 = heights.get(heights.size() / 2), bumps = 0;
-				for (int y : heights) bumps += Math.abs(y - level0);
-				int score = bumps * 4 + trees * 3 + (Math.abs(dx) + Math.abs(dz)) / 2;
-				if (score < bestScore) {
-					bestScore = score;
-					best = new BlockPos(corner.getX(), level0 + 1, corner.getZ());   // floor level: one above the ground
-				}
 			}
+			if (best != null && bestTrees <= 2) break;                          // a clearing close by: there
 		}
 		return best;
 	}

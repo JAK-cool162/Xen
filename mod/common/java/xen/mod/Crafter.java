@@ -416,6 +416,8 @@ final class Crafter {
 				if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(() -> craftSmall(planksRecipe()), "planks");
 				return step(() -> craftSmall("crafting_table"), "a crafting table");
 			}
+			Action out = roomForTable();
+			if (out != null) return out;
 			return step(() -> placeTable(), "a place for the table");
 		}
 		Action wait = c.pace.craftPrep(order, order);                    // a moment to get ready (quick for what it knows); only now, at
@@ -480,6 +482,8 @@ final class Crafter {
 		BlockPos at = nearbyTable();
 		if (at == null) {
 			if (count(n -> n.equals("crafting_table")) == 0) return step(() -> craftSmall("crafting_table"), "a crafting table");
+			Action out = roomForTable();
+			if (out != null) return out;
 			return step(() -> placeTable(), "a place for the table");
 		}
 		return step(() -> craftAt(at, goal), goal);
@@ -609,6 +613,37 @@ final class Crafter {
 	}
 
 	/** Put its crafting table down next to it, on solid ground. */
+	/** A spot for a table: free, on solid ground, not part of what it's building, not where it stands. */
+	private boolean tableSpot(ServerLevel level, BlockPos pos, BlockPos feet) {
+		BlockPos below = pos.below();
+		if (pos.equals(feet) || pos.equals(feet.above()) || pos.equals(feet.below())) return false;
+		if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(pos).getFluidState().isEmpty()) return false;
+		return level.getBlockState(below).isCollisionShapeFullBlock(level, below) && !c.builder.planned(pos);
+	}
+
+	/**
+	 * Nowhere for its table within reach (in the middle of its own build, everything round it is the house): it steps out
+	 * to the nearest free spot first, as a player would, instead of trying the same spot over and over. Null: there's
+	 * room right here (or none it can get to: it tries anyway).
+	 */
+	private Action roomForTable() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -1; dy <= 1; dy++) {
+			BlockPos pos = feet.offset(dx, dy, dz);
+			if (tableSpot(level, pos, feet) && c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) <= 4.3) return null;
+		}
+		BlockPos best = null;
+		for (int dx = -10; dx <= 10; dx++) for (int dz = -10; dz <= 10; dz++) for (int dy = -2; dy <= 2; dy++) {
+			BlockPos pos = feet.offset(dx, dy, dz);
+			if (!tableSpot(level, pos, feet) || !level.getBlockState(pos.above()).canBeReplaced()) continue;
+			if (best == null || pos.distSqr(feet) < best.distSqr(feet)) best = pos;
+		}
+		if (best == null) return null;
+		c.goals.instant = "stepping out to put its crafting table down";
+		return c.walkTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(best));
+	}
+
 	private boolean placeTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
@@ -617,10 +652,8 @@ final class Crafter {
 		for (int dx = -3; dx <= 3; dx++) {
 			for (int dz = -3; dz <= 3; dz++) {
 				for (int dy = -1; dy <= 1; dy++) {
-					BlockPos pos = feet.offset(dx, dy, dz), below = pos.below();
-					if (pos.equals(feet) || pos.equals(feet.above()) || pos.equals(feet.below())) continue;
-					if (!level.getBlockState(pos).canBeReplaced() || !level.getBlockState(pos).getFluidState().isEmpty()) continue;
-					if (!level.getBlockState(below).isCollisionShapeFullBlock(level, below) || c.builder.planned(pos)) continue;
+					BlockPos pos = feet.offset(dx, dy, dz);
+					if (!tableSpot(level, pos, feet)) continue;
 					if (c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) > 4.3) continue;
 					spots.add(pos);
 				}

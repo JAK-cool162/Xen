@@ -265,6 +265,11 @@ final class Fighter {
 		return idle();
 	}
 
+	/** Up on its pillar out of reach (healing, or waiting one out). */
+	boolean perched() {
+		return perched;
+	}
+
 	/**
 	 * Nothing at it any more, but it's still up on its pillar: it stays up while it heals (eating if it can) or while one
 	 * it can see is still close, for up to a minute. Null: down it goes, on with things.
@@ -274,6 +279,7 @@ final class Fighter {
 		XenPlayer p = c.player;
 		if (p.getY() < perchY + 1.5 || p.tickCount - perchSeen > 1200) {
 			perched = escaping = false;
+			if (p.getY() >= perchY + 1.5) c.tidy.comeDown();                 // (still up there: it digs its way down, the pillar with it)
 			return null;
 		}
 		boolean near = !p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6),
@@ -281,6 +287,7 @@ final class Fighter {
 		if (!near && p.getHealth() >= 16) {
 			perched = escaping = false;
 			c.journal("thinks", String.format(java.util.Locale.ROOT, "healed up (%.0f health), nothing about: down from its pillar", p.getHealth()));
+			c.tidy.comeDown();
 			return null;
 		}
 		c.goals.instant = "up out of reach, healing";

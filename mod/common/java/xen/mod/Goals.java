@@ -697,6 +697,17 @@ final class Goals {
 		next = Math.max(next, c.player.level().getGameTime() + ticks);
 	}
 
+	/**
+	 * It said yes to building what someone asked for: that's its goal now, till it's built, the way a player who agreed
+	 * keeps at it instead of drifting off to whatever else comes to mind (what's pressing, a fight, the night, hunger,
+	 * still comes first, as it always does).
+	 */
+	void adoptBuild() {
+		drop();
+		current = Short.HOUSE;
+		rewardAtStart = c.genReward;
+	}
+
 	/** Someone asked it for something: that comes first. */
 	void drop() {
 		exploreAskedUntil = 0;

@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.29
+# Xen Companion (Fabric mod) 2.0.0-beta.30
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.29+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.29+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.30+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.30+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.29+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.30+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -155,6 +155,29 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### It leaves the land the way a player would (2.0.0-beta.30)
+
+* **Pillars come down.** The pillar it jumped up on (to reach the top logs of a tree, to get out of a zombie's reach)
+  comes down again once it's done up there: still on it, it digs the block under its feet and drops down with it; down
+  already, it takes the pillar apart from the ground, the top first, so nothing is left floating. Never in a fight,
+  never with a monster close, never a block that has become part of something or that fills a hole it climbed out of.
+* **Its night's hut, in the morning.** The little dirt hut it put up for the night it may take down again (the blocks go
+  back in its bag), roof first. Not its home, not a fort.
+* **Mines into hillsides.** A new mine starts at the foot of a hillside close by (three or more blocks of stone or earth
+  rising right in front, dry all the way down), a couple of blocks straight in, then the staircase down; not a hole in
+  the flat ground. Flat land all round: where it stands, as before.
+* **Habits, not rules.** Each pillar (and each hut) it weighs once: a diligent Xen nearly always tidies up and walks
+  further for a hillside; a lazy, slothful one leaves a pillar or two and digs where it is.
+* **Houses in clearings.** It picks the open, flattest spot close by, counting the trees and the leaves over the whole
+  footprint, and looks further out (up to 24 blocks) when everything close is forest, instead of wedging the house
+  between trunks.
+* **It finishes what it agreed to build.** "Pip, can you build a house here?", yes: the house is its goal until it's
+  built (a fight, the night or hunger still come first); before, its mind could wander off to other things halfway.
+  Inside its own half-built house it steps out to put its crafting table down (it used to try the same spot forever).
+* **Smaller fixes.** Skins from mineskin.org's gallery that are mostly see-through (test uploads: a face on an empty
+  sheet, drawn black in the game) are left out, so Xens no longer look like shadows. "My farm is planted!" is said once,
+  not each time it looks the farm over.
 
 ### It plans what it was never shown, and reads biomes (2.0.0-beta.29)
 

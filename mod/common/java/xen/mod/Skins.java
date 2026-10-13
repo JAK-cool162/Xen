@@ -214,21 +214,52 @@ final class Skins {
 		return res.body();
 	}
 
+	private int junk;
+
+	/**
+	 * A gallery skin that's a whole person: the gallery has test uploads too, a face on an empty sheet, and the game
+	 * draws the empty parts black (a Xen in it looks like a shadow). The body and the head have to be drawn in. If it
+	 * can't look (no image support, no answer), the skin is kept, as before.
+	 */
+	private boolean whole(String value) {
+		try {
+			JsonObject tex = new Gson().fromJson(new String(java.util.Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8), JsonObject.class);
+			String url = tex.getAsJsonObject("textures").getAsJsonObject("SKIN").get("url").getAsString().replace("http://", "https://");
+			HttpRequest req = HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "XenCompanion (Minecraft mod)").timeout(java.time.Duration.ofSeconds(20)).build();
+			HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+			if (res.statusCode() != 200) return true;
+			java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(res.body()));
+			if (img == null || img.getWidth() < 64) return true;
+			int s = img.getWidth() / 64;
+			return drawn(img, 8 * s, 8 * s, 8 * s, 8 * s) >= 0.9f && drawn(img, 20 * s, 20 * s, 8 * s, 12 * s) >= 0.9f;   // the face, the front of the body
+		} catch (Throwable e) {
+			return true;
+		}
+	}
+
+	/** How much of a part of the skin is drawn in (not see-through). */
+	private static float drawn(java.awt.image.BufferedImage img, int x0, int y0, int w, int h) {
+		int n = 0;
+		for (int y = y0; y < y0 + h; y++) for (int x = x0; x < x0 + w; x++) if ((img.getRGB(x, y) >>> 24) > 128) n++;
+		return n / (float) (w * h);
+	}
+
 	/** Some skins from mineskin.org's public gallery, with their signed textures. */
 	private void fetchGallery() {
 		if (fetchingGallery) return;
 		fetchingGallery = true;
 		net.submit(() -> {
 			try {
-				JsonObject list = new Gson().fromJson(get(MINESKIN + "/v2/skins?size=24"), JsonObject.class);
+				JsonObject list = new Gson().fromJson(get(MINESKIN + "/v2/skins?size=36"), JsonObject.class);
 				for (JsonElement e : list.getAsJsonArray("skins")) {
 					String uuid = e.getAsJsonObject().get("uuid").getAsString();
 					JsonObject skin = new Gson().fromJson(get(MINESKIN + "/v2/skins/" + uuid), JsonObject.class).getAsJsonObject("skin");
 					JsonObject data = skin.getAsJsonObject("texture").getAsJsonObject("data");
-					gallery.add("texture:" + data.get("value").getAsString() + ":" + data.get("signature").getAsString());
+					if (whole(data.get("value").getAsString())) gallery.add("texture:" + data.get("value").getAsString() + ":" + data.get("signature").getAsString());
+					else junk++;
 					Thread.sleep(300);
 				}
-				XenMod.LOG.info("Xen has {} skins from mineskin.org's gallery", gallery.size());
+				XenMod.LOG.info("Xen has {} skins from mineskin.org's gallery{}", gallery.size(), junk > 0 ? " (left out " + junk + " that were mostly see-through)" : "");
 			} catch (Exception e) {
 				XenMod.LOG.warn("Xen couldn't get skins from mineskin.org: {}", e.toString());
 			} finally {

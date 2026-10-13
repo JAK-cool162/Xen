@@ -86,8 +86,13 @@ final class Farmer {
 	}
 
 	/** Start a crop farm (by its home, or here): the plan in words. */
+	/** It tilled or planted something since it started (so there's news to tell), and when it last told it. */
+	private boolean worked;
+	private long toldAt = -24000;
+
 	String start() {
 		on = true;
+		worked = false;
 		since = now();
 		if (middle == null) plot.clear();
 		c.journal("does", "starts a crop farm");
@@ -156,8 +161,11 @@ final class Farmer {
 		on = false;
 		c.goals.farm = middle;
 		c.places.remember("farm", middle);
-		c.say(c.pick3("My farm is planted! " + plantedCount(level) + " crops.", "Done! Now we wait for the wheat to grow.",
-				"Farm's ready. I'll come back when it's ripe."));
+		if (worked || now() - toldAt > 20 * 60 * 10) {                       // (news once: not every time it looks the farm over and finds nothing to do)
+			toldAt = now();
+			c.say(c.pick3("My farm is planted! " + plantedCount(level) + " crops.", "Done! Now we wait for the wheat to grow.",
+					"Farm's ready. I'll come back when it's ripe."));
+		}
 		return null;
 	}
 
@@ -170,6 +178,7 @@ final class Farmer {
 		}
 		c.hands.useWith(at, with);
 		c.acted = true;
+		worked = true;
 		return Action.PLACE;
 	}
 

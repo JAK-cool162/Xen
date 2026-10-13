@@ -74,7 +74,7 @@ final class Chores {
 	/** The block right by it that it's trying to get, and since when (hitting at it for ever is no good: another one). */
 	private BlockPos working;
 	private long workingSince;
-	private BlockPos target;
+	BlockPos target;
 
 	/** Its legs can't get to what it was going for (three tries): out of reach, it picks another (no waiting for help). */
 	void unreachable() {
@@ -784,6 +784,9 @@ final class Chores {
 			case SMELT -> smeltNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
+					if (hutFilled != null && !"fort".equals(shape) && (c.goals.home == null || !c.goals.home.closerThan(c.player.blockPosition(), 10)))
+						c.tidy.shelter(hutFilled);                            // morning: its night's hut may come down again (its call)
+					hutFilled = null;
 					cancel();
 					if (resume != null) c.mode = resume;                        // following again, as it was told
 					resume = null;
@@ -1018,15 +1021,27 @@ final class Chores {
 		BlockPos home = c.goals.home;                                          // a new one: by its home, like players dig theirs
 		if (home != null && home.closerThan(c.player.blockPosition(), 48)) toMine = home.relative(c.player.getDirection(), 6);
 		BlockPos top = toMine != null ? toMine : c.player.blockPosition();
-		net.minecraft.core.Direction dry = dryWay(top, top.getY() - y);
-		if (dry == null) {                                                     // water all round (a shore, a swamp): somewhere drier
-			BlockPos away = drySpot(top);
-			if (away != null) {
-				toMine = away;
-				dry = dryWay(away, away.getY() - y);
+		intoHill = false;
+		Object[] hill = hillside(top, y);                                     // a hillside close by: in there, not a hole in the flat ground
+		if (hill != null) {
+			toMine = (BlockPos) hill[0];
+			mineDir = (net.minecraft.core.Direction) hill[1];
+			intoHill = true;
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "digs its mine into the hillside at %d %d %d (%s), not a hole in the flat ground",
+					toMine.getX(), toMine.getY(), toMine.getZ(), mineDir.getName()));
+			XenMod.LOG.info("{} starts a mine in the hillside at {} {} {} ({})", c.name, toMine.getX(), toMine.getY(), toMine.getZ(), mineDir.getName());
+		} else {
+			XenMod.LOG.info("{} starts a mine where it is (no hillside close by)", c.name);
+			net.minecraft.core.Direction dry = dryWay(top, top.getY() - y);
+			if (dry == null) {                                                 // water all round (a shore, a swamp): somewhere drier
+				BlockPos away = drySpot(top);
+				if (away != null) {
+					toMine = away;
+					dry = dryWay(away, away.getY() - y);
+				}
 			}
+			if (dry != null) mineDir = dry;
 		}
-		if (dry != null) mineDir = dry;
 		mineRecordY = y;
 		mineRecordDir = mineDir;
 		mineRecordLeg = 0;
@@ -1053,21 +1068,71 @@ final class Chores {
 	 * the first with no water on or over its first steps (what it can see from up here), or null.
 	 */
 	private net.minecraft.core.Direction dryWay(BlockPos from, int down) {
-		ServerLevel level = (ServerLevel) c.player.level();
 		net.minecraft.core.Direction d = c.player.getDirection();
-		for (int r = 0; r < 4; r++, d = d.getClockWise()) {
-			boolean wet = false;
-			for (int i = 0; i <= Math.min(Math.max(down, 4), 20) && !wet; i++) {
-				BlockPos step = from.relative(d, i).below(i);
-				for (int up = 0; up <= i + 3 && !wet; up++) {                    // the step and all above it to the surface
-					BlockPos q = step.above(up);
-					wet = !level.getFluidState(q).isEmpty() || !level.getFluidState(q.relative(d.getClockWise())).isEmpty()
-							|| !level.getFluidState(q.relative(d.getCounterClockWise())).isEmpty();
+		for (int r = 0; r < 4; r++, d = d.getClockWise()) if (!wet(from, d, down)) return d;
+		return null;
+	}
+
+	/** Water on or over the first steps of a staircase down that way? */
+	private boolean wet(BlockPos from, net.minecraft.core.Direction d, int down) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		for (int i = 0; i <= Math.min(Math.max(down, 4), 20); i++) {
+			BlockPos step = from.relative(d, i).below(i);
+			for (int up = 0; up <= i + 3; up++) {                              // the step and all above it to the surface
+				BlockPos q = step.above(up);
+				if (!level.getFluidState(q).isEmpty() || !level.getFluidState(q.relative(d.getClockWise())).isEmpty()
+						|| !level.getFluidState(q.relative(d.getCounterClockWise())).isEmpty()) return true;
+			}
+		}
+		return false;
+	}
+
+	/** Its new mine goes in through a hillside: first a couple of blocks straight in, then the staircase down. */
+	private boolean intoHill;
+	private BlockPos tunnelIn;
+
+	/** Ground a mine can go into: stone or earth (not a tree's trunk, a build, sand or gravel that would fall in). */
+	private static boolean hillBlock(net.minecraft.world.level.block.state.BlockState s) {
+		return s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.tags.BlockTags.TERRACOTTA)
+				|| s.is(net.minecraft.world.level.block.Blocks.SANDSTONE) || s.is(net.minecraft.world.level.block.Blocks.RED_SANDSTONE);
+	}
+
+	/**
+	 * A hillside close by to dig its mine into, the way players start one: the foot of a slope that rises at least three
+	 * blocks of stone or earth right in front, dry all the way down; the higher the hill and the closer, the better. How
+	 * far it'll walk for one is its own: a diligent Xen goes further, a lazy one digs where it is unless a hill's right
+	 * there. {foot, way in}, or null (flat land all round: a staircase where it is, as before).
+	 */
+	private Object[] hillside(BlockPos from, int depth) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		int far = 10 + Math.round(22 * c.personality.diligence);
+		Object[] best = null;
+		float bestScore = Float.NEGATIVE_INFINITY;
+		for (int r = 0; r <= far; r += 3) {
+			int n = r == 0 ? 1 : Math.max(8, r * 2);
+			for (int k = 0; k < n; k++) {
+				double a = 2 * Math.PI * k / n;
+				int x = from.getX() + (int) Math.round(r * Math.cos(a)), z = from.getZ() + (int) Math.round(r * Math.sin(a));
+				if (!level.isLoaded(new BlockPos(x, from.getY(), z))) continue;
+				Vec3 g = XenMod.surface(level, x, z);
+				if (g == null) continue;
+				BlockPos foot = BlockPos.containing(g);
+				if (Math.abs(foot.getY() - from.getY()) > 12 || !level.getBlockState(foot).canBeReplaced() || !level.getBlockState(foot.above()).canBeReplaced()) continue;
+				for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+					BlockPos in = foot.relative(d);
+					if (!hillBlock(level.getBlockState(in)) || !hillBlock(level.getBlockState(in.above())) || !hillBlock(level.getBlockState(in.above(2)))) continue;   // a wall of earth right in front
+					Vec3 g3 = XenMod.surface(level, x + 3 * d.getStepX(), z + 3 * d.getStepZ());
+					int rise = g3 == null ? 0 : (int) g3.y - foot.getY();
+					if (rise < 3 || wet(foot, d, foot.getY() - depth)) continue;
+					float score = Math.min(rise, 10) - r / 5f;
+					if (score > bestScore) {
+						bestScore = score;
+						best = new Object[] {foot.immutable(), d};
+					}
 				}
 			}
-			if (!wet) return d;
 		}
-		return null;
+		return best;
 	}
 
 	/** Dry ground a little way off (no water within 4 blocks of it), for a mine's staircase; null if none near. */
@@ -1126,6 +1191,8 @@ final class Chores {
 				toMine = null;
 				mineStart = c.player.blockPosition();
 				legStarted = now();
+				if (intoHill && mineBase == null) tunnelIn = mineStart.relative(mineDir, 2);   // into the hill first
+				intoHill = false;
 			} else {
 				doing = "going to its mine";
 				c.run(c.player.blockPosition().distSqr(toMine) > 400);
@@ -1239,8 +1306,9 @@ final class Chores {
 				return null;
 			}
 			int down = feet.getY() - mineY, step = Math.min(down, 3);        // (a few steps ahead at a time: a straight staircase, not a far point it digs about for)
-			goal = feet.relative(mineDir, step).below(step);
-			doing = "digging a staircase down (y " + feet.getY() + ")";
+			if (tunnelIn != null && (feet.distManhattan(tunnelIn) <= 0 || feet.distManhattan(tunnelIn) > 6)) tunnelIn = null;
+			goal = tunnelIn != null ? tunnelIn : feet.relative(mineDir, step).below(step);
+			doing = tunnelIn != null ? "digging into the hillside" : "digging a staircase down (y " + feet.getY() + ")";
 		} else {                                                             // branch tunnels: 24 long, 3 apart, back and forth
 			int k = mineLeg;
 			int across = 3 * ((k + 1) / 2);
@@ -2352,10 +2420,14 @@ final class Chores {
 		return Action.IDLE;
 	}
 
+	/** The spots of its hut it fills itself (empty when it planned it): in the morning it may take those down again. */
+	private List<BlockPos> hutFilled;
+
 	private Action shelterNext() {
 		if (dugout != null) return dugoutNext();
 		if (pit != null) return pitNext();
 		ServerLevel level = (ServerLevel) c.player.level();
+		if (hutFilled == null && walls != null) hutFilled = walls.stream().filter(q -> level.getBlockState(q).canBeReplaced()).map(BlockPos::immutable).toList();
 		if (inside != null && !inside.contains(c.player.blockPosition()) && ++walked < 200) {   // the spot it picked: over there first
 			BlockPos in = inside.get(0);
 			for (BlockPos b : inside) if (b.distSqr(c.player.blockPosition()) < in.distSqr(c.player.blockPosition())) in = b;

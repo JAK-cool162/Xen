@@ -1,8 +1,42 @@
-XEN COMPANION 2.0.0-beta.29: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.30: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.30
+===========================
+
+Tidying up (Tidy.java, new). Every block it puts under its own feet climbing (Hands.keepPillaring: the walker's pillar
+moves, out of a hole, a perch out of a zombie's reach; not a build's scaffold, which the builder takes down itself,
+and not in the End) is noted (where, when), up to 96, forgotten after 10 minutes or once it's gone. Each one it weighs
+once: taken down with p = 0.55 + 0.45 diligence - 0.3 sloth, else left. On top of its own pillar: it digs the block
+under its feet once it's done up there (its perch ended: Fighter.stayUp -> comeDown(), 10 s; or 5 s since it last
+placed one and no chore target within 6 blocks at or above its feet). On the ground: the highest pillar block it left
+within 12 blocks whose top is clear (air, leaves, a trunk; not another of its pillar blocks: the top first, nothing
+left floating) and that stands out of the ground (no more than one side against earth or stone: a pillar that fills a
+hole it climbed out of stays), mined from where it stands or from beside the pillar's foot; 10 s at one and no luck:
+left. Never in a fight, perched, building, or with a monster within 8 blocks. Before item pick-ups and its lost
+things in its decisions. Night huts: the wall spots that were empty when it started the hut, in the morning (not a
+fort, not by its home), all taken down (roof first, same rule) with p = 0.45 + 0.45 diligence - 0.3 sloth, decided once
+for the hut.
+Mines into hillsides (Chores.hillside): a new mine (not a cave, not its old one) looks for a hillside within 10 + 22 x
+diligence blocks (rings 3 apart, 8+ points each): a spot with feet and head room whose next block one way is three high
+of stone, earth, terracotta or sandstone, the ground three blocks on 3+ higher, and dry down the staircase (Chores.wet,
+split from dryWay); score min(rise, 10) - distance/5. There: two blocks straight in, then the staircase down that way.
+None: where it stands, as before. In the server log: "starts a mine in the hillside at ..." / "starts a mine where it
+is".
+House sites (Architect.site): over the footprint, what's above the ground up to 7 high: a log or anything solid 8 points,
+leaves 2 (before: only the block right on the ground, 3), bumps 4, distance 1/2; within 8 blocks first, then out to 24
+(steps of 4) unless the best close by has at most 2 trees or leaves over it.
+Asked builds stick (Goals.adoptBuild): a build it said yes to in chat becomes its current goal (Short.HOUSE), over when
+the builder is done; before, its mind could pick something else while the builder waited.
+Crafting table (Crafter.roomForTable): no free spot in reach that isn't part of its build: it walks to the nearest
+free one within 10 blocks first (before: it failed, waited 30 s and tried the same again, stuck inside its own
+half-built house).
+Skins: gallery skins (mineskin.org) whose face or body front is under 90% drawn in are left out (each texture fetched
+and checked once; no answer or no image support: kept); 36 looked at instead of 24.
+Farm: "My farm is planted!" only when it tilled or planted something since it started, or 10 minutes after the last.
 
 WHAT'S NEW IN 2.0.0-beta.29
 ===========================

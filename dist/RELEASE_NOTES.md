@@ -1,7 +1,28 @@
-**Xen Companion 2.0.0-beta.29**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.30**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.30: it leaves the land the way a player would
+
+* **Pillars come down.** The dirt pillar it jumped up on (to reach the top of a tree, to get out of a zombie's reach)
+  comes down again once it's done up there: still on it, it digs the block under its feet; down already, it takes the
+  pillar apart from the ground, top first. In a test field it took down 8 of 11 pillars right away (2 stray dirt blocks
+  left, 9 before); a 3-day test world logged 34 taken down in its last 5 minutes alone.
+* **Its night's hut** it may take down again in the morning, roof first (not its home).
+* **Mines into hillsides.** A new mine starts at the foot of a hillside close by, two blocks straight in, then the
+  staircase down; not a hole in the flat ground. In the 3-day test worlds 19 of 34 new mines went into a hillside; the
+  rest had flat land all round.
+* **Habits, not rules.** A diligent Xen nearly always tidies up and walks further for a hillside; a lazy, slothful one
+  leaves a pillar or two and digs where it stands.
+* **Houses in clearings**, not wedged between tree trunks under the leaves (it looks further out when everything close is
+  forest). **A house it agreed to build stays its goal till it's built**, and inside its own half-built house it steps
+  out to put its crafting table down (it used to get stuck there). A forest test house went from barely started to
+  finished in 8 minutes.
+* **Fixes.** Mostly see-through skins from mineskin.org's gallery are left out (Xens looked like black shadows in them).
+  "My farm is planted!" is said once, not over and over.
+* **Survival a little better** over 3-day test worlds (5 Xens each): 4 deaths on the usual seed (beta.29: 7 to 22), 24
+  on a seed neither was tuned on (beta.29: 30).
 
 ### 2.0.0-beta.29: it plans what it was never shown, and reads biomes
 

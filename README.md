@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.29+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.29+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.30+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.30+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -413,6 +413,20 @@ hasn't seen goes to the beach it saw. In lush caves, dripstone caves or the
 deep dark it knows it's in a cave straight away (lush caves glow, so dark
 isn't the clue), and a river biome helps it name a river it sees.
 `/xen g1x` shows the biome it's in and the ones it has seen.
+
+**It leaves the land the way a player would** (2.0.0-beta.30). The pillar it
+jumped up on, to reach the top of a tree or to get out of a zombie's reach,
+comes down again once it's done up there: still on it, it digs the block
+under its feet; down already, it takes the pillar apart from the ground, the
+top first. Its night's dirt hut it may take down in the morning. A new mine
+goes into a hillside close by, a couple of blocks straight in and then down,
+not a hole in the flat ground. These are habits, not rules: a diligent Xen
+nearly always tidies up and walks further for a hillside, a lazy, slothful
+one leaves a pillar or two and digs where it stands. A house goes up in a
+clearing rather than wedged between tree trunks under the leaves (it looks
+further out when everything close is forest), a house it was asked to build
+stays its goal until it's done, and inside its own half-built house it steps
+out to put its crafting table down instead of trying the same spot forever.
 
 **It weighs survival tips** (2.0.0-beta.28). Xen gets tips the way a new
 player does ("can't win this fight? get out of reach or away, heal, then come

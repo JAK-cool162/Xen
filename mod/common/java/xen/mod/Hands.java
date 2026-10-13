@@ -142,6 +142,7 @@ public final class Hands {
 		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
 				new BlockHitResult(hit, Direction.UP, ground, false));
 		Compat.swing(p);
+		if (!level.getBlockState(pillarFrom).canBeReplaced() && p.companion != null) p.companion.tidy.placed(pillarFrom.immutable());   // (to take down again, once it's done up there)
 		pillar = false;
 		limit = Math.min(limit, ticks + 3);
 	}
