@@ -984,7 +984,8 @@ public class XenMod implements ModInitializer {
 						.then(Commands.literal("free").executes(ctx -> each(ctx, c -> { c.mode = Companion.Mode.FREE; return c.name + " will do its own thing."; }))))
 				.then(Commands.literal("status").executes(ctx -> each(ctx, Companion::status)))
 				.then(Commands.literal("progress").executes(ctx -> each(ctx, Companion::progress)))
-				.then(Commands.literal("predict").executes(ctx -> each(ctx, c -> c.goals.predictions())))   // (what it expects of each choice now, and how good its guesses have been)
+				.then(Commands.literal("predict").executes(ctx -> each(ctx, c -> c.goals.predictions())))
+				.then(Commands.literal("tips").executes(ctx -> each(ctx, c -> c.tips.describe())))   // (the survival tips it weighs, and how far it trusts each)   // (what it expects of each choice now, and how good its guesses have been)
 				.then(Commands.literal("g1x").executes(ctx -> each(ctx, c -> c.g1x.describe())))   // (what its geometry vision makes of the place)   // (one short line each: how far along it is)
 				.then(Commands.literal("layout").executes(ctx -> each(ctx, c -> c.builder.showLayoutAgain())))
 				.then(Commands.literal("terrain").requires(XenMod::mayRun)           // the world as it really is (a dev tool: WorldTruth)
@@ -1326,6 +1327,8 @@ public class XenMod implements ModInitializer {
 			part.accept("experience", () -> { if (known.has("experience")) c.experience.load(known.getAsJsonArray("experience")); });
 			part.accept("experienceLearned", () -> { if (known.has("experienceLearned")) c.experience.loadLearned(known.getAsJsonObject("experienceLearned")); });
 			part.accept("moves", () -> { if (known.has("moves")) c.walker.loadMoves(known.getAsJsonObject("moves")); });
+			part.accept("fightCosts", () -> { if (known.has("fightCosts")) c.fighter.loadCosts(known.getAsJsonObject("fightCosts")); });
+			part.accept("tips", () -> { if (known.has("tips")) c.tips.load(known.getAsJsonObject("tips")); });
 			part.accept("trust", () -> {
 				if (known.has("trust")) for (var e : known.getAsJsonObject("trust").entrySet()) c.trust.put(java.util.UUID.fromString(e.getKey()), e.getValue().getAsFloat());
 			});

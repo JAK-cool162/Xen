@@ -1366,6 +1366,16 @@ public final class Hands {
 		return n;
 	}
 
+	/** A sword or an axe anywhere in its bag (else it fights with its fists). */
+	boolean hasWeapon() {
+		Inventory inv = p.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			String n = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (n.endsWith("_sword") || n.endsWith("_axe")) return true;
+		}
+		return false;
+	}
+
 	boolean hasBow() {
 		return findHotbar(Hands::isBow) >= 0 && arrows() > 0;
 	}

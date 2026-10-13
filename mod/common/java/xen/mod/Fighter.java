@@ -33,6 +33,20 @@ final class Fighter {
 	private LivingEntity lastFoe;
 	/** Hits taken in a row without landing one (three: its shield goes up), and until when it holds the shield up. */
 	private int combo, comboAt, shieldUntil, windAt = -1000;
+	/**
+	 * What beating one of each kind of mob has cost it (health, as with stone tools and no armor), learned from its own
+	 * fights: the health it lost from the moment it took one on till it was dead, shared out over the others that were at
+	 * it too. A death counts as more than it had. Before its first, a rough idea of the kind (a zombie hits for 3, takes
+	 * four hits of a stone sword).
+	 */
+	final java.util.Map<String, Float> cost = new java.util.HashMap<>();
+	/** The fight it's in: health lost since it took on each foe (its id), and how many were at it then. */
+	private final java.util.Map<Integer, float[]> engaged = new java.util.HashMap<>();
+	/** Getting away from a fight it can't win: two blocks up out of reach (perched), or running; and since when. */
+	private boolean perched, escaping, up;
+	private int perchY, escapedAt, perchSeen;
+	/** Its gut says get out of this fight (till when). */
+	private int gutUntil = -1000;
 
 	Fighter(Companion c) {
 		this.c = c;
@@ -49,6 +63,230 @@ final class Fighter {
 	void reset() {
 		lastFoe = null;
 		sTap = 0;
+		engaged.clear();
+	}
+
+	// ---------------------------------------------------------------------- can it win this? (learned from its fights)
+	private static String kind(LivingEntity e) {
+		return net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
+	}
+
+	/** A rough first idea of what one of a kind costs (health lost beating it with a stone sword, no armor). */
+	static float prior(String kind) {
+		return switch (kind) {
+			case "zombie", "husk", "drowned", "zombie_villager", "phantom" -> 5f;
+			case "skeleton", "stray", "bogged", "vex", "cave_spider" -> 6f;
+			case "spider" -> 4f;
+			case "slime", "magma_cube" -> 3f;
+			case "silverfish", "endermite" -> 2f;
+			case "pillager", "zombified_piglin", "piglin", "breeze" -> 7f;
+			case "creeper", "blaze", "guardian" -> 8f;
+			case "witch", "hoglin", "zoglin" -> 9f;
+			case "enderman" -> 10f;
+			case "vindicator" -> 12f;
+			case "piglin_brute", "wither_skeleton", "ravager", "evoker" -> 14f;
+			case "warden" -> 40f;
+			default -> 6f;
+		};
+	}
+
+	private float costOf(String kind) {
+		Float k = cost.get(kind);
+		return k != null ? k : prior(kind);
+	}
+
+	/** How its gear changes what a fight costs: armor takes some of every hit, a better weapon ends it sooner (1: a stone sword, no armor). */
+	private float gear() {
+		var p = c.player;
+		float best = 1;                                                      // (its fists)
+		var inv = p.getInventory();
+		for (int i = 0; i < 9; i++) {
+			String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (!n.endsWith("_sword") && !n.endsWith("_axe")) continue;
+			best = Math.max(best, n.startsWith("netherite") ? 8 : n.startsWith("diamond") ? 7 : n.startsWith("iron") ? 6 : n.startsWith("stone") ? 5 : 4);
+		}
+		float armor = Math.max(0.2f, 1 - 0.04f * Math.min(20, p.getArmorValue()));
+		return armor * Math.max(0.6f, Math.min(2.5f, 5f / best));
+	}
+
+	/** What it expects the rest of this fight to cost it: the foe (as hurt as it is now) and the others about that are after it. */
+	float expected(LivingEntity foe) {
+		var p = c.player;
+		float g = gear(), sum = 0;
+		boolean counted = false;
+		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+			double d = m.distanceTo(p);
+			if (m != foe && m.getTarget() != p && d > 4) continue;              // (only the ones after it, or right by it)
+			if (m != foe && d > 3 && !p.hasLineOfSight(m)) continue;          // (what it can see, or hear right by it)
+			sum += costOf(kind(m)) * g * (m.getHealth() / m.getMaxHealth()) * (m == foe ? 1f : 0.8f);
+			counted |= m == foe;
+		}
+		if (!counted) sum += costOf(kind(foe)) * g * (foe.getHealth() / foe.getMaxHealth());
+		return sum;
+	}
+
+	/** How much health it wants left at the end of a fight: its nerve (brave, proud, wrathful: less), the dark (more). */
+	private float margin() {
+		var who = c.personality;
+		float m = 3 + 4 * (1 - who.bravery) - 2 * who.sin(xen.mod.core.Sins.PRIDE) - 1.5f * who.sin(xen.mod.core.Sins.WRATH);
+		if (who.believes("live_to_fight")) m += 3;
+		var p = c.player;
+		if (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7) m += 1.5f;
+		return Math.max(1, m);
+	}
+
+	/**
+	 * Its gut feels this fight going wrong (a monster on it, hurt): that feeling goes into its call on the fight (the tip
+	 * "can't win this: get out of reach or away, heal, come back" comes to mind, and it takes it or fights on), instead of a
+	 * step back on the spot that only gets it hit again. False: not a fight that's its call (the arena, a player).
+	 */
+	boolean gutSays(float[] fear, float danger) {
+		if (lastFoe == null || lastFoe instanceof Player || c.inArena) return false;
+		gutUntil = c.player.tickCount + 100;                                    // (the feeling goes into its call on the fight: see next())
+		return true;
+	}
+
+	/** Getting out of a fight right now (going up, up there, or running to heal): its gut keeps quiet meanwhile. */
+	boolean escapingNow() {
+		return perched || escaping || fleeing;
+	}
+
+	/** It was hurt: that goes on what the foes it's taken on cost it. */
+	void hurt(float amount) {
+		for (float[] e : engaged.values()) e[0] += amount;
+	}
+
+	/** It beat one: what that one cost it is learned (a little each time). */
+	void beat(LivingEntity foe) {
+		float[] e = engaged.remove(foe.getId());
+		if (e == null || foe instanceof Player) return;
+		learn(kind(foe), e[0] / Math.max(1, e[1]));
+	}
+
+	/** It died fighting: whatever it was fighting cost more than it had. */
+	void died() {
+		if (lastFoe != null && !(lastFoe instanceof Player)) {
+			float[] e = engaged.get(lastFoe.getId());
+			float lost = e != null ? e[0] + 6 : 20;
+			learn(kind(lastFoe), lost / Math.max(1, e != null ? e[1] : 1));
+		}
+		engaged.clear();
+		perched = escaping = false;
+	}
+
+	private void learn(String kind, float lost) {
+		float bare = Math.max(0.5f, Math.min(30f, lost / gear()));
+		float was = costOf(kind), now = was + 0.3f * (bare - was);
+		cost.put(kind, now);
+		if (Math.abs(now - was) >= 0.5f) c.journal("learns", String.format(java.util.Locale.ROOT, "a %s costs it about %.0f health to beat now (was %.0f)", kind.replace('_', ' '), now, was));
+	}
+
+	com.google.gson.JsonObject saveCosts() {
+		var o = new com.google.gson.JsonObject();
+		for (var e : cost.entrySet()) o.addProperty(e.getKey(), Math.round(e.getValue() * 10) / 10f);
+		return o;
+	}
+
+	void loadCosts(com.google.gson.JsonObject o) {
+		if (o == null) return;
+		for (var e : o.entrySet()) {
+			try {
+				cost.put(e.getKey(), Math.max(0.5f, Math.min(30f, e.getValue().getAsFloat())));
+			} catch (RuntimeException ignored) {
+				// (one it can't read: the rough idea again)
+			}
+		}
+	}
+
+	/** Mobs that only hit what they can reach (two blocks up, they can't): it can wait them out on a pillar. */
+	private static boolean meleeOnly(String kind) {
+		return switch (kind) {
+			case "zombie", "husk", "drowned", "zombie_villager", "zombified_piglin", "piglin_brute", "vindicator", "hoglin", "zoglin", "silverfish", "endermite" -> true;
+			default -> false;
+		};
+	}
+
+	private static boolean free(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos b) {
+		return level.getBlockState(b).getCollisionShape(level, b).isEmpty() && level.getFluidState(b).isEmpty();
+	}
+
+	/** Up two blocks is out of reach of everything at it (nothing shoots, climbs or flies), and it has the blocks and the room. */
+	private boolean canPerch(LivingEntity foe) {
+		var p = c.player;
+		if (!p.onGround() || p.isInWater() || p.isInLava() || c.hands.spareBlock() == null || !meleeOnly(kind(foe))) return false;
+		var feet = p.blockPosition();
+		if (!free(p.level(), feet.above(2)) || !free(p.level(), feet.above(3))) return false;
+		return p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && !meleeOnly(kind(m)) && p.hasLineOfSight(m)).isEmpty();
+	}
+
+	/** Two blocks up and out of reach: it pillars up, then hits down at what it can reach, eats, heals. Null: it can't (it runs). */
+	private Action perch(LivingEntity foe, double d) {
+		XenPlayer p = c.player;
+		Hands h = c.hands;
+		if (perched && !meleeOnly(kind(foe))) {                              // one that shoots (or climbs): no use up there, down and away
+			perched = false;
+			return null;
+		}
+		perchSeen = p.tickCount;
+		if (!perched) {
+			perched = true;
+			up = false;
+			perchY = p.getBlockY();
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "out of this fight (%.0f health): two blocks up, out of the %s's reach", p.getHealth(), kind(foe).replace('_', ' ')));
+			if (!c.inArena) c.chatter(c.personality.say("flee"), false);
+		}
+		h.lowerShield();
+		p.setSprinting(false);
+		if (p.getY() < perchY + 1.9 || !p.onGround()) {                      // still going up (in the air: the block isn't under it yet)
+			c.goals.instant = "pillaring up out of reach";
+			if (!p.onGround()) {
+				h.watching = foe;
+				return idle();
+			}
+			var feet = p.blockPosition();
+			if (!free(p.level(), feet.above(2)) || !h.startPillar()) {        // (a roof, or out of blocks: it runs instead)
+				perched = false;
+				return null;
+			}
+			c.pillaring = true;
+			return Action.JUMP;
+		}
+		c.goals.instant = "up out of reach, healing";
+		if (!up) {
+			up = true;
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "up on its pillar (%d blocks), out of the %s's reach: hits down at it, heals", p.getBlockY() - perchY, kind(foe).replace('_', ' ')));
+		}
+		h.watching = foe;
+		h.ready(false, d);
+		if (p.getAttackStrengthScale(0.5f) >= 0.95f && d <= p.entityInteractionRange() && p.hasLineOfSight(foe)) return hit(foe);   // a hit down at it
+		if (p.getHealth() < p.getMaxHealth() && h.canHeal()) return Action.EAT;
+		return idle();
+	}
+
+	/**
+	 * Nothing at it any more, but it's still up on its pillar: it stays up while it heals (eating if it can) or while one
+	 * it can see is still close, for up to a minute. Null: down it goes, on with things.
+	 */
+	Action stayUp() {
+		if (!perched) return null;
+		XenPlayer p = c.player;
+		if (p.getY() < perchY + 1.5 || p.tickCount - perchSeen > 1200) {
+			perched = escaping = false;
+			return null;
+		}
+		boolean near = !p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && p.hasLineOfSight(m)).isEmpty();
+		if (!near && p.getHealth() >= 16) {
+			perched = escaping = false;
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "healed up (%.0f health), nothing about: down from its pillar", p.getHealth()));
+			return null;
+		}
+		c.goals.instant = "up out of reach, healing";
+		c.hands.watching = null;
+		if (p.getHealth() < p.getMaxHealth() && c.hands.canHeal()) return Action.EAT;
+		return idle();
 	}
 
 	/** Its next move against foe (null: go on with other things). hurtNow: it was hit this tick. */
@@ -58,6 +296,12 @@ final class Fighter {
 		int now = p.tickCount;
 		if (foe != lastFoe) {
 			if (foe instanceof Player && !c.inArena && !c.skills.sparringWith(foe.getUUID())) c.chatter(c.personality.say("fight"), false);
+			if (!(foe instanceof Player) && !engaged.containsKey(foe.getId())) {
+				int at = p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
+						m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && (m == foe || m.getTarget() == p)).size();
+				engaged.put(foe.getId(), new float[] {0, Math.max(1, at)});
+				while (engaged.size() > 12) engaged.remove(engaged.keySet().iterator().next());
+			}
 			lastFoe = foe;
 			foeY = foe.getY();
 			sTap = 0;
@@ -106,14 +350,38 @@ final class Fighter {
 			retreat = Math.max(retreat, Math.min(0.6f, retreat + (c.personality.believes("warrior_never_runs") ? 0.5f : 1f) * more));
 		}
 		float health = p.getHealth() / p.getMaxHealth();
-		Action gear = c.kit.use(foe, d, fleeing || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
+		// Can it win this? What this kind (and the others at it) have cost it before, against the health it has: if it would
+		// come out of it with next to nothing, a player gets out of reach first (two blocks up: a zombie can't hit that) or
+		// away, heals, and only then takes it on again. Its own nerve says how close it cuts it (a warrior never runs).
+		boolean outmatched = false;
+		if (!(foe instanceof Player) && !c.inArena) {
+			float left = p.getHealth() - expected(foe), want = margin();
+			if (escaping || perched) outmatched = left < want + 4 && p.getHealth() < 18;   // (it took the tip: away till it has healed, then back at it)
+			else if (left < want || now < gutUntil && p.getHealth() < 16) {    // it sees it going badly (or feels it): a tip comes to mind, and it's its call
+				float pull = Math.max(0, Math.min(1, (want - left) / Math.max(4, want))) + (now < gutUntil ? 0.3f : 0);
+				outmatched = c.tips.take(Tips.Tip.CANT_WIN, pull, String.format(java.util.Locale.ROOT, "%.0f health, the %s would cost it about %.0f%s",
+						p.getHealth(), kind(foe).replace('_', ' '), expected(foe), now < gutUntil ? ", its gut says get out" : ""), 60);
+			}
+		}
+		if (outmatched && !escaping) {
+			escaping = true;
+			escapedAt = now;
+		}
+		if (!outmatched && escaping) escaping = false;
+		if (perched || outmatched && canPerch(foe)) {
+			Action up = perch(foe, d);
+			if (up != null) return up;
+		}
+		Action gear = c.kit.use(foe, d, fleeing || outmatched || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
 		if (gear != null) return gear;
-		if (retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
+		if (outmatched || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
 			if (!fleeing && !c.inArena) c.chatter(c.personality.say("flee"), false);
 			fleeing = true;                                                    // back off until it has healed a bit
+			c.goals.instant = "backing off to heal";
 			h.lowerShield();
-			if (d > 5 && h.canHeal()) return Action.EAT;                       // a golden apple (or food) at a safe distance
+			if (d > (outmatched ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);
+			if (outmatched && d < 6 && clearRun(foe)) return runFrom(foe, sprintable);   // close: just sprint off (no time to work out a way)
 			Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
 			if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
 			return c.walkTo(p.position().add(away.normalize().scale(8)));
@@ -217,6 +485,27 @@ final class Fighter {
 			return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
+	}
+
+	/** Straight away from it, the next few blocks: ground to run on, no drop, no lava or water (else it works out a way). */
+	private boolean clearRun(LivingEntity foe) {
+		XenPlayer p = c.player;
+		var level = p.level();
+		Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
+		if (away.lengthSqr() < 1e-4) return false;
+		away = away.normalize();
+		for (int i = 1; i <= 3; i++) {
+			var at = net.minecraft.core.BlockPos.containing(p.position().add(away.scale(i)));
+			boolean ground = false;
+			for (int dy = 0; dy <= 2 && !ground; dy++) {                        // (a step down or two is fine)
+				var below = at.below(dy + 1);
+				ground = !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
+				if (!level.getFluidState(below).isEmpty() || !level.getFluidState(at.below(dy)).isEmpty()) return false;
+			}
+			if (!ground) return false;
+			if (!free(level, at.above()) && !free(level, at.above(2))) return false;   // (a wall it can't jump)
+		}
+		return true;
 	}
 
 	/** Turn its back on it and sprint away (jumping up a step if one is in the way): no pathfinding, no time lost. */

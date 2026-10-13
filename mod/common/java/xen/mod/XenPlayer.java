@@ -65,9 +65,11 @@ public class XenPlayer extends ServerPlayer {
 		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && source.getDirectEntity() == by) {
 			companion.struckBy(by, amount);
 		}
+		float before = getHealth();
 		boolean hurt = super.hurtServer(level, source, amount);
 		if (hurt && companion != null && !isCreative()) {
 			companion.aversions.hurt(source, amount);                          // (what hurt it: it remembers)
+			companion.fighter.hurt(Math.max(0, before - getHealth()));         // (what the fight it's in is costing it)
 			if (amount >= 1) companion.journalHurt(source, amount);
 		}
 		return hurt;

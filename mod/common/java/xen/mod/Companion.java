@@ -321,6 +321,7 @@ public final class Companion {
 		if (player.tickCount % 10 == 0) {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			noteKills();                                                 // (something it hit died: its drops are its own)
+			tips.tick();                                                 // (a tip it took, or didn't: how did that go?)
 			belief.tick(player.level().getGameTime());                   // (a bad day fades)
 			places.tick();                                               // the way it walked, remembered
 			totems();
@@ -1875,6 +1876,12 @@ public final class Companion {
 			saidGoingBack = false;
 			return null;
 		}
+		if (goals.outAtNight() && !hands.hasWeapon() && player.level().canSeeSky(lostAt.above())     // night, out in the open, no sword: a tip comes to mind (its call)
+				&& tips.take(Tips.Tip.NO_SWORD_NIGHT, 0.4f + (diedOf.isEmpty() || diedOf.contains("fall") ? 0 : 0.3f) + 0.2f * Math.min(1, (float) (Vec3.atCenterOf(lostAt).distanceTo(player.position()) / 64)),
+						"no sword, night, its things out where it died" + (diedOf.isEmpty() ? "" : " (" + diedOf + ")"), 600)) {
+			goals.instant = "waiting for morning to go back for its things";
+			return null;
+		}
 		if (!saidGoingBack) {
 			saidGoingBack = true;
 			lostBest = Double.MAX_VALUE;
@@ -2104,6 +2111,7 @@ public final class Companion {
 		if (!e.isAlive() || e.isRemoved()) {
 			if (now - hands.lastHitAt < 60) {
 				if (e instanceof net.minecraft.world.entity.monster.Monster || e instanceof ServerPlayer) belief.up(0.03f, "beat " + e.getName().getString());
+				fighter.beat(e);                                                    // (what that one cost it: learned)
 				killed.addLast(new long[] {e.blockPosition().asLong(), now});
 				while (killed.size() > 16) killed.removeFirst();
 			}
@@ -2533,11 +2541,11 @@ public final class Companion {
 			hands.lowerShield();
 			player.setSprinting(false);
 			fighter.reset();
-			return null;
+			return fighter.stayUp();                                     // (up on its pillar, healing: it stays up a while)
 		}
 		if (!hurtNow && !reflexes.ready(foe.getUUID(), !WorldSenses.sees(player, hands.yaw, hands.pitch, foe))) {   // Xen 2.0: it notices a reaction time later
 			fighting = false;
-			return null;
+			return fighter.stayUp();                                     // (up on its pillar meanwhile: it stays up)
 		}
 		lastFoe = foe;
 		lastFoeAt = player.level().getGameTime();
@@ -2553,6 +2561,8 @@ public final class Companion {
 	private long lastFoeAt;
 
 	final Fighter fighter = new Fighter(this);
+	/** Survival tips it weighs (and learns how far to trust). */
+	final Tips tips = new Tips(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */
@@ -3337,6 +3347,8 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
+		fighter.died();                                                // (what it was fighting cost more than it had)
+		tips.died();                                                   // (the tips it was weighing: right or wrong)
 		gut.died();                                                    // (if it had just gone against its gut: the gut was right)
 		habits.died();
 		prepared.died();

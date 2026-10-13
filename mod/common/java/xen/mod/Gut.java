@@ -129,7 +129,7 @@ final class Gut {
 		hearAnswer(p.level().getGameTime());                                     // (it asked someone: what did they say?)
 		// Instinct first (a clear danger), and under water short of air: air first, whatever the gut says. Drowning hurts
 		// whatever it does there, so every move felt wrong and it "held still, that feels wrong" till it drowned.
-		if (c.instinct.clear() || p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply()) {
+		if (c.instinct.clear() || p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply() || c.fightingNow() && c.fighter.escapingNow()) {   // (getting out of a fight already: that's what it says anyway)
 			last = null;
 			return null;
 		}
@@ -177,6 +177,11 @@ final class Gut {
 			}
 		}
 		if (!c.reflexes.ready("gut", false)) return null;                       // (it feels it a reaction time later)
+		if (c.fightingNow() && move != Action.JUMP && c.fighter.gutSays(fear, danger)) {   // in a fight: the feeling is "get out of this", and how is the fight's (up out of reach, or away), not one step back
+			doing = "";
+			last = null;
+			return null;
+		}
 		overrides++;
 		doing = switch (move) {
 			case BACK -> "stepping back, that feels wrong";

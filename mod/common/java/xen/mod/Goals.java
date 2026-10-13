@@ -1015,8 +1015,16 @@ final class Goals {
 		nightCheckedAt = now;
 		boolean outdoorWork = option == Mind.WOOD || option == Mind.EXPLORE || option == Mind.HOUSE || option == Mind.FARM
 				|| option == Mind.STONE && !needBlocksForTheNight() || option == Mind.REST;
-		if (!outdoorWork || !outAtNight()) return false;
-		c.journal("does", "night fell: drops " + Mind.SAYS[option] + " for a shelter");
+		boolean hurt = c.player.getHealth() <= 12 && option != Mind.SHELTER && option != Mind.SLEEP;
+		if (!outdoorWork && !hurt || !outAtNight()) return false;
+		var p = c.player;                                                     // out in the dark: a tip comes to mind, and it's its call
+		int near = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(16), m -> m.isAlive()).size();
+		float dark = p.level().getMaxLocalRawBrightness(p.blockPosition()) < 5 ? 0.1f : 0;
+		float pull = hurt ? (12 - p.getHealth()) / 12f + 0.1f * Math.min(3, near) + dark : 0.55f + 0.1f * Math.min(3, near) + dark;
+		if (!c.tips.take(hurt ? Tips.Tip.HURT_IN_DARK : Tips.Tip.NIGHTFALL, pull, String.format(java.util.Locale.ROOT, "%s, %.0f health, %s",
+				Mind.SAYS[option], p.getHealth(), near == 0 ? "nothing about" : near + " monster" + (near > 1 ? "s" : "") + " about"), 600)) return false;
+		c.journal("does", (outdoorWork ? "night fell" : String.format(java.util.Locale.ROOT, "hurt (%.0f health) out in the dark", c.player.getHealth()))
+				+ ": drops " + Mind.SAYS[option] + " for a shelter");
 		finishOption(false);
 		c.chores.cancel();
 		next = now;
@@ -1075,6 +1083,7 @@ final class Goals {
 			boolean sheltered = f[Mind.SHELTERED] > 0.5f || c.chores.shelterBuilt && below;
 			boolean atHome = home != null && c.player.blockPosition().closerThan(home, 24);
 			boolean monstersNight = who.believes("night_belongs_to_monsters") && !below;   // (its belief: it stays in, unless it's down a mine already)
+			if (c.player.getHealth() <= 12 && !sheltered && !below && can[Mind.SHELTER]) return why(Mind.SHELTER, "night, and hurt: dig in and heal");   // (not a long walk to a mine like this)
 			if (tier >= 1 && can[Mind.MINE] && !monstersNight) {               // a pickaxe: the night's for mining, as players do (stone, coal, more iron: all worth having)
 				boolean mineNear = mine != null && mine.closerThan(c.player.blockPosition(), mineRange);
 				return why(Mind.MINE, below || mineNear ? "night: mining (safe under the ground)"
