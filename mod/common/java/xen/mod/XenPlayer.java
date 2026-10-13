@@ -66,7 +66,10 @@ public class XenPlayer extends ServerPlayer {
 			companion.struckBy(by, amount);
 		}
 		boolean hurt = super.hurtServer(level, source, amount);
-		if (hurt && companion != null && !isCreative()) companion.aversions.hurt(source, amount);   // (what hurt it: it remembers)
+		if (hurt && companion != null && !isCreative()) {
+			companion.aversions.hurt(source, amount);                          // (what hurt it: it remembers)
+			if (amount >= 1) companion.journalHurt(source, amount);
+		}
 		return hurt;
 	}
 

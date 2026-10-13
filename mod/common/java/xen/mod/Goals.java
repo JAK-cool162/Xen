@@ -799,12 +799,17 @@ final class Goals {
 			c.habits.started(option);
 			optionFeatures = f;
 			optionSituation = situation;
+			optionExpect = d.expect[o];
+			optionWhere = c.player.blockPosition().immutable();
 			optionFollowed = o == planned;
 			optionAt = now;
 			optionHow = d.how[o];
 			optionSays = d.says[o] == null ? "" : d.says[o];
 			c.purpose.goal = o == planned ? planWhy.replaceAll(" \\(.*", "") : Mind.SAYS[o];
 			c.journal("thinks", "Xen 2.0 chose to " + Mind.SAYS[option] + " (" + d.how[o] + ")");
+			Experience.Prediction e = d.expect[o];
+			if (e != null) c.journal("thinks", String.format(java.util.Locale.ROOT, "expects: goes well %.0f%%, risk %.0f/100%s", 100 * e.good(), 100 * e.risk(),
+					e.minutes() > 0 ? String.format(java.util.Locale.ROOT, ", about %.1f min", e.minutes()) : ""));
 			if (o == first && d.note != null) {
 				c.journal("thinks", d.note);
 				if (d.against != null) c.belief.up(0.01f, "its own call over the usual plan");
@@ -827,9 +832,12 @@ final class Goals {
 	/** The situation it chose the current option in (for its outcome memory), and whether that was the plan's advice. */
 	private float[] optionSituation;
 	private boolean optionFollowed;
+	/** What it expected of the current option when it chose it (and where it was), to reflect on when it's over. */
+	private Experience.Prediction optionExpect;
+	private BlockPos optionWhere;
 
 	/** A decision: every choice it could make, best first; why each scored as it did; why it went against the plan (or null). */
-	private record Decision(int[] order, String[] how, String[] says, String against, float difficulty, String note) {}
+	private record Decision(int[] order, String[] how, String[] says, String against, float difficulty, String note, Experience.Prediction[] expect, float[] score) {}
 
 	/**
 	 * Xen 2.0 decides (the code gives it what it sees and what it can do; the choice is its own). Three things weigh in,
@@ -857,7 +865,7 @@ final class Goals {
 			sumSq += util[i] * util[i];
 			k++;
 		}
-		if (k == 0) return new Decision(new int[0], new String[n], new String[n], null, 0, null);
+		if (k == 0) return new Decision(new int[0], new String[n], new String[n], null, 0, null, new Experience.Prediction[n], new float[n]);
 		double mean = sum / k, sd = Math.sqrt(Math.max(1e-6, sumSq / k - mean * mean));
 		float belief = c.belief.get();
 		float adviceW = (1.0f + 0.8f * c.personality.diligence) * (1.25f - 0.5f * belief) * c.experience.planTrust();   // (how much it goes by the usual plan: its nature, and how the plan has worked out for it)
@@ -867,11 +875,13 @@ final class Goals {
 		float[] score = new float[n];
 		String[] how = new String[n];
 		Experience.Guess[] g = new Experience.Guess[n];
+		Experience.Prediction[] expect = new Experience.Prediction[n];
 		for (int i = 0; i < n; i++) {
 			if (!can[i]) continue;
 			float z = (float) ((util[i] - mean) / Math.max(sd, 0.5));
 			float thought = i == ch.option && ch.how.startsWith("thinking it through") ? 0.5f : 0;   // (the one its world model thought best)
 			g[i] = c.experience.guess(situation, i, here);
+			expect[i] = c.experience.predict(g[i], i);   // (what it expects, before it does it: held against what happens)
 			float past = expW * g[i].sure() * g[i].expect();
 			float advice = i == planned ? adviceW : 0;
 			float curious = i == Mind.EXPLORE ? 0.8f * c.personality.curiosity * situation[17] : 0;   // (G1X: much it hasn't seen round it: a curious one goes to look)
@@ -910,7 +920,47 @@ final class Goals {
 			else if (i == Mind.EXPLORE && situation[17] > 0.5f) says[i] = "I haven't seen what's around here yet";
 			else if (g[i] != null && g[i].n() > 0 && g[i].expect() > 0.3f) says[i] = "it went well the last times I did";
 		}
-		return new Decision(order, how, says, against, difficulty, note);
+		return new Decision(order, how, says, against, difficulty, note, expect, score);
+	}
+
+	/**
+	 * What it expects of each thing it could do now (/xen predict): how likely it goes well, how risky, how long, from
+	 * the times like this and its mind; which it would pick; how good its guesses have been. Its real numbers.
+	 */
+	String predictions() {
+		if (c.player == null || c.mod.mind == null) return null;
+		float[] f = MindSense.features(c);
+		boolean[] can = MindSense.allowed(c, f, false);
+		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
+		int planned = agenda(f, can);
+		String planWhy = agendaWhy;
+		float[] situation = c.experience.situation();
+		Mind.Choice ch = c.mod.mind.choose(f, can, caution, 0, random, bias(c.tribe()));
+		Decision d = decide(f, can, caution, ch, planned, planWhy, situation);
+		StringBuilder sb = new StringBuilder(c.name).append(" sizes up: ");
+		StringBuilder now = new StringBuilder();
+		for (int i = 0; i < situation.length; i++) {
+			boolean flag = i <= 4 || i == 14 || i == 15 || i == 16;
+			if (flag && situation[i] > 0.5f) now.append(now.length() == 0 ? "" : ", ").append(Experience.PARTS[i]);
+		}
+		sb.append(now.length() == 0 ? "nothing special" : now).append(String.format(java.util.Locale.ROOT, "; health %.0f, %.0f%% unseen", c.player.getHealth(), 100 * situation[17]));
+		for (int r = 0; r < d.order.length && r < 4; r++) {
+			int o = d.order[r];
+			Experience.Prediction e = d.expect[o];
+			sb.append("\n ").append(r == 0 ? "> " : "  ").append(Mind.SAYS[o]).append(String.format(java.util.Locale.ROOT, ": goes well %.0f%%, risk %.0f/100, ", 100 * e.good(), 100 * e.risk()))
+					.append(e.minutes() > 0 ? String.format(java.util.Locale.ROOT, "about %.1f min", e.minutes()) : "time unknown");
+			Experience.Guess g = c.experience.guess(situation, o, c.player.blockPosition());
+			sb.append(g.n() > 0 ? " (" + g.says() + ")" : " (never like this: how it usually goes)");
+			if (o == planned) sb.append(" [the usual plan]");
+			String w = c.experience.weighs(o);
+			if (!w.isEmpty()) sb.append(" [weighs ").append(w).append("]");
+		}
+		float err = c.experience.meanError();
+		sb.append(err < 0 ? "\n guesses: none checked yet" : String.format(java.util.Locale.ROOT, "\n guesses: off by %.2f lately (%d checked)%s", err, c.experience.predicted,
+				c.experience.firstError >= 0 ? String.format(java.util.Locale.ROOT, ", %.2f its first 30", c.experience.firstError) : ""));
+		if (!c.experience.lesson.isEmpty()) sb.append("\n last lesson: ").append(c.experience.lesson);
+		sb.append("\n its moves: ").append(c.walker.moves());
+		return sb.toString();
 	}
 
 	/**
@@ -1581,8 +1631,14 @@ final class Goals {
 		if (died) after[Mind.HEALTH] = 0;
 		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);
 		c.mod.mind.remember(before, o, r, h, after, died, minutes, Mind.bits(MindSense.allowed(c, after, false)));
-		if (!notItsDoing) c.experience.record(optionSituation, o, r, h, died, minutes, c.player.blockPosition(), optionFollowed);   // (its outcome memory: how that went, here, like that; not a /kill)
+		if (!notItsDoing) {                                                   // (its outcome memory: how that went, here, like that, against what it expected; not a /kill)
+			String thought = c.experience.record(optionSituation, o, r, h, died, minutes, optionWhere != null ? optionWhere : c.player.blockPosition(), optionFollowed,
+					optionExpect, optionSituation == null ? null : c.experience.situation());
+			if (thought != null) c.journal("reflects", thought);
+		}
 		optionSituation = null;
+		optionExpect = null;
+		optionWhere = null;
 		c.mod.mindExperiences++;
 		if (o == Mind.MINE && c.places.get("mine hut") == null && c.places.get("mine") != null && !c.builder.busy() && !c.player.isCreative()
 				&& c.chores.mineRecordY != Integer.MIN_VALUE && c.player.blockPosition().closerThan(c.places.get("mine"), 24)) {   // its mine gets a proper entrance

@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * What it thinks you two should do, out loud, from what it actually knows: a place it found and hasn't been to ("I saw
  * a village about 140 blocks northeast earlier. Want to check it out?"), a way it hasn't seen (G1X: "haven't seen
- * what's past there yet"), or a lesson it learned the hard way (its outcome memory: "last time I went mining at night I
+ * what's past there yet"), what it worked out when something went other than it expected, or a lesson it learned the hard way (its outcome memory: "last time I went mining at night I
  * died. not doing that again"). Nothing made up: each idea is something in its memory or in front of its eyes.
  * <p>Only to a player close by (not a spectator: nobody sees those), now and then (a chatty one more often), each idea
  * once in a long while.
@@ -44,6 +44,7 @@ final class Ideas {
 		next = now + 20 * 20;                                               // (nothing to say: it looks again in 20 s)
 		String line = place(friend);
 		if (line == null) line = lesson();
+		if (line == null) line = reflection();
 		if (line == null && !p.level().isDarkOutside()) line = unseen(friend);
 		if (line == null) return;
 		float chatty = Math.max(0.1f, Math.min(1f, c.personality.chattiness));
@@ -106,6 +107,14 @@ final class Ideas {
 		return c.pick3("Last time I " + what + when + " I died. Not doing that again.",
 				"Note to self: last time I " + what + when + ", I died.",
 				"I'm not doing that again. Last time I " + what + when + " I died.");
+	}
+
+	/** What it worked out from a guess that was way off ("mining went worse than I thought: night came. I'll mind that next time"). */
+	private String reflection() {
+		var e = c.experience;
+		if (e.lesson.isEmpty() || now() - e.lessonAt > 20 * 60 * 20) return null;   // (today's: older ones it has taken in)
+		if (!fresh("reflect " + e.lesson, 20 * 60 * 60)) return null;
+		return e.lesson;
 	}
 
 	/** G1X: much it hasn't seen one way (daytime, a curious one): it says so. */

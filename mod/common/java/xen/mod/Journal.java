@@ -17,6 +17,8 @@ import java.util.Deque;
 public final class Journal {
 	private static final int KEEP = 5000;
 	private final Deque<String> lines = new ArrayDeque<>();
+	/** Each death's last moments (what that Xen saw, thought and did just before), kept apart so they outlast the rest. */
+	private final Deque<String> deaths = new ArrayDeque<>();
 	private final Path dir;
 
 	Journal(Path dir) {
@@ -29,10 +31,29 @@ public final class Journal {
 		while (lines.size() > KEEP) lines.removeFirst();
 	}
 
+	/** A Xen died: its last few dozen lines are kept with the death (the journal itself rolls over fast). */
+	synchronized void died(String who, String how) {
+		Deque<String> last = new ArrayDeque<>();
+		String tag = String.format(" %-8s ", who);
+		var it = lines.descendingIterator();
+		while (it.hasNext() && last.size() < 40) {
+			String l = it.next();
+			if (l.startsWith(tag, 8)) last.addFirst(l);
+		}
+		StringBuilder sb = new StringBuilder(who + " died (" + how + "), " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + ":\n");
+		for (String l : last) sb.append("  ").append(l).append('\n');
+		deaths.addLast(sb.toString());
+		while (deaths.size() > 30) deaths.removeFirst();
+	}
+
 	/** All of it, oldest first (and what the solver has learned so far, at the end). */
 	public synchronized String text() {
 		StringBuilder sb = new StringBuilder("Xen journal (" + lines.size() + " lines): time, Xen, what, and the words\n\n");
 		for (String l : lines) sb.append(l).append('\n');
+		if (!deaths.isEmpty()) {
+			sb.append("\nThe last moments before each death (the latest ").append(deaths.size()).append("):\n\n");
+			for (String d : deaths) sb.append(d).append('\n');
+		}
 		if (XenMod.INSTANCE != null) sb.append("\nWhat the solver has learned (place, way out: how often it worked):\n").append(XenMod.INSTANCE.solverMind.report());
 		return sb.toString();
 	}

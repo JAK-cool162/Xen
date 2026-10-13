@@ -98,6 +98,104 @@ final class Walker {
 		};
 	}
 
+	// ------------------------------------------------------------------------------------ what it learns of its own moves
+	/**
+	 * How its own moves have gone, by kind and size (a 1, 2 or 3-block jump, a jump up; a drop of 3, 4, 5, more; a
+	 * bridge; a pillar): tried, failed. Before a gap it weighs them as they've gone for it: jump, bridge or walk round.
+	 * A jump it keeps missing costs it more (it bridges or goes round instead); one it never misses, it dares a longer one.
+	 */
+	final int[][] moveTries = new int[Kind.values().length][4], moveFails = new int[Kind.values().length][4];
+
+	static int size(Kind k, BlockPos from, BlockPos to) {
+		int flat = Math.max(Math.abs(to.getX() - from.getX()), Math.abs(to.getZ() - from.getZ()));
+		return switch (k) {
+			case PARKOUR -> to.getY() > from.getY() ? 0 : Math.max(1, Math.min(3, flat - 1));
+			case FALL -> Math.max(0, Math.min(3, from.getY() - to.getY() - 2));
+			default -> 0;
+		};
+	}
+
+	private static boolean learns(Kind k) {
+		return k == Kind.PARKOUR || k == Kind.FALL || k == Kind.BRIDGE || k == Kind.PILLAR;
+	}
+
+	/** How much more time a move is worth going round, from how often that kind has failed it (none tried: nothing said). */
+	private double learned(Kind k, int size) {
+		if (!learns(k)) return 0;
+		int t = moveTries[k.ordinal()][size], f = moveFails[k.ordinal()][size];
+		if (t == 0) return 0;
+		double rate = (f + 0.5) / (t + 2.0);                                  // (a try or two: not much said)
+		return Math.max(0, rate - 0.15) * 80;
+	}
+
+	/** A move done (or not): it remembers how that kind went, and says what it makes of a miss. */
+	private void moved(Move m, boolean failed) {
+		if (!learns(m.kind())) return;
+		int k = m.kind().ordinal(), s = size(m.kind(), m.from(), m.to());
+		moveTries[k][s]++;
+		if (failed) moveFails[k][s]++;
+		if (moveTries[k][s] > 40) {                                          // (the old tries count for less: its legs now matter)
+			moveTries[k][s] = 30;
+			moveFails[k][s] = Math.round(moveFails[k][s] * 0.75f);
+		}
+		if (failed) c.journal("learns", String.format(java.util.Locale.ROOT, "%s failed (%d of %d like it): %s", what(m.kind(), s), moveFails[k][s], moveTries[k][s],
+				learned(m.kind(), s) > 15 ? "it'll bridge or go round sooner" : "noted"));
+	}
+
+	static String what(Kind k, int s) {
+		return switch (k) {
+			case PARKOUR -> s == 0 ? "a jump up across a gap" : "a " + s + "-block jump";
+			case FALL -> "a drop of " + (s + 2) + (s == 3 ? "+" : "") + " blocks";
+			case BRIDGE -> "a bridge block";
+			case PILLAR -> "a pillar block";
+			default -> k.name().toLowerCase(java.util.Locale.ROOT);
+		};
+	}
+
+	/** For /xen predict and the like: how its jumps have gone. */
+	String moves() {
+		StringBuilder sb = new StringBuilder();
+		for (Kind k : Kind.values()) {
+			if (!learns(k)) continue;
+			for (int s = 0; s < 4; s++) {
+				int t = moveTries[k.ordinal()][s];
+				if (t == 0) continue;
+				sb.append(sb.length() == 0 ? "" : ", ").append(what(k, s)).append(' ').append(t - moveFails[k.ordinal()][s]).append('/').append(t);
+			}
+		}
+		return sb.length() == 0 ? "no jumps, drops or bridges yet" : sb.toString();
+	}
+
+	com.google.gson.JsonObject saveMoves() {
+		var o = new com.google.gson.JsonObject();
+		for (Kind k : Kind.values()) {
+			if (!learns(k)) continue;
+			var a = new com.google.gson.JsonArray();
+			for (int s = 0; s < 4; s++) {
+				a.add(moveTries[k.ordinal()][s]);
+				a.add(moveFails[k.ordinal()][s]);
+			}
+			o.add(k.name().toLowerCase(java.util.Locale.ROOT), a);
+		}
+		return o;
+	}
+
+	void loadMoves(com.google.gson.JsonObject o) {
+		if (o == null) return;
+		for (Kind k : Kind.values()) {
+			try {
+				var a = o.getAsJsonArray(k.name().toLowerCase(java.util.Locale.ROOT));
+				if (a == null) continue;
+				for (int s = 0; s < 4 && 2 * s + 1 < a.size(); s++) {
+					moveTries[k.ordinal()][s] = Math.max(0, a.get(2 * s).getAsInt());
+					moveFails[k.ordinal()][s] = Math.max(0, Math.min(moveTries[k.ordinal()][s], a.get(2 * s + 1).getAsInt()));
+				}
+			} catch (RuntimeException ignored) {
+				// (what it can't read: it starts over on that)
+			}
+		}
+	}
+
 	/** Is the move it's on a jump across a gap (it runs at the edge on purpose)? */
 	boolean leaping() {
 		return path != null && index < path.size() && path.get(index).kind() == Kind.PARKOUR;
@@ -386,6 +484,12 @@ final class Walker {
 			maxFall += h >= 16 ? 4 : 2;
 			maxGap = 3;
 		}
+		for (int g = 3; g >= 1; g--) {                                       // what it knows of its own jumps: a gap it keeps missing, it doesn't try; the longest it always makes, one more
+			int t = moveTries[Kind.PARKOUR.ordinal()][g], f = moveFails[Kind.PARKOUR.ordinal()][g];
+			if (t >= 4 && f * 2 > t) maxGap = Math.min(maxGap, g - 1);
+		}
+		int top = Math.max(1, maxGap), tt = moveTries[Kind.PARKOUR.ordinal()][top], tf = moveFails[Kind.PARKOUR.ordinal()][top];
+		if (maxGap >= 1 && maxGap < 3 && tt >= 6 && tf * 10 < tt && h >= 14 && fear < 0.4f) maxGap++;
 		if (now() - badSince > 400) bad.clear();                           // (old troubles forgotten)
 	}
 
@@ -740,6 +844,7 @@ final class Walker {
 
 	private void add(Kind k, BlockPos from, BlockPos to, double cost, List<BlockPos> dig) {
 		if (cost >= INF) return;
+		cost += learned(k, size(k, from, to));                                // (what it knows of its own legs: a jump it keeps missing costs more)
 		if (!dig.isEmpty() && !this.dig) return;
 		out.add(new Move(k, from, to, dig, cost));
 	}
@@ -1050,7 +1155,13 @@ final class Walker {
 			return false;
 		}
 		Move m = path.get(index);
+		if (m.kind() == Kind.PARKOUR && stage == 0 && !p.onGround()) stage = 1;   // (in the air: it jumped)
+		if (m.kind() == Kind.PARKOUR && stage == 1 && (p.onGround() || p.isInWater()) && !arrived(m) && p.getY() < m.from().getY() - 0.6) {
+			problem(m, "missed the jump");                                     // (landed short, down in the gap)
+			return false;
+		}
 		if (arrived(m)) {
+			moved(m, false);
 			stepped = true;
 			index++;
 			stage = 0;
@@ -1101,6 +1212,7 @@ final class Walker {
 
 	private void problem(Move m, String why) {
 		lastProblem = why;
+		moved(m, true);
 		if (mobWay) noMobWayUntil = now() + 100;                              // the mobs' way didn't work here: its own for a bit
 		c.troubles++;
 		bad.addTo(key(m), 1);

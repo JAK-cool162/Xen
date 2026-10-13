@@ -23,6 +23,29 @@ roof, unseen; the option; outcome = tanh(reward/2) - harm - 1.5 if it died, -0.2
 mean outcome, sure = W/(W+1.5). planTrust(): 1.6 with under 8 cases, else 1.6 + 2.5 * sure * (mean followed - mean own)
 in [0.5, 2.5]. 400 cases a Xen, saved in companions.json ("experience"). Deaths by /kill or the void are not recorded.
 
+Predict and reflect (Experience.predict/reflect): when it picks an option it records a Prediction (expect, good, risk,
+minutes): the cases' kernel guess (expect, share with outcome > 0, share died or harm > 0.3, mean minutes) blended by sure
+with that option's base rate over all its cases (shrunk n/(n+3) toward the base rate over all options, and that toward
+expect 0, good 0.5, risk 0.25). When the option ends, before the case is added: the kernel guess from the existing cases
+is put right by one gradient step on (guess - outcome)^2 / 2 over that option's per-part weights (distance = sum w_i d_i^2;
+step = -0.3 err dGuess/dw_i clamped to +-0.5, w in [0.2, 5], all 1 to start); |expected - outcome| goes into the last 50
+errors (and the mean of the first 30 is kept). Off by 0.6 or more, a line: what changed between the start and end
+situations (night came, danger +0.4, into water, a lower pickaxe tier, health -0.35 or died, food -0.35) and the part
+whose weight grew most (over 0.05); a worse-than-expected one with a reason is its lesson (Ideas may say it that day).
+Weights and errors saved in companions.json ("experienceLearned"). guess() and familiar() use the learned weights.
+/xen predict: the top 4 options with good %, risk /100, minutes, the cases, the plan's pick, learned weights over 1.15,
+the mean error lately and at first, the last lesson, and its move record.
+
+Move learning (Walker): tries and fails per kind and size (parkour 1/2/3 blocks and up-jumps, falls of 2..5+, bridge,
+pillar): a move that ends in problem() (or a jump that lands below its take-off: "missed the jump") fails, one it
+arrives at succeeds. Cost += 80 * max(0, (fails + 0.5)/(tries + 2) - 0.15) for that kind and size. A gap missed more
+than half of 4+ tries lowers maxGap below it; the top gap made 9 of 10 of 6+ tries (health 14+, fear under 0.4) raises
+maxGap by one (to 3). Over 40 tries it rescales to 30 (fails x0.75). Saved ("moves").
+
+Journal: every hit of 1 or more ("hurt": amount, by, health, food, day/night, light, chore or instant, fighting); on a
+death the last 40 of that Xen's lines are copied to a kept list (30 deaths), saved after the journal as "The last moments
+before each death".
+
 Thinking time (no setting): thinkTicks = 40 x (1.4 - 0.6 familiar) x (1.3 - 0.6 belief) x (0.8 + 0.5 diligence) x
 (1.25 - 0.5 reflexes) x (1 + 0.4 sloth - 0.3 wrath) x (1 + 0.8 confusion) x (0.4 + 1.6 difficulty), difficulty =
 1/(1 + 3 margin) of the top two scores; 0 in danger; no cap. Over 10 ticks it ponders first ("thinking about what to do

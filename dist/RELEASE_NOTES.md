@@ -13,6 +13,16 @@ controls.
   what it cost, a death. "Mined at night here, died twice": next time it says "I'd usually go mining now, but the last
   times like this didn't end well. I'll make a shelter for the night instead." Sitting about while healthy counts as time
   lost, so it doesn't rest all day. Kept with the world (400 cases a Xen). A /kill isn't a lesson.
+* **It predicts, then reflects.** Before it starts something it says what it expects: how likely it goes well, how
+  risky, how long. When it's over it holds that against what happened. Way off, it works out why, in words: what changed
+  while it was at it ("Mining went worse than I thought: night came while I was at it. I didn't think about it getting
+  dark. I will next time.") and what it hadn't weighed, and from then on that counts for more for that choice,
+  everywhere (not one cave: "mining at dusk goes badly" carries to every mine). How far off its guesses are is kept, so
+  you can see it get better. `/xen predict` shows each choice it could make now with its real numbers, the one it
+  would pick, what it has learned to weigh, and how good its guesses have been.
+* **It learns its own moves.** Before a gap it weighs jumping, bridging and walking round by how those have gone for
+  it: a jump it keeps missing costs it more (it bridges or goes round), a gap it misses more often than not it stops
+  trying, and the longest jump it always makes, it dares one longer. Kept with the world.
 * **Its own time to think.** How long it takes to decide is its own (not a setting any more): quick in danger, when it
   knows the spot, sure of itself or hot-headed; longer when the choice is close, the place is new, or it's careful,
   rattled or lazy. While it thinks it looks around. Reaction time and confusion are its own too (the settings are gone).
@@ -29,6 +39,8 @@ controls.
   northeast earlier. Want to check it out?", "I haven't seen what's west of here yet", "last time I went mining at night
   I died. Not doing that again"); "why are you doing that?" gets the real reason for its choice; and it never says the
   same thing twice in a few minutes (asked again, "like I said, ...").
+* **The journal keeps each death's last moments** (the 40 lines before it, by that Xen, and every hit it took: by what,
+  its health, day or night, the light, what it was doing), so a death can be read back after the journal rolls over.
 * Fixes: standing where its own hut's wall goes, it steps inside (it used to say "lazy2005 is in the way" about itself).
 * Tested: being measured (the same seed as beta.26, to day 3).
 

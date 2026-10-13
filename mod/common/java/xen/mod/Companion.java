@@ -3319,6 +3319,17 @@ public final class Companion {
 		if (mod.config.journal && mod.journal != null) mod.journal.add(name, kind, text);
 	}
 
+	/** Hurt: by what, how much, and what it was doing then (so a death can be read back). */
+	void journalHurt(DamageSource source, float amount) {
+		if (!mod.config.journal || mod.journal == null || inArena) return;
+		var k = source.getEntity();
+		String by = k != null ? BuiltInRegistries.ENTITY_TYPE.getKey(k.getType()).getPath().replace('_', ' ') : source.type().msgId();
+		String doing = !chores.doing.isEmpty() ? chores.doing : goals.instant.isEmpty() ? "looking around" : goals.instant;
+		journal("hurt", String.format(java.util.Locale.ROOT, "%.0f by %s (health %.0f, food %d, %s, light %d) while %s%s", amount, by, player.getHealth(),
+				player.getFoodData().getFoodLevel(), player.level().isDarkOutside() ? "night" : "day",
+				player.level().getMaxLocalRawBrightness(player.blockPosition()), doing, fightingNow() ? " (fighting)" : ""));
+	}
+
 	private String journaledThought = "", journaledSight = "";
 	private long journaledSightAt;
 
@@ -3353,6 +3364,7 @@ public final class Companion {
 		lifeReward = 0;
 		emotions.reset();
 		String how = source.type().msgId();
+		if (mod.config.journal && mod.journal != null && !inArena) mod.journal.died(name, cause + " at " + player.blockPosition().toShortString());
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
 		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
