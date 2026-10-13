@@ -1,7 +1,36 @@
-**Xen Companion 2.0.0-beta.26.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.27**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.27: Xen decides for itself (the decision core), G1X vision, and chat that says what it means
+
+* **Xen decides.** Before, a hand-written plan made most of its choices (79 of 115 in one game) and its learned mind
+  only filled the gaps. Now every choice is its own, weighed from three things: what its mind makes of each choice, the
+  usual plan (as advice: how much it listens is learned from how the plan has worked out for it), and what happened the
+  last times it chose that in a spot like this one.
+* **It remembers how things went** (outcome memory): every choice it finishes is kept with the situation, what it got,
+  what it cost, a death. "Mined at night here, died twice": next time it says "I'd usually go mining now, but the last
+  times like this didn't end well. I'll make a shelter for the night instead." Sitting about while healthy counts as time
+  lost, so it doesn't rest all day. Kept with the world (400 cases a Xen). A /kill isn't a lesson.
+* **Its own time to think.** How long it takes to decide is its own (not a setting any more): quick in danger, when it
+  knows the spot, sure of itself or hot-headed; longer when the choice is close, the place is new, or it's careful,
+  rattled or lazy. While it thinks it looks around. Reaction time and confusion are its own too (the settings are gone).
+* **Goals as long as they take.** No more "six minutes and stop": mining, gathering, a village visit, exploring go on
+  while they get somewhere (more of what it's after, new ground, new places seen) and stop when nothing comes of them
+  for a while (its own patience: two to four minutes).
+* **G1X, geometry vision.** What its eyes see is kept as shape, not just block kinds: how far each sight line went and
+  what stopped it (floor, wall, ceiling, water, lava, leaves), and which blocks it has seen open or solid. From that it
+  knows how far it can walk each way, where ledges are (and when it can't see the bottom of one), water and lava round
+  it, a roof over it, what's in the way, whether a cave joins up with where it has been, and how much of each way it
+  hasn't seen; with nothing to do it looks the way it knows least about. The place's shape goes into its outcome
+  memory (a river ahead, a cliff, a roof), and a curious one goes to look at what it hasn't seen. /xen g1x shows it.
+* **Chat that says what it means.** It suggests things from what it actually knows ("I saw a village about 140 blocks
+  northeast earlier. Want to check it out?", "I haven't seen what's west of here yet", "last time I went mining at night
+  I died. Not doing that again"); "why are you doing that?" gets the real reason for its choice; and it never says the
+  same thing twice in a few minutes (asked again, "like I said, ...").
+* Fixes: standing where its own hut's wall goes, it steps inside (it used to say "lazy2005 is in the way" about itself).
+* Tested: being measured (the same seed as beta.26, to day 3).
 
 ### 2.0.0-beta.26.1 (hotfix): a shield first
 

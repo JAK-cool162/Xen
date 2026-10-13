@@ -347,6 +347,7 @@ public final class Companion {
 		if (player.tickCount % 20 == 13) confusion.second();
 		if (player.tickCount % 1200 == 17) aversions.fade();
 		if (player.tickCount % 40 == 21) diamondsWatch();
+		if (player.tickCount % 100 == 37) ideas.tick();
 		teaching.watchCrouch();
 		if (player.tickCount % 20 == 3) teaching.tick();
 		if (hurtNow && !inArena) {                                      // its tribe may come to guard it
@@ -718,6 +719,10 @@ public final class Companion {
 			idleLookUntil = now + 40 + random.nextInt(100);
 			idleLook = somethingToLookAt();
 			idleThought = "Nothing to do this moment: looking around.";
+			if (g1x.lookWhereUnseen()) {                                     // G1X: the way it knows least about, it looks at (active perception)
+				idleLook = null;
+				idleThought = "Nothing to do this moment: having a look where it hasn't seen.";
+			}
 		}
 		hands.glance = idleLook;
 		Action fidget = antics.fidget(near);                          // standing about a while: a jiggle, a hop, its hotbar...
@@ -2569,6 +2574,10 @@ public final class Companion {
 	final Visits visits = new Visits(this);
 	/** What happened the times it chose something (Xen 2.0's outcome memory: it decides with it). */
 	final Experience experience = new Experience(this);
+	/** G1X: the shape of what it has seen (depths, known open and solid space): gaps, ledges, ways, what it hasn't seen. */
+	final G1X g1x = new G1X(this, Eyes.COLS, Eyes.ROWS);
+	/** What it thinks you two should do, from what it knows (a place it found, a way it hasn't seen, a lesson). */
+	final Ideas ideas = new Ideas(this);
 	/** Fishing, with a rod, like a player. */
 	final Fisher fisher = new Fisher(this);
 	/** Xen Ex1: what it made of the last moment (keys, turn, look, danger), the moments before (for learning), and what it perceived last. */
@@ -3086,9 +3095,20 @@ public final class Companion {
 		boolean talking = talkingWith != null && player != null && player.level().getGameTime() < talkingUntil;
 		if (always && !talking && now - lastChatter < 8_000) return;  // (Xen 2.0: two lines in a row only in a conversation)
 		if (!always && !fresh(text)) return;                           // someone just said that: no need to say it again
+		String key = text.toLowerCase(java.util.Locale.ROOT).replaceAll("[0-9]+", "#").replaceAll("[^a-z# ]", "").trim();
+		Long before = ownSaid.get(key);
+		if (before != null && now - before < (talking ? 45_000 : 300_000)) {   // (it said that just now: a player doesn't repeat themselves)
+			if (!(always && talking)) return;
+			text = pick3("like I said, ", "I told you, ", "still: ") + Character.toLowerCase(text.charAt(0)) + text.substring(1);   // (asked again: an answer, not silence)
+		}
+		if (ownSaid.size() > 200) ownSaid.values().removeIf(t -> now - t > 300_000);
+		ownSaid.put(key, now);
 		lastChatter = now;
 		say(text);
 	}
+
+	/** What it said lately (the meaning, numbers aside) and when: it doesn't say the same thing again for a while. */
+	private final java.util.Map<String, Long> ownSaid = new java.util.HashMap<>();
 
 	/**
 	 * Hasn't any Xen said this lately (three minutes)? Then it's fresh (and noted as said). Ten Xens saying the same
@@ -3307,7 +3327,9 @@ public final class Companion {
 		gut.died();                                                    // (if it had just gone against its gut: the gut was right)
 		habits.died();
 		prepared.died();
-		if (goals.option >= 0) goals.finishOption(true);                  // Xen 2.0 learns what that choice led to
+		goals.notItsDoing = source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) || source.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD);   // (/kill, the void: nothing it chose did that)
+		if (goals.option >= 0) goals.finishOption(true);
+		goals.notItsDoing = false;                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
 		belief.down(source.getEntity() != null ? 0.06f : 0.04f, "died");
 		if (skills.partner != null) skills.endSpar(false);
@@ -4101,8 +4123,9 @@ public final class Companion {
 					: i.startsWith("staying with") || i.startsWith("following") ? "I like the company"
 					: i.contains("sheep") ? "I need wool for a bed" : i.startsWith("going back for its things") ? "I want my things back" : "";
 			if (!instinct.isEmpty()) return instinct;
+			if (!goals.optionSays.isEmpty()) return goals.optionSays;            // (Xen 2.0: why it chose it, in words, from the decision itself)
 			String how = goals.optionHow == null ? "" : goals.optionHow;
-			if (how.startsWith("the plan: ") || how.equals("a duel")) return reason(how.replace("the plan: ", ""));
+			if (how.startsWith("the plan: ") || how.equals("a duel")) return reason(how.replace("the plan: ", "").split("; ")[0]);
 			if (goals.option >= 0 && goals.option < WHY.length) return WHY[goals.option];
 			var m = java.util.regex.Pattern.compile("\\(([^)]+)\\)").matcher(goals.instant);
 			if (m.find()) return reason(m.group(1));

@@ -30,7 +30,8 @@ final class Visits {
 	/** The place it's visiting, what kind, and till when. */
 	BlockPos at;
 	String kind = "";
-	private long until, nextThink, nextScan;
+	private long until, nextThink, nextScan, progressAt;
+	private int progressStuff;
 	String doing = "";
 	private final Set<BlockPos> visited = new HashSet<>();
 	/** The village's beds and hay, its doors (the houses to walk past), and the ones it has been to. */
@@ -54,6 +55,11 @@ final class Visits {
 		return at != null;
 	}
 
+	/** Has it been to that place (or is it there now)? */
+	boolean wasThere(BlockPos p) {
+		return visited.contains(p) || at != null && at.equals(p);
+	}
+
 	private long now() {
 		return c.player.level().getGameTime();
 	}
@@ -74,9 +80,15 @@ final class Visits {
 			pick();
 			if (at == null) return null;
 		}
+		if (now > until && now - progressAt < 20 * 60 * 2) until = now + 20 * 60;   // (still getting somewhere there: on with it)
 		if (now > until || c.mode != Companion.Mode.FREE || c.inArena || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
-			end("time's up there");
+			end("nothing more coming of it");
 			return null;
+		}
+		int stuff = c.items().values().stream().mapToInt(Integer::intValue).sum() + been.size();
+		if (stuff != progressStuff) {
+			progressStuff = stuff;
+			progressAt = now;
 		}
 		if (c.fightingNow() && golem == null) return null;                   // (a monster first: its fight, then the visit goes on)
 		c.goals.instant = doing;
@@ -107,7 +119,8 @@ final class Visits {
 		wantsVillager = c.goals.home != null || c.personality.plan == xen.mod.core.Strategy.SETTLER || c.personality.plan == xen.mod.core.Strategy.BUILDER;
 		at = best;
 		kind = bestKind;
-		until = now() + 20 * 60 * 4;                                         // (four minutes there at most)
+		until = now() + 20 * 60 * 4;                                         // (four minutes, then: as long as it's getting somewhere)
+		progressAt = now();
 		beds.clear();
 		hay.clear();
 		doors.clear();

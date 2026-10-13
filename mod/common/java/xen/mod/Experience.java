@@ -19,7 +19,7 @@ import java.util.ArrayDeque;
  */
 final class Experience {
 	/** One time it chose something: the situation, the choice, and how it went (-1 bad ... +1 good). */
-	record Case(float[] s, int option, float outcome, boolean died, float harm, float minutes, long cell, long when) {}
+	record Case(float[] s, int option, float outcome, boolean died, float harm, float minutes, long cell, long when, boolean followed) {}
 
 	/** What it makes of the cases for a choice: what it expects (-1..1), how sure (0..1), how many, and in words. */
 	record Guess(float expect, float sure, int n, String says) {}
@@ -27,7 +27,7 @@ final class Experience {
 	static final int KEEP = 400;
 	/** The situation, as it remembers it: the things that change how a choice goes. */
 	static final String[] PARTS = {"night", "dusk", "underground", "in water", "danger", "health", "food", "pickaxe", "sword", "armor", "iron",
-			"home near", "food on it", "blocks"};
+			"home near", "food on it", "blocks", "water near", "a big drop near", "a roof", "unseen"};
 	private final Companion c;
 	final ArrayDeque<Case> cases = new ArrayDeque<>();
 
@@ -55,6 +55,16 @@ final class Experience {
 		s[11] = c.goals.home != null && p.blockPosition().closerThan(c.goals.home, 48) ? 1 : 0;
 		s[12] = Math.min(1, items.getOrDefault("food", 0) / 4f);
 		s[13] = Math.min(1, (items.getOrDefault("cobblestone", 0) + items.getOrDefault("dirt", 0)) / 16f);
+		G1X.Around a = c.g1x.around();                                       // G1X: the shape of the place (a river ahead, a cliff, a roof, how much is unseen)
+		boolean water = false, drop = false;
+		for (int i = 0; i < 8; i++) {
+			water |= a.water()[i];
+			drop |= a.drop()[i] > 6;
+		}
+		s[14] = water ? 1 : 0;
+		s[15] = drop ? 1 : 0;
+		s[16] = a.roof() ? 1 : 0;
+		s[17] = a.unseenAll();
 		return s;
 	}
 
@@ -64,11 +74,12 @@ final class Experience {
 	}
 
 	/** A choice finished: how it went, from what Xen 2.0's critics made of it (reward, harm) and whether it died. */
-	void record(float[] before, int option, float reward, float harm, boolean died, float minutes, BlockPos where) {
+	void record(float[] before, int option, float reward, float harm, boolean died, float minutes, BlockPos where, boolean followed) {
 		if (before == null || option < 0) return;
 		float outcome = (float) Math.tanh(reward / 2.0) - Math.min(1f, harm) - (died ? 1.5f : 0);
+		if (option == Mind.REST && before.length > 5 && before[5] > 0.7f && before[4] < 0.3f) outcome -= 0.25f;   // (healthy, nothing after it, and it sat about: time gone, nothing done)
 		outcome = Math.max(-1f, Math.min(1f, outcome));
-		cases.addLast(new Case(before, option, outcome, died, harm, minutes, cell(where), c.player.level().getGameTime()));
+		cases.addLast(new Case(before, option, outcome, died, harm, minutes, cell(where), c.player.level().getGameTime(), followed));
 		while (cases.size() > KEEP) cases.removeFirst();
 	}
 
@@ -102,6 +113,24 @@ final class Experience {
 		return new Guess(expect, sure, n, says);
 	}
 
+	/**
+	 * How much it goes by the usual plan, from how that has worked out for it: the times it followed the plan against
+	 * the times it went its own way. Few times either way: a newcomer listens to the plan (1.6); followed and it went
+	 * well, more (up to 2.5); its own calls went better, less (down to 0.5). Learned, not set.
+	 */
+	float planTrust() {
+		double sumP = 0, sumO = 0;
+		int nP = 0, nO = 0;
+		for (Case k : cases) {
+			if (k.option() == Mind.REST) continue;                           // (resting says little about whose calls work)
+			if (k.followed()) { sumP += k.outcome(); nP++; } else { sumO += k.outcome(); nO++; }
+		}
+		if (nP + nO < 8) return 1.6f;
+		double p = nP == 0 ? 0 : sumP / nP, o = nO == 0 ? 0 : sumO / nO;
+		double sure = Math.min(nP, nO) / (Math.min(nP, nO) + 6.0);
+		return (float) Math.max(0.5, Math.min(2.5, 1.6 + 2.5 * sure * (p - o)));
+	}
+
 	/** How familiar the situation is (0: never like this, 1: often): from all the cases, whatever was chosen. */
 	float familiar(float[] now) {
 		double sumW = 0;
@@ -128,6 +157,7 @@ final class Experience {
 			o.addProperty("min", Math.round(k.minutes() * 10) / 10f);
 			o.addProperty("cell", k.cell());
 			o.addProperty("t", k.when());
+			if (k.followed()) o.addProperty("plan", true);
 			a.add(o);
 		}
 		return a;
@@ -145,7 +175,8 @@ final class Experience {
 				float[] v = new float[PARTS.length];
 				for (int i = 0; i < v.length && i < s.size(); i++) v[i] = s.get(i).getAsFloat();
 				cases.addLast(new Case(v, option, o.get("out").getAsFloat(), o.has("died") && o.get("died").getAsBoolean(),
-						o.get("harm").getAsFloat(), o.get("min").getAsFloat(), o.get("cell").getAsLong(), o.get("t").getAsLong()));
+						o.get("harm").getAsFloat(), o.get("min").getAsFloat(), o.get("cell").getAsLong(), o.get("t").getAsLong(),
+						o.has("plan") && o.get("plan").getAsBoolean()));
 			} catch (RuntimeException ignored) {
 				// (a case it can't read: let go)
 			}

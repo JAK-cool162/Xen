@@ -60,6 +60,11 @@ final class Chores {
 	private int afterAmount;
 	private int want, had;
 	private long until;
+	/** When it last got somewhere with it (something gained, new ground, new places seen), and where it set off from. */
+	private long progressAt;
+	private int progressHave = -1, progressKnown;
+	private double progressFar;
+	private Vec3 progressFrom;
 	private UUID forWhom;
 	private String giveItem;
 	private final Set<Long> skip = new HashSet<>();
@@ -136,6 +141,11 @@ final class Chores {
 		moves = 0;
 		shelterBuilt = false;
 		until = now() + (long) (TIME * c.personality.patience());
+		progressAt = now();
+		progressHave = -1;
+		progressFar = 0;
+		progressFrom = c.player.position();
+		progressKnown = c.g1x.size();
 		skip.clear();
 		saidLooking = false;
 		scans = 0;
@@ -750,10 +760,15 @@ final class Chores {
 	Action next() {
 		if (kind == null) return null;
 		if (fruitless()) return null;
+		progress();
 		if (now() > until && kind != Kind.HIDE) {
-			finish(kind == Kind.GATHER && count(items) > had ? "I only found " + (count(items) - had) + " " + what + "."
-					: c.pick3("No luck here. On to something else.", "That didn't work out. Something else, then.", "Can't get to it. I'll do something else."));
-			return null;
+			if (now() - progressAt < stallTicks()) {                          // still getting somewhere: on with it, as long as it takes
+				until = now() + 20 * 60;                                         // (it looks again in a minute)
+			} else {
+				finish(kind == Kind.GATHER && count(items) > had ? "I only found " + (count(items) - had) + " " + what + "."
+						: c.pick3("No luck here. On to something else.", "That didn't work out. Something else, then.", "Can't get to it. I'll do something else."));
+				return null;
+			}
 		}
 		return switch (kind) {
 			case GATHER -> gatherNext();
@@ -782,6 +797,33 @@ final class Chores {
 				yield c.player.getFoodData().needsFood() && count("food") > 0 ? Action.EAT : null;
 			}
 		};
+	}
+
+	/** Getting somewhere with it: more of what it's after, new ground (further than it got from where it set off), new places seen (G1X). */
+	private void progress() {
+		long now = now();
+		int have = items == null ? 0 : count(items);
+		if (have != progressHave) {
+			if (progressHave >= 0) progressAt = now;
+			progressHave = have;
+		}
+		if (progressFrom != null) {
+			double far = c.player.position().distanceTo(progressFrom);
+			if (far > progressFar + 4) {
+				progressFar = far;
+				progressAt = now;
+			}
+		}
+		int known = c.g1x.size();
+		if (known > progressKnown + 400) {
+			progressKnown = known;
+			progressAt = now;
+		}
+	}
+
+	/** How long it keeps at something with nothing coming of it before it calls it (its own patience: two to four minutes). */
+	private long stallTicks() {
+		return (long) (20 * 60 * (2 + 2 * Math.min(1f, c.personality.patience() / 1.5f)));
 	}
 
 	private void finish(String say) {
@@ -934,7 +976,7 @@ final class Chores {
 		int need = what.equals("debris") ? 4 : what.equals("diamonds") ? 3 : what.equals("iron") ? 2 : 1;
 		if (tier < need) return "You can't go mining for " + what + " yet: you need " + Crafter.tierName(need) + " first.";
 		begin(Kind.MINE);
-		until = now() + 20 * 60 * 6;                                        // six minutes down there at most
+		until = now() + 20 * 60 * 6;                                        // (six minutes, then: still getting somewhere? on, as long as it takes)
 		debrisHunt = what.equals("debris");
 		if (debrisHunt) set(new int[] {Blocks.GOLD}, new String[] {"ancient_debris"}, "ancient debris", "ancient debris");   // (the Nether: and gold on the way)
 		else if (what.equals("diamonds")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.GOLD, Blocks.COAL}, new String[] {"diamond"}, "diamonds", "diamond ore");
@@ -2248,6 +2290,12 @@ final class Chores {
 			return Action.IDLE;
 		}
 		doing = "building a " + shape + ", " + left + " blocks to go, stuck: " + c.hands.cantPlace;
+		if (c.hands.selfInWay != null && inside != null && !inside.isEmpty()) {   // standing where a wall goes: a step inside, away from it
+			BlockPos block = c.hands.selfInWay;
+			c.hands.selfInWay = null;
+			BlockPos to = inside.stream().max(java.util.Comparator.comparingDouble(q -> q.distSqr(block))).orElse(inside.get(0));
+			return c.walkTo(Vec3.atBottomCenterOf(to));
+		}
 		if (++waited == 12 && inside != null && inside.size() > 1 && moves < inside.size()) {   // it can't see that side from here: another spot inside
 			BlockPos to = inside.get(++moves % inside.size());
 			waited = 0;

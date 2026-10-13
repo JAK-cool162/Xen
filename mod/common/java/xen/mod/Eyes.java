@@ -30,7 +30,8 @@ final class Eyes {
 	/** Ore it can make out up to here (past that, a player sees stone: the speckles don't show); trees, water, lava, houses to RANGE. */
 	static final int ORE_SIGHT = 64;
 	private static final double H_FOV = Math.toRadians(110), V_FOV = Math.toRadians(90), STEP = Math.toRadians(3);
-	private static final int COLS = (int) (H_FOV / STEP) + 1, ROWS = (int) (V_FOV / STEP) + 1, PER_TICK = 24, CAP = 2000;
+	static final int COLS = (int) (H_FOV / STEP) + 1, ROWS = (int) (V_FOV / STEP) + 1;
+	private static final int PER_TICK = 24, CAP = 2000;
 	/** The yes or no for each kind of block (null: no, not worth knowing), worked out once per block state. */
 	private static final Map<BlockState, String> KIND = new IdentityHashMap<>();
 
@@ -92,6 +93,7 @@ final class Eyes {
 	/** Every tick: the next slice of sight lines. */
 	void tick() {
 		if (c.player == null || c.player.isSleeping()) return;
+		c.g1x.touch();                                                       // (what its body knows: the blocks right round it)
 		ServerLevel level = (ServerLevel) c.player.level();
 		Vec3 eye = c.player.getEyePosition();
 		double yaw = Math.toRadians(c.player.getYRot()), pitch = Math.toRadians(c.player.getXRot());
@@ -108,12 +110,14 @@ final class Eyes {
 			cursor++;
 			double h = yaw - H_FOV / 2 + col * STEP + jitterH, v = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch - V_FOV / 2 + row * STEP + jitterV));
 			double dx = -Math.sin(h) * Math.cos(v), dy = -Math.sin(v), dz = Math.cos(h) * Math.cos(v);   // (Minecraft's yaw and pitch)
-			cast(level, eye, dx, dy, dz);
+			cast(level, eye, dx, dy, dz, row * COLS + col);
 		}
 	}
 
 	/** One sight line, block by block (every block it crosses), until something stops it. */
-	private void cast(ServerLevel level, Vec3 eye, double dx, double dy, double dz) {
+	private void cast(ServerLevel level, Vec3 eye, double dx, double dy, double dz, int line) {
+		G1X g = c.g1x;
+		int axis = -1;                                                       // (the last step's axis: which face of a block it met)
 		int x = (int) Math.floor(eye.x), y = (int) Math.floor(eye.y), z = (int) Math.floor(eye.z);
 		int sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
 		double tdx = dx == 0 ? 1e9 : Math.abs(1 / dx), tdy = dy == 0 ? 1e9 : Math.abs(1 / dy), tdz = dz == 0 ? 1e9 : Math.abs(1 / dz);
@@ -129,14 +133,17 @@ final class Eyes {
 				x += sx;
 				t = tx;
 				tx += tdx;
+				axis = 0;
 			} else if (ty < tz) {
 				y += sy;
 				t = ty;
 				ty += tdy;
+				axis = 1;
 			} else {
 				z += sz;
 				t = tz;
 				tz += tdz;
+				axis = 2;
 			}
 			if (y < level.getMinY() || y >= level.getMaxY()) return;
 			if (x >> 4 != chunkX || z >> 4 != chunkZ) {                        // (blocks straight from the chunk: quick)
@@ -162,13 +169,22 @@ final class Eyes {
 				continue;
 			}
 			if (open && s.getFluidState().isEmpty() && chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) > y) sawOpen(level);
+			if (open && s.getFluidState().isEmpty()) g.sawOpen(level, x, y, z, t);        // G1X: open space it saw
 			String k = kind(s);
 			if (k != null && (t <= ORE_SIGHT || !ORE_KINDS.contains(k))) remember(k, m, t);
 			else if (darkRun > 0 && !open && deepStone(s)) remember("deepstone", m, t);   // dark stone under the grass: where ore is
 
-			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) return;               // rock, a wall: that's as far as it sees
-			if (!s.getFluidState().isEmpty() && t > 16) return;                  // (deep water: murky)
+			if (s.canOcclude() && !s.is(BlockTags.LEAVES)) {                     // rock, a wall: that's as far as it sees
+				g.sawStop(level, line, x, y, z, t, s, axis, sy);
+				return;
+			}
+			if (!open || !s.getFluidState().isEmpty()) g.sawStop(level, -1, x, y, z, t, s, axis, sy);   // (a fence, glass, water: there, and seen past)
+			if (!s.getFluidState().isEmpty() && t > 16) {                        // (deep water: murky)
+				g.sawStop(level, line, x, y, z, t, s, axis, sy);
+				return;
+			}
 		}
+		g.sawNothing(level, line, t);
 	}
 
 	/**

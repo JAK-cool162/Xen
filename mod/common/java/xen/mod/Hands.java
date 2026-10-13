@@ -166,6 +166,8 @@ public final class Hands {
 	boolean strictSight;
 	/** A builder that has tried from everywhere: a block it can't see goes in (or out) anyway. */
 	boolean blindOk;
+	/** The last block it couldn't place was where it stands itself (it has to step aside), or null. */
+	BlockPos selfInWay;
 	/** The last cantMine was because it couldn't see the block (and couldn't dig its way to it). */
 	boolean cantMineUnseen;
 	/** Where its eyes stay a moment after it clicked something (the block it just put down, the table it used), and till when. */
@@ -867,9 +869,12 @@ public final class Hands {
 		}
 		var there = level.getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(pos));
 		if (!there.isEmpty()) {
-			cantPlace = there.get(0).getName().getString() + " is in the way";
+			boolean me = there.size() == 1 && there.get(0) == p;
+			cantPlace = me ? "I'm standing in the way" : there.get(0).getName().getString() + " is in the way";
+			selfInWay = me ? pos.immutable() : null;                          // (its own body: it steps aside, it doesn't wait for itself)
 			return false;
 		}
+		selfInWay = null;
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) {
 			cantPlace = "too far to reach";
 			return false;

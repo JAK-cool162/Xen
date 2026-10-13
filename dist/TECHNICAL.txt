@@ -1,7 +1,50 @@
-XEN COMPANION 2.0.0-beta.26.1: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.27: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.27
+===========================
+
+Decision core (Goals.thinkMind/decide): the agenda (the usual plan) no longer starts its choice; every allowed option
+gets score = mindW * z + thought + 2.5 * sure * expect + advice + curious, where z is the option's mind utility (striatum
+value - caution * amygdala harm + bias) standardised over the allowed options (sd at least 0.5), thought +0.5 for the
+option the world model picked when it thought it through, expect/sure the outcome memory's guess for that option here,
+advice = (1 + 0.8 diligence) * (1.25 - 0.5 belief) * planTrust for the plan's option, curious = 0.8 curiosity * unseen
+(G1X) for explore; mindW = 0.6 + 0.6 belief. Tried best first (startOption), an exploration pick now and then (curiosity).
+Against the plan from bad outcomes: journal, a little self-belief, and (2 min apart) it says so. optionSays: the spoken
+reason (why()); "like I said" for an answer it gave within 45 s.
+
+Experience (outcome memory, new): per finished option a case (18 situation numbers: night, dusk, underground, in water,
+danger, health, food, pickaxe tier, sword, armor, iron, home near, food on it, blocks, water near, a drop over 6 near, a
+roof, unseen; the option; outcome = tanh(reward/2) - harm - 1.5 if it died, -0.25 for resting healthy and safe; the 32 x
+16 x 32 cell; time; followed the plan or not). guess(): kernel-weighted (exp(-d/0.35), x2 in the same cell, recent x1.5)
+mean outcome, sure = W/(W+1.5). planTrust(): 1.6 with under 8 cases, else 1.6 + 2.5 * sure * (mean followed - mean own)
+in [0.5, 2.5]. 400 cases a Xen, saved in companions.json ("experience"). Deaths by /kill or the void are not recorded.
+
+Thinking time (no setting): thinkTicks = 40 x (1.4 - 0.6 familiar) x (1.3 - 0.6 belief) x (0.8 + 0.5 diligence) x
+(1.25 - 0.5 reflexes) x (1 + 0.4 sloth - 0.3 wrath) x (1 + 0.8 confusion) x (0.4 + 1.6 difficulty), difficulty =
+1/(1 + 3 margin) of the top two scores; 0 in danger; no cap. Over 10 ticks it ponders first ("thinking about what to do
+next", idle: it looks round) and decides again at the end. Reflexes and Confusion use only the Xen's own traits; the
+reaction and confusion settings are kept in the file but no longer used (and off the settings screen).
+
+Goals without a clock: Chores track progress (more of the items it's after, 4 blocks further than it got from where it
+set off, 400 more blocks known to G1X); past its time it carries on while progress is under stallTicks old (2 to 4 min,
+its patience), checking again each minute. Visits the same (items or houses gone past); exploring is extended while
+G1X knows 600 more blocks.
+
+G1X (new): fed by Eyes' sight lines (each line's row and column): depth[], hit[] (floor/wall/ceiling from the last step's
+axis, water, lava, leaves, none) per line; known space Long2ByteOpenHashMap x 2 generations of 250,000 (OPEN within 32
+blocks, SOLID, WATER, LAVA where lines stop or pass; a 3 x 4 x 3 touch round the body every 10 ticks). Queries:
+standable, fits (walk, too low, blocked, swim, lava, unknown), ledge(dir) (-2: bottom unseen), safeDrop, blocking(to),
+connected(a, b) (BFS over known open, 6000), unseen(yaw, range), around() (per 8 directions: free, drop, water, lava,
+unseen; roof, walls; cached a second). lookWhereUnseen() when idle (the most unseen way over 50%, every 3 s at most).
+/xen g1x. Ideas (new): to a non-spectator player within 24: a found place 40 to 600 blocks off not visited (30 min apart
+each), its latest death lesson (40 min), a mostly unseen way (curious, daytime; 15 min); 20 s between looks, 3 to 6 min
+after saying one. Chatter: the same line (numbers aside) not again for 5 min (45 s in a conversation).
+
+Hands.placeAt: its own body in the spot sets selfInWay; a hut it's building then has it step inside, away from it.
 
 
 WHAT'S NEW IN 2.0.0-beta.26.1
