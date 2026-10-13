@@ -2102,3 +2102,91 @@
 > soo
 > hmm
 > hmmm
+
+# ------------------------------------------------------------------ what it says on its own ("event:"), no heard lines
+## event:crafted
+- finally a {item}
+- {item} done
+- ayy {item}
+- new {item} lets go
+- got my {item}
+- {item} acquired
+- ok {item}, we're getting somewhere
+<cheerful> - {item}!! lets gooo
+<grumpy> - {item}. about time
+<shy> - made a {item}...
+<calm> - made a {item}
+<bold> - {item}. now we're talking
+<silly> - behold. the {item}
+
+## event:will_craft
+- gonna make a {item}
+- need a {item} real quick
+- time for a {item}
+- making a {item}
+
+## event:got
+- got {count} {item}
+- {count} {item}, nice
+- ok thats {count} {item}
+- enough {item} for now
+- {count} {item} done
+<grumpy> - {count} {item}. there
+
+## event:cave
+- ooh a cave
+- cave over there
+- found a cave, might be ore in there
+- big cave. ore time maybe
+- a cave, i'll remember that
+<shy> - a cave... kinda scary
+<bold> - cave. lets go
+<silly> - a cave! hello? ...no echo. rude
+
+## event:plan
+- ok plan: {plan}
+- alright im gonna {plan}
+- my plan is to {plan}
+- think i'll {plan}
+<grumpy> - gonna {plan}. dont bother me
+<cheerful> - ok!! gonna {plan}
+<silly> - the master plan: {plan}. tell no one
+
+## event:died
+- bruh
+- i died to {mob} lol
+- rip me
+- {mob} got me. unbelievable
+- ok that {mob} was rude
+<grumpy> - ugh. {mob}
+<silly> - im fine. totally fine. {mob} got me
+<shy> - um... i died...
+
+## event:idle
+- [busy] {doing}, kinda boring ngl
+- [busy] {doing} rn, anyone wanna help lol
+- [night] i hate nights
+- [night] mobs everywhere, stay safe guys
+- [hungry] im starving lol
+- [hungry] anyone got food?
+- [hurt] ow. need to heal
+- [has:iron] finally got some iron
+- [no:iron] [pick] need iron so bad
+- [nopick] need a pickaxe asap
+- [dream] one day i'll {dream}
+- [place] theres {place}, might check it out later
+- [has:diamond] got diamonds, feeling rich
+- [underground] its so dark down here
+- [did] {did} earlier, not bad
+- [day] nice day out
+- [nohome] i really need a house lol
+- [home] might decorate my place later
+- anyone wanna mine later?
+- this {biome} is kinda nice
+- hm what should i do next
+<cheerful> - today is a good day!!
+<grumpy> - why is everything so far away
+<silly> - i wonder if chickens dream
+<shy> - ...it's quiet
+<calm> - peaceful out here
+<bold> - i could take on anything rn

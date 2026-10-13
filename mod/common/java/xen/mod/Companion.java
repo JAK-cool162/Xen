@@ -3369,6 +3369,10 @@ public final class Companion {
 		if (mod.config.journal && mod.journal != null && !inArena) mod.journal.died(name, cause + " at " + player.blockPosition().toShortString());
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
+		if (!inArena && !source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) && random.nextFloat() < 0.4f + 0.4f * personality.chattiness) {
+			String said = banter.event("died", java.util.Map.of("mob", new BanterSelf().death().isEmpty() ? "that" : new BanterSelf().death()));   // ("bruh", "i died to a skeleton lol")
+			if (said != null) chatter(said, false);
+		}
 		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
 				|| how.contains("drown") || player.isUnderWater();                   // (under water: not worth drowning again for)
 		BlockPos here = player.blockPosition().immutable();
@@ -3566,6 +3570,9 @@ public final class Companion {
 	 * Trading is its own business: anyone can make it an offer. Just talk: returns its notes for the chat to answer from.
 	 */
 	private static final java.util.regex.Pattern LATER = java.util.regex.Pattern.compile("\\b(later|sometime|some time|tomorrow|tmr|tmrw|another time|one day|someday|after this)\\b");
+	/** What a player says about themselves or to greet (never an order, whatever words are in it). */
+	private static final java.util.Set<String> ABOUT_THEM = java.util.Set.of("goodnight", "bye", "good_morning", "greet", "thanks", "sorry", "laugh");
+
 	/** What its talk model answers first when it's sure (talk, not orders: "gonna go to sleep" isn't "go to sleep"). */
 	private static final java.util.Set<String> EARLY_TALK = java.util.Set.of("greet", "wsg", "how_are_you", "player_fine", "player_bad", "player_tired",
 			"player_bored", "player_happy", "player_scared", "player_angry", "player_died", "player_died_creeper", "player_died_lava", "player_died_fall",
@@ -3642,6 +3649,13 @@ public final class Companion {
 		if (said != null) banter.reaction(said, player.level().getGameTime());   // (how its last answer went down: a laugh, a "what?")
 		boolean later = LATER.matcher(words).find() && !r.intent().equals("chat");   // "wanna go mining later": an idea for later, not a request now
 		if (later) r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		if (said != null && !r.intent().equals("chat") && !r.intent().equals("peace")) {   // "im gonna go to sleep", "brb gonna eat": about them, not an order
+			xen.mod.talk.Banter.Read about = xen.mod.talk.Banter.read(said, name);
+			if (about.p() >= 0.95f && (about.kind().startsWith("player_") || ABOUT_THEM.contains(about.kind()))) {
+				journal("thinks", "\"" + said + "\" is about them (" + about.kind() + "), not a request (" + r.intent() + ")");
+				r = new xen.mod.talk.Chat.Request("chat", "", 0);
+			}
+		}
 		if (said != null && r.intent().equals("chat") && !talker.waitingFor(u)) {   // talk it's sure of: its talk model answers, before any keyword reads it as an order
 			xen.mod.talk.Banter.Read rd = xen.mod.talk.Banter.read(said, name);
 			if (rd.p() >= 0.85f && EARLY_TALK.contains(rd.kind()) || later && rd.kind().startsWith("invite_")) {

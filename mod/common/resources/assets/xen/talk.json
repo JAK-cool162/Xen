@@ -5740,6 +5740,539 @@
 ],
 "ask": null
 }
+],
+"event:crafted": [
+{
+"text": "finally a {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{item} done",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ayy {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "new {item} lets go",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "got my {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{item} acquired",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok {item}, we're getting somewhere",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{item}!! lets gooo",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "{item}. about time",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "made a {item}...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "made a {item}",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+},
+{
+"text": "{item}. now we're talking",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "behold. the {item}",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"event:will_craft": [
+{
+"text": "gonna make a {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "need a {item} real quick",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "time for a {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "making a {item}",
+"need": [],
+"tones": [],
+"ask": null
+}
+],
+"event:got": [
+{
+"text": "got {count} {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{count} {item}, nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok thats {count} {item}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "enough {item} for now",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{count} {item} done",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{count} {item}. there",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+}
+],
+"event:cave": [
+{
+"text": "ooh a cave",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "cave over there",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "found a cave, might be ore in there",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "big cave. ore time maybe",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "a cave, i'll remember that",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "a cave... kinda scary",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "cave. lets go",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+},
+{
+"text": "a cave! hello? ...no echo. rude",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"event:plan": [
+{
+"text": "ok plan: {plan}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "alright im gonna {plan}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "my plan is to {plan}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "think i'll {plan}",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "gonna {plan}. dont bother me",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "ok!! gonna {plan}",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "the master plan: {plan}. tell no one",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+}
+],
+"event:died": [
+{
+"text": "bruh",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "i died to {mob} lol",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "rip me",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "{mob} got me. unbelievable",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ok that {mob} was rude",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "ugh. {mob}",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "im fine. totally fine. {mob} got me",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "um... i died...",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+}
+],
+"event:idle": [
+{
+"text": "{doing}, kinda boring ngl",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{doing} rn, anyone wanna help lol",
+"need": [
+"busy"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i hate nights",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "mobs everywhere, stay safe guys",
+"need": [
+"night"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "im starving lol",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "anyone got food?",
+"need": [
+"hungry"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "ow. need to heal",
+"need": [
+"hurt"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "finally got some iron",
+"need": [
+"has:iron"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "need iron so bad",
+"need": [
+"no:iron",
+"pick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "need a pickaxe asap",
+"need": [
+"nopick"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "one day i'll {dream}",
+"need": [
+"dream"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "theres {place}, might check it out later",
+"need": [
+"place"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "got diamonds, feeling rich",
+"need": [
+"has:diamond"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "its so dark down here",
+"need": [
+"underground"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "{did} earlier, not bad",
+"need": [
+"did"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "nice day out",
+"need": [
+"day"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "i really need a house lol",
+"need": [
+"nohome"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "might decorate my place later",
+"need": [
+"home"
+],
+"tones": [],
+"ask": null
+},
+{
+"text": "anyone wanna mine later?",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "this {biome} is kinda nice",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "hm what should i do next",
+"need": [],
+"tones": [],
+"ask": null
+},
+{
+"text": "today is a good day!!",
+"need": [],
+"tones": [
+"cheerful"
+],
+"ask": null
+},
+{
+"text": "why is everything so far away",
+"need": [],
+"tones": [
+"grumpy"
+],
+"ask": null
+},
+{
+"text": "i wonder if chickens dream",
+"need": [],
+"tones": [
+"silly"
+],
+"ask": null
+},
+{
+"text": "...it's quiet",
+"need": [],
+"tones": [
+"shy"
+],
+"ask": null
+},
+{
+"text": "peaceful out here",
+"need": [],
+"tones": [
+"calm"
+],
+"ask": null
+},
+{
+"text": "i could take on anything rn",
+"need": [],
+"tones": [
+"bold"
+],
+"ask": null
+}
 ]
 }
 }

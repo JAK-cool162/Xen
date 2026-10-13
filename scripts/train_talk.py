@@ -35,7 +35,8 @@ DIM = 64
 SEED = 20261013
 
 # ------------------------------------------------------------------------------------------- reading the corpus
-SLOTS = {"player", "me", "doing", "mood", "pick", "death", "place", "dream", "friend", "biome", "did", "day", "answer", "xyz"}
+SLOTS = {"player", "me", "doing", "mood", "pick", "death", "place", "dream", "friend", "biome", "did", "day", "answer", "xyz",
+         "item", "count", "plan", "mob"}
 COUNTS = {"iron", "diamond", "wood", "stone", "food", "coal", "gold", "emerald"}
 FAVS = {"block", "food", "mob", "color", "biome", "weapon", "thing"}
 FLAGS = {"pick", "nopick", "night", "day", "hurt", "hungry", "fine", "busy", "idle", "home", "nohome", "died", "place", "friend",
@@ -94,7 +95,7 @@ def parse(path):
             sys.exit(f"{path}:{n}: a tag in the middle of an answer: {text}")
         kinds[cur]["replies"].append({"text": text, "need": need, "tones": tones, "ask": ask})
     for k, v in kinds.items():
-        if not k.startswith("answer:") and not v["heard"]:
+        if not k.startswith(("answer:", "event:")) and not v["heard"]:
             sys.exit(f"{k}: no heard lines")
     return kinds
 
@@ -313,7 +314,7 @@ def quantize(model):
 
 def main():
     kinds = parse(CORPUS)
-    names = [k for k in kinds if not k.startswith("answer:")]
+    names = [k for k in kinds if not k.startswith(("answer:", "event:"))]
     index = {k: i for i, k in enumerate(names)}
     r = random.Random(SEED)
     seen = {}

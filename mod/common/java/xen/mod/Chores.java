@@ -831,7 +831,7 @@ final class Chores {
 		String s = say.toLowerCase(java.util.Locale.ROOT);
 		if (s.startsWith("got") || s.startsWith("done") || s.startsWith("here")) c.belief.up(0.015f, say);   // (what it set out to do: done)
 		else if (s.startsWith("i can't") || s.startsWith("no ") || s.startsWith("couldn't")) c.belief.down(0.015f, say);
-		c.chatter(say, !own);
+		if (!say.isEmpty()) c.chatter(say, !own);
 	}
 
 	/** When it went into its shelter for the night, and when it may next start a mine from one. */
@@ -877,7 +877,8 @@ final class Chores {
 	private Action gatherNext() {
 		int got = count(items) - had;
 		if (got >= want) {
-			finish("Got " + got + " " + what + "!");
+			String said = c.banter.event("got", java.util.Map.of("count", String.valueOf(got), "item", what));
+			finish(said != null && (!own || c.random().nextFloat() < 0.35f) ? said : own ? "" : "Got " + got + " " + what + "!");
 			if (after != null) {                                        // and now what it was asked for
 				String next = after;
 				after = null;

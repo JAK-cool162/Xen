@@ -372,6 +372,24 @@ public final class Banter {
 		return r.text().contains(thing.equals("diamond") ? "diamond" : thing);
 	}
 
+	/** Words for this one answer beyond what's always known of it ({item}, {count}, {plan}, {mob}). */
+	private Map<String, String> extra = Map.of();
+
+	/**
+	 * Something it says on its own, the way a player would ("event:crafted": "ayy iron pickaxe"), with these words
+	 * filled in; null when there's nothing in the library for it (or nothing true to say).
+	 */
+	public String event(String name, Map<String, String> words) {
+		if (!loaded) return null;
+		extra = words == null ? Map.of() : words;
+		try {
+			Answer a = pick("event:" + name, "", "", 0);
+			return a == null ? null : a.text();
+		} finally {
+			extra = Map.of();
+		}
+	}
+
 	/** A line from someone just after it answered them: a laugh or thanks, it'll say that kind of thing more; "what?" or an insult, less. */
 	public void reaction(String text, long now) {
 		if (lastId == null || now - lastAt > 20 * 30 || !loaded) return;
@@ -441,9 +459,11 @@ public final class Banter {
 			asked = r.ask();
 			askedAt = now;
 		}
-		lastId = r.id();
-		lastAt = now;
-		lastKind = kind;
+		if (!kind.startsWith("event:")) {
+			lastId = r.id();
+			lastAt = now;
+			lastKind = kind;
+		}
 		return new Answer(texts.get(i), kind, r.id());
 	}
 
@@ -503,7 +523,7 @@ public final class Banter {
 				case "day" -> String.valueOf(me.day());
 				case "xyz" -> me.where();
 				case "answer" -> answer;
-				default -> null;
+				default -> extra.get(slot);
 			};
 			if (v == null || v.isEmpty()) return null;
 			m.appendReplacement(sb, Matcher.quoteReplacement(v));

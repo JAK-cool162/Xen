@@ -1200,7 +1200,10 @@ final class Goals {
 			p.plan = Strategy.choose(p.sins, c.mod.strategies, -1, random);
 			startPlan(now);
 			c.journal("thinks", "works out its plan: " + p.planInWords());
-			c.chatter(c.pick3("My plan: " + Strategy.WORDS[p.plan], "Here's the plan: " + Strategy.WORDS[p.plan],
+			String[] casual = {"speedrun it: iron, diamonds, the nether, the dragon", "build a really nice home first", "farm and chill, the end can wait",
+					"get rich mining", "explore everything", "trade with villagers and get rich", "gear up and fight stuff", "play it safe: armor, a bed, no night trips"};
+			String said = p.plan < casual.length ? c.banter.event("plan", java.util.Map.of("plan", casual[p.plan])) : null;
+			c.chatter(said != null ? said : c.pick3("My plan: " + Strategy.WORDS[p.plan], "Here's the plan: " + Strategy.WORDS[p.plan],
 					"I know what I'll do: " + Strategy.WORDS[p.plan]), true);
 			return;
 		}

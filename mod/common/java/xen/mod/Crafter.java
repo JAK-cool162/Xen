@@ -403,6 +403,13 @@ final class Crafter {
 	 * The next step toward what it's making: planks, sticks, a table, then the tool at the table. Null when there's
 	 * nothing to do (or a step failed: it tries again later).
 	 */
+	/** Worth saying out loud, like a player would: better tools and armor, not planks and sticks. */
+	static boolean notable(String item) {
+		return item.startsWith("stone_pickaxe") || item.startsWith("iron_") || item.startsWith("diamond_") || item.startsWith("netherite_")
+				|| item.equals("shield") || item.equals("bow") || item.equals("crossbow") || item.equals("bed") || item.endsWith("_bed")
+				|| item.equals("enchanting_table") || item.equals("ender_eye") || item.equals("bucket");
+	}
+
 	Action next() {
 		if (order != null) return orderNext();
 		if (c.player.level().getGameTime() < nextTry) return takeTableAlong();   // (it just failed at something: not again yet, only its table to pick up)
@@ -411,7 +418,10 @@ final class Crafter {
 			making = null;
 			return takeTableAlong();
 		}
-		if (making == null || !making.equals(goal)) c.chatter("I'll make " + (goal.endsWith("s") ? "" : "aeiou".indexOf(goal.charAt(0)) >= 0 ? "an " : "a ") + goal.replace('_', ' ') + ".", false);
+		if ((making == null || !making.equals(goal)) && notable(goal) && c.random().nextFloat() < 0.5f) {   // (a player doesn't announce every stick: the big ones, now and then)
+			String say = c.banter.event("will_craft", java.util.Map.of("item", goal.replace('_', ' ')));
+			if (say != null) c.chatter(say, false);
+		}
 		making = goal;
 		c.goals.instant = "making a " + goal.replace('_', ' ');
 		boolean wooden = goal.startsWith("wooden_"), tool = goal.matches(".*_(pickaxe|axe|shovel|hoe|sword)$");
@@ -598,7 +608,10 @@ final class Crafter {
 		boolean made = craftIn(menu, r);
 		c.player.closeContainer();
 		if (made) {
-			c.chatter("I made " + (name.endsWith("s") ? "" : "aeiou".indexOf(name.charAt(0)) >= 0 ? "an " : "a ") + name.replace('_', ' ') + "!", false);
+			if (notable(name)) {                                                 // (the big ones: an iron pickaxe, a shield, diamond gear)
+				String say = c.banter.event("crafted", java.util.Map.of("item", name.replace('_', ' ')));
+				if (say != null) c.chatter(say, false);
+			}
 			if (name.endsWith("_pickaxe")) XenMod.LOG.info("{} made a {} {} s into its life", c.name, name.replace('_', ' '), c.player.tickCount / 20);   // (how quick a start: for the tests)
 			XenMod.LOG.info("{} made a {}", c.name, name);
 			if (name.endsWith("_pickaxe") || name.endsWith("_sword") || name.equals("shield") || name.endsWith("_chestplate")) c.did("made a " + name.replace('_', ' '));

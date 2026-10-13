@@ -13,6 +13,9 @@ controls.
   one, it says it more), and a chat goes on as long as it's fun instead of ending after four lines. "im gonna go to
   sleep" isn't an order to sleep any more, and "wanna go mining later" is an idea, not a request it refuses.
   "Where are you?" gets its real coordinates. On lines it never trained on it reads the kind right about 9 times in 10.
+  What it says on its own comes from the same library and is said like a player, less often: "finally a stone
+  pickaxe", "getting stone, kinda boring ngl", "anyone wanna mine later?", "bruh. i died to a skeleton lol" (it no
+  longer announces every stick and plank it makes).
 * **The optional AI chat model is gone** (SmolLM2, its 145-390 MB download, the GPU option and its settings): it was
   buggy and slow, and the new talk model is in the jar (2 MB) and answers at once. No more -with-chat jars.
 * **It backs off from mobs sooner** when it's outnumbered or in the dark (most of its deaths were two or three mobs at

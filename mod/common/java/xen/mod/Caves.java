@@ -145,6 +145,8 @@ final class Caves {
 	}
 
 	private String caveLine(BlockPos spot) {
+		String said = c.banter.event("cave", null);                          // (its talk library: the way a player says it)
+		if (said != null) return said;
 		return orePockets.contains(spot.asLong())
 				? c.pick3("Big dark pocket, stone walls. There might be ore here.", "Stone all around a cave like this can mean ore nearby.", "That cave looks promising. I'll check the stone walls.")
 				: c.pick3("A cave! Good place for ore.", "There's a cave there. I'll remember it.", "Ooh, a cave.");
