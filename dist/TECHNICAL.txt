@@ -1,7 +1,46 @@
-XEN COMPANION 2.0.0-beta.27: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.28: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.28
+===========================
+
+Survival tips (Tips.java, new): CANT_WIN, NIGHTFALL, HURT_IN_DARK, NO_SWORD_NIGHT. take(tip, pull, why, hold): trust
+(first time: 0.35 + 0.35 (1 - bravery) - 0.15 pride + 0.1 random), nerve = 0.3 bravery + 0.25 pride + 0.15 wrath
+(CANT_WIN: +0.5 believes warrior_never_runs, -0.3 live_to_fight; the others: -0.2 night_belongs_to_monsters); score =
+0.9 trust + 0.8 pull - nerve; taken with p = 1 / (1 + e^(-6 (score - 0.55))); the call holds for `hold` ticks (fights
+60, night 600). Judged after max(200, 2 hold) ticks or at a death: took it, fine +0.04, died -0.06; went its own way,
+lost 8+ health or died +0.12 ("should've listened"), fine -0.05; trust in [0.05, 0.95]. Saved in companions.json
+("tips": trust, taken, ignored, right, wrong). /xen tips.
+Where they come to mind: CANT_WIN in Fighter when health - expected < margin (or its gut fears the fight: Gut no
+longer steps back on the spot in a mob fight, its fear adds 0.3 to the pull); pull = (margin - left) / max(4, margin).
+NIGHTFALL / HURT_IN_DARK in Goals.nightfall() (out under the open sky at night, every 5 s): outdoor work (wood,
+explore, house, farm, stone, rest), pull 0.55 + 0.1 per monster within 16 (up to 3) + 0.1 in light under 5; or health
+12 or less on anything but a shelter or sleep, pull (12 - health) / 12 + the same. Taken: it drops it for a shelter.
+NO_SWORD_NIGHT in going back for its things: no sword or axe, night, the spot under the open sky; pull 0.4, +0.3
+killed by a mob, +0.2 x distance/64. The plan also advises a shelter at night at 12 health or less (advice: the mind
+weighs it). It isn't in a duel, the arena, or against a player.
+Fight cost (Fighter): health lost per mob beaten by kind (from taking it on till it died, shared over the hostiles
+targeting it then; a death counts as lost + 6), stored as at "a stone sword, no armor" (/ gear: armor x (1 - 0.04 per
+point, max 20), weapon x 5 / best sword or axe in the hotbar (netherite 8, diamond 7, iron 6, stone 5, other 4,
+fists 1), clamped 0.6..2.5); EMA 0.3; first idea per kind (zombie 5, skeleton 6, spider 4, creeper 8, witch 9,
+enderman 10, vindicator 12, warden 40...). expected = sum over hostiles within 8 after it (target or within 4, seen or
+within 3) of cost x gear x health fraction (x0.8 for the others). margin = 3 + 4 (1 - bravery) - 2 pride - 1.5 wrath
+(+3 live_to_fight, +1.5 at night in light under 7), at least 1. Saved ("fightCosts").
+Ways out (taking CANT_WIN; held till health - expected >= margin + 4 or 18 health): perch: melee-only foes (zombie
+family, vindicator, brute, hoglin, silverfish...) and nothing that shoots in sight within 16, on the ground, a spare
+block, room 2 and 3 over its feet: pillars twice (Hands.startPillar), then hits down when charged >= 0.95 and in reach,
+eats, idles; stays up after the fight while hurt (under 16) or a hostile it sees is within 6, up to 60 s; one that
+shoots comes: down and away. Cover: a skeleton, stray, bogged, pillager, witch, blaze or piglin that sees it within
+16: the nearest spot (rings 1 to 6, 16 directions, feet y -1..+1, standable) its eyes can't see at the head or the
+feet (ClipContext COLLIDER), of those the furthest from it; looked for every 20 ticks; out of its sight: stays, eats.
+Else run: away from all hostiles after it within 16 (sum of v / |v|^2), that way for 40 ticks, the nearest of 0,
++-30, +-60, +-90 degrees that's clear 3 blocks ahead (ground within 2 down, no fluid, steps it can jump): sprints
+straight (runAlong), else walkTo 8 blocks. Eats on the run 6.5+ blocks from the foe.
+Tests: seed 20261009 to day 3, 5 Xens: 15 -> 8 deaths (zombies 9 -> 2), iron 2 -> 4; seed 424242 (held out): 28 -> 20
+(skeletons 8 -> 1, zombies 10 -> 6).
 
 
 WHAT'S NEW IN 2.0.0-beta.27

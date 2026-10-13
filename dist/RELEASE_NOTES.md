@@ -1,7 +1,25 @@
-**Xen Companion 2.0.0-beta.27**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.28**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.28: survival tips it weighs for itself, fewer deaths
+
+* **Tips, not rules.** Xen gets survival tips the way a new player does: "can't win this fight: get out of reach (two
+  blocks up) or away, heal, then come back", "night's here and you're out working: a roof (or a hole) before it gets
+  worse", "hurt and out in the dark: a roof first, heal, then go on", "no sword and it's night: let your things wait
+  till morning". When one comes to mind it weighs it (how far it trusts that tip, how bad things look, its nerve) and
+  takes it or goes its own way. Then it sees what happened and trusts the tip more or less ("went its own way and died:
+  should've listened"). Each Xen ends up with its own idea of which tips are worth it. `/xen tips` shows it.
+* **It knows what a fight will cost.** It learns what beating each kind of mob costs it ("a zombie costs it about 4
+  health to beat now"), for its sword and armor (no sword: a lot more), and holds that against its health and the
+  others coming at it.
+* **Better ways out.** Taking the tip, it pillars two blocks up out of a zombie's reach and hits down at it, heals and
+  comes down; from a skeleton it ducks out of its sight (behind a tree, a hill) instead of running in the open; and it
+  runs away from all of them at once instead of zig-zagging between them. Its gut feeling in a fight goes into that
+  call instead of a step back on the spot that only got it hit again.
+* **Fewer deaths.** Two 3-day test worlds, 5 Xens each: 15 to 8 deaths and 28 to 20 (43 to 28 in all; skeletons 10 to
+  5, zombies 19 to 8), with more iron found.
 
 ### 2.0.0-beta.27: Xen talks like a player (its own trained talk model), decides for itself, G1X vision
 

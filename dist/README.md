@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.27
+# Xen Companion (Fabric mod) 2.0.0-beta.28
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.27+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.27+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.28+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.28+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.27+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.28+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -155,6 +155,23 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### It weighs survival tips (2.0.0-beta.28)
+
+Xen gets tips the way a new player does, not rules: "can't win this fight: get out of reach (two blocks up) or away,
+heal, then come back", "night's here and you're out working: a roof (or a hole) before it gets worse", "hurt and out
+in the dark: a roof first, heal, then go on", "no sword and it's night: let your things wait till morning". When one
+comes to mind it weighs it (how far it trusts that tip, how bad things look, its nerve: brave, proud or wrathful, it
+goes its own way more; a Xen that believes a warrior never runs mostly stands its ground) and takes it or doesn't.
+Then it sees what happened: it took it and came out fine, or went its own way and got badly hurt ("should've
+listened"), and it trusts the tip more; went its own way and was fine, a little less. `/xen tips` shows it.
+
+It learns what each kind of mob costs it to beat ("a zombie costs it about 4 health to beat now"), for the sword and
+armor it has, and that's how it sees a fight going badly. Taking the tip, it pillars two blocks up (out of a zombie's
+reach) and hits down at it, heals and comes down; from a skeleton it ducks out of sight (behind a tree, a hill) rather
+than run in the open; and it runs away from all of them at once, one way for a moment, instead of zig-zagging. Its gut
+feeling in a fight goes into that call instead of a step back on the spot. Over two 3-day test worlds (5 Xens each),
+deaths went from 43 to 28 (15 to 8, and 28 to 20; skeleton deaths 10 to 5, zombie deaths 19 to 8).
 
 ### It talks like a player (2.0.0-beta.27)
 

@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.27+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.27+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.28+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.28+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -390,6 +390,22 @@ less. A chat goes on as long as it's fun (laughs and thanks keep it going).
 The model is trained by `scripts/train_talk.py` on `data/talk/corpus.txt`;
 on lines it never saw it gets the kind right about 9 times in 10, and when
 it isn't sure, the rest of Xen's chat answers instead.
+
+**It weighs survival tips** (2.0.0-beta.28). Xen gets tips the way a new
+player does ("can't win this fight? get out of reach or away, heal, then come
+back", "night's here: a roof before it gets worse", "hurt in the dark: a roof
+first", "no sword at night: let your things wait till morning"), not rules.
+When one comes to mind it weighs it (how far it trusts that tip, how bad
+things look, its nerve: a brave or proud Xen goes its own way more) and takes
+it or doesn't. Then it sees how that went and trusts the tip more or less
+("went its own way and died: should've listened"). It also learns what each
+kind of mob costs it to beat ("a zombie costs it about 4 health now"), for
+its sword and armor, and that's how it sees a fight going badly. Taking a
+tip, it pillars two blocks up out of a zombie's reach and hits down at it,
+ducks out of a skeleton's sight instead of running in the open, and runs
+away from all of them at once instead of zig-zagging between them.
+`/xen tips` shows how far each Xen trusts each tip. Over two 3-day test
+worlds (5 Xens each) deaths went from 43 to 28 (15 to 8, and 28 to 20).
 
 **Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
 circuits it worked out itself in its redstone lessons, placed part by part by

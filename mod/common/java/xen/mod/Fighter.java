@@ -381,10 +381,14 @@ final class Fighter {
 			h.lowerShield();
 			if (d > (outmatched ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);
-			if (outmatched && d < 6 && clearRun(foe)) return runFrom(foe, sprintable);   // close: just sprint off (no time to work out a way)
-			Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
-			if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
-			return c.walkTo(p.position().add(away.normalize().scale(8)));
+			LivingEntity shooter = outmatched ? shooterInSight() : null;     // one shooting at it: out of its sight, not just away (it'd be shot in the back)
+			if (shooter != null) {
+				Action cover = takeCover(shooter);
+				if (cover != null) return cover;
+			}
+			Vec3 dir = escapeDir(foe);
+			if (outmatched && clearRun(dir)) return runAlong(dir, sprintable);   // a clear way: just sprint off (no time to work out a way)
+			return c.walkTo(p.position().add(dir.scale(8)));
 		}
 		fleeing = false;
 
@@ -487,36 +491,153 @@ final class Fighter {
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
 	}
 
-	/** Straight away from it, the next few blocks: ground to run on, no drop, no lava or water (else it works out a way). */
-	private boolean clearRun(LivingEntity foe) {
+	/** That way, the next few blocks: ground to run on, no drop, no lava or water, no wall it can't jump (else it works out a way). */
+	private boolean clearRun(Vec3 dir) {
 		XenPlayer p = c.player;
 		var level = p.level();
-		Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
-		if (away.lengthSqr() < 1e-4) return false;
-		away = away.normalize();
 		for (int i = 1; i <= 3; i++) {
-			var at = net.minecraft.core.BlockPos.containing(p.position().add(away.scale(i)));
+			var at = net.minecraft.core.BlockPos.containing(p.position().add(dir.scale(i)));
+			if (!free(level, at)) {                                            // a step up: it can jump that, with room over it
+				if (!free(level, at.above()) || !free(level, at.above(2))) return false;
+				continue;
+			}
+			if (!free(level, at.above())) return false;
 			boolean ground = false;
 			for (int dy = 0; dy <= 2 && !ground; dy++) {                        // (a step down or two is fine)
 				var below = at.below(dy + 1);
+				if (!level.getFluidState(below).isEmpty()) return false;
 				ground = !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
-				if (!level.getFluidState(below).isEmpty() || !level.getFluidState(at.below(dy)).isEmpty()) return false;
 			}
 			if (!ground) return false;
-			if (!free(level, at.above()) && !free(level, at.above(2))) return false;   // (a wall it can't jump)
 		}
 		return true;
 	}
 
+	/** Which way it runs: away from all that's after it (the closer, the more), and that way for a moment (no dithering between foes). */
+	private Vec3 runDir;
+	private int runDirAt;
+
+	private Vec3 escapeDir(LivingEntity foe) {
+		XenPlayer p = c.player;
+		int now = p.tickCount;
+		if (runDir != null && now - runDirAt < 40 && clearRun(runDir)) return runDir;
+		Vec3 sum = Vec3.ZERO;
+		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && (m.getTarget() == p || m.distanceTo(p) < 6))) {
+			Vec3 v = p.position().subtract(m.position()).multiply(1, 0, 1);
+			double dd = Math.max(1, v.lengthSqr());
+			sum = sum.add(v.scale(1 / dd));
+		}
+		if (sum.lengthSqr() < 1e-8) sum = p.position().subtract(foe.position()).multiply(1, 0, 1);
+		if (sum.lengthSqr() < 1e-8) sum = new Vec3(1, 0, 0);
+		Vec3 base = sum.normalize();
+		runDir = base;
+		runDirAt = now;
+		for (int k : new int[] {0, 30, -30, 60, -60, 90, -90}) {             // straight away if it can, else the nearest way that's clear
+			Vec3 dir = base.yRot((float) Math.toRadians(k));
+			if (clearRun(dir)) {
+				runDir = dir;
+				break;
+			}
+		}
+		return runDir;
+	}
+
+	private static boolean shoots(String kind) {
+		return switch (kind) {
+			case "skeleton", "stray", "bogged", "pillager", "witch", "blaze", "piglin" -> true;
+			default -> false;
+		};
+	}
+
+	/** The nearest one about that shoots and can see it (16 blocks), or null. */
+	private LivingEntity shooterInSight() {
+		XenPlayer p = c.player;
+		LivingEntity best = null;
+		double bestD = 16;
+		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && shoots(kind(m)))) {
+			double dd = m.distanceTo(p);
+			if (dd < bestD && m.hasLineOfSight(p)) {
+				bestD = dd;
+				best = m;
+			}
+		}
+		return best;
+	}
+
+	/** Can it (its eyes) see that spot? */
+	private boolean seen(LivingEntity by, Vec3 at) {
+		var hit = c.player.level().clip(new net.minecraft.world.level.ClipContext(by.getEyePosition(), at, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, by));
+		return hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS;
+	}
+
+	/** A spot close by it can't see (behind a tree, a hill, a wall): there, then it heals; null: none (it runs). */
+	private net.minecraft.core.BlockPos cover;
+	private int coverAt = -1000;
+
+	private Action takeCover(LivingEntity shooter) {
+		XenPlayer p = c.player;
+		var level = p.level();
+		int now = p.tickCount;
+		String what = kind(shooter).replace('_', ' ');
+		if (!seen(shooter, p.getEyePosition()) && !seen(shooter, p.position().add(0, 0.5, 0))) {   // out of its sight already: it stays, heals
+			c.goals.instant = "in cover from the " + what + ", healing";
+			c.hands.watching = null;
+			if (p.getHealth() < p.getMaxHealth() && c.hands.canHeal()) return Action.EAT;
+			return idle();
+		}
+		if (now - coverAt > 20) {
+			coverAt = now;
+			var was = cover;
+			cover = null;
+			var feet = p.blockPosition();
+			for (int r = 1; r <= 6 && cover == null; r++) {                    // the nearest spot out of its sight
+				double best = Double.MAX_VALUE;
+				for (int a = 0; a < 16; a++) {
+					double ang = a * Math.PI / 8;
+					var q = feet.offset((int) Math.round(Math.cos(ang) * r), 0, (int) Math.round(Math.sin(ang) * r));
+					for (int dy : new int[] {0, 1, -1}) {
+						var s = q.above(dy);
+						var under = s.below();
+						if (!free(level, s) || !free(level, s.above()) || level.getBlockState(under).getCollisionShape(level, under).isEmpty()
+								|| !level.getFluidState(under).isEmpty()) continue;
+						Vec3 eye = Vec3.atBottomCenterOf(s).add(0, 1.6, 0);
+						if (seen(shooter, eye) || seen(shooter, Vec3.atBottomCenterOf(s).add(0, 0.5, 0))) continue;
+						double score = Vec3.atBottomCenterOf(s).distanceTo(shooter.position());
+						score = -score;                                           // (of those as near, the one further from it)
+						if (score < best) {
+							best = score;
+							cover = s;
+						}
+						break;
+					}
+				}
+			}
+			if (cover != null && (was == null || !was.equals(cover)))
+				c.journal("thinks", String.format(java.util.Locale.ROOT, "the %s is shooting at it: takes cover %d blocks off, out of its sight", what,
+						(int) Math.round(Math.sqrt(cover.distSqr(feet)))));
+		}
+		if (cover == null) return null;
+		c.goals.instant = "taking cover from the " + what;
+		return c.walkTo(Vec3.atBottomCenterOf(cover));
+	}
+
 	/** Turn its back on it and sprint away (jumping up a step if one is in the way): no pathfinding, no time lost. */
 	private Action runFrom(LivingEntity foe, boolean sprintable) {
+		Vec3 away = c.player.position().subtract(foe.position()).multiply(1, 0, 1);
+		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
+		return runAlong(away.normalize(), sprintable);
+	}
+
+	/** Sprint that way (jumping up a step if one is in the way). */
+	private Action runAlong(Vec3 away, boolean sprintable) {
 		XenPlayer p = c.player;
 		Hands h = c.hands;
 		h.lowerShield();
 		h.watching = null;
-		Vec3 away = p.position().subtract(foe.position()).multiply(1, 0, 1);
-		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
-		h.face(p.getEyePosition().add(away.normalize().scale(6)));             // a flick of the mouse
+		h.face(p.getEyePosition().add(away.scale(6)));                        // a flick of the mouse
 		h.pitch = 0;
 		p.setSprinting(sprintable);
 		int[] f = xen.mod.core.Perception.forward(h.yaw);
