@@ -1,7 +1,28 @@
-**Xen Companion 2.0.0-beta.28**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.29**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.29: it plans what it was never shown, and reads biomes
+
+* **Know-how and plans.** Xen knows how things are made and where they come from: the game's own crafting recipes,
+  what a furnace makes of what, and a few hints a player picks up ("iron ore wants a stone pickaxe", "sand: beaches,
+  deserts, rivers"). Give it a goal (`/xen plan bucket`, or "make me a shield" in chat) or let it pick its own (an iron
+  pickaxe, a shield, a bucket...) and it works back from what it has to a plan, for example: "1. chop a tree, 2. craft
+  planks, ... 8. mine iron ore with a stone pickaxe, 9. craft a furnace, 10. smelt 3 raw iron, 11. craft a bucket".
+  Nothing about buckets was written for it.
+* **Advice, not orders.** The plan's next step weighs in with its other choices, and its mind decides. The plan is
+  worked out again whenever what it has changes, so a skipped step, a find or a failed way just change it. What each
+  kind of step costs it is learned and shared across every plan (iron mined for a bucket counts toward a shield), it
+  takes the cheaper of two ways (coal or planks to burn), and a step that keeps coming to nothing it pushes less.
+  `/xen plan` shows the plan.
+* **It reads biomes.** Where its sight lines end it notes the biome and remembers where it saw each one, and what each
+  tends to have (a desert or beach: sand; a swamp: clay; badlands: gold; the mountains: emeralds and iron). A plan that
+  wants sand it hasn't seen goes to the beach it saw. In lush caves, dripstone caves or the deep dark it knows it's in a
+  cave at once, and a river biome helps it name a river. `/xen g1x` shows the biomes.
+* **Survival about the same as beta.28** over paired 3-day test worlds (5 Xens each): 30 and 28 deaths on a seed
+  neither was tuned on, 7 to 22 on the usual one for both. Falls are the most common death on hilly ground; that's
+  next.
 
 ### 2.0.0-beta.28: survival tips it weighs for itself, fewer deaths
 

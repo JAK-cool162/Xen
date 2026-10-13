@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.28
+# Xen Companion (Fabric mod) 2.0.0-beta.29
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.28+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.28+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.29+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.29+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.28+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.29+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -155,6 +155,31 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### It plans what it was never shown, and reads biomes (2.0.0-beta.29)
+
+Xen has know-how: the game's own crafting recipes (whatever the version or data pack), what a furnace makes of what,
+and a few hints a player picks up ("iron ore wants a stone pickaxe", "sand: beaches, deserts, rivers", "string:
+spiders, at night"). Give it a goal, `/xen plan bucket` or "make me a shield" in chat, or let it pick its own (an
+iron pickaxe, a shield, a bucket...), and it works back from what it has to a plan:
+
+```
+1. chop a tree (3 logs), 2. craft 12 oak planks, 3. craft a crafting table, 4. craft 4 sticks, 5. craft a wooden
+pickaxe, 6. mine stone (11 cobblestone), 7. craft a stone pickaxe, 8. mine iron ore (3 raw iron), 9. craft a furnace,
+10. smelt 3 raw iron into iron ingots, 11. craft a bucket (about 10 min)
+```
+
+The plan is advice, not an order: its next step weighs in with its other choices (how much: its diligence and how its
+plans have worked out), and its mind decides. It's worked out again whenever what it has changes, so a skipped step,
+a find, a failed way just change the plan. What each kind of step costs it is learned and shared across every plan
+(mining iron for a bucket counts toward the plan for a shield); where there are two ways (coal or planks to burn) it
+takes the cheaper, and a kind of step that keeps coming to nothing it pushes less. `/xen plan` shows the plan.
+
+It reads biomes the way a player reads the land: where its sight lines end it notes the biome and remembers where it
+saw each one, and what each tends to have (a desert or beach: sand; a swamp: clay; badlands: gold; the mountains:
+emeralds and iron). A plan that wants sand it hasn't seen goes to the beach it saw. In lush caves, dripstone caves or
+the deep dark it knows it's in a cave at once (lush caves glow, so dark isn't the clue), and a river biome helps it
+name a river it sees. `/xen g1x` shows the biome it's in and the ones it has seen.
 
 ### It weighs survival tips (2.0.0-beta.28)
 

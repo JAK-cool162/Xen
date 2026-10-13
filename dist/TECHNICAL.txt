@@ -1,7 +1,45 @@
-XEN COMPANION 2.0.0-beta.28: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.29: TECHNICAL NOTES
 ===========================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.29
+===========================
+
+Know-how and plans (Plans.java, new). make(item, n): backward chaining from what it has (stock by item and by kind:
+any planks "planks", any logs "log", any wool "wool", coal or charcoal "coal", cobbled deepslate or blackstone
+"cobblestone"), the cheapest of three kinds of way for each thing still needed: a source (the hints: gather wood,
+stone, dirt, coal, iron; fetch gold/diamond/redstone/lapis/copper/emerald ore, sand, gravel, flint, clay, obsidian,
+sugar cane, pumpkin, melon; hunt for wool, leather, feathers, meat; look (string, bone, gunpowder, slime, pearls, blaze
+rods, wheat, filled buckets: no way to go about it yet, x3 cost); each with the pickaxe tier it needs, which becomes a
+need of its own), the furnace (SMELTS: iron/gold/copper ingots, glass, stone, smooth stone, brick, charcoal, cooked
+food; fuel: coal (8 each) or planks (1.5), the cheaper, and a furnace if none is within 12 blocks or carried), or a
+crafting recipe from the server's RecipeManager (Crafter.recipeIdFor: its wood, the best tier; ingredients by kind
+via Ingredient.items(); a crafting table if it doesn't fit 2x2; what a craft makes: planks/sticks/torches/stairs 4,
+ladders/fences/doors/paper 3, slabs 6, panes/bars/rails 16, wooden trapdoors 2, else 1; leftovers count for later
+steps). Depth 10, 4000 calls, no loops (a thing already being worked out). Steps merged by kind and thing, in the order
+they can be done. Cost: setup + each x n minutes (hints), or learned per kind of step ("gather:raw_iron",
+"smelt:iron_ingot", "craft:bucket": tries, came to nothing, minutes each, EMA 0.3): (0.5 setup + learned x n) x (1 +
+1.5 x fail rate); a fetch of what it hasn't seen: + 2 setup, or + 0.5 setup + distance/200 to a biome it saw that has
+it. Goal: asked (/xen plan <item> [n], "make me a ..." in chat when it can't just craft it) or its own, every 2 min
+from stone tools on (iron pickaxe, shield, iron sword, bucket, iron chestplate; a brave or wrathful one: the sword
+first); its own let go after 40 min (10 with no way). Re-planned when what it has changes or every 30 s. Its next step
+adds (0.6 + 0.9 diligence) x trust (x1.4 asked) x (1 - 0.7 fail rate of that kind of step, after 3 tries) to that
+choice's score; a craft or smelt step makes that choice open to it. Its mind still decides. Started when its mind
+picks that kind of choice: gather (Chores.gather), fetch (Chores.fetch: the nearest open block of the kind or one its
+eyes saw, mined, its drop picked up, the next till n), craft (Crafter.orderRecipe), smelt (Chores.smelt(input): any
+input as well as ore and food); iron or coal it hasn't seen: its own usual mining (caves it knows, the depth it
+believes), watched; hunt and look: the usual. Its result (what it got for the time, or died) is learned; trust +0.03 /
+-0.05, +0.05 for a goal reached. Saved in companions.json ("plans"). /xen plan.
+Biomes (Biomes.java, new): every 8th sight line (rotating) ending at a wall over 6 blocks off: the biome there, the
+nearest spot it saw each one (a new one in its thoughts with what it tends to have: desert/beach/river sand, swamp
+clay, badlands gold, peaks and windswept hills emeralds and iron, dripstone caves copper, lush caves clay, oceans
+gravel, forests and plains logs). Cave biomes (lush caves, dripstone caves, deep dark) count only under the ground; in
+one (checked every second) it's a cave at once (Caves.sawInBiome: room of 6+, lit or not) and its eyes take 2 dark
+steps instead of 5 for a cave. Sights: a spot it can't name from its shape, in a cave biome under the ground: a cave;
+river water in a river biome (or ice in a frozen river): a river (if it runs on). A plan's fetch with nothing in
+sight: its exploring heads to that biome. /xen g1x shows the biome and the nearest it saw.
 
 
 WHAT'S NEW IN 2.0.0-beta.28
