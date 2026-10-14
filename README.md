@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.30+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.30+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.30.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.30.1+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -452,7 +452,8 @@ When nobody it knows is around, Xen leaves notes on signs ("Day 12: Diamonds
 here! -Pip").
 
 **Settings in Mod Menu** (or `/xen set` on servers), with the categories down
-the left: Talk (chat, talking on its own and with Xens,
+the left: **How to** (since 2.0.0-beta.30.1: the few commands and chat lines
+to get going, on one short page, right under Basics), Talk (chat, talking on its own and with Xens,
 trading, saying no), Xens (how many, names, personalities, skins), Goals (own
 goals, antics, learning by watching, evolution), PvP, Build (redstone, signs),
 Speed (decisions) and **Experimental**:
@@ -471,6 +472,8 @@ Speed (decisions) and **Experimental**:
   between rules.)
 
 ![Xen Companion settings in Mod Menu](docs/screenshots/settings.png)
+
+![The How to tab: the few commands and chat lines to get going](docs/screenshots/settings_howto.png)
 
 ![The Experimental category: custom instructions and a custom script](docs/screenshots/settings_experimental.png)
 

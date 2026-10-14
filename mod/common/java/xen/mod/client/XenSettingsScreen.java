@@ -23,9 +23,12 @@ import java.util.List;
  * phone the launcher's scroll gesture) when they don't all fit, with arrows on the right showing there's more.
  */
 public class XenSettingsScreen extends Screen {
-	private static final String[] TABS = {"Basics", "Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Xen 2.0", "Experimental"};
+	private static final String[] TABS = {"Basics", "How to", "Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Xen 2.0", "Experimental"};
+	/** The How to tab. */
+	private static final int HOW_TO_TAB = 1;
 	private static final String[] ABOUT = {
 			"The few things most people change. Everything else is under More settings.",
+			"Start here. Hover over any setting to see what it does.",
 			"How Xen talks: answering, talking on its own, with other Xens, trading, saying no.",
 			"Who the Xens are: how many, their names, natures and skins.",
 			"What Xens want and how they grow: goals, fun, learning and evolution.",
@@ -39,6 +42,24 @@ public class XenSettingsScreen extends Screen {
 			+ "When: night, morning, rain, hungry, hurt, attacked, diamonds, someone comes, sees <a mob>, hears <a word>, every <N> minutes.\n"
 			+ "Do: say <words> ({name} and {player} are filled in), do <a request> (as if its owner asked: \"do follow me\", "
 			+ "\"do get 5 wood\"), dance, spin, wave, show off.\nEach rule runs at most once a minute.";
+	/** The How to page, short: a heading ("#"), a command or a chat line and what it does, or a note ("!"). */
+	private static final String[][] HOW_TO = {
+			{"#", "Start"},
+			{"/xen summon", "a Xen joins you; it's yours"},
+			{"/xen spawn 5", "5 Xens living on their own (host or op)"},
+			{"/xen dismiss", "your Xen goes home"},
+			{"#", "Talk to it: its name, then what you want"},
+			{"Pip, follow me", "or \"stay here\", \"go explore\", \"stop\""},
+			{"Pip, get me 10 logs", "or \"find iron\", \"get us food\""},
+			{"Pip, build a house", "or \"build a shelter\", \"craft a bucket\""},
+			{"Pip, what are you doing?", "it tells you, and why"},
+			{"#", "Handy"},
+			{"/xen status", "how it is and what it's doing"},
+			{"/xen plan <item>", "a goal for it (/xen plan shows its steps)"},
+			{"/xen log", "its journal as a file: why it did what it did"},
+			{"/xen set <setting> <value>", "any setting, from chat"},
+			{"!", "Pip is the Xen's name: use yours (the first 3 letters work). Your Xen takes orders only from you; anyone can talk to it."},
+	};
 	/** The category that's open (kept while the game runs, so it opens where you left it). */
 	private static int tab;
 	/** All the categories shown (More settings), or only Basics. */
@@ -83,8 +104,10 @@ public class XenSettingsScreen extends Screen {
 		Component title = Component.literal("Xen").withStyle(ChatFormatting.BOLD, ChatFormatting.AQUA);
 		addRenderableWidget(new StringWidget(8, 10, side - 8, 12, title, font));
 		int step = Math.max(14, Math.min(22, (height - 62) / TABS.length)), tall = Math.min(20, step - 2);   // (a short screen: smaller tabs)
-		if (!more && tab != 0) more = true;                              // (opened on a category: show them all)
-		for (int i = 0; i < (more ? TABS.length : 1); i++) {
+		int shown = more ? TABS.length : HOW_TO_TAB + 1;                  // (the basics: Basics and How to)
+		if (!more && tab > HOW_TO_TAB) more = true;                      // (opened on a category: show them all)
+		if (more) shown = TABS.length;
+		for (int i = 0; i < shown; i++) {
 			int which = i;
 			Button b = Button.builder(Component.literal(TABS[i]), x -> {
 				tab = which;
@@ -94,10 +117,10 @@ public class XenSettingsScreen extends Screen {
 			b.active = i != tab;                                         // the open one is the pressed-in one
 			addRenderableWidget(b);
 		}
-		int after = 28 + (more ? TABS.length : 1) * step + 4;
+		int after = 28 + shown * step + 4;
 		addRenderableWidget(Button.builder(Component.literal(more ? "Fewer settings" : "More settings"), x -> {
 			more = !more;
-			if (!more) tab = 0;
+			if (!more && tab > HOW_TO_TAB) tab = 0;
 			scroll = 0;
 			rebuildWidgets();
 		}).bounds(8, after, side - 8, tall).tooltip(tip(Component.literal(more ? "Back to the basics." : "Every setting, by category."))).build());
@@ -130,7 +153,8 @@ public class XenSettingsScreen extends Screen {
 				choice("Hardcore", "hardcore", List.of("auto", "on", "off"), s -> s.equals("auto") ? "auto (as the world)" : s,
 						"One life each. A hardcore Xen that dies is gone for good: it doesn't come back, and those who knew it remember it. It lives like it, too: it minds danger more, backs off from a fight sooner, and won't go off on a risky errand while hurt, however nicely it's asked. auto: hardcore in a hardcore world.");
 			}
-			case 1 -> {
+			case HOW_TO_TAB -> howTo();
+			case 2 -> {
 				onOff("Chat", "chat", "Xen answers and understands chat.");
 				onOff("Local chat", "localChat", "What anyone says (players and Xens) only reaches those within the chat range, and only Xens that close hear it. Someone standing nearby can overhear, and a Xen that overhears a plot against its friend may tell them. Off: chat reaches the whole server.");
 				choice("Chat range", "chatRange", List.of(32, 16, 48, 64, 128), n -> n + " blocks" + (n == 32 ? " (2 chunks)" : ""), "How far local chat and local death messages carry.");
@@ -140,7 +164,7 @@ public class XenSettingsScreen extends Screen {
 				onOff("Trading", "trading", "Xen trades with villagers (on their trading screen) and bargains with players.");
 				onOff("Can say no", "refuse", "Xen may refuse: when it's badly hurt, scared, needs what you ask for, or you hurt it. Saying please changes its mind (unless you hurt it).");
 			}
-			case 2 -> {
+			case 3 -> {
 				choice("Xens per player", "maxPerPlayer", List.of(1, 2, 3, 5, 10, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens one player may summon.");
 				choice("Xens in the world", "maxXens", List.of(50, 5, 10, 20, 100, 0), n -> n == 0 ? "no limit" : "" + n, "How many Xens the world may have in all.");
 				onOff("Random names", "randomNames", "New Xens get names that fit their nature (off: Xen, Xen2, Xen3...).");
@@ -150,7 +174,7 @@ public class XenSettingsScreen extends Screen {
 				choice("Skins", "skins", skinChoices(), s -> s,
 						"accurate: a real account's own skin for a Xen with a real name; otherwise skins real players made (mineskin.org's gallery, online; the modern ones until then). blob: Xen 2.0's look, simple skins: flat colours, two plain eyes. modern: the mod's skins in today's style (shaded hair, hoodies, jackets; many slim). random: all the mod's skins and Minecraft's 18. pack: the modern and the fun ones. fun: the funny 61 of earlier versions. folder: your own PNG skins in config/xen/skins (from NameMC, Planet Minecraft or drawn yourself; signed once through mineskin.org, so everyone sees them). mineskin: random skins from mineskin.org's gallery (online). Or a player's skin: /xen set skins player:Name.");
 			}
-			case 3 -> {
+			case 4 -> {
 				onOff("Own goals", "wants", "Free Xens choose their own goals (food, shelter, wood, stone, ore, trading, exploring) and a dream to work toward, and learn which they like.");
 				choice("Hardcore", "hardcore", List.of("auto", "on", "off"), s -> s.equals("auto") ? "auto (as the world)" : s,
 						"One life each. A hardcore Xen that dies is gone for good: it doesn't come back, and those who knew it remember it. It lives like it, too: it minds danger more, backs off from a fight sooner, and won't go off on a risky errand while hurt, however nicely it's asked. auto: hardcore in a hardcore world.");
@@ -168,7 +192,7 @@ public class XenSettingsScreen extends Screen {
 				choice("Portal math from generation", "smartsAtGeneration", List.of(4, 0, 1, 2, 3, 6, 8), n -> n == 0 ? "born knowing" : "" + n,
 						"From which generation of evolution Xens know that a block in the Nether is eight in the overworld (so they build their way home at x/8, z/8) and find strongholds from two eye throws. Younger Xens can be taught: say \"the Nether is 8 times smaller\".");
 			}
-			case 4 -> {
+			case 5 -> {
 				choice("Teams", "teams", List.of(-1, 0, 1, 2, 3, 4, 6), n -> n < 0 ? "auto" : n == 0 ? "none" : n == 1 ? "one team" : n + " teams", "auto: like an SMP, Xens start and join teams on their own, and anyone not on their team is a rival they may fight (fighters, bullies, anyone near their base). Or put Xens on teams: new Xens join the team of those around them they like most; they may switch later, and you can ask them to join yours.");
 				onOff("Team members can fight", "friendlyFire", "Being on a team doesn't stop a fight: each Xen decides who to fight, by its temper, its motives and who it trusts."); 
 				choice("PvP", "pvp", List.of("own", "off", "defend", "teams"), s -> s,
@@ -176,16 +200,16 @@ public class XenSettingsScreen extends Screen {
 				choice("Griefing", "grief", List.of("revenge", "off", "chaos"), s -> s,
 						"revenge: someone who hurt a Xen badly may find their house on fire, if it's the kind to hold a grudge (wrathful, envious or aggressive). off: never. chaos: a mean one may also burn a stranger's house. Never its owner's, its village's or a friend's.");
 			}
-			case 5 -> {
+			case 6 -> {
 				onOff("Redstone", "redstone", "Xen may build small circuits it learned (NOT, OR, AND gates) from parts it carries.");
 				choice("Biggest circuit", "maxRedstoneParts", List.of(8, 16, 24, 32, 64), n -> n + " parts", "Nothing bigger, so it can't slow the server down.");
 				onOff("Signs", "signs", "When nobody it knows is around, Xen leaves notes on signs it carries.");
 			}
-			case 6 -> {
+			case 7 -> {
 				choice("Decisions", "decisionTicks", List.of(5, 10, 20), n -> n == 5 ? "4 a second" : n == 10 ? "2 a second" : "1 a second",
 						"Fewer decisions for slower computers and phones.");
 			}
-			case 7 -> {
+			case 8 -> {
 				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
 				choice("Says on its own", "talkAmount", List.of("normal", "quiet", "chatty"), s -> s.equals("normal") ? "normal (45 s apart)" : s.equals("quiet") ? "quiet (2 min apart)" : "chatty (20 s apart)",
 						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");
@@ -201,15 +225,62 @@ public class XenSettingsScreen extends Screen {
 
 		int half = Math.min(90, (panelWidth - 8) / 2);
 		int y = height - 28;
-		addRenderableWidget(Button.builder(Component.literal("Reset"), b -> {
+		if (tab != HOW_TO_TAB) addRenderableWidget(Button.builder(Component.literal("Reset"), b -> {
 			settings.reset(new ArrayList<>(keys));
 			rebuildWidgets();
 		}).bounds(width - 10 - 2 * half - 8, y, half, 20).tooltip(tip(Component.literal("Put " + TABS[tab] + "'s settings back to how they come."))).build());
-		addRenderableWidget(Button.builder(Component.literal("Save"), b -> {
+		if (tab != HOW_TO_TAB) addRenderableWidget(Button.builder(Component.literal("Save"), b -> {
 			settings.save();
 			b.setMessage(Component.literal("Saved"));
 		}).bounds(width - 10 - 3 * half - 16, y, half, 20).tooltip(tip(Component.literal("Save the settings now (to config/xen.json; they're also saved as you change them, and kept when the mod updates)."))).build());
 		addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose()).bounds(width - 10 - half, y, half, 20).build());
+	}
+
+	/** The How to page: the few commands and chat lines to get going (each with what it does), wrapped to fit. */
+	private void howTo() {
+		int y = top;
+		for (String[] e : HOW_TO) {
+			if (e[0].equals("#")) {                                            // a heading
+				if (y > top) y += 5;
+				inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, 10, Component.literal(e[1]).withStyle(ChatFormatting.BOLD, ChatFormatting.YELLOW), font)));
+				y += 13;
+			} else if (e[0].equals("!")) {                                     // a note at the end
+				y += 6;
+				for (String line : wrap(e[1], panelWidth)) {
+					inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, 10, Component.literal(line).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC), font)));
+					y += 10;
+				}
+			} else if (font.width(e[0] + "  " + e[1]) <= panelWidth) {          // the command and what it does, on one line
+				inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, 10,
+						Component.literal(e[0]).withStyle(ChatFormatting.AQUA).append(Component.literal("  " + e[1]).withStyle(ChatFormatting.GRAY)), font)));
+				y += 12;
+			} else {                                                           // narrow: what it does under it
+				inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, 10, Component.literal(e[0]).withStyle(ChatFormatting.AQUA), font)));
+				y += 10;
+				for (String line : wrap(e[1], panelWidth - 10)) {
+					inPanel(addRenderableWidget(new StringWidget(left + 10, y, panelWidth - 10, 10, Component.literal(line).withStyle(ChatFormatting.GRAY), font)));
+					y += 10;
+				}
+				y += 2;
+			}
+		}
+	}
+
+	/** Words to lines no wider than width. */
+	private List<String> wrap(String text, int width) {
+		List<String> lines = new ArrayList<>();
+		StringBuilder line = new StringBuilder();
+		for (String word : text.split(" ")) {
+			String tryLine = line.length() == 0 ? word : line + " " + word;
+			if (font.width(tryLine) > width && line.length() > 0) {
+				lines.add(line.toString());
+				line = new StringBuilder(word);
+			} else {
+				line = new StringBuilder(tryLine);
+			}
+		}
+		if (line.length() > 0) lines.add(line.toString());
+		return lines;
 	}
 
 	/**

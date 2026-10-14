@@ -1,7 +1,16 @@
-**Xen Companion 2.0.0-beta.30**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.30.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.30.1: a How to page in the settings
+
+* **How to tab.** In the settings (Mod Menu → Xen Companion), right under Basics, so it's there before "More
+  settings": the few commands and chat lines to get going on one short page. `/xen summon`, `/xen spawn 5`,
+  `/xen dismiss`; "Pip, follow me", "get me 10 logs", "build a house", "what are you doing?"; `/xen status`,
+  `/xen plan <item>`, `/xen log`, `/xen set`. Each one has a few words on what it does. For anyone who doesn't read
+  the README.
+* Everything else is as in 2.0.0-beta.30.
 
 ### 2.0.0-beta.30: it leaves the land the way a player would
 
