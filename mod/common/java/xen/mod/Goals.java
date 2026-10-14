@@ -1709,6 +1709,7 @@ final class Goals {
 		optionWhere = null;
 		c.mod.mindExperiences++;
 		if (o == Mind.MINE && c.places.get("mine hut") == null && c.places.get("mine") != null && !c.builder.busy() && !c.player.isCreative()
+				&& c.crafter.pickTier() >= 3                                            // (once its mine has paid off: the first trips are for iron, not a hut)
 				&& c.chores.mineRecordY != Integer.MIN_VALUE && c.player.blockPosition().closerThan(c.places.get("mine"), 24)) {   // its mine gets a proper entrance
 			String hut = c.builder.startPlan(Architect.mineEntrance(c.places.get("mine"), c.chores.mineRecordDir,
 					Architect.ofWood(MindSense.count(c, n -> n.startsWith("spruce_")) > 8 ? "spruce" : "oak", true, false)), "", "mine");

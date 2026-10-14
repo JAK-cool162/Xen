@@ -1,7 +1,37 @@
-**Xen Companion 2.0.0-beta.30.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.31**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.31: it goes looking for iron like a player (caves, deeper, longer)
+
+From 10 recorded Xens: they reached a stone pickaxe, then dug stone and coal near the top of the mountain, gave up
+("Giving up on this spot") and started over, walked past the caves they pointed out, and got bored within minutes.
+What was going on, and what changed:
+
+* **Caves it sees are caves it uses.** "Cave entrance over there" was only a remark: that cave never made it into the
+  list its mining trips look at. Now a cave mouth, the inside of a cave or a ravine it recognises goes there, and its
+  next trip for iron heads to the nearest one (the walls show the ore). A cave it breaks into on its way down, it now
+  explores for ore instead of digging on past it.
+* **A look round first.** With no cave known, a curious Xen often has a look round low ground for one (up to about 45
+  seconds) before it digs its own staircase; a lazy one seldom bothers. A cave it can only get to through water it
+  crosses off, and it digs its own mine instead.
+* **It keeps going down.** On an iron trip, coal it already has plenty of and plain stone ("there might be ore in
+  there") no longer pull it off its staircase (ore right next to it it still takes). Every step down counts as getting
+  somewhere: it used to give up after "nothing for 3 minutes" while still on its way down. Even a lazy one gives a
+  mining trip about two minutes now.
+* **Staircases that look ahead.** Water, or daylight on the steps ahead (the staircase about to come out of a hill's
+  side, a lake in the valley): it turns the staircase another way, like a player does. Flooded anyway: it starts again
+  on the highest dry ground close by, not on the river bank. Stone or ore on the bottom of a lake it leaves (it used to
+  swim after it for minutes).
+* **A longer attention span.** Boredom now builds only when nothing new is happening: something it never had before
+  keeps it interested, so it no longer throws a party five minutes into its life. The mine-entrance hut waits until
+  its mine has paid off (an iron pickaxe); it used to spend a fifth of its first day building one.
+* **Tested** (10 Xens from a fresh world, the same spot in a cherry grove mountain, against 2.0.0-beta.30.2): mining
+  trips given up in the first 10 minutes 10 -> 3 (4 -> 1 in another run); trips into caves 0 -> 15; caves noticed
+  22 -> 41; 2 iron pickaxes against 1. Over a whole first day (night included) deaths went from 22 to 9 and 10 in two
+  runs, give-ups from 11 to 5 and 8. In one 10-minute run 3 of the 10 had an iron pickaxe (none before).
+* Everything else is as in 2.0.0-beta.30.2.
 
 ### 2.0.0-beta.30.2: loop until every Xen has a real player's skin
 

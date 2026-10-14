@@ -218,6 +218,7 @@ final class Sights {
 		}
 		if (kind == null || kind.endsWith("river") && !runsOn(level, at)) return;
 		if (!c.places.rememberAnother(kind, at, 48)) return;                     // (one it knows already)
+		if (kind.startsWith("cave") || kind.equals("ravine")) c.caves.sawFromAfar(at, kind);   // (a way down to ore: kept for mining)
 		c.journal("sees", (kind.equals("cave") ? "the inside of a cave" : "a " + kind) + " at " + at.toShortString() + " (it knows what that is: it was shown)");
 		XenMod.LOG.info("{} sees a {} at {}", c.name, kind, at.toShortString());
 		if (java.util.concurrent.ThreadLocalRandom.current().nextFloat() < 0.35f) c.chatter(switch (kind) {

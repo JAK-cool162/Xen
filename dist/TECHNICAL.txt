@@ -1,8 +1,47 @@
-XEN COMPANION 2.0.0-beta.30.2: TECHNICAL NOTES
-==============================================
+XEN COMPANION 2.0.0-beta.31: TECHNICAL NOTES
+============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.31
+===========================
+
+Why the user's 10 recorded Xens (2026-10-14, beta 30.2, 8 minutes each) never got iron: stone pickaxe at 2 min, then
+staircases from y 90-108 that stopped after a few blocks ("Nothing here. I'll try somewhere else.", 4.2 min, y 98 -> 91),
+56 coal mined on an iron trip, "Cave entrance over there" with no trip there, three parties before minute 8.
+
+Chores (mining):
+- mineCats(): on a trip that isn't for coal, coal leaves the targets (oreCandidates, glance) once it has 8 (coal,
+  charcoal, torches / 4); catsNoCoal is made in set(). oreInReach still takes any ore beside it.
+- glance's "deepstone" answer (Blocks.STONE: "dark stone may have ore", fromEyes) is ignored on a mining trip unless
+  stone is what it came for: the staircase and the branch tunnels are for that.
+- fruitless(): on the way down (mineBase == null) a new lowest y resets the clock (deepest, reset in begin()); a mining
+  trip's patience is at least 0.7 (3 min * patience: 2.1 min at least).
+- The staircase looks ahead once a step: wet(feet, dir, 4) or opensUp (sky light on the head block 2-4 steps ahead) ->
+  another direction (clockwise, opposite, counter-clockwise) that is neither; journal "turns its staircase ...". In
+  water 10 s while going down: the mine is forgotten and it starts again at drySpot(), which now picks the highest
+  dry ground of its candidates.
+- Caves: a known cave within 20 blocks and no higher than its feet + 4, met during a trip (not in cave mode, not
+  looking): cave mode, there ("came on a cave ... explores it for ore"). Going to a cave and in water 10 s: the cave
+  is done (Caves.done) and the trip starts again (mine(mineY, tripWhat, left)).
+- A look round for a cave first (lookForCave): no known cave, daytime, overworld, above y 40 under the open sky, not
+  in the last 4 min; p = 0.3 + 0.5 curiosity - 0.25 sloth (+0.1 if it knows a cave place). Up to 45 s: 8 directions
+  24 blocks out, the lowest ground not over water and not where it has been (+ a random 0-6); a cave within 64 seen
+  meanwhile -> cave mode. Hillside tunnelling in gives up after 300 ticks (on with the staircase).
+- fromEyes skips seen blocks under water (underwater(), which no longer looks at unloaded chunks).
+Caves: done(pos) (nearest() skips those; they stay known, so they aren't "found" again); "all of this cave" and a cave
+  trip given up mark it. sawFromAfar(at, kind): from Sights (cave entrance, cave, ravine), the dimmest standable air
+  within 3 across and 8 down of where its eyes fell (8+ air around) is remembered like a cave it found.
+Whims: the kinds of things it has had (every 20 ticks); a new kind: boredom -0.15 each, and for 2 minutes boredom rises
+  at 0.3x.
+Goals: the mine-entrance hut only with an iron pickaxe (pickTier >= 3).
+Tests (scratchpad early.sh: 10 Xens, fresh world seed 20261014, tick rate 40; BIOME=cherry_grove spawns them there):
+- cherry grove, 10 game min, beta.30.2 -> beta.31: gives up 10 -> 3, cave trips 0 -> 15, caves noticed 22 -> 41,
+  Acquire Hardware 2 -> 2, Isn't It Iron Pick 1 -> 2, deaths 3 -> 5. Another pair: gives up 4 -> 1, 0 -> 3 iron pickaxes.
+- cherry grove, 20 game min (a day): deaths 22 -> 10 and 9, gives up 11 -> 5 and 8, cave trips 0 -> 4 and 8.
+- birch forest by a lake, 10 game min: deaths 2 -> 0, cave trips 0 -> 7 (gives up 8 -> 11: swimming after stone on a lake
+  bed, there before too; seen blocks under water are now left alone).
 
 WHAT'S NEW IN 2.0.0-beta.30.2
 =============================

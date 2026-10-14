@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.30.2+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.30.2+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.31+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.31+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -345,7 +345,9 @@ name when it's obvious you're talking to it, it remembers what you tell it
 ("remember that the base is by the big oak"), and it reads signs. It takes
 knockback like any player, runs when there's far to go, can't see far in the
 dark (and lights caves with torches), and doesn't know about ore buried in
-stone.
+stone. Going for iron it does what a player does: heads for a cave it has seen
+(or has a look round for one first), explores the one its staircase breaks
+into, and keeps on down its own staircase, turning it away from water.
 
 **It's unpredictable.** Crouch up and down next to it and it dances along
 (other Xens join in); now and then it shows off a trick ("Watch this!") that

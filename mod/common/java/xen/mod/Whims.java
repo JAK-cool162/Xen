@@ -26,6 +26,9 @@ final class Whims {
 	/** 0 to 1: how bored it is. */
 	float boredom;
 	private int lastOption = -1;
+	/** The kinds of things it has had (something new is never boring), and when it last got a new one. */
+	private final java.util.Set<String> had = new java.util.HashSet<>();
+	private long newAt;
 	private long until;
 	private String doing;
 	private BlockPos at;
@@ -70,6 +73,15 @@ final class Whims {
 		float patience = c.personality.patience();
 		float rise = 1f / (20 * 60 * (6 + 8 * patience)) * c.mod.config.decisionTicks;   // full in 6 to 14 minutes of the same
 		if (option < 0 || "looking around".equals(c.goals.instant) || c.goals.instant.isEmpty()) rise *= 2;   // (nothing to do: faster)
+		if (p.tickCount % 20 == 0) {                                              // something it never had before: that's fun, not boring
+			int before = had.size();
+			had.addAll(c.items().keySet());
+			if (had.size() > before && before > 0) {
+				newAt = now;
+				boredom = Math.max(0, boredom - 0.15f * (had.size() - before));
+			}
+		}
+		if (now - newAt < 20 * 60 * 2) rise *= 0.3f;                              // (getting somewhere new: it hardly notices the time)
 		if (FAST) rise *= 200;                                                    // (tests: -Dxen.boredFast=true)
 		if (option != lastOption && option >= 0) {
 			boredom = Math.max(0, boredom - 0.25f);                              // something new: less bored

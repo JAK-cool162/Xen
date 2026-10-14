@@ -32,6 +32,8 @@ final class Caves {
 	/** Last ore-wall check for each known cave, to avoid repeating block scans every sight sweep. */
 	private final Map<Long, Long> oreChecked = new HashMap<>();
 	private long nextScan;
+	/** Caves it has been all through (nothing more to see there): kept, so it doesn't "find" them again, but not gone back to. */
+	private final Set<Long> done = new HashSet<>();
 
 	Caves(Companion c) {
 		this.c = c;
@@ -70,6 +72,32 @@ final class Caves {
 		c.journal("sees", "a cave at " + spot.toShortString());
 		XenMod.LOG.info("{} found a cave at {}", c.name, spot.toShortString());
 		c.chatter(caveLine(spot), false);
+	}
+
+	/**
+	 * A cave's mouth or a ravine it recognised from afar ({@link Sights}): the dark way in near where its eyes fell is
+	 * kept with the caves it found, so going mining it can head there (the walls show the ore) instead of digging.
+	 */
+	void sawFromAfar(BlockPos at, String kind) {
+		if (c.player == null) return;
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		BlockPos best = null;
+		int bestSky = 99;
+		for (BlockPos q : BlockPos.betweenClosed(at.offset(-3, -8, -3), at.offset(3, 2, 3))) {
+			if (!level.isLoaded(q) || !level.getBlockState(q).isAir() || !level.getBlockState(q.above()).isAir()) continue;
+			if (level.getBlockState(q.below()).getCollisionShape(level, q.below()).isEmpty()) continue;   // (something to stand on)
+			int sky = level.getBrightness(LightLayer.SKY, q);
+			if (sky < bestSky || sky == bestSky && best != null && q.getY() < best.getY()) {
+				if (air(level, q) < 8) continue;
+				bestSky = sky;
+				best = q.immutable();
+			}
+		}
+		if (best == null || bestSky > 12 && !kind.equals("ravine") || !remember(level, best)) return;
+		c.eyes.caves++;
+		c.journal("thinks", "that " + kind + " at " + best.toShortString() + " is a way down to ore (it'll remember it for mining)");
+		XenMod.LOG.info("{} found a cave at {} ({} it saw)", c.name, best.toShortString(), kind);
 	}
 
 	/** In (or seeing) a cave biome under the ground: a cave, lit or not (lush caves glow), if there's room about. */
@@ -172,7 +200,7 @@ final class Caves {
 		BlockPos best = null;
 		double bestScore = Double.MAX_VALUE;
 		for (BlockPos k : known) {
-			if (!k.closerThan(c.player.blockPosition(), far)) continue;
+			if (!k.closerThan(c.player.blockPosition(), far) || done.contains(k.asLong())) continue;
 			double score = k.distSqr(c.player.blockPosition()) - (orePockets.contains(k.asLong()) ? 16 * 16 : 0);
 			if (score < bestScore) {
 				bestScore = score;
@@ -180,6 +208,11 @@ final class Caves {
 			}
 		}
 		return best;
+	}
+
+	/** It has seen all of that cave it can (or it gave nothing): not one to go back to. */
+	void done(BlockPos k) {
+		if (k != null) done.add(k.asLong());
 	}
 
 	/**
