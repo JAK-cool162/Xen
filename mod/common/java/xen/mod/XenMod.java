@@ -61,6 +61,8 @@ public class XenMod implements ModInitializer {
 	final Roster roster = new Roster();
 	/** The world's lore: what happened on it (see {@link Lore}). */
 	final Lore lore = new Lore();
+	/** What grows when they live together: constitutions and taxes they vote on, opinions, faiths (see {@link Society}). */
+	final Society society = new Society(this);
 	/** (Experiment) Spawn as Xen: a Xen plays your character (see {@link Avatar}). */
 	final Avatar avatar = new Avatar(this);
 	final Arena arena = new Arena(this);
@@ -217,6 +219,7 @@ public class XenMod implements ModInitializer {
 		}
 		roster.load(brainFile().resolveSibling("companions.json"));
 		lore.load(brainFile().resolveSibling("lore.json"));
+		society.load(brainFile().resolveSibling("society.json"));
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
 		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
 		Path file = brainFile();
@@ -410,6 +413,7 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) roster.remember(c, teamOf(c));
 		roster.save();
 		lore.save();
+		society.save();
 		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
 		xen.mod.talk.Banter.save();
 	}
@@ -423,6 +427,7 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) roster.remember(c, teamOf(c));                          // (before they leave: all they know)
 		roster.save();
 		lore.save();
+		society.save();
 		xen.mod.talk.Voice.save();
 		xen.mod.talk.Banter.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
@@ -484,6 +489,7 @@ public class XenMod implements ModInitializer {
 		if (s.getTickCount() % 100 == 0) {
 			try {
 				Tribe.tickAll(this);                                          // tribes: who's in which, sharing, the night watch
+				if (config.tribes) society.tick(s.overworld().getGameTime());   // (faiths founded, the history for graphs)
 			} catch (RuntimeException e) {
 				LOG.warn("Xen tribes stumbled: {}", e.toString(), e);
 			}
@@ -1064,6 +1070,11 @@ public class XenMod implements ModInitializer {
 				}))
 				.then(Commands.literal("knows").executes(ctx -> each(ctx, c -> c.knowledge.status())))
 
+				.then(Commands.literal("society").executes(ctx -> {             // constitutions, taxes, amendments, jobs, faiths
+					String out = String.join("\n", society.describe());
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				}))
 				.then(Commands.literal("tribes").executes(ctx -> {
 					StringBuilder sb = new StringBuilder();
 					for (Tribe t : tribes.values()) if (t.members.size() > 1) sb.append(sb.length() > 0 ? "\n" : "").append(t.status());

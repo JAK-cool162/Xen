@@ -40,7 +40,8 @@ final class Laws {
 
 	enum Job {
 		WOODCUTTER("woodcutter", Mind.WOOD), MINER("miner", Mind.MINE), FARMER("farmer", Mind.FOOD), BUILDER("builder", Mind.HOUSE),
-		GUARD("guard", Mind.GUARD), TRADER("trader", Mind.TRADE);
+		GUARD("guard", Mind.GUARD), TRADER("trader", Mind.TRADE), ENGINEER("engineer", Mind.FARM), DECORATOR("decorator", Mind.HOUSE),
+		PRIEST("priest", Mind.HELP);
 
 		final String word;
 		final int option;
@@ -100,6 +101,9 @@ final class Laws {
 		Rule rule = null;
 		for (Rule r : Rule.values()) if (r.heard.matcher(w).find()) rule = r;
 		if (rule == null) return "What rule, exactly? (no fighting, share food, everyone works, curfew, tax, no strangers)";
+		java.util.regex.Matcher pct = Pattern.compile("(\\d{1,2})\\s*(%|percent)").matcher(w);
+		if (rule == Rule.TAX && rules.containsKey(rule) && pct.find() && !tribe.members.isEmpty())   // a new rate: an amendment, voted on
+			return tribe.members.get(0).mod.society.vote(tribe, Integer.parseInt(pct.group(1)), byName, by == null ? null : by.getUUID());
 		if (rules.containsKey(rule)) return "That's already a rule here: " + rule.words + ".";
 		return vote(rule, by == null ? null : by.getUUID(), byName);
 	}
@@ -113,8 +117,15 @@ final class Laws {
 		}
 		boolean passes = yes > no;
 		if (passes) rules.put(rule, byName);
+		if (passes && rule == Rule.TAX) {                                        // the rate goes into the constitution: what its proposer would pay
+			Society.Charter ch = tribe.members.isEmpty() ? null : tribe.members.get(0).mod.society.charter(tribe);
+			Companion who = null;
+			for (Companion m : tribe.members) if (m.name.equals(byName)) who = m;
+			if (ch != null) ch.tax = Math.max(5, Math.min(30, who != null ? who.mod.society.wants(who) : 10));
+		}
 		String result = String.format(Locale.ROOT, "Vote on \"%s\" (%s's idea): %d for, %d against. %s", rule.words, byName, yes, no,
-				passes ? "It's a rule now!" : "It doesn't pass.");
+				passes ? "It's a rule now!" + (rule == Rule.TAX && !tribe.members.isEmpty() ? " " + tribe.members.get(0).mod.society.charter(tribe).tax + "% of everyone's "
+						+ (tribe.market.currency == null ? "money" : tribe.market.currency.replace('_', ' ')) + " each morning." : "") : "It doesn't pass.");
 		XenMod.LOG.info("{}: {}", tribe.name, result);
 		return result;
 	}
@@ -122,10 +133,10 @@ final class Laws {
 	/** Every so often: the leader may propose a rule it likes, jobs are handed out, rules are kept (and enforced). */
 	void tick(long now) {
 		if (tribe.members.size() < 3 || now < nextThought) return;
-		nextThought = now + 20 * 60 * 3;
+		nextThought = now + (Society.FAST ? 400 : 20 * 60 * 3);
 		Companion leader = leader();
 		if (leader == null) return;
-		long today = now / 24000;
+		long today = now / (Society.FAST ? 6000 : 24000);                         // (tests: a "day" every five minutes)
 		if (today != day) {                                                      // a new day: jobs, the tax, who worked
 			if (day >= 0) newDay(leader);
 			day = today;
@@ -153,6 +164,7 @@ final class Laws {
 	private Rule leaderIdea(Companion l) {
 		var p = l.personality;
 		float r = random.nextFloat();
+		if (Society.FAST && !rules.containsKey(Rule.TAX)) return Rule.TAX;          // (tests: the tax first, so its votes come round)
 		if (p.kindness > 0.6f && r < 0.5f) return Rule.SHARE_FOOD;
 		if (p.power > 0.6f && r < 0.4f) return random.nextBoolean() ? Rule.TAX : Rule.EVERYONE_WORKS;
 		if (p.loyalty > 0.6f && r < 0.5f) return Rule.NO_FIGHTING;
@@ -163,6 +175,8 @@ final class Laws {
 
 	/** Each member gets the job that fits it best (and says so). */
 	private void assignJobs(Companion leader) {
+		jobs.keySet().retainAll(tribe.members);                                  // (who moved to another village, or left)
+		worked.keySet().retainAll(tribe.members);
 		for (Companion m : tribe.members) {
 			if (m.player == null) continue;
 			var p = m.personality;
@@ -173,6 +187,9 @@ final class Laws {
 			fit.put(Job.BUILDER, p.diligence * 0.4f + (p.build.equals("fort") || p.build.equals("tower") ? 0.3f : 0.1f));
 			fit.put(Job.GUARD, p.power * 0.6f + p.bravery * 0.3f + (p.aggressive() ? 0.2f : 0));
 			fit.put(Job.TRADER, p.money * 0.7f + p.chattiness * 0.3f);
+			fit.put(Job.ENGINEER, (m.farmer.middle != null ? 0.35f : -0.2f) + 0.4f * p.curiosity + 0.2f * p.diligence);   // (a farm to make run by itself)
+			fit.put(Job.DECORATOR, (m.goals.home != null ? 0.2f : -0.3f) + 0.4f * p.sin(xen.mod.core.Sins.PRIDE) + (p.believes("beauty_matters") ? 0.35f : 0));
+			if (m.mod.society.priestOf(m) != null) fit.put(Job.PRIEST, 2f);                 // (its faith's priest: that's its calling)
 			if (style != null) switch (style) {                                   // the jobs the leader's way needs most
 				case CAUTIOUS -> {
 					fit.merge(Job.FARMER, 0.15f, Float::sum);
@@ -221,18 +238,26 @@ final class Laws {
 			for (Companion m : tribe.members) if (m.player != null && m != leader && worked.getOrDefault(m, 0) == 0) offense(m, "didn't work yesterday");
 		}
 		worked.clear();
-		if (rules.containsKey(Rule.TAX) && tribe.market.currency != null) {        // the tax: one of the village's money each
+		Society.Charter charter = leader.mod.society.charter(tribe);
+		if (rules.containsKey(Rule.TAX) && tribe.market.currency != null && charter.tax > 0) {   // the tax: its share of everyone's money, as the constitution says
 			String money = tribe.market.currency;
 			for (Companion m : tribe.members) {
 				if (m == leader || m.player == null || m.player.distanceTo(leader.player) > 32) continue;
-				if (m.items().getOrDefault(money, 0) > 0 && m.personality.loyalty + m.trust(leader.player.getUUID()) > 0.6f) {
-					m.chores.give(leader.player, money, 1);
-					m.chatter("Here's my tax, " + leader.name + ".", false);
-				} else if (m.items().getOrDefault(money, 0) > 0) {
+				int has = m.items().getOrDefault(money, 0);
+				if (has <= 0) continue;
+				int due = Math.max(1, Math.round(has * charter.tax / 100f));
+				float willing = m.personality.loyalty + m.trust(leader.player.getUUID()) + 0.3f * m.mod.society.feel(m);
+				if (willing > 0.6f) {
+					m.chores.give(leader.player, money, due);
+					charter.collected += due;
+					m.mod.society.paid(m, due, has);
+					m.chatter(m.mod.society.feel(m) < -0.3f ? "Fine. Here's my " + charter.tax + "%, " + leader.name + "." : "Here's my tax, " + leader.name + ".", false);
+				} else {
 					offense(m, "didn't pay the tax");
 				}
 			}
 		}
+		leader.mod.society.maybeAmend(tribe, leader, leader.player.level().getGameTime() / 24000);
 	}
 
 	/** A rule broken: a warning, then a fine, then the village turns its back on them. */
@@ -263,6 +288,13 @@ final class Laws {
 	/** A member hit another member: against the rules? */
 	void hit(Companion attacker, Companion victim) {
 		if (rules.containsKey(Rule.NO_FIGHTING) && tribe.members.contains(attacker) && tribe.members.contains(victim)) offense(attacker, "fighting in the village");
+	}
+
+	/** The jobs of its members now (not of those who moved on). */
+	Map<Companion, Job> currentJobs() {
+		Map<Companion, Job> out = new LinkedHashMap<>();
+		for (var e : jobs.entrySet()) if (tribe.members.contains(e.getKey())) out.put(e.getKey(), e.getValue());
+		return out;
 	}
 
 	List<String> describe() {

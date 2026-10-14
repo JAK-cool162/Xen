@@ -1,7 +1,39 @@
-**Xen Companion 2.0.0-beta.31**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.32**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.32: a society of their own, the way people make one
+
+Inspired by Altera's Project Sid (1,000 AI agents in one Minecraft world forming a civilization). None of it is
+scripted: each Xen weighs every part by its own nature, the way a person would.
+
+* **A constitution with a tax.** A village that votes a tax in writes a rate into its constitution (5 to 30%, what its
+  proposer would pay): that share of everyone's village money each morning, paid to the leader. One that won't pay
+  breaks the rule (a warning, a fine, then the village turns its back on it).
+* **They change it by vote.** Each Xen feels its own way about the tax: power and loyalty for it, a love of money
+  against it, and what paying it costs it. When the village's feelings drift away from the rate, the one who feels it
+  most proposes an amendment ("This tax is too much. I say 9%. Let's vote.") and each votes for the rate closer to what
+  it would pay. You can propose one too: "new rule: tax 10%".
+* **Opinions spread by talk.** In their chats with each other, a chatty Xen with a strong view argues it ("Taxes help
+  everyone!", "20% is too much.") and the other moves toward it as far as it trusts the speaker.
+* **Faiths.** Now and then a chatty Xen with a kind heart (or a proud one) founds a faith and becomes its priest: in
+  the tests, Breadism ("The Bread lights the way down"), the Order of the Gentle Golden Carrot ("The Golden Carrot
+  rewards those who share"), the Followers of the Furnace. It preaches in its chats and may bring a gift with the
+  blessing ("I trade not just goods but the blessings of..."); followers spread it too, less keenly. Each one decides
+  for itself: trust in the preacher, curiosity and a gift weigh against pride and a faith of its own. Fellow followers
+  trust each other more, and that shows wherever trust does (sharing, votes, trades).
+* **New jobs:** priest, engineer (a farm to make run by itself), decorator, alongside woodcutter, miner, farmer,
+  builder, guard and trader.
+* **`/xen society`:** each village's constitution, tax, what its members would pay on average, its amendments and jobs,
+  and each faith with its followers (and their share of all Xens). A history for graphs is kept in
+  `<world>/xen/society.csv` (followers of each faith, each village's tax, over time).
+* **Fixed:** Xen-to-Xen chats could stop for good if a Xen died in the middle of one.
+* **Tested** (10 Xens close together, sped up): in one game day three faiths were founded and 2 of 10 and 3 of 10 Xens
+  joined two of them; three villages voted in their first rules; in another run a village voted in an 18% tax (2 for,
+  1 against) and another voted one down (2 for, 3 against). An amendment needs a village with a tax that holds
+  together for a couple of days: not seen in the tests yet.
+* Everything else is as in 2.0.0-beta.31.
 
 ### 2.0.0-beta.31: it goes looking for iron like a player (caves, deeper, longer)
 

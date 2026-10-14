@@ -413,7 +413,7 @@ final class Tribe {
 		if (!rules.isEmpty()) sb.append("; rules: ").append(String.join(", ", rules));
 		if (!laws.jobs.isEmpty()) {
 			sb.append("; jobs:");
-			for (var e : laws.jobs.entrySet()) sb.append(' ').append(e.getKey().name).append('=').append(e.getValue().word);
+			for (var e : laws.currentJobs().entrySet()) sb.append(' ').append(e.getKey().name).append('=').append(e.getValue().word);
 		}
 		return sb.toString();
 	}

@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.31+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.31+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.32+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.32+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -244,7 +244,9 @@ critic, a fear (harm) critic and a world model that imagines ahead, trained from
 scratch in a simulated survival life and still learning in your world (minions keep
 the classic brain). Xens have a hidden nature (aggressive, passive or friendly;
 kindness, loyalty, power and money), pick their own teams, make village rules and
-jobs and punish those who break them, build houses in styles (modern, on stilts,
+jobs and punish those who break them, write a tax into their constitution and vote to
+change it (opinions spread as they talk), found faiths whose priests preach and win
+followers (`/xen society` tells it all, like Altera's Project Sid), build houses in styles (modern, on stilts,
 towers, cottages, with ponds and workshops), dig highways (underground, or under the
 Nether roof), and fly with elytras. Right-click it to
 open its bag. `/xen spawn 50` (operators) brings in a crowd of Xens across the

@@ -50,6 +50,16 @@ final class Sharing {
 		to = null;
 	}
 
+	/** A gift it means to give (a priest's, say): walked over and tossed at their feet like any other. False if it's busy. */
+	boolean gift(Companion them, String item, int n, long now) {
+		if (to != null || them == null || them.player == null) return false;
+		to = them;
+		what = item;
+		count = Math.max(1, n);
+		until = now + 20 * 30;
+		return true;
+	}
+
 	/** Is this item on the ground one a friend just tossed to it? */
 	boolean expected(ItemStack s) {
 		return expecting != null && c.player != null && now() < expectingUntil

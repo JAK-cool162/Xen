@@ -29,7 +29,8 @@ final class Talker {
 	private static final Pattern NO = Pattern.compile("^(no|nope|nah|not now|don'?t|no thanks|n)\\b");
 	/** Who talked last, for all Xens together (game time): at most one remark every 10 seconds. */
 	private static long anyoneSpoke = -1_000_000;
-	private static int conversations;
+	/** A chat with another Xen is playing out (its lines are queued here): counted by the Xens who are, not a tally that could stick. */
+	boolean conversing;
 
 	private final Companion c;
 	private final Random random = new Random();
@@ -313,7 +314,9 @@ final class Talker {
 	// --------------------------------------------------------------------------- Xen with Xen
 	private void chatWithXen(long now) {
 		nextXenTalk = now + 200;
-		if (conversations >= 2) return;                                  // two chats at a time, for all Xens together
+		int talking = 0;                                                 // two chats at a time, for all Xens together
+		for (Companion x : c.mod.companions) if (x.talker.conversing) talking++;
+		if (talking >= 2) return;
 		for (Companion o : c.mod.companions) {
 			if (o == c || o.player() == null || o.inArena || o.player().level() != c.player.level()) continue;
 			if (o.player().distanceTo(c.player) > 12 || o.talker.busy() || !c.mod.config.talk) continue;
@@ -405,11 +408,12 @@ final class Talker {
 			line(c, rumor, t += 60, () -> o.rumors.overheard(c.name, me, rumor), whisper ? o : null);
 			line(o, pick("Really? Good to know.", "No way!", "Huh. I'll keep that in mind.", "Seriously?", "I heard that too."), t += 50, null);
 		}
+		t = c.mod.society.talk(c, o, t, this::line);                       // the tax, faith: what they think, and it spreads
 		line(c, pick("See you around!", "Bye for now.", "Later.", "Bye...", "See you!", "Toodles!"), t + 60, () -> {
 			c.trust(them, 0.1f);                                         // a nice chat: they like each other a bit more
 			o.trust(me, 0.1f);
 		});
-		conversations++;
+		conversing = true;
 	}
 
 	private void line(Companion who, String text, long at, Runnable then) {
@@ -431,7 +435,7 @@ final class Talker {
 				else who.talker.sayNear((String) l[1]);
 			}
 			if (l[3] != null) ((Runnable) l[3]).run();
-			if (lines.isEmpty()) conversations = Math.max(0, conversations - 1);
+			if (lines.isEmpty()) conversing = false;
 		}
 	}
 

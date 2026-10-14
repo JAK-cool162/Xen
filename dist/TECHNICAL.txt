@@ -1,8 +1,45 @@
-XEN COMPANION 2.0.0-beta.31: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.32: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.32
+===========================
+
+Society.java (new; XenMod.society, kept in <world>/xen/society.json, history in society.csv every 1200 ticks:
+"minute,faith,name,followers,by the priest,by others,population" and "minute,tax,village,rate,collected,0,members").
+- Tax feeling per Xen (-1..1), first from its nature: 0.6 power + 0.4 loyalty + 0.2 kindness - 0.9 money - 0.2 greed
+  - 0.15 + noise. wants() = 15 * (feel + 1) percent. Paying moves it: -share * (0.25 + 0.6 money).
+- Laws: the TAX rule passing sets Charter.tax = its proposer's wants (5..30). newDay: each member with village money
+  pays max(1, round(has * tax%)) to the leader (willing: loyalty + trust in the leader + 0.3 feel > 0.6; else an
+  offense), charter.collected counts it. Then maybeAmend: 3+ voters, 2+ days since the last vote, mean wants at
+  least 4 points off the rate: the most strongly feeling member on that side (|feel| * (0.5 + chattiness)) proposes
+  round(mean); each votes yes when the proposal is closer to what it wants. Passed: amendments (kept 20), lore.
+  "new rule: tax N%" from a player in a village with a tax: Society.vote (each leans 3 * trust in the proposer).
+- Talker.converse (Xen with Xen) -> Society.talk: same village, a tax, |feel| > 0.45, p = 0.25 + 0.5 chattiness: it
+  argues; the other's feel moves (speaker - it) * 0.25 * (0.5 + trust) * (1 - 0.5 pride). Faith: fellow followers bless
+  each other (+0.03 trust both ways); a follower and one who isn't: preach (a priest 0.9, others 0.15 + 0.3
+  chattiness). A priest may give a gift (0.3 + 0.4 kindness; bread, cooked meat, apples, coal, torches, logs or
+  cobblestone it has 4 of) through Sharing.gift (walked over, tossed at their feet). Converts with p = 0.08 + 0.35
+  trust + 0.2 curiosity + (gift: 0.15 + 0.15 money) - 0.3 (a faith of its own) - 0.15 pride - 0.15 (stubborn)
+  (+0.05 from a priest), 0.02..0.85; a faith's own founder x0.05.
+- Founding: every 3 min, at most 3 faiths, 4+ Xens; a Xen a day old, chattiness >= 0.55, kindness >= 0.5 or pride >=
+  0.5, p 0.08: a name ("the Church of the Holy Pickaxe", "the Order of the Gentle Golden Carrot", "Breadism"...), a
+  teaching ("The Bread lights the way down"), a blessing; it is the priest (Laws job PRIEST).
+- -Dxen.societyFast=true (tests only): founding every 400 ticks (p 0.3, an hour old), leaders' rule ideas every 400
+  ticks and the tax first, village "days" of 6000 ticks, no wait between amendments.
+Laws: jobs ENGINEER (Mind.FARM; a farm), DECORATOR (Mind.HOUSE; pride, beauty_matters), PRIEST (Mind.HELP; its faith's
+  founder); currentJobs() (jobs of members only; assignJobs drops those who moved on).
+Talker: the "two chats at a time" limit counts the Xens whose chat is playing (conversing), not a static tally that
+  stayed up when a Xen died mid-chat (no more Xen chats after that).
+/xen society: Society.describe().
+Tests (server-quick, seed 20261014, 10 Xens spawned within 4 blocks, tick rate 1000, -Dxen.societyFast=true, 1 day):
+- run 1: Breadism, the Order of the Gentle Golden Carrot, the Order of the Blessed Torch founded; 3 of 10 and 2 of 10
+  joined; three villages voted in "share food with the hungry"; priests got the priest job. (Its Torch founder joined
+  the Carrot: founders now x0.05.)
+- run 2: three faiths founded; "a tax for the village": 2 for, 1 against, 18%. Without the test switch: a tax voted down
+  2 to 3; "everyone works", "no fighting" passed. No amendment yet (the taxed village broke up after deaths at night).
 
 WHAT'S NEW IN 2.0.0-beta.31
 ===========================
