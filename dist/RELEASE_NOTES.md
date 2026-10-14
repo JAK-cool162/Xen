@@ -1,7 +1,19 @@
-**Xen Companion 2.0.0-beta.30.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.30.2**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.30.2: loop until every Xen has a real player's skin
+
+* **Loop until real player skin.** A new switch next to Skins (Basics and Xens tabs; `/xen set realSkins true`). On:
+  it keeps looking until every Xen wears a skin a real player made (mineskin.org's public gallery) instead of one of
+  the mod's own. Offline, or the gallery ran short, it tries again later and further back through the gallery. A Xen
+  still in a stock skin changes into a real one as soon as there is one: out of the game and straight back in, like a
+  player changing skins, with its bag, health and place kept and no "joined the game". New Xens get a real one at once
+  when one is in. A Xen named after a real account keeps that account's skin.
+* Tested: four Xens in the mod's modern skins all changed within 30 s of switching it on (a diamond in a bag stayed
+  there); one in Minecraft's own Steve skin changed too, its things kept. Two new Xens came in real skins straight away.
+* Everything else is as in 2.0.0-beta.30.1.
 
 ### 2.0.0-beta.30.1: a How to page in the settings
 

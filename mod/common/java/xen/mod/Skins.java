@@ -45,7 +45,9 @@ import java.util.concurrent.Executors;
  *   <li>{@code "player:Name"}: the skin of a Minecraft account;</li>
  *   <li>a default skin's name ({@code "steve"}, {@code "alex:slim"}...) or {@code "texture:<value>:<signature>"}.</li>
  * </ul>
- * Anything online happens on its own thread; until it's ready, a Xen gets one of the mod's own skins.
+ * Anything online happens on its own thread; until it's ready, a Xen gets one of the mod's own skins. With
+ * {@code realSkins} on, it keeps looking (further back through the gallery, again later when it's offline) until no Xen
+ * is left in one of the mod's own skins.
  */
 final class Skins {
 	private static final String MINESKIN = "https://api.mineskin.org";
@@ -62,6 +64,13 @@ final class Skins {
 			.connectTimeout(java.time.Duration.ofSeconds(15)).build();
 	private Path dir;
 	private volatile boolean fetchingGallery;
+	/** Where the gallery goes on from (further back each time), and when to try again after it couldn't be reached. */
+	private volatile String galleryAfter;
+	private volatile long nextTry;
+	private int fails;
+	private final java.util.Set<String> seen = ConcurrentHashMap.newKeySet();
+	/** The skins that come with the mod (both packs, the blob ones). */
+	private final java.util.Set<String> stock = new java.util.HashSet<>();
 
 	/** The modern pack (today's style), and the fun pack of earlier versions ({@link #pack}). */
 	private final List<String> modern = new ArrayList<>();
@@ -72,6 +81,28 @@ final class Skins {
 		read("/assets/xen/skins/pack.json", pack);
 		read("/assets/xen/skins/modern.json", modern);
 		read("/assets/xen/skins/blob.json", blob);
+		stock.addAll(pack);
+		stock.addAll(modern);
+		stock.addAll(blob);
+	}
+
+	/** One of the mod's own skins (its packs, Minecraft's default ones), not one a real player made. */
+	boolean stock(String skin) {
+		return skin == null || stock.contains(skin) || Looks.builtIn(skin) >= 0;
+	}
+
+	/** A gallery skin (made by a real player) nobody here wears yet (null: none in yet). */
+	String real(java.util.Set<String> worn, Random r) {
+		List<String> free = new ArrayList<>();
+		for (String g : gallery) if (!worn.contains(g)) free.add(g);
+		return free.isEmpty() ? null : free.get(r.nextInt(free.size()));
+	}
+
+	/** "Keep looking": fewer than want gallery skins nobody wears? More from the gallery (offline: again in a while). */
+	void keepLooking(int want, java.util.Set<String> worn) {
+		int free = 0;
+		for (String g : gallery) if (!worn.contains(g)) free++;
+		if (free < want && gallery.size() < 600 && System.currentTimeMillis() >= nextTry) fetchGallery();
 	}
 
 	private static void read(String resource, List<String> into) {
@@ -224,7 +255,16 @@ final class Skins {
 	private boolean whole(String value) {
 		try {
 			JsonObject tex = new Gson().fromJson(new String(java.util.Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8), JsonObject.class);
-			String url = tex.getAsJsonObject("textures").getAsJsonObject("SKIN").get("url").getAsString().replace("http://", "https://");
+			return wholeAt(tex.getAsJsonObject("textures").getAsJsonObject("SKIN").get("url").getAsString());
+		} catch (Throwable e) {
+			return true;
+		}
+	}
+
+	/** The same, for the skin image at this address. */
+	private boolean wholeAt(String url) {
+		try {
+			url = url.replace("http://", "https://");
 			HttpRequest req = HttpRequest.newBuilder(URI.create(url)).header("User-Agent", "XenCompanion (Minecraft mod)").timeout(java.time.Duration.ofSeconds(20)).build();
 			HttpResponse<byte[]> res = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
 			if (res.statusCode() != 200) return true;
@@ -244,25 +284,45 @@ final class Skins {
 		return n / (float) (w * h);
 	}
 
-	/** Some skins from mineskin.org's public gallery, with their signed textures. */
+	/** Some skins from mineskin.org's public gallery, with their signed textures (the newest first, then further back). */
 	private void fetchGallery() {
 		if (fetchingGallery) return;
 		fetchingGallery = true;
 		net.submit(() -> {
+			int before = gallery.size();
 			try {
-				JsonObject list = new Gson().fromJson(get(MINESKIN + "/v2/skins?size=36"), JsonObject.class);
+				String after = galleryAfter;
+				JsonObject list = new Gson().fromJson(get(MINESKIN + "/v2/skins?size=36" + (after == null ? "" : "&after=" + after)), JsonObject.class);
 				for (JsonElement e : list.getAsJsonArray("skins")) {
-					String uuid = e.getAsJsonObject().get("uuid").getAsString();
+					JsonObject item = e.getAsJsonObject();
+					String uuid = item.get("uuid").getAsString();
+					if (!seen.add(uuid)) continue;
+					if (item.has("texture") && !item.get("texture").isJsonNull()
+							&& !wholeAt("https://textures.minecraft.net/texture/" + item.get("texture").getAsString())) {   // (a test upload: not worth asking for)
+						junk++;
+						continue;
+					}
 					JsonObject skin = new Gson().fromJson(get(MINESKIN + "/v2/skins/" + uuid), JsonObject.class).getAsJsonObject("skin");
 					JsonObject data = skin.getAsJsonObject("texture").getAsJsonObject("data");
-					if (whole(data.get("value").getAsString())) gallery.add("texture:" + data.get("value").getAsString() + ":" + data.get("signature").getAsString());
-					else junk++;
+					String t = "texture:" + data.get("value").getAsString() + ":" + data.get("signature").getAsString();
+					if (item.has("texture") || whole(data.get("value").getAsString())) {
+						if (!gallery.contains(t)) gallery.add(t);
+					} else junk++;
 					Thread.sleep(300);
 				}
+				try {
+					galleryAfter = list.getAsJsonObject("pagination").getAsJsonObject("next").get("after").getAsString();
+				} catch (RuntimeException end) {
+					galleryAfter = null;                                       // (the end of it: from the newest again)
+				}
+				fails = 0;
 				XenMod.LOG.info("Xen has {} skins from mineskin.org's gallery{}", gallery.size(), junk > 0 ? " (left out " + junk + " that were mostly see-through)" : "");
 			} catch (Exception e) {
+				fails++;
 				XenMod.LOG.warn("Xen couldn't get skins from mineskin.org: {}", e.toString());
 			} finally {
+				if (fails > 0) nextTry = System.currentTimeMillis() + Math.min(600_000L, 30_000L << Math.min(fails - 1, 5));   // offline: again in a while
+				else if (gallery.size() == before) nextTry = System.currentTimeMillis() + 60_000L;   // (nothing new on that page)
 				fetchingGallery = false;
 			}
 		});

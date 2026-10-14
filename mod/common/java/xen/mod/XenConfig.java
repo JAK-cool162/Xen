@@ -142,6 +142,13 @@ public final class XenConfig {
 	 */
 	public java.util.List<String> skins = new java.util.ArrayList<>(java.util.List.of("accurate"));
 	/**
+	 * Real skins, keep looking: every Xen gets a skin a real player made (mineskin.org's public gallery) instead of one
+	 * of the mod's own. Offline, or the gallery ran short: it keeps trying, and a Xen still in one of the mod's skins
+	 * changes into a real one as soon as one comes in (it steps out of the game and straight back in, like a player
+	 * changing skins). A Xen named after a real account keeps that account's skin.
+	 */
+	public boolean realSkins = false;
+	/**
 	 * How new Xens are named: "accurate" (the default: real Minecraft accounts, like the Carpet mod's fake players: the
 	 * names you list in config/xen/real_names.txt and any name you summon a Xen by, each with that account's real skin;
 	 * once the list is used up, names like real players' that are made up), "player" (like real players' names now:

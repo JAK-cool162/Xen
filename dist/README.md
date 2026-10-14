@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.30.1
+# Xen Companion (Fabric mod) 2.0.0-beta.30.2
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.30.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.30.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.30.2+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.30.2+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.30.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.30.2+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -487,6 +487,13 @@ slow a server away. Turn **Redstone** off to disable it.
   * `mineskin`: random skins from mineskin.org's public gallery (online);
   * `player:Name`: a Minecraft account's skin (`/xen set skins player:Dream`);
   * one skin by name (`steve`, `alex:slim`) or `texture:<value>:<signature>`.
+* **Loop until real player skin** (`realSkins`, off at first; next to Skins in the
+  settings): it keeps looking until every Xen wears a skin a real player made
+  (mineskin.org's gallery) instead of one of the mod's own. Offline, or the gallery
+  ran short: it tries again later, further back through the gallery, and a Xen still
+  in a stock skin changes into a real one as soon as there is one (out of the game
+  and straight back in, its things and place kept, no "joined the game"). A Xen named
+  after a real account keeps that account's skin.
 * **Antics** (`antics`): Xens do unpredictable things for fun. Crouch up and
   down next to one and it dances along (Xens nearby join in); now and then it
   shows off a trick ("Watch this!": a sprint, a jump and a spin) that doesn't

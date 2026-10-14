@@ -94,7 +94,9 @@ public final class Companion {
 	private float lifeReward;
 	/** Its nature (genes) and how it looks. */
 	final Personality personality;
-	final String skin;
+	/** Its skin ({@link Looks#profile}); a real player's one in place of one of the mod's own, with "keep looking" on. */
+	String skin;
+	private boolean reskinning;
 	/** Players it knows: its owner and whoever has talked to it. */
 	final Set<UUID> known = new java.util.HashSet<>();
 	/** How it does this generation (for evolution). */
@@ -124,7 +126,7 @@ public final class Companion {
 	// ------------------------------------------------------------------------------- joining
 	/** Join the server as a real player at a position. */
 	void join(ServerLevel level, Vec3 at, float yaw) {
-		habits.arrived();                                               // (new here: a look around first)
+		if (!reskinning) habits.arrived();                              // (new here: a look around first)
 		GameProfile profile = Looks.profile(name, skin);
 		// What the server kept of it (its bag, health, where it was), like any player coming back: read before it joins.
 		java.util.Optional<net.minecraft.nbt.CompoundTag> saved = server.getPlayerList().loadPlayerData(new net.minecraft.server.players.NameAndId(profile));
@@ -3434,6 +3436,53 @@ public final class Companion {
 		player = null;
 		mod.forget(this);
 		mod.goneForGood(this, id, goneAt == null ? BlockPos.ZERO : goneAt, goneHow);
+	}
+
+	/**
+	 * Into another skin (one a real player made, found online): out of the game and straight back in wearing it, the
+	 * way a player changes skins (its bag, health and place kept; no "joined the game"). Not in the middle of anything
+	 * a moment away would spoil: false, and it waits for a better moment.
+	 */
+	boolean reskin(String to) {
+		XenPlayer p = player;
+		if (p == null || to == null || to.equals(skin) || respawnIn >= 0 || goneIn >= 0 || minion || inArena || !p.isAlive() || p.isSleeping()
+				|| p.isPassenger() || !p.onGround() || p.isInWater() || fightingNow() || pillaring || builder.busy()) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		Vec3 at = p.position();
+		float yaw = p.getYRot();
+		UUID was = p.getUUID(), now = Looks.uuid(name, Looks.builtIn(to));
+		hands.stop();
+		server.getPlayerList().remove(p);                             // (its bag, health and all saved, as when a player leaves)
+		String old = skin;
+		skin = to;
+		if (!was.equals(now)) {                                       // (one of Minecraft's own skins went with another UUID: what's saved goes along)
+			try (var files = java.nio.file.Files.list(server.getWorldPath(net.minecraft.world.level.storage.LevelResource.PLAYER_DATA_DIR))) {
+				for (java.nio.file.Path f : files.filter(f -> f.getFileName().toString().startsWith(was.toString())).toList())
+					java.nio.file.Files.copy(f, f.resolveSibling(now + f.getFileName().toString().substring(was.toString().length())),
+							java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			} catch (Exception e) {
+				XenMod.LOG.warn("{}'s saved things didn't move with its new skin: {}", name, e.toString());
+			}
+			for (Companion o : mod.companions) {
+				Float t = o.trust.remove(was);
+				if (t != null) o.trust.put(now, t);
+			}
+		}
+		reskinning = true;
+		XenMod.quietJoin = true;
+		try {
+			join(level, at, yaw);
+		} catch (RuntimeException e) {                                // (back in its old one, rather than not at all)
+			XenMod.LOG.warn("{} couldn't change skins: {}", name, e.toString());
+			skin = old;
+			join(level, at, yaw);
+		} finally {
+			XenMod.quietJoin = false;
+			reskinning = false;
+		}
+		mod.roster.remember(this, mod.teamOf(this));
+		journal("is", "in a skin a real player made now (it had one of the mod's own)");
+		return skin.equals(to);
 	}
 
 	/** Come back where a player would respawn (bed or world spawn), healthy and hungry-free. */

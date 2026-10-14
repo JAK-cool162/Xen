@@ -1,8 +1,28 @@
-XEN COMPANION 2.0.0-beta.30.1: TECHNICAL NOTES
-=============================================
+XEN COMPANION 2.0.0-beta.30.2: TECHNICAL NOTES
+==============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.30.2
+=============================
+
+realSkins ("Loop until real player skin", XenConfig, off by default; an onOff row after Skins in Basics and Xens).
+- Skins: stock(skin) is one of the mod's own (pack, modern, blob, or Minecraft's 18 by name); real(worn) is a gallery
+  skin nobody wears; keepLooking(want, worn) fetches another gallery page when fewer than want are free (at most 600).
+  The gallery now pages (pagination.next.after, back to the newest at the end; seen uuids skipped), checks each list
+  item's texture (textures.minecraft.net/texture/<hash>, the see-through test) before asking for its signed details,
+  and after a failure waits 30 s, 1, 2, 4, 8 and then 10 min before trying again (60 s after a page with nothing new).
+- XenMod.realSkins every 200 ticks: the Xens in stock skins (not minions, not in the arena) keep it looking, and two a
+  time change via Companion.reskin. create(): a new Xen (or a returning one in a stock skin), no account skin, gets
+  real(worn) when one is in.
+- Companion.reskin(to): not while dead, respawning, asleep, riding, in the air or water, fighting, pillaring or
+  building. PlayerList.remove (saves it), skin = to, join() again at the same place and yaw with quietJoin (no joined
+  message, no look-around), roster.remember. Minecraft's own skins have their own UUIDs (Looks.uuid): from one of
+  them the playerdata files are copied to the new UUID and other Xens' trust moves with it.
+- Checked (server-quick, skins modern): /xen set realSkins true; 4 of 4 changed within 30 s, a Xen's 5 diamonds kept;
+  skins default, then on: byte80 (Steve's UUID) changed, new playerdata file, its 7 emeralds kept; 2 new Xens came in
+  gallery skins with no change needed. No errors.
 
 WHAT'S NEW IN 2.0.0-beta.30.1
 =============================

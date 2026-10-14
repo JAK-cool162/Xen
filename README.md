@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.30.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.30.1+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.30.2+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.30.2+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -283,7 +283,10 @@ made-up word like Zorbax, or a classic like Pip) and a skin: one of the mod's
 own 61 ([`docs/skins`](docs/skins/README.md), free to use), Minecraft's 18,
 your own PNGs in `config/xen/skins/` (from NameMC, Planet Minecraft or drawn
 yourself: signed once through mineskin.org so everyone sees them), random ones
-from mineskin.org's gallery, or a player's (`/xen set skins player:Name`). The genes
+from mineskin.org's gallery, or a player's (`/xen set skins player:Name`). With
+**Loop until real player skin** on (`/xen set realSkins true`, next to Skins in the
+settings) it keeps looking until no Xen is left in one of the mod's own skins: each
+gets one a real player made, as soon as there's one (offline, it tries again later). The genes
 really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
 tries new things up to 1.5x as often, a patient one keeps at a chore longer.
 

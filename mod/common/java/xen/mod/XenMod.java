@@ -118,6 +118,7 @@ public class XenMod implements ModInitializer {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		config = XenConfig.load(configDir.resolve("xen.json"));
 		skins.prepare(configDir, config.skins);
+		if (config.realSkins) skins.keepLooking(8, java.util.Set.of());   // (real players' skins in before the first Xen comes)
 		if (config.realNameStyle()) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
@@ -488,6 +489,13 @@ public class XenMod implements ModInitializer {
 			}
 			if (config.evolution) evolve();
 		}
+		if (config.realSkins && s.getTickCount() % 200 == 100) {
+			try {
+				realSkins();
+			} catch (RuntimeException e) {
+				LOG.warn("Xen's real skins stumbled: {}", e.toString());
+			}
+		}
 		if (s.getTickCount() % 6000 == 3000) {                                // every five minutes: its team, its rules
 			try {
 				maybeFoundTeams();                                             // (a Xen may start a team of its own)
@@ -780,6 +788,32 @@ public class XenMod implements ModInitializer {
 
 	/** A Xen is coming back after dying (its "joined the game" isn't said). */
 	static volatile boolean quietJoin;
+
+	/**
+	 * "Loop until real player skin": Xens still in one of the mod's own skins (it was offline, or the gallery ran
+	 * short) keep it looking, and change into one a real player made as soon as there's one (two at a time).
+	 */
+	private void realSkins() {
+		java.util.Set<String> worn = new java.util.HashSet<>();
+		List<Companion> stock = new ArrayList<>();
+		for (Companion c : companions) {
+			worn.add(c.skin);
+			if (c.player != null && !c.minion && !c.inArena && skins.stock(c.skin)) stock.add(c);
+		}
+		if (stock.isEmpty()) return;
+		skins.keepLooking(Math.min(stock.size() + 4, 200), worn);
+		int changed = 0;
+		for (Companion c : stock) {
+			if (changed >= 2) break;
+			String real = skins.real(worn, random);
+			if (real == null) break;
+			if (c.reskin(real)) {
+				worn.add(real);
+				changed++;
+				LOG.info("{} wears a skin a real player made now ({} still in the mod's own)", c.name, stock.size() - changed);
+			}
+		}
+	}
 
 	/** Local death messages: the game's own (to everyone) off, it sends them itself; back on when the setting goes off. */
 	private void deathMessages() {
@@ -1248,6 +1282,12 @@ public class XenMod implements ModInitializer {
 		boolean account = real != null || config.nameStyle.equals("accurate") && typed && wanted != null && known == null;
 		String own = config.realNameStyle() ? (account ? skins.playerNow(name, 3000) : skins.player(name)) : null;
 		if (own != null) skin = own;
+		if (own == null && config.realSkins && (known == null || skins.stock(skin))) {   // a real player's skin, if one's in (else later)
+			java.util.Set<String> worn = new java.util.HashSet<>();
+			for (Companion o : companions) worn.add(o.skin);
+			String r = skins.real(worn, random);
+			if (r != null) skin = r;
+		}
 		Companion c = new Companion(this, server, name, owner == null ? null : owner.getUUID(),
 				owner == null ? "nobody" : owner.getName().getString(), p, skin);
 		if (config.ownLife && config.wants) c.mode = Companion.Mode.FREE;   // its own life: it plays its own game
