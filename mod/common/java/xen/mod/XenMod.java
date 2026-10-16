@@ -1070,6 +1070,19 @@ public class XenMod implements ModInitializer {
 				}))
 				.then(Commands.literal("knows").executes(ctx -> each(ctx, c -> c.knowledge.status())))
 
+				.then(Commands.literal("time").executes(ctx -> {                 // where their time goes: each Xen, then all of them
+					List<Diary> all = new ArrayList<>();
+					StringBuilder sb = new StringBuilder();
+					for (Companion c : companions) {
+						if (c.minion) continue;
+						all.add(c.diary);
+						sb.append(Diary.describe(c.name, List.of(c.diary))).append('\n');
+					}
+					sb.append(Diary.describe("All Xens", all));
+					String out = sb.toString();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				}))
 				.then(Commands.literal("society").executes(ctx -> {             // constitutions, taxes, amendments, jobs, faiths
 					String out = String.join("\n", society.describe());
 					ctx.getSource().sendSuccess(() -> Component.literal(out), false);

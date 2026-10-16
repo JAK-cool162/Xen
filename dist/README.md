@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.32
+# Xen Companion (Fabric mod) 2.0.0-beta.32.1
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.32+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.32+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.32.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.32.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.32+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.32.1+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -1367,6 +1367,7 @@ away in single player. On a server, operators use:
 | `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
 | `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
 | `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
+| `/xen time` | where each Xen's time goes: minutes on each kind of thing it chose, how often it got somewhere, deaths |
 | `/xen society` | each village's constitution, tax and amendments, its jobs, and each faith with its followers |
 | `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 

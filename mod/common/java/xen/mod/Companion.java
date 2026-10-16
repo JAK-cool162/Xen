@@ -2741,6 +2741,8 @@ public final class Companion {
 	boolean lostFight;
 	/** How much it trusts each player (and Xen) it has met, -1 to 1: kind words and fair deals up, hits and cheating down. */
 	final Map<UUID, Float> trust = new HashMap<>();
+	/** Where its time goes (for /xen time): minutes on each kind of thing, and how often it came to something. */
+	final Diary diary = new Diary();
 
 	float trust(UUID who) {
 		if (who == null) return 0;

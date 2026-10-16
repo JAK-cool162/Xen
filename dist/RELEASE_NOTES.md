@@ -1,7 +1,17 @@
-**Xen Companion 2.0.0-beta.32**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.32.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.32.1: /xen time, where their time goes
+
+* **`/xen time`**: for each Xen, and all of them added up, the game minutes it spent on each kind of thing its mind
+  chose (mining, a shelter for the night, wood, exploring...), how many times, how often that got it somewhere, and how
+  often it ended in its death. The honest answer to "what does it actually do all day?".
+* What it showed (5 Xens, a fresh world, 3 game days): mining 34% of their time (28% of trips found something), the
+  night's shelter 25%, stone 11%, exploring 11%, wood 10%, a house 1%; 15 deaths (skeletons 6, falls 4, creepers 2,
+  drowned 2, a zombie), and no Xen lived a whole day. Keeping them alive comes next.
+* Everything else is as in 2.0.0-beta.32.
 
 ### 2.0.0-beta.32: a society of their own, the way people make one
 

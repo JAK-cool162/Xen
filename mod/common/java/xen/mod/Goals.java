@@ -1718,6 +1718,7 @@ final class Goals {
 		Tribe t = c.tribe();
 		if (t != null) t.laws.didWork(c, o);
 		c.journal("learns", String.format(Locale.ROOT, "Xen 2.0: %s took %.1f min, reward %+.2f, harm %.2f%s", Mind.OPTIONS[o], minutes, r, h, died ? " (died)" : ""));
+		c.diary.spent(Mind.OPTIONS[o], (now - optionAt) / 1200f, r > 0.05f, died);
 	}
 
 	// -------------------------------------------------------------------------------- words

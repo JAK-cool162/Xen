@@ -1,8 +1,19 @@
-XEN COMPANION 2.0.0-beta.32: TECHNICAL NOTES
-============================================
+XEN COMPANION 2.0.0-beta.32.1: TECHNICAL NOTES
+==============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.32.1
+=============================
+
+Diary.java (new): Companion.diary; Goals (where each option's outcome is learned) adds the minutes since the option
+began, whether its reward was over 0.05 ("got somewhere") and whether it died. /xen time: each Xen (not minions), then
+all added up, the largest share first. Measured with it (cmps.sh: seed 20261009, 5 Xens, normal, learning on, tick rate
+10000, 3 days): 215 game minutes of own choices: mine 72.6 (34%, 53 times, 28% got somewhere, died 2x), shelter 52.8
+(25%, 15, 13%), stone 23.1 (11%), explore 22.9 (11%, died 3x), wood 22.3 (10%), farm 14.4, smelt 2.4, house 2.2 (1 try).
+15 deaths (shot by skeleton 6, fall 4, creeper 2, drowned 2, zombie 1); longest life 1226 s; stone pickaxes at 79-249 s;
+iron: one Xen, 2.
 
 WHAT'S NEW IN 2.0.0-beta.32
 ===========================
