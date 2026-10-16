@@ -418,6 +418,11 @@ final class Plans {
 		return sb + String.format(java.util.Locale.ROOT, " (about %.0f min)", Math.max(1, p.minutes));
 	}
 
+	/** The step its plan says is next, as it stands (null: none), without working anything out. */
+	Step peek() {
+		return plan == null || plan.steps.isEmpty() ? null : plan.steps.get(0);
+	}
+
 	/**
 	 * The step its plan says is next (null: no goal, or no way it knows): worked out again when what it has changed, or
 	 * every half minute. Done: the goal's met, and it says so.

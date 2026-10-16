@@ -1,8 +1,84 @@
-XEN COMPANION 2.0.0-beta.32.1: TECHNICAL NOTES
-==============================================
+XEN COMPANION 2.0.0-beta.33: TECHNICAL NOTES
+============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.33
+===========================
+
+Vision.java (new): per Xen, Camera 64x36 (public, also used by the client recorder). Ray grid in tan space over 70 deg
+vertical, 16:9, from getYHeadRot/getXRot; DDA over chunk block states (getChunkNow), air and MapColor.NONE (glass)
+pass, water seen into for 6 blocks then tints, plants hit only inside their outline shape's bounds, entities in view
+(LivingEntity, ItemEntity, up to 32, picked at the start of each pass, boxes read per row) tested by AABB.clip in front
+of the block. Pixel: rgb, label id (block path, "mob:<type>", sky, fog, water), distance, raw brightness with sky
+darkening, face (1 top, 2 bottom, 4 east/west, 5 north/south, 3 creature), entity id. Colour = MapColor.col (or a tuned
+colour), x face shade (1.0/0.5/0.8/0.6), x light curve f/(4-3f) with gamma 0.5 and ambient 0.03, haze from 55% of the
+range, sky by getSkyDarken. Rows: 1 a tick when watched by a real player (FAR 64), 1 every 4 ticks otherwise (32);
+outer quarter columns one ray per two pixels; top/bottom quarter rows every other pass; a row is skipped while the pose
+hasn't changed (0.1 block, 1 deg) and nothing is in view (every 4th pass it is redone). understand() after each pass:
+caveMouth (outside, 3-32 blocks, not a top face, light <= 7, heightmap > y+2, sky and block light above <= 3, >= 14 px;
+-> Caves.sawFromAfar), drop (lower half, top faces 6+ below the feet within 10 blocks horizontally, >= 8 px), ravine (a
+drop 12+ deep, half stone/deepslate/water/lava), structure (>= 25 px of built blocks 6+ blocks off, 2+ kinds; with
+villagers in view: village; -> Habits.spotted), darkGround (top faces within 24 with light 0, >= 40 px), hiddenMob (a
+monster seen within 5 s, in view now, no pixels, within 24), mess (home within 24: lone dirt/cobble pillar tops >= 3, or
+4+ item pixels). notice(): moving or new creatures (monster 3, player 2.5, item 1.2, else 1, by speed), else a rare
+(<= 4 px) Eyes.kind block; chance 0.3 + 0.5 curiosity; Habits.notice(at, 10-25 ticks) turns the head when the hands
+aren't busy. Mind: 6 new inputs at the end (VIS0..VIS0+5); Mind.load widens any saved mind from F52..F inputs (new rows
+zero); a world mind that was carried over is kept when the shipped one is carried over too. Rules: 6 new conditions from
+those inputs. VoiceSelf.saw(): what it sees now first. /xen vision, /xen vision dump (PPM 4x + text, world xen/vision).
+config.vision (default true). Shading and colours from config/xen/vision.txt (top, bottom, northSouth, eastWest, gamma,
+ambient, hazeFrom, colour.<block> = rrggbb). Measured (quick server, 10 Xens, no player near): 0.7-1.5 ms a view.
+
+Rules.java (new): conditions (night, dusk, underground, in water, hurt, hungry, no food, no pickaxe, wooden pickaxe, no
+logs, no trees, monsters, no home, no bed, full bag, stuck, and the 6 from vision) taken when an own choice starts
+(Goals.thinkMind); Goals.finishOption calls finished(o, reward, harm, died): bad = died or harm > 0.1, good = not bad
+and (reward > 0.05, or no harm for shelter, sleep, flee, eat, rest). Counted per "cond|option", "a+b|option" (pairs)
+and "*|option": seen, good, bad (rules.tsv in the world's xen folder, by Xen name). judge: n >= 3; rate = (good+0.5)/
+(n+1), hurt = (bad+0.25)/(n+1) against the option's usual; YES if rate >= 0.6 and +0.2 over usual (being stuck: no lift
+needed); NO if hurt >= 0.34 and +0.2 over usual, or rate <= 0.4 and 0.25 under; a rule it has holds with 0.1 slack; a
+pair only if neither single says it (and is dropped when a single comes to say it). sure = n/(n+4) x rate (or hurt).
+lean: +0.5 sure (do), -0.6 sure (don't) for rules whose conditions hold (looked at every 100 ticks). Stuck: 2400 ticks
+within 6 blocks with the same inventory (not asleep, sheltering, following, guarding, trading, told to stay, building,
+talking, night underground/resting); or the same failing option 4 of the last 5 (not sleep/shelter/eat/flee): that
+option -1 for 3 minutes; tried options -0.4 while stuck; unstuck when 16 blocks away, a good outcome, or after 6
+minutes. tell/heard: its surest rule (>= 0.3) the other lacks; hearsay weighs 2 x (0.5 + 0.5 trust), refused when its
+own 6+ times differ by 0.4. /xen rules. Measured (early2.sh, seed 20261014, 10 Xens, 1 day): 6 written, 1 crossed out
+(the previous outcome measure, reward > 0.05 only, wrote none in two such days).
+
+Intent.java (new): Talker.converse calls intent.chat before the free talk: promises (one kept is thanked for; one past
+its day is owned up to, trust -0.05), catchUp (the Note of what the other was off to do: its Diary line then and now:
+died, worked, tried, nothing; the haul for mining, wood, stone, food, exploring), upTo (doing and why from VoiceSelf;
+same joinable option: "Me too!"; an invitation by chattiness, accepted by trust, chattiness, same option, minus loner,
+sloth, an asked job, hurt or hungry: with/withOption/withUntil 4 min; the one who asked shares its nearest cave),
+ask (need: food when hungry with none, else the plan's next GATHER/FETCH/HUNT/SMELT step (Plans.peek); will = 0.2 +
+0.5 kindness + 0.4 trust + 0.2 loyalty (same tribe) - 0.5 greed; spare keeps 4 food/logs/planks/coal, 16 cobble, 4 x
+greed, and its own need: gift via Sharing.gift, or a promise for a day), rule (a Rules.tell, by chattiness). lean: the
+shared option +0.35/+0.25, tagging along on explore/adventure FOLLOW +0.45 (MindSense.friend returns the partner);
+an open promise +0.15 + 0.3 loyalty on the option that gets it. tick (100 ticks): a promise it can keep (they're within
+48, it has the thing to spare) it walks over and keeps. Measured in the 1-day tests: invitations 1/1/0, promises 2/2/1,
+none kept within that day.
+
+Storage.spotLoot: Eyes' "chest" sightings up to 40 blocks (not its own, its tribe's, near home, or given up on; not out
+in the dark): a loot-table chest always, a placed one by curiosity; 60 s to get there. A loot walk that times out puts
+the chest in looted (it doesn't try it again and again).
+
+client/Recorder.java (new, client side, in the same jar): KeyMappings F8 (start/stop) and F9 (note screen), registered
+through Fabric's key mapping helper by reflection (its class was renamed for 26.x). States every 5 ticks: time, frame,
+pos, dimension, yaw/pitch and their change, fov, WASD/jump/sneak/sprint/attack/use, slot, item, health, food, air, day
+time, on ground, in water, looking at; the camera (the same Vision.Camera, the player's fov and window aspect) as
+run-length label ids, distances (x4, base64) and light<<4|face (base64); new label names as {"labels":...}. Every 10
+ticks a screenshot (Screenshot.takeScreenshot with a downscale factor that divides the window, box-averaged to 128x72)
+and Xen's picture of the same view (64x36), as PNGs written by its own encoder (zlib), off the render thread. Events:
+mine (an attacked block turned to air), use, attack (entity type), hurt, death, note. gzip JSONL. -Dxen.recordTest=N
+(gradle -PrecordTest=N) records N seconds by itself. Measured (dev client, 2 min, spectator): 240 pictures + 480
+states, 4.4 MB (131 MB an hour).
+
+xen/vision (new, Python): recordings.py (Session: log, labels, states, frames; read_png without an image library;
+summary), tune.py (block-face pixels within 35 blocks, not the bottom 20% or the crosshair: colour per block by least
+squares, face shades, gamma and ambient by grid search; before = |Xen's picture - real|; writes vision.txt). Measured on
+the 2-minute recording: 46.9 -> 21.4 a channel (in-sample). tests/test_vision.py: a made-up recording with known
+shading is found again (within 0.06).
 
 WHAT'S NEW IN 2.0.0-beta.32.1
 =============================

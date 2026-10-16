@@ -349,6 +349,7 @@ final class Talker {
 				line(o, (o.goals.dream == c.goals.dream ? "Me too! " : "Cool! ") + "I want to " + o.goals.dream.what + ".", t += 50, null);
 			}
 		}
+		t = c.intent.chat(o, t, this::line);                                  // what they're really up to: how it went, why, what one needs, going together
 		if (random.nextFloat() < 0.85f) {                                      // a chat in their own words, as long as they both have something to say
 			Companion a = c, b = o;
 			String last = null;

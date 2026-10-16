@@ -81,6 +81,8 @@ public class XenClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.event.player.UseBlockCallback.EVENT.register((player, level, hand, hit) -> axeClick(player, level, hit.getBlockPos(), 2));
 		net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player, level, hand) -> axeClick(player, level, player.blockPosition(), 0));
 		ClientTickEvents.START_CLIENT_TICK.register(XenClient::axeFar);
+		Recorder.init();                                              // your own play as training data (F8: start, stop; F9: a note)
+		ClientTickEvents.END_CLIENT_TICK.register(Recorder::tick);
 		if (!Boolean.getBoolean("xen.uiTest")) return;
 		XenSettingsScreen.noTooltips = true;                          // (they'd cover the screenshots)
 		ScreenEvents.AFTER_INIT.register((client, opened, width, height) -> screen = opened);

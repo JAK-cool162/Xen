@@ -57,6 +57,7 @@ loom {
 	runs {
 		client {
 			if (project.hasProperty('uiTest')) vmArg '-Dxen.uiTest=true'
+			if (project.hasProperty('recordTest')) vmArg "-Dxen.recordTest=${project.property('recordTest')}"   // -PrecordTest=90: the recorder by itself for 90 s
 			if (project.hasProperty('gpuTest')) vmArg "-Dxen.gpuTest=${project.property('gpuTest')}"   // -PgpuTest=<model file>
 			if (project.hasProperty('joinServer')) programArgs '--quickPlayMultiplayer', project.property('joinServer')   // -PjoinServer=localhost:25569
 			if (project.hasProperty('clientName')) programArgs '--username', project.property('clientName')   // -PclientName=XenCam

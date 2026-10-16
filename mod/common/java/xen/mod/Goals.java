@@ -768,6 +768,8 @@ final class Goals {
 		float[] group = c.purpose.lean();                                       // its village's priorities (its leader's way), as far as it goes along
 		for (int i = 0; i < Mind.N; i++) b[i] += group[i];
 		c.habits.bias(b);                                                       // its routine, what it's sick of, how stung it is
+		c.rules.lean(b);                                                        // the rules it wrote itself; stuck: something it hasn't tried
+		c.intent.lean(b);                                                       // what it promised, what it agreed to do with someone
 		return b;
 	}
 
@@ -828,6 +830,7 @@ final class Goals {
 			c.chores.own = true;                                               // (its own idea: what it's asked for comes first)
 			option = o;
 			c.habits.started(option);
+			c.rules.started(option, f);
 			optionFeatures = f;
 			optionSituation = situation;
 			optionExpect = d.expect[o];
@@ -1719,6 +1722,7 @@ final class Goals {
 		if (t != null) t.laws.didWork(c, o);
 		c.journal("learns", String.format(Locale.ROOT, "Xen 2.0: %s took %.1f min, reward %+.2f, harm %.2f%s", Mind.OPTIONS[o], minutes, r, h, died ? " (died)" : ""));
 		c.diary.spent(Mind.OPTIONS[o], (now - optionAt) / 1200f, r > 0.05f, died);
+		if (!notItsDoing) c.rules.finished(o, r, h, died);
 	}
 
 	// -------------------------------------------------------------------------------- words

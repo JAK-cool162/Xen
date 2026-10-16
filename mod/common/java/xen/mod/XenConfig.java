@@ -98,6 +98,12 @@ public final class XenConfig {
 	/** Xens open chests they find out in the world that nobody has opened yet (dungeons, camps, trial chambers) and loot them. */
 	public boolean loot = true;
 	/**
+	 * Xen vision: a picture of what each Xen sees (64 by 36 sight lines, map colours, no textures), and what it makes
+	 * of it (a cave mouth, a drop, buildings, dark ground, a monster behind cover, a mess at home) for its mind, its
+	 * own rules and its chat. Light (a row or two of sight lines a tick); off for a slow server.
+	 */
+	public boolean vision = true;
+	/**
 	 * Adventures: free Xens go for the Ender Dragon on their own when they're ready (the Nether for blaze rods, pearls,
 	 * the stronghold, the End), and take on trial chambers they find.
 	 */

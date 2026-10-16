@@ -241,6 +241,7 @@ final class Storage {
 		if (job == null) return null;
 		if (now() > until) {
 			c.chatter("I couldn't get to the chest.", false);
+			if (job == Job.LOOT && chest != null) looted.add(chest);              // (it gave up on that one: not the same walk again and again)
 			cancel();
 			return null;
 		}
@@ -477,6 +478,26 @@ final class Storage {
 					c.chatter(c.pick3("Ooh, a chest!", "A chest! Let's see what's inside.", "Treasure?"), false);
 					return true;
 				}
+			}
+		}
+		// One it saw further off (its eyes see a long way): a chest nobody's opened yet is worth the walk; someone's, if it's curious.
+		BlockPos far = c.eyes.nearest("chest", 40, k -> {
+			BlockPos b = BlockPos.of(k);
+			return looted.contains(b) || chests.containsKey(b) || mine(b);
+		});
+		if (far != null && far.distSqr(feet) > 10 * 10 && (!c.player.level().isDarkOutside() || !c.player.level().canSeeSky(feet))) {   // (not a long walk out in the dark)
+			var be = level.getBlockEntity(far);
+			boolean treasure = be instanceof RandomizableContainerBlockEntity box && box.getLootTable() != null;
+			if (treasure || (be instanceof net.minecraft.world.level.block.entity.ChestBlockEntity || be instanceof net.minecraft.world.level.block.entity.BarrelBlockEntity)
+					&& c.player.getRandom().nextFloat() < 0.1f + 0.4f * c.personality.curiosity) {
+				begin(Job.LOOT);
+				peek = !treasure;
+				sneaky = false;
+				chest = far.immutable();
+				until = now() + 20 * 60;
+				c.journal("does", (treasure ? "goes for a chest it saw " : "goes to look in a chest it saw ") + Math.round(Math.sqrt(far.distSqr(feet))) + " blocks off");
+				if (treasure) c.chatter(c.pick3("Ooh, is that a chest over there?", "A chest! Let's see what's inside.", "Treasure?"), false);
+				return true;
 			}
 		}
 		// Someone's chest (placed, already opened): a curious Xen has a look inside, like players on a server do. A greedy,

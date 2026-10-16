@@ -220,6 +220,8 @@ public class XenMod implements ModInitializer {
 		roster.load(brainFile().resolveSibling("companions.json"));
 		lore.load(brainFile().resolveSibling("lore.json"));
 		society.load(brainFile().resolveSibling("society.json"));
+		Rules.load(brainFile().resolveSibling("rules.tsv"));                  // the rules each Xen wrote itself
+		Vision.loadTuning(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("vision.txt"));   // (its shading, tuned from recordings)
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
 		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
 		Path file = brainFile();
@@ -274,7 +276,7 @@ public class XenMod implements ModInitializer {
 			} catch (IOException | RuntimeException e) {
 				own = null;
 			}
-			if (own == null || own.carried || shipped != null && own.updates < shipped.updates) {   // unreadable, an older version, or less trained than the one that ships
+			if (own == null || own.carried && (shipped == null || !shipped.carried) || shipped != null && own.updates < shipped.updates) {   // unreadable, an older version, or less trained than the one that ships
 				LOG.info("Upgrading this world's Xen mind to the one that ships (the old one is kept as mind.bin.old)");
 				keepOld(mindFile);
 				own = null;
@@ -414,6 +416,7 @@ public class XenMod implements ModInitializer {
 		roster.save();
 		lore.save();
 		society.save();
+		Rules.save();
 		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
 		xen.mod.talk.Banter.save();
 	}
@@ -428,6 +431,7 @@ public class XenMod implements ModInitializer {
 		roster.save();
 		lore.save();
 		society.save();
+		Rules.save();
 		xen.mod.talk.Voice.save();
 		xen.mod.talk.Banter.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
@@ -1080,6 +1084,33 @@ public class XenMod implements ModInitializer {
 					}
 					sb.append(Diary.describe("All Xens", all));
 					String out = sb.toString();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				}))
+				.then(Commands.literal("vision").executes(ctx -> {              // what each Xen sees, what it makes of it, what it costs
+					StringBuilder sb = new StringBuilder();
+					for (Companion c : companions) if (!c.minion) sb.append(sb.length() > 0 ? "\n" : "").append(c.vision.status());
+					String out = sb.length() == 0 ? "No Xens." : sb.toString();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				}).then(Commands.literal("dump").executes(ctx -> {             // its view as a picture (PPM) and what each pixel is, in the world's xen folder
+					StringBuilder sb = new StringBuilder();
+					for (Companion c : companions) {
+						if (c.minion || c.player == null) continue;
+						try {
+							sb.append(sb.length() > 0 ? "\n" : "").append(c.name).append(": ").append(c.vision.dump(brainFile().resolveSibling("vision")).getFileName());
+						} catch (IOException e) {
+							sb.append(sb.length() > 0 ? "\n" : "").append(c.name).append(": ").append(e.getMessage());
+						}
+					}
+					String out = sb.length() == 0 ? "No Xens." : sb.toString();
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				})))
+				.then(Commands.literal("rules").executes(ctx -> {               // the rules each Xen wrote itself, from what worked and what didn't
+					StringBuilder sb = new StringBuilder();
+					for (Companion c : companions) if (!c.minion) sb.append(sb.length() > 0 ? "\n" : "").append(c.rules.describe());
+					String out = sb.length() == 0 ? "No Xens." : sb.toString();
 					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
 					return 1;
 				}))

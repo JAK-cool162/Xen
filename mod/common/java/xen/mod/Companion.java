@@ -311,6 +311,9 @@ public final class Companion {
 		pace.tick();                                                    // a tool that just broke; its eyes on its hands
 		t0 = Perf.now();
 		eyes.tick();                                                    // a yes or no for every block it can see
+		t0 = Perf.now();
+		vision.tick();                                                  // its view as a picture, and what it makes of it
+		Perf.add("vision", t0);
 		Perf.add("eyes", t0);
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
@@ -324,6 +327,10 @@ public final class Companion {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			noteKills();                                                 // (something it hit died: its drops are its own)
 			tips.tick();                                                 // (a tip it took, or didn't: how did that go?)
+			if (player.tickCount % 100 == 0) {
+				rules.tick();                                            // (stuck? what's true now, for its rules)
+				intent.tick();                                           // (a promise it can keep now)
+			}
 			biomes.tick();                                               // (the biome it's in: a cave biome is a cave)
 			belief.tick(player.level().getGameTime());                   // (a bad day fades)
 			places.tick();                                               // the way it walked, remembered
@@ -562,7 +569,7 @@ public final class Companion {
 	 * its friend, or looks around. Null: the brain's choice is fine.
 	 */
 	/** Is a real player (not a Xen) within 96 blocks? If not, it lives a bit slower (less work for the server). */
-	private boolean watched = true;
+	boolean watched = true;
 
 	private boolean watchedByAPlayer() {
 		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
@@ -1871,7 +1878,7 @@ public final class Companion {
 	/** Of its things lying where it died, the one it's picking up now. */
 	private UUID lostItem, lostItemNext;
 	/** What killed it last ("skeleton", "lava"), for the sign it leaves there. */
-	private String diedOf = "";
+	String diedOf = "";
 
 	private Action backForMyThings() {
 		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
@@ -4299,7 +4306,9 @@ public final class Companion {
 	}
 
 	/** Its own words: it reads what's said, picks what kind of reply fits it, builds the sentence (see {@link xen.mod.talk.Voice}). */
-	final xen.mod.talk.Voice voice = new xen.mod.talk.Voice(new VoiceSelf(), System.nanoTime());
+	/** What it knows of itself, in words (what it's doing, why, what it saw): for its voice and its chats. */
+	final xen.mod.talk.Voice.Self me = new VoiceSelf();
+	final xen.mod.talk.Voice voice = new xen.mod.talk.Voice(me, System.nanoTime());
 
 	/** What its voice knows of it: its nature, how it feels, what it does and wants, and what it thinks of things. */
 	private final class VoiceSelf implements xen.mod.talk.Voice.Self {
@@ -4369,6 +4378,10 @@ public final class Companion {
 		}
 
 		@Override public String saw() {
+			if (vision.village) return "a village";                                   // (what it sees right now first)
+			if (vision.caveMouth) return "a cave mouth";
+			if (vision.ravine) return "a ravine";
+			if (vision.structure) return "some buildings";
 			Places.Place latest = null;
 			for (Places.Place p : places.all()) {
 				String n = p.name();
@@ -4516,6 +4529,12 @@ public final class Companion {
 	final Uses uses = new Uses(this);
 	final Habits habits = new Habits(this);
 	final Sharing sharing = new Sharing(this);
+	/** One thread through what it does and says: what it told and promised others, what it agreed to do with them. */
+	final Intent intent = new Intent(this);
+	/** The rules it writes itself from what worked and what didn't (and getting itself unstuck). */
+	final Rules rules = new Rules(this);
+	/** What it sees, as a picture (and what it makes of it). */
+	final Vision vision = new Vision(this);
 	final Reactions reactions = new Reactions(this);
 
 	// ------------------------------------------------------------------------ standing about

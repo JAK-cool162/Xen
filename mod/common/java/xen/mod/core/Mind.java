@@ -46,7 +46,9 @@ public final class Mind {
 			"xp", "obsidian", "lapis", "raw food", "furnace", "dragon beaten", "sheltered", "has friend",
 			// Xen 6.0: its sins (fixed at birth) and its own plan (one of Strategy.N)
 			"pride", "greed", "lust", "envy", "gluttony", "wrath", "sloth",
-			"plan speedrun", "plan builder", "plan settler", "plan miner", "plan explorer", "plan trader", "plan warrior", "plan survivor"};
+			"plan speedrun", "plan builder", "plan settler", "plan miner", "plan explorer", "plan trader", "plan warrior", "plan survivor",
+			// beta.33: what its eyes make of its view (Vision)
+			"sees a cave mouth", "sees a drop", "sees buildings", "sees dark ground", "monster behind cover", "mess at home"};
 	public static final int HEALTH = 0, FOODLVL = 1, NIGHT = 2, DUSK = 3, DANGER = 4, HOSTILES = 5, ENEMY = 6, UNDERGROUND = 7, INWATER = 8,
 			LOGS = 9, PLANKS = 10, COBBLE = 11, COAL = 12, RAWIRON = 13, IRON = 14, DIAMOND = 15, FOODITEMS = 16, TORCHES = 17, EMERALD = 18,
 			GOLD = 19, PICK = 20, AXE = 21, SWORD = 22, ARMOR = 23, HOE = 24, BUCKET = 25, BED = 26, HOME = 27, FARMED = 28, CHEST = 29,
@@ -55,10 +57,12 @@ public final class Mind {
 			BRAVERY = 47, CURIOSITY = 48, DILIGENCE = 49, XP = 50, OBSIDIAN = 51, LAPIS = 52, RAWFOOD = 53, FURNACE = 54, DRAGON = 55,
 			SHELTERED = 56, HASFRIEND = 57, SIN0 = 58, PLAN0 = SIN0 + Sins.N;
 	public static final int F = FEATURES.length;
+	/** The first of what its eyes make of its view (6 of them, in Vision's order). */
+	public static final int VIS0 = F - 6;
 	/** The inputs Xen 5.2 had (a 5.2 mind is carried over: the new inputs start with no say, then it learns them). */
 	static final int F52 = 58;
 	/** Its version, for the log and "who are you". */
-	public static final String VERSION = "Xen 2.0 beta 32.1 (mind 6, Ex1 v3, talk model, survival tips, know-how, tidy, caves, society)";
+	public static final String VERSION = "Xen 2.0 beta 33 (mind 6, Ex1 v3, talk model, survival tips, know-how, tidy, caves, society, own rules, one thread)";
 	/** How a count becomes a feature: count / scale, at most 1. */
 	public static float count(int n, float scale) {
 		return Math.min(1f, n / scale);
@@ -409,7 +413,7 @@ public final class Mind {
 	public static Mind load(DataInputStream in) throws IOException {
 		if (in.readInt() != MAGIC) return null;
 		int oldF = in.readInt();
-		if (in.readInt() != N || oldF > F || oldF != F && oldF != F52) return null;
+		if (in.readInt() != N || oldF > F || oldF < F52) return null;      // (fewer inputs: the new ones start with no say)
 		int[] hidden = new int[in.readInt()];
 		for (int i = 0; i < hidden.length; i++) hidden[i] = in.readInt();
 		Mind m = new Mind(hidden, 3e-4f, 1);

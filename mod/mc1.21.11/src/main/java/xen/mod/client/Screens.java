@@ -15,4 +15,14 @@ final class Screens {
 	static Screen current(Minecraft client) {
 		return client.screen;
 	}
+
+	/** A line over the hotbar (the recorder's on and off). */
+	static void overlay(Minecraft client, net.minecraft.network.chat.Component text) {
+		if (client.player != null) client.player.displayClientMessage(text, true);
+	}
+
+	/** The time of day, 0 to 23999. */
+	static long dayTime(net.minecraft.world.level.Level level) {
+		return level.getDayTime() % 24000;
+	}
 }

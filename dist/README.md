@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.32.1
+# Xen Companion (Fabric mod) 2.0.0-beta.33
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.32.1+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.32.1+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.33+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.33+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.32.1+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.33+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -155,6 +155,32 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### It sees, writes its own rules, and talks about real things (2.0.0-beta.33)
+
+* **Vision**: a 64 by 36 picture of what it sees from where its head points. Each sight line stops at the first block
+  or creature, so it can't see through walls. Colours are the blocks' map colours (no textures), shaded like the game.
+  From it, simple rules pick out a cave mouth, a drop, a ravine, buildings or a village, dark ground where monsters
+  spawn, a monster behind cover, or a mess near home. These feed its mind, its own rules and its chat, and its head
+  turns to what moves or stands out. About 1 ms of server time per whole view per Xen; `vision` in the settings turns
+  it off.
+* **Its own if/then rules**, written from what worked and what didn't for it ("if monsters are about, then don't get
+  wood"), crossed out again when they stop holding, passed on to other Xens in chats. They lean its choices; they never
+  force them. `/xen rules` lists each Xen's rules.
+* **Loops**: going round in circles (the same choice failing again and again, or minutes stuck in one spot), it notices,
+  leaves that choice for a while and tries something else.
+* **Chats from its real life**: how the last thing went (what really happened), what it's doing and why, asking for
+  what its plan needs (a gift, a promise it keeps when it can, or a no), going somewhere together.
+* **Chests it sees** up to 40 blocks off, it goes and opens; one it can't reach, it leaves alone after.
+
+**Recording your play for Xen** (training data, for whoever wants to help train it). The recorder is in the same jar,
+on your own game, and off until you press **F8** (F8 again stops it; **F9** adds a note, like "going for iron"; both keys
+can be changed in Controls). It saves, a few times a second, a small picture of your screen, what each part of it is,
+Xen's picture of the same view, where you look, your keys, the item in hand, health, hunger and the time of day, and
+what you mine, place and hit, into `.minecraft/xen_recordings/session_.../`. It never records chat, names or the server
+address, and never touches your controls. About 130 MB an hour in a test. To tune Xen's colours to your screen:
+`python -m xen.vision.tune .minecraft/xen_recordings/session_* -o .minecraft/config/xen/vision.txt` (the mod reads it
+when the server starts).
 
 ### It goes looking for iron like a player (2.0.0-beta.32)
 
@@ -1309,6 +1335,7 @@ away in single player. On a server, operators use:
 | `ownLife` | `true` | a new Xen starts free and plays its own game ([more](#its-own-life)) |
 | `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
 | `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
+| `vision` | `true` | Xen vision: a picture of what each Xen sees (64 by 36 sight lines, no textures) and what it makes of it, for its mind, its own rules and its chat |
 | `adventures` | `true` | free Xens go for the Ender Dragon on their own when ready, and take on trial chambers |
 | `smartsAtGeneration` | `4` | from this generation of evolution Xens know the Nether portal math (x/8) and triangulating strongholds |
 | `pathAssist` | `true` | its legs find the way: sprint, jump, drop, jump gaps, swim, climb, doors, dig, bridge, tower up ([more](#path-assist)) |
@@ -1369,6 +1396,9 @@ away in single player. On a server, operators use:
 | `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
 | `/xen time` | where each Xen's time goes: minutes on each kind of thing it chose, how often it got somewhere, deaths |
 | `/xen society` | each village's constitution, tax and amendments, its jobs, and each faith with its followers |
+| `/xen rules` | the if/then rules each Xen wrote itself from what worked and what didn't, and how sure it is of each |
+| `/xen vision` | what each Xen sees right now (a cave mouth, a drop, buildings, dark ground...) and what its eyes cost |
+| `/xen vision dump` | each Xen's view as a picture (PPM) and what every pixel is (text), in the world's `xen/vision` folder |
 | `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 
 * **Its bag**: right-click your Xen to open its inventory.

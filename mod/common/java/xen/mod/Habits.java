@@ -298,6 +298,15 @@ final class Habits {
 		}
 	}
 
+	/** Something its eyes caught (it moved, or stands out): its head turns there a moment, if its hands are free. */
+	private Vec3 noticeAt;
+	private long noticeUntil;
+
+	void notice(Vec3 at, long until) {
+		noticeAt = at;
+		noticeUntil = until;
+	}
+
 	// ------------------------------------------------------------------------------ curiosity
 	/** It spotted something new (a village, a temple, a portal...): maybe a look. */
 	void spotted(BlockPos at, String what) {
@@ -322,7 +331,7 @@ final class Habits {
 		}
 		if (frustration > 0) frustration = Math.max(0, frustration - 1f / (20 * 60 * 10));   // gone in about ten minutes
 		if (scoutTo != null && !c.hands.busy() && !c.fightingNow()) glance(now());   // its first look around: eyes on everything
-		else glanceAt = null;
+		else glanceAt = noticeAt != null && now() < noticeUntil && !c.hands.busy() && !c.fightingNow() ? noticeAt : null;   // (something its eyes caught)
 		if (glanceAt != null || headYaw != 0) turnHead();
 	}
 

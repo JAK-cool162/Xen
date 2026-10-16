@@ -41,4 +41,14 @@ final class Screens {
 			return null;
 		}
 	}
+
+	/** A line over the hotbar (the recorder's on and off). */
+	static void overlay(Minecraft client, net.minecraft.network.chat.Component text) {
+		if (client.player != null) client.player.sendOverlayMessage(text);
+	}
+
+	/** The time of day, 0 to 23999 (26.x: world clocks). */
+	static long dayTime(net.minecraft.world.level.Level level) {
+		return level.getOverworldClockTime() % 24000;
+	}
 }

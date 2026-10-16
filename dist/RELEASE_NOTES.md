@@ -1,7 +1,48 @@
-**Xen Companion 2.0.0-beta.32.1**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.33**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.33: eyes, rules of its own, and chats that mean something
+
+* **Xen vision.** Each Xen now has a picture of what it sees: 64 by 36 sight lines over a player's field of view, from
+  where its head points. Each line stops at the first block or creature it meets, so nothing shows through a wall. No
+  textures and no GPU: a pixel's colour is the block's map colour, shaded the way the game shades it (tops brightest,
+  sides darker), darker in low light, hazier far off, and the sky's colour by the time of day. Every pixel also knows
+  what it is (the block or creature, how far, how light). Sharp in the middle, coarse at the edges. Near a player it
+  looks at one row a tick (a whole view in about 1.4 s); out of everyone's sight it's slower and shorter-sighted.
+  Measured on a test server: about 1 ms of server time per whole view per Xen.
+* **What it makes of it**, by simple rules: a cave mouth, a drop in front of it, a ravine, something people built (a
+  village with villagers), dark ground where monsters spawn, a monster that went behind cover, a mess near its home.
+  That goes into its mind's inputs, its own rules (below) and its chat. A cave mouth it sees becomes a cave it can mine
+  in. Its head turns to what moves or stands out, when its hands are free. Hints, not orders: its mind still decides.
+  `/xen vision` shows what each Xen sees and what that costs; `/xen vision dump` saves its view as a picture.
+* **It writes its own if/then rules.** Every choice it finishes is counted against what was true when it chose (night,
+  underground, hurt, no food, its pickaxe, monsters about, what it sees, being stuck). When a choice clearly goes better
+  or worse in some situation than it usually does, it writes a rule ("if monsters are about, then don't get wood") and
+  leans that way, as much as it's sure of it. When later times don't bear a rule out, it crosses it out. It tells other
+  Xens its rules when they chat; they take them as hearsay. Kept with the world. `/xen rules` lists them.
+* **It notices when it's going round in circles.** The same choice again and again with nothing to show for it, or two
+  minutes in one spot with nothing gained: that choice is off for a while, it tries something it hasn't tried, and
+  whatever gets it out can become a rule for being stuck.
+* **Chats come from what it's really doing.** Xens remember what the other was off to do last time and ask how it went;
+  the answer is what really happened ("Not great. A skeleton got me. Lost my stuff."). They say what they're doing and
+  why. One asks for what its plan is short of: the other hands it over, promises to bring some (and does when it can), or
+  says no. They invite each other along ("Want to come mining with me?") and, if yes, lean the same way for a while.
+* **Chests it sees, it goes for.** It used to notice a chest only within 12 blocks; now it goes for one its eyes saw up
+  to 40 blocks off (not on a long walk in the dark). One it can't get to, it remembers and leaves alone.
+* **A recorder for training data** (in the same jar, client side, off until you press F8; F9 adds a note like "going
+  for iron"). A few times a second it saves a small picture of your screen (128 by 72), what each part of it is, Xen's
+  own picture of the same view, where you look, your keys, the item in hand, health, hunger, time of day, and what you
+  mine, place and hit. No chat, no names, no server address. It saves to `.minecraft/xen_recordings/` on your own
+  device. `python -m xen.vision.tune` fits Xen's colours and shading to your real screen; `python -m
+  xen.vision.recordings summary` says what's in a recording.
+* In tests (10 Xens, a fresh world, one game day each, the same seed):
+  * Rules: 6 written and 1 crossed out in a day.
+  * Vision: in two runs with it, cave trips 26 and 16 (8 in a run without it), and deaths 4 and 8 (10 without). That
+    is too few runs to call it better.
+  * Recorder (2 minutes on a test client): 240 pictures, 4.4 MB, about 131 MB an hour. Tuning on that recording: Xen's
+    colours were off by 47 a channel, 21 after (on the same pixels, so a fit, not a test).
 
 ### 2.0.0-beta.32.1: /xen time, where their time goes
 

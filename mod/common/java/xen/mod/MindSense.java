@@ -131,6 +131,8 @@ final class MindSense {
 
 	/** Its friend: whoever it follows, else its owner, else the tribe member it trusts most (online, same world, 48 blocks). */
 	static ServerPlayer friend(Companion c) {
+		Companion along = c.intent.partner();                                 // (going along with someone: them)
+		if (along != null && c.intent.tagAlong) return along.player;
 		for (java.util.UUID id : new java.util.UUID[] {c.leader, c.owner}) {
 			if (id == null) continue;
 			ServerPlayer p = c.server.getPlayerList().getPlayer(id);
@@ -198,6 +200,13 @@ final class MindSense {
 		f[Mind.FRIENDNEAR] = friend != null && friend.distanceTo(p) < 16 ? 1 : 0;
 		f[Mind.ASKEDFOLLOW] = c.mode == Companion.Mode.FOLLOW ? 1 : 0;
 		f[Mind.FRIENDNEEDS] = c.needs.pending() != null ? 1 : 0;
+		Vision v = c.vision;                                                       // what its eyes make of its view
+		f[Mind.VIS0] = v.caveMouth ? 1 : 0;
+		f[Mind.VIS0 + 1] = v.drop ? Math.min(1f, v.dropDepth / 20f) : 0;
+		f[Mind.VIS0 + 2] = v.village ? 1 : v.structure ? 0.6f : 0;
+		f[Mind.VIS0 + 3] = v.darkGround ? 1 : 0;
+		f[Mind.VIS0 + 4] = v.hiddenMob ? 1 : 0;
+		f[Mind.VIS0 + 5] = v.mess ? 1 : 0;
 		Tribe t = c.tribe();
 		f[Mind.TRIBEDANGER] = t != null && t.inDanger(c) != null ? 1 : 0;
 		f[Mind.TRIBE] = t == null ? 0 : Math.min(1f, (t.members.size() - 1) / 6f);
