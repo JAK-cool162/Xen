@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.34
+# Xen Companion (Fabric mod) 2.0.0-beta.35
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.34+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.34+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.35+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.35+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.34+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.35+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -158,6 +158,28 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
 
+### Recording your play without the lag (2.0.0-beta.35)
+
+Hours of real play (trial chambers, trading, the End, an XP farm, elytra, a mace fight, looting chests) is what teaches
+Xen Ex1 how people play. Two ways to record it now, both in the form Ex1 learns from as it is (no converting):
+
+* **On your own server, or in singleplayer: nothing on your game at all.** `/xen set gameplayLog players` (an
+  operator; `both` adds the Xens). The server writes what each player does and sees, 4 times a second, to
+  `<server folder>/config/xen/gameplay_logs/` (or the folder `gameplayLogFolder` names): about 30 MB an hour each, no
+  pictures. Your game does nothing extra, so it can't lag you. Players are told when their play is logged. These logs
+  also have your chat in them (what you said and heard); look before you share one.
+* **On someone else's server: F8, now light.** F8 records the same things on your own game, the same way: what you
+  do (keys, where you look, what's in your hands, health, hunger, what you mine and hit) and a small view (14 by 24
+  sight lines twice a second), with no pictures. One file, `.minecraft/xen_recordings/play_<date>.jsonl.gz`, about
+  1 MB an hour. No chat, no names, no server address. Measured on a test client (no real graphics card): 0.42 ms of
+  the game's time a tick on average, against 1.15 ms for the old recording with pictures; your machine may differ.
+  **Hold sneak (Shift) and press F8** for the old recording with pictures (for Xen's eyes, and for `/xen tour`).
+* **Notes:** F9 while recording, or `/xen note <what you're doing>` on a server that logs you ("trading with
+  villagers", "XP farm in the End"). A note can come before or after; one recording for one thing is easiest to read.
+
+To send it: zip the `play_*.jsonl.gz` files (or the gameplay logs). `python -m xen.ex1.train recordings/*.jsonl
+<your files>` trains Ex1 on them; recordings from 2.0.0-beta.33 and .34 (session folders) are read too.
+
 ### It talks in its own words: XenTalk (2.0.0-beta.34)
 
 Xens now have a small language model of their own, **XenTalk**, made for this and nothing else: 4 layers, about 2
@@ -197,7 +219,7 @@ them, what they just said) and writes a line word by word. Nothing is picked fro
 
 **Data without playing for hours: `/xen tour [minutes]`** (operators, or the host in singleplayer). You float through the
 world as a spectator, a new view every 3 seconds: out on the land, inside caves, high over it, your view turning
-slowly, further and further from where you started (1,200 views an hour). Press F8 first and the recorder saves it all
+slowly, further and further from where you started (1,200 views an hour). Hold sneak and press F8 first (the recording with pictures) and it saves it all
 while you're away from the keyboard. These are marked as spectator views, so they teach
 Xen's eyes (colours, what things look like), not how a person plays. `/xen tour stop` puts you back where you were.
 For how a person plays, a short session doing one thing (10 minutes of caving, with a note or two on F9) teaches more
@@ -222,7 +244,7 @@ than hours of everything. And the Xens' own play can be logged with no one at th
 * **Chests it sees** up to 40 blocks off, it goes and opens; one it can't reach, it leaves alone after.
 
 **Recording your play for Xen** (training data, for whoever wants to help train it). The recorder is in the same jar,
-on your own game, and off until you press **F8** (F8 again stops it; **F9** adds a note, like "going for iron"; both keys
+on your own game, and off until you hold sneak and press **F8** (since 2.0.0-beta.35; plain F8 is the light recording above. F8 again stops it; **F9** adds a note, like "going for iron"; both keys
 can be changed in Controls). It saves, a few times a second, a small picture of your screen, what each part of it is,
 Xen's picture of the same view, where you look, your keys, the item in hand, health, hunger and the time of day, and
 what you mine, place and hit, into `.minecraft/xen_recordings/session_.../`. It never records chat, names or the server
@@ -1448,6 +1470,7 @@ away in single player. On a server, operators use:
 | `/xen rules` | the if/then rules each Xen wrote itself from what worked and what didn't, and how sure it is of each |
 | `/xen vision` | what each Xen sees right now (a cave mouth, a drop, buildings, dark ground...) and what its eyes cost |
 | `/xen tour [minutes]` | operators: you fly through the world as a spectator, a new view every 3 s (land, caves, high up), for the recorder (F8); `/xen tour stop` ends it |
+| `/xen note <text>` | anyone whose play the server logs (`gameplayLog`): a note in your own gameplay log, like "trading with villagers" |
 | `/xen vision dump` | each Xen's view as a picture (PPM) and what every pixel is (text), in the world's `xen/vision` folder |
 | `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 

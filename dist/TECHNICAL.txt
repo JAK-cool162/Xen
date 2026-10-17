@@ -1,7 +1,44 @@
-XEN COMPANION 2.0.0-beta.34: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.35: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.35
+===========================
+
+client/Recorder.java: F8 starts the light recording, sneak (the sneak key held) + F8 the full one (as in .34: 64x36
+labels, distances and light 4 a second, screen pictures 2 a second, Xen's pictures). Light: xen_recordings/
+play_<stamp>.jsonl.gz, a session_start event (source player, format 1.2.0), then every 5 ticks a state built by
+GameplayLog.state(Player, Level, o, input, inventory every 200 ticks, view every 10 ticks): the gameplay log's own
+record (dimension, rain, day time, screen, biome, light, the player's body, keys, hands, armor, inventory, looking_at,
+blocks below/feet/head, nearby within 24 (16 nearest), view 14x24 over 90 x 130.6 deg to 192). Keys from the client's
+key mappings; sprint is isSprinting() (toggle sprint holds the key down for good), use is isUsingItem(). Events as the
+gameplay log names them: damage_taken (amount, health), death, block_break, swing (target), use, note. Nothing is
+written while a screen is open or as a spectator. Test runs (-PrecordTest=60, -PrecordFull, dev client on llvmpipe, 5
+Xens about): light 0.421 ms a tick on average (1,200 ticks, 240 states, 18.7 KB); full 1.147 ms a tick (2.8 MB). The
+full recording's states now also have vel, sprinting, sneaking, light, rain, below/feet/head, off, using and near (the
+creatures within 24 all round), format "xen-recorder 2".
+
+GameplayLog.java: state() split into the per-player clocks and a public static state(Player, Level, ...) that the
+recorder shares; lookingAt, nearby and vision take any Player and Level. note(ServerPlayer, text): a "note" event.
+XenMod: /xen note <text> (anyone; "Your play isn't being logged" when it isn't).
+
+xen/ex1/recorder.py (new): a recorder session folder (log.jsonl.gz, formats 1 and 2) as the gameplay log's records,
+so features.frames reads it unchanged. Format 1 lacks some of what Ex1 senses, so: velocity from the change in
+position; sprinting = forward held, on the ground and over 0.25 blocks a tick; light = the median light of the
+ground in the lower middle of the view within 24 blocks; below = stone when on the ground (else air or water), feet
+and head = water when in water; creatures = those in view (nearest pixel of each, its direction from the pixel), not
+behind; the 14x24 view sampled from the 64x36 picture at the same angles (tan space, off the picture: its edge); a
+shield when the session used one. Spectator states are marked as a screen (left out). train.py: session folders and
+.jsonl.gz files are read too.
+
+Tried: a player's recordings (14 sessions, 8.6 minutes, 1,771 frames, 99 just before a hurt) with the 8 older
+recordings (27,399 frames), the last fifth of each held out. Without / with them: on the older held-out play forward
+0.927 / 0.929, jump 0.917 / 0.916, attack 0.948 / 0.945, pitch error 7.3 / 7.5 deg, danger AUC 0.844 / 0.842; on
+theirs forward 0.892 / 0.875, attack 0.817 / 0.803, danger AUC 0.85 / 0.83 (8 hurts: too few to tell). No better, so
+ex1.json is unchanged. That the model that never saw them gets 89% of their forward key right says the conversion
+reads them sensibly.
 
 
 WHAT'S NEW IN 2.0.0-beta.34

@@ -1,4 +1,4 @@
-"""Train Xen Ex1 on recorded play: python -m xen.ex1.train recordings/*.jsonl --out mod/common/resources/assets/xen/ex1.json
+"""Train Xen Ex1 on recorded play: python -m xen.ex1.train recordings/*.jsonl [xen_recordings/session_*] --out mod/common/resources/assets/xen/ex1.json
 
 One small network (119 senses -> 64 -> 64), four heads: the keys a player presses (forward, back, left, right, jump,
 sneak, sprint, attack, use), how it turns in the next quarter second, where it looks next (pitch), and danger: will it
@@ -6,6 +6,7 @@ be hurt in the next two seconds. Numpy only (no GPU, no framework). The last fif
 see what it really learned. In the game the danger head keeps learning from each Xen's own hurts (Ex1.java).
 """
 import argparse
+import gzip
 import json
 import math
 import sys
@@ -13,6 +14,7 @@ import sys
 import numpy as np
 
 from xen.ex1 import features as F
+from xen.ex1 import recorder as R
 
 H = 64
 HEADS = {"keys": len(F.KEYS), "yaw": len(F.YAW_BINS) + 1, "pitch": 1, "danger": 1}
@@ -23,8 +25,11 @@ def load(paths, with_xen=False):
     how people play, not how Xens do."""
     train, test = [], []
     for path in paths:
-        with open(path) as fh:
-            records = [json.loads(line) for line in fh if line.strip()]
+        if R.is_session(path):                                # (the mod's recorder: a session folder)
+            records = R.records(path)
+        else:                                                 # (a gameplay log, or the recorder's light play_*.jsonl.gz)
+            with (gzip.open(path, "rt", encoding="utf-8") if path.endswith(".gz") else open(path)) as fh:
+                records = [json.loads(line) for line in fh if line.strip()]
         if F.source(records) == "xen" and not with_xen:
             print(f"(left out {path}: a Xen's own play; --with-xen to use it)", file=sys.stderr)
             continue

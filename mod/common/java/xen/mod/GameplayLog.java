@@ -52,9 +52,9 @@ import java.util.UUID;
  * python -m xen.ex1.compare puts a Xen's play next to a player's. A player whose play is logged is told so when it
  * starts. Like the recorder, it logs only what that one would know: no ore through walls.
  */
-final class GameplayLog {
+public final class GameplayLog {
 	/** The recorder's format these files follow. */
-	static final String FORMAT = "1.2.0";
+	public static final String FORMAT = "1.2.0";
 	static final int EVERY = 5, IN_FIGHT = 1, VISION_EVERY = 10, INVENTORY_EVERY = 200, FIGHT_TICKS = 60;
 	static final int ROWS = 14, COLS = 24;
 	static final double FOV_V = 90, FOV_H = 130.626, NEAR = 64, FAR = 192, AROUND = 24;
@@ -262,11 +262,11 @@ final class GameplayLog {
 
 	// ------------------------------------------------------------------------------------------- what it writes
 
-	private static String id(BlockState s) {
+	public static String id(BlockState s) {
 		return BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
 	}
 
-	private static String id(Entity e) {
+	public static String id(Entity e) {
 		return BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
 	}
 
@@ -327,7 +327,7 @@ final class GameplayLog {
 	}
 
 	/** What its crosshair is on: a creature, a block, or nothing (within its reach, like a game client's). */
-	private static JsonObject lookingAt(ServerPlayer p, ServerLevel level) {
+	private static JsonObject lookingAt(Player p, net.minecraft.world.level.Level level) {
 		Vec3 eye = p.getEyePosition(), look = p.getLookAngle();
 		double reachB = p.blockInteractionRange(), reachE = p.entityInteractionRange();
 		BlockHitResult block = level.clip(new ClipContext(eye, eye.add(look.scale(reachB)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, p));
@@ -367,7 +367,7 @@ final class GameplayLog {
 	}
 
 	/** The creatures (and dropped things) about, nearest first. */
-	private static JsonArray nearby(ServerPlayer p, ServerLevel level) {
+	private static JsonArray nearby(Player p, net.minecraft.world.level.Level level) {
 		List<Entity> about = new ArrayList<>(level.getEntities(p, p.getBoundingBox().inflate(AROUND), e -> !e.isSpectator() && e.isAlive() && e.distanceTo(p) <= AROUND));
 		about.sort((a, b) -> Double.compare(a.distanceToSqr(p), b.distanceToSqr(p)));
 		JsonArray out = new JsonArray();
@@ -390,7 +390,7 @@ final class GameplayLog {
 	 * Its view as the recorder takes it: 14 by 24 sight lines across 90 by 130.6 degrees, each as far as the first
 	 * block it meets (to 192, -1 for nothing) and what that block is (-2 past 64, -1 for nothing).
 	 */
-	static JsonObject vision(ServerPlayer p, ServerLevel level) {
+	static JsonObject vision(Player p, net.minecraft.world.level.Level level) {
 		Vec3 eye = p.getEyePosition();
 		List<String> palette = new ArrayList<>();
 		Map<String, Integer> index = new HashMap<>();
@@ -450,10 +450,22 @@ final class GameplayLog {
 	}
 
 	private void state(ServerPlayer p, Log log) {
-		ServerLevel level = (ServerLevel) p.level();
 		log.lastState = log.ticks;
 		JsonObject o = head(log, "state");
 		log.i++;
+		boolean inventory = log.ticks - log.lastInventory >= INVENTORY_EVERY, view = log.ticks - log.lastVision >= VISION_EVERY;
+		if (inventory) log.lastInventory = log.ticks;
+		if (view) log.lastVision = log.ticks;
+		state(p, p.level(), o, input(p), inventory, view);
+		log.health = p.getHealth();
+		write(log, o);
+	}
+
+	/**
+	 * One state, as the recorder writes it, into {@code o}: the same for a player logged here and for the mod's own
+	 * recorder on a player's game (F8), so Ex1 reads both as they are.
+	 */
+	public static void state(Player p, net.minecraft.world.level.Level level, JsonObject o, JsonObject input, boolean inventory, boolean view) {
 		o.addProperty("dimension", level.dimension().identifier().toString());
 		o.addProperty("raining", level.isRaining());
 		o.addProperty("thundering", level.isThundering());
@@ -485,14 +497,13 @@ final class GameplayLog {
 		me.addProperty("sneaking", p.isShiftKeyDown());
 		me.addProperty("in_water", p.isInWater());
 		me.addProperty("health", r3(p.getHealth()));
-		log.health = p.getHealth();
 		me.addProperty("food", p.getFoodData().getFoodLevel());
 		me.addProperty("air", p.getAirSupply());
 		me.addProperty("xp_level", p.experienceLevel);
 		me.addProperty("xp_progress", r3(p.experienceProgress));
 		me.addProperty("xp_total", p.totalExperience);
 		o.add("player", me);
-		o.add("input", input(p));
+		o.add("input", input);
 		o.addProperty("selected_slot", p.getInventory().getSelectedSlot());
 		o.add("main_hand", item(p.getMainHandItem()));
 		o.add("off_hand", item(p.getOffhandItem()));
@@ -503,8 +514,7 @@ final class GameplayLog {
 		armor.add("feet", item(p.getItemBySlot(EquipmentSlot.FEET)));
 		o.add("armor", armor);
 		o.addProperty("using_item", p.isUsingItem());
-		if (log.ticks - log.lastInventory >= INVENTORY_EVERY) {
-			log.lastInventory = log.ticks;
+		if (inventory) {
 			JsonArray inv = new JsonArray();
 			var items = p.getInventory().getNonEquipmentItems();
 			for (int k = 0; k < items.size(); k++) {
@@ -525,11 +535,17 @@ final class GameplayLog {
 		blocks.addProperty("head", id(level.getBlockState(feet.above())));
 		o.add("blocks", blocks);
 		o.add("nearby", nearby(p, level));
-		if (log.ticks - log.lastVision >= VISION_EVERY) {
-			log.lastVision = log.ticks;
-			o.add("vision", vision(p, level));
-		}
+		if (view) o.add("vision", vision(p, level));
+	}
+
+	/** A note the player wrote (/xen note): what it's doing, for whoever reads the log. */
+	boolean note(ServerPlayer p, String text) {
+		Log log = logs.get(p.getUUID());
+		if (log == null || log.out == null) return false;
+		JsonObject o = event(log, "note");
+		o.addProperty("text", text);
 		write(log, o);
+		return true;
 	}
 
 	// ------------------------------------------------------------------------------------------------- events

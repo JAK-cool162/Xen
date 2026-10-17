@@ -1,7 +1,25 @@
-**Xen Companion 2.0.0-beta.34**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.35**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.35: record hours of play without the lag
+
+* **F8 is light now.** It records what you do and see in the form Xen Ex1 learns from as it is: your keys, where you
+  look, what's in your hands, health and hunger, what you mine and hit, the creatures around you, the blocks at your
+  feet, and a small view (14 by 24 sight lines twice a second). No pictures, no screen grabs. One file,
+  `.minecraft/xen_recordings/play_<date>.jsonl.gz`, about 1 MB an hour (the old recording: over 100 MB). On a test
+  client: 0.42 ms of the game's time a tick on average, against 1.15 ms with pictures.
+* **Hold sneak (Shift) and press F8** for the old recording with pictures (Xen's eyes, `/xen tour`).
+* **On your own server or in singleplayer, nothing runs on your game at all:** `/xen set gameplayLog players` has the
+  server write every player's play in the same form (`config/xen/gameplay_logs/`). These logs have chat in them; look
+  before you share one.
+* **`/xen note <text>`** puts a note ("trading with villagers") in your gameplay log, like F9 does in a recording.
+* **Older recordings still count:** `python -m xen.ex1.train` reads 2.0.0-beta.33/.34 session folders too (what they
+  didn't write down, like creatures behind you, is worked out from the view).
+* Tried on a player's first recordings (8.6 minutes): Ex1 trained with them scored the same as without (93% on forward
+  either way on older held-out play; danger AUC 0.84 either way), so this release doesn't change Ex1. That much is too
+  little to move it: about 30 to 60 minutes of each kind of play is what would.
 
 ### 2.0.0-beta.34: XenTalk, Xens talk in their own words
 

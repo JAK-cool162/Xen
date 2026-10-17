@@ -53,6 +53,11 @@ public final class Recorder {
 
 	private static KeyMapping recordKey, noteKey;
 	private static boolean on;
+	/** Recording with pictures (sneak + F8): heavy. Without (F8): what you do and see, as the gameplay log writes it. */
+	private static boolean full;
+	private static long moments;
+	/** Time the recording took on the game's thread (said when a test recording ends). */
+	private static long spent;
 	private static Path dir;
 	private static Writer log;
 	private static ExecutorService io;
@@ -126,7 +131,7 @@ public final class Recorder {
 		if (recordKey == null) return;
 		while (recordKey.consumeClick()) {
 			if (on) stop(client);
-			else start(client);
+			else start(client, client.options.keyShift.isDown());
 		}
 		while (noteKey != null && noteKey.consumeClick()) {
 			if (on && Screens.current(client) == null) Screens.open(client, new NoteScreen());
@@ -134,7 +139,7 @@ public final class Recorder {
 		var p = client.player;
 		if (TEST > 0 && p != null && client.level != null) {
 			testTicks++;
-			if (testTicks == 100 && !on) start(client);
+			if (testTicks == 100 && !on) start(client, Boolean.getBoolean("xen.recordFull"));
 			if (on && testTicks == 100 + TEST * 20) stop(client);
 		}
 		if (!on) return;
@@ -148,21 +153,36 @@ public final class Recorder {
 			attacking = null;
 		}
 		float hp = p.getHealth();
-		if (lastHealth >= 0 && hp < lastHealth) event(hp <= 0 ? "death" : "hurt", String.format(Locale.ROOT, "\"amount\":%.1f", lastHealth - hp));
+		if (lastHealth >= 0 && hp < lastHealth) event(hp <= 0 ? "death" : "hurt", String.format(Locale.ROOT, "\"amount\":%.1f,\"health\":%.1f", lastHealth - hp, hp));
 		lastHealth = hp;
 		if (Screens.current(client) != null) return;                                          // (a screen open: the world isn't what you're looking at)
-		if (ticks % STATE_EVERY == 0) state(client);
-		if (ticks % SHOT_EVERY == 0) shot(client, frame);
+		long t0 = System.nanoTime();
+		if (!full) {
+			if (ticks % STATE_EVERY == 0) light(client);
+		} else {
+			if (ticks % STATE_EVERY == 0) state(client);
+			if (ticks % SHOT_EVERY == 0) shot(client, frame);
+		}
+		spent += System.nanoTime() - t0;
 	}
 
-	private static void start(Minecraft client) {
+	private static void start(Minecraft client, boolean withPictures) {
 		if (client.player == null) return;
 		try {
 			String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-			dir = client.gameDirectory.toPath().resolve("xen_recordings").resolve("session_" + stamp);
-			Files.createDirectories(dir.resolve("frames"));
-			Files.createDirectories(dir.resolve("xen"));
-			log = new java.io.OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(dir.resolve("log.jsonl.gz"))), StandardCharsets.UTF_8);
+			full = withPictures;
+			Path file;
+			if (full) {
+				dir = client.gameDirectory.toPath().resolve("xen_recordings").resolve("session_" + stamp);
+				Files.createDirectories(dir.resolve("frames"));
+				Files.createDirectories(dir.resolve("xen"));
+				file = dir.resolve("log.jsonl.gz");
+			} else {                                                                         // (one small file, no pictures)
+				dir = client.gameDirectory.toPath().resolve("xen_recordings");
+				Files.createDirectories(dir);
+				file = dir.resolve("play_" + stamp + ".jsonl.gz");
+			}
+			log = new java.io.OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(file)), StandardCharsets.UTF_8);
 			io = Executors.newSingleThreadExecutor(r -> {
 				Thread t = new Thread(r, "xen-recorder");
 				t.setDaemon(true);
@@ -172,11 +192,19 @@ public final class Recorder {
 			started = System.currentTimeMillis();
 			ticks = 0;
 			frame = 0;
+			moments = 0;
+			spent = 0;
 			lastHealth = -1;
 			on = true;
-			write("{\"session\":\"" + stamp + "\",\"format\":\"xen-recorder 1\",\"shot\":[" + SHOT_W + "," + SHOT_H + "],\"labels_size\":[" + Vision.W + "," + Vision.H
+			if (!full) {
+				write("{\"type\":\"event\",\"kind\":\"session_start\",\"t_ms\":" + System.currentTimeMillis() + ",\"tick\":0,\"tag\":\"player\",\"mod_version\":\""
+						+ xen.mod.GameplayLog.FORMAT + "\",\"source\":\"player\",\"written_by\":\"xen recorder\",\"interval_ticks\":" + STATE_EVERY + "}");
+				say(client, "Xen recorder: on (F8 to stop, F9 for a note). Saving to xen_recordings/play_" + stamp + ".jsonl.gz");
+				return;
+			}
+			write("{\"session\":\"" + stamp + "\",\"format\":\"xen-recorder 2\",\"shot\":[" + SHOT_W + "," + SHOT_H + "],\"labels_size\":[" + Vision.W + "," + Vision.H
 					+ "],\"state_hz\":" + 20 / STATE_EVERY + ",\"shot_hz\":" + 20 / SHOT_EVERY + "}");
-			say(client, "Xen recorder: on (F8 to stop, F9 for a note). Saving to xen_recordings/session_" + stamp);
+			say(client, "Xen recorder: on, with pictures (F8 to stop, F9 for a note). Saving to xen_recordings/session_" + stamp);
 		} catch (IOException e) {
 			say(client, "Xen recorder: couldn't start (" + e.getMessage() + ")");
 			on = false;
@@ -199,7 +227,9 @@ public final class Recorder {
 			});
 			was.shutdown();
 		}
-		if (client.player != null) say(client, "Xen recorder: off. " + frame + " pictures saved.");
+		if (client.player != null) say(client, full ? "Xen recorder: off. " + frame + " pictures saved." : "Xen recorder: off. " + moments + " moments saved.");
+		if (TEST > 0) xen.mod.XenMod.LOG.info("Xen recorder ({}): {} ms a game tick on average over {} ticks", full ? "with pictures" : "light",
+				String.format(Locale.ROOT, "%.3f", spent / 1e6 / Math.max(1, ticks)), ticks);
 	}
 
 	private static void say(Minecraft client, String text) {
@@ -221,7 +251,47 @@ public final class Recorder {
 	}
 
 	private static void event(String what, String fields) {
+		if (!full) {                                                                         // (the gameplay log's names: Ex1 reads it as it is)
+			String kind = switch (what) {
+				case "hurt" -> "damage_taken";
+				case "mine" -> "block_break";
+				case "attack" -> "swing";
+				default -> what;
+			};
+			write("{\"type\":\"event\",\"kind\":\"" + kind + "\",\"t_ms\":" + System.currentTimeMillis() + ",\"tick\":" + ticks + ",\"tag\":\"player\""
+					+ (fields.isEmpty() ? "" : "," + fields) + "}");
+			return;
+		}
 		write("{\"t\":" + (System.currentTimeMillis() - started) + ",\"event\":\"" + what + "\"" + (fields.isEmpty() ? "" : "," + fields) + "}");
+	}
+
+	/**
+	 * The light recording: what you do and see 4 times a second, written the way the gameplay log writes a player
+	 * (14 by 24 sight lines twice a second, no pictures, no 64 by 36 view), so it costs little and Ex1 learns from it as
+	 * it is. Sprinting is the real thing, not the key (toggle sprint holds the key down for good).
+	 */
+	private static void light(Minecraft client) {
+		var p = client.player;
+		if (p.isSpectator()) return;                                                         // (a spectator, a tour: not how a person plays)
+		var o = client.options;
+		com.google.gson.JsonObject st = new com.google.gson.JsonObject();
+		st.addProperty("type", "state");
+		st.addProperty("i", moments++);
+		st.addProperty("tick", ticks);
+		st.addProperty("t_ms", System.currentTimeMillis());
+		st.addProperty("tag", "player");
+		com.google.gson.JsonObject in = new com.google.gson.JsonObject();
+		in.addProperty("forward", o.keyUp.isDown());
+		in.addProperty("back", o.keyDown.isDown());
+		in.addProperty("left", o.keyLeft.isDown());
+		in.addProperty("right", o.keyRight.isDown());
+		in.addProperty("jump", o.keyJump.isDown());
+		in.addProperty("sneak", o.keyShift.isDown());
+		in.addProperty("sprint", p.isSprinting());
+		in.addProperty("attack", o.keyAttack.isDown());
+		in.addProperty("use", p.isUsingItem());
+		xen.mod.GameplayLog.state(p, client.level, st, in, ticks % 200 == 0, ticks % SHOT_EVERY == 0);
+		write(st.toString());
 	}
 
 	/** What you do and see now: your body, your hands, your keys, where you look, and what each part of the view is. */
@@ -263,11 +333,12 @@ public final class Recorder {
 				"{\"t\":%d,\"frame\":%d,\"pos\":[%.2f,%.2f,%.2f],\"dim\":\"%s\",\"yaw\":%.1f,\"pitch\":%.1f,\"turn\":[%.1f,%.1f],\"fov\":%.0f,"
 						+ "\"keys\":{\"w\":%b,\"a\":%b,\"s\":%b,\"d\":%b,\"jump\":%b,\"sneak\":%b,\"sprint\":%b,\"attack\":%b,\"use\":%b},\"slot\":%d,\"hand\":\"%s\","
 						+ "\"hp\":%.1f,\"food\":%d,\"air\":%d,\"day_time\":%d,\"on_ground\":%b,\"in_water\":%b,\"spectator\":%b,\"looking_at\":\"%s\","
-						+ "\"what\":\"%s\",\"dist\":\"%s\",\"light_face\":\"%s\"}",
+						+ "\"what\":\"%s\",\"dist\":\"%s\",\"light_face\":\"%s\",%s}",
 				System.currentTimeMillis() - started, shotNow ? frame : -1, p.getX(), p.getY(), p.getZ(), dim, yaw, pitch, dYaw, dPitch, fov,
 				o.keyUp.isDown(), o.keyLeft.isDown(), o.keyDown.isDown(), o.keyRight.isDown(), o.keyJump.isDown(), o.keyShift.isDown(), o.keySprint.isDown(),
 				o.keyAttack.isDown(), o.keyUse.isDown(), p.getInventory().getSelectedSlot(), item(p.getMainHandItem()), p.getHealth(), p.getFoodData().getFoodLevel(),
-				p.getAirSupply(), Screens.dayTime(level), p.onGround(), p.isInWater(), p.isSpectator(), lookingAt(client), rle(cam.what), b64.encodeToString(dist), b64.encodeToString(lf));
+				p.getAirSupply(), Screens.dayTime(level), p.onGround(), p.isInWater(), p.isSpectator(), lookingAt(client), rle(cam.what), b64.encodeToString(dist), b64.encodeToString(lf),
+				body(client, inView));
 		write(line);
 		if (shotNow) {                                                                      // Xen's own picture of this view, next to yours
 			int[] mine = cam.rgb.clone();
@@ -276,6 +347,34 @@ public final class Recorder {
 			ExecutorService x = io;
 			if (x != null) x.submit(() -> png(to, mine, cam.w, cam.h));
 		}
+	}
+
+	/**
+	 * What Xen Ex1 learns from that the view doesn't show (recorder 2): how you move, sprinting and sneaking as they are
+	 * (not the keys: toggle sprint holds the key down for good), the light where you are, rain, the blocks under you, at
+	 * your feet and at your head, your other hand, using an item, and the creatures within 24 blocks all round.
+	 */
+	private static String body(Minecraft client, List<Entity> around) {
+		var p = client.player;
+		var level = client.level;
+		Vec3 v = p.getDeltaMovement();
+		BlockPos at = p.blockPosition();
+		Vec3 me = p.position();
+		List<Entity> near = new ArrayList<>();
+		for (Entity e : around) if (e instanceof LivingEntity && e.distanceTo(p) <= 24) near.add(e);
+		near.sort(java.util.Comparator.comparingDouble(e -> e.distanceTo(p)));
+		StringBuilder n = new StringBuilder();
+		for (Entity e : near.subList(0, Math.min(8, near.size()))) {
+			Vec3 r = e.position().subtract(me);
+			if (n.length() > 0) n.append(',');
+			n.append(String.format(Locale.ROOT, "{\"k\":\"%s\",\"h\":%b,\"d\":%.2f,\"r\":[%.2f,%.2f,%.2f]}", kind(e), e instanceof net.minecraft.world.entity.monster.Enemy,
+					e.distanceTo(p), r.x, r.y, r.z));
+		}
+		return String.format(Locale.ROOT, "\"vel\":[%.3f,%.3f,%.3f],\"sprinting\":%b,\"sneaking\":%b,\"light\":%d,\"rain\":%b,\"below\":\"%s\",\"feet\":\"%s\",\"head\":\"%s\","
+						+ "\"off\":\"%s\",\"using\":%b,\"near\":[%s]",
+				v.x, v.y, v.z, p.isSprinting(), p.isShiftKeyDown(), level.getMaxLocalRawBrightness(BlockPos.containing(p.getEyePosition())), level.isRaining(),
+				name(level.getBlockState(at.below()).getBlock()), name(level.getBlockState(at).getBlock()), name(level.getBlockState(at.above()).getBlock()),
+				item(p.getOffhandItem()), p.isUsingItem(), n);
 	}
 
 	private static String lookingAt(Minecraft client) {

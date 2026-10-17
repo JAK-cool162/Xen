@@ -1100,6 +1100,14 @@ public class XenMod implements ModInitializer {
 							return 1;
 						}))
 						.then(Commands.argument("minutes", IntegerArgumentType.integer(1, 600)).executes(ctx -> tour(ctx, IntegerArgumentType.getInteger(ctx, "minutes")))))
+				.then(Commands.literal("note").then(Commands.argument("text", StringArgumentType.greedyString()).executes(ctx -> {   // a note in your own gameplay log: what you're doing
+					ServerPlayer p = ctx.getSource().getPlayer();
+					String text = StringArgumentType.getString(ctx, "text");
+					String out = p == null ? "Only a player has a gameplay log." : gameplayLog.note(p, text) ? "Noted in your gameplay log: " + text
+							: "Your play isn't being logged (an operator can turn it on: /xen set gameplayLog players).";
+					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+					return 1;
+				})))
 				.then(Commands.literal("vision").executes(ctx -> {              // what each Xen sees, what it makes of it, what it costs
 					StringBuilder sb = new StringBuilder();
 					for (Companion c : companions) if (!c.minion) sb.append(sb.length() > 0 ? "\n" : "").append(c.vision.status());
