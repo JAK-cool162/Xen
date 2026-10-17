@@ -118,7 +118,18 @@ final class Chores {
 		return kind != null;
 	}
 
+	/** Which chore this is (one more each time one begins), and whether the last one ended by itself (done, or it gave up on it). */
+	int serial;
+	boolean endedItself = true;
+
+	/** Stopped from outside (a fight, its gut, something to pick up, someone asking): the chore didn't end, it was cut off (see {@link Focus}). */
 	void cancel() {
+		if (kind != null) endedItself = false;
+		stop();
+	}
+
+	/** It ends (done, or it gave up). */
+	private void stop() {
 		kind = null;
 		target = null;
 		prey = null;
@@ -130,7 +141,9 @@ final class Chores {
 	}
 
 	private void begin(Kind k) {
-		cancel();
+		stop();
+		serial++;
+		endedItself = true;
 		dugout = null;
 		pit = null;
 		inside = null;
@@ -658,7 +671,7 @@ final class Chores {
 			if (++waited < 100) return Action.IDLE;
 		}
 		pit = null;
-		cancel();
+		stop();
 		c.chatter(c.pick3("Dug in. See you in the morning!", "A hole in the ground: not pretty, but safe.", "Nice and snug down here."), true);
 		shelterBuilt = true;
 		doing = "hiding in its hole until morning";
@@ -864,7 +877,7 @@ final class Chores {
 					if (hutFilled != null && !"fort".equals(shape) && (c.goals.home == null || !c.goals.home.closerThan(c.player.blockPosition(), 10)))
 						c.tidy.shelter(hutFilled);                            // morning: its night's hut may come down again (its call)
 					hutFilled = null;
-					cancel();
+					stop();
 					if (resume != null) c.mode = resume;                        // following again, as it was told
 					resume = null;
 					yield null;
@@ -873,7 +886,7 @@ final class Chores {
 				yield dig != null ? dig : Action.IDLE;
 			}
 			case EAT -> {
-				cancel();
+				stop();
 				yield c.player.getFoodData().needsFood() && count("food") > 0 ? Action.EAT : null;
 			}
 		};
@@ -907,7 +920,7 @@ final class Chores {
 	}
 
 	private void finish(String say) {
-		cancel();
+		stop();
 		String s = say.toLowerCase(java.util.Locale.ROOT);
 		if (s.startsWith("got") || s.startsWith("done") || s.startsWith("here")) c.belief.up(0.015f, say);   // (what it set out to do: done)
 		else if (s.startsWith("i can't") || s.startsWith("no ") || s.startsWith("couldn't")) c.belief.down(0.015f, say);
@@ -2540,7 +2553,7 @@ final class Chores {
 		if (gaveAt >= 0) {                                             // given: a moment still, then it's done
 			if (now() - gaveAt < 60) return Action.IDLE;
 			gaveAt = -1;
-			cancel();
+			stop();
 			return null;
 		}
 		if (now() < thinkUntil) {                                      // looking at them, thinking it over
@@ -2643,7 +2656,7 @@ final class Chores {
 			return Action.IDLE;
 		}
 		dugout = null;
-		cancel();
+		stop();
 		c.chatter(c.pick3("Safe in my little hole in the hill. Good night!", "Dug in for the night.", "Nice and cozy in here."), true);
 		shelterBuilt = true;
 		doing = "hiding in its dugout until morning";
@@ -2682,7 +2695,7 @@ final class Chores {
 			}
 		}
 		if (done) {
-			cancel();
+			stop();
 			c.chatter("Done! I'm safe in my little " + shape + ".", true);   // (always said: you'll want to know where it is)
 			shelterBuilt = true;
 			doing = "hiding in its " + shape + " until morning";

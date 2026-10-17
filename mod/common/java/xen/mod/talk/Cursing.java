@@ -5,9 +5,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Swearing, the way players swear in chat: "oh shit", "wtf", "fucking creepers", "this is so damn far", "ow, fuck!",
- * "damn it". How much: how foul its mouth is (a hidden stat) and how angry it is right now (see the mod's Rage); a
- * clean-mouthed Xen hardly ever, a foul-mouthed one that's furious in most lines. Only the words players use about the
+ * Swearing, the way players swear in chat, angry or not: "oh shit", "wtf", "fucking creepers", "this shit is so far",
+ * "hell yeah", "ow, fuck!", "damn it". How much: how foul its mouth is (a hidden stat) and how angry it is right now
+ * (see the mod's Rage); a clean-mouthed Xen hardly ever, a foul-mouthed one in a good share of its lines just talking,
+ * and in most of them when it's furious. Only the words players use about the
  * game and each other in a heated moment: never a slur, never about who someone is. What it says stays what it says
  * (the swearing goes around the words, it doesn't change what they mean), and a line already swearing isn't made worse.
  */
@@ -34,6 +35,16 @@ public final class Cursing {
 			{"^(Ow|Ouch|Ugh|Argh|Agh)\\b", "$1, fuck|$1 shit|$1, damn"},
 			{"\\b[Ss]hut up\\b", "shut the fuck up|stfu"},
 			{"\\b[Gg]o away\\b", "fuck off|piss off"},
+			{"^[Yy](es|eah|ep)\\b", "hell yeah|fuck yeah|hell yes"},
+			{"^[Nn]o\\b(?!t)", "hell no|fuck no|nah fuck that"},
+			{"^[Ww]hy\\b", "why the hell|why tf|why the fuck"},
+			{"^[Ww]here\\b", "where the hell|where tf"},
+			{"^[Ww]hat(?= (are|is|was|do|did|happened|the))\\b", "what the hell|wtf|what the fuck"},
+			{"^[Ww]ow\\b", "holy shit|damn|holy fuck"},
+			{"\\b(awesome|cool|great|nice|sick)\\b", "fucking $1|$1 as hell|damn $1"},
+			{"\\b[Tt]his(?= (is|was) )", "this shit"},
+			{"\\bI'm (tired|hungry|lost|bored|done|starving|dead)\\b", "I'm so fucking $1|I'm $1 as hell|damn I'm $1"},
+			{"\\b(lucky|unlucky)\\b", "fucking $1|$1 as hell"},
 	};
 	private static final Pattern[] PATTERNS = new Pattern[SWAPS.length];
 	static {
@@ -43,6 +54,8 @@ public final class Cursing {
 	private static final Pattern SWEARING = Pattern.compile("(?i)\\b(fuck\\w*|shit\\w*|damn\\w*|hell|wtf|ffs|stfu|fml|crap|ass|piss\\w*|bastard)\\b");
 	/** A line it starts with, hurt or furious. */
 	private static final String[] OPENERS = {"shit, ", "fuck, ", "damn, ", "ffs ", "bro wtf, "};
+	/** And just talking. */
+	private static final String[] CASUAL = {"damn, ", "bro wtf, ", "shit, ", "hell, ", "fuck it, "};
 	/** One it ends a line with, furious. */
 	private static final String[] TAILS = {" ffs", ", damn it", " wtf", ", fuck this", " fml"};
 
@@ -70,9 +83,11 @@ public final class Cursing {
 			made++;
 		}
 		boolean heated = s.endsWith("!") || anger >= 0.4f;
-		if (made == 0 && heated && r.nextFloat() < amount * (0.25f + 0.6f * anger) * (s.endsWith("!") ? 1f : 0.5f)) {   // hurt, heated: a word to start with ("shit, a creeper!")
+		float open = heated ? amount * (0.25f + 0.6f * anger) * (s.endsWith("!") ? 1f : 0.5f) : amount * 0.18f;   // (heated: often; just talking: now and then)
+		if (made == 0 && r.nextFloat() < open) {                                  // a word to start with ("shit, a creeper!", "damn, this is far")
 			boolean keep = s.startsWith("I ") || s.startsWith("I'") || s.length() > 1 && Character.isUpperCase(s.charAt(1));
-			s = OPENERS[r.nextInt(OPENERS.length)] + (keep ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1));
+			String[] from = heated ? OPENERS : CASUAL;
+			s = from[r.nextInt(from.length)] + (keep ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1));
 			made++;
 		}
 		if (made < most && (s.endsWith("!") || anger >= 0.8f) && !s.endsWith("?") && r.nextFloat() < amount * anger * 0.6f) {   // furious: one to end with too

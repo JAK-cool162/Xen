@@ -224,6 +224,7 @@ public class XenMod implements ModInitializer {
 		lore.load(brainFile().resolveSibling("lore.json"));
 		society.load(brainFile().resolveSibling("society.json"));
 		Rules.load(brainFile().resolveSibling("rules.tsv"));                  // the rules each Xen wrote itself
+		Focus.load(brainFile().resolveSibling("focus.tsv"));                  // what Focus learned of which goals are worth going back to
 		Vision.loadTuning(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("vision.txt"));   // (its shading, tuned from recordings)
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
 		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
@@ -420,6 +421,7 @@ public class XenMod implements ModInitializer {
 		lore.save();
 		society.save();
 		Rules.save();
+		Focus.save();
 		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
 		xen.mod.talk.Banter.save();
 	}
@@ -435,6 +437,7 @@ public class XenMod implements ModInitializer {
 		lore.save();
 		society.save();
 		Rules.save();
+		Focus.save();
 		xen.mod.talk.Voice.save();
 		xen.mod.talk.Banter.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();

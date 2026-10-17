@@ -236,13 +236,14 @@ public final class CrossCheck {
 		String[] lines = {"Oh no, a creeper!", "Ow! What was that for?", "This is so far.", "Nope, not going down there.", "I really need wood.",
 				"What?", "Hey, stop hitting me!", "The zombies are everywhere.", "Got 3 iron.", "Come to 120 64 -30."};
 		java.util.Random r = new java.util.Random(7);
-		int clean = 0, foul = 0, n = 0, again = 0;
+		int clean = 0, foul = 0, calm = 0, n = 0, again = 0;
 		boolean coords = true;
 		List<String> seen = new ArrayList<>();
 		for (int k = 0; k < 50; k++) {
 			for (String l : lines) {
 				n++;
 				if (!xen.mod.talk.Cursing.swear(l, 0.01f, 0f, r).equals(l)) clean++;
+				if (!xen.mod.talk.Cursing.swear(l, 0.6f, 0f, r).equals(l)) calm++;
 				String f = xen.mod.talk.Cursing.swear(l, 1f, 1f, r);
 				if (!f.equals(l)) foul++;
 				if (l.contains("120 64") && !f.equals(l)) coords = false;
@@ -252,9 +253,10 @@ public final class CrossCheck {
 		}
 		check(clean == 0, "a clean mouth swore " + clean + " times");
 		check(foul > n / 2, "a furious foul mouth swore in only " + foul + "/" + n + " lines");
+		check(calm > n / 5, "a foul mouth just talking swore in only " + calm + "/" + n + " lines");
 		check(coords, "swearing changed coordinates");
 		check(again == 0, "a line already swearing got more (" + again + ")");
-		System.out.printf(java.util.Locale.ROOT, "swearing: clean mouth %d/%d lines, furious foul mouth %d/%d (\"%s\")%n", clean, n, foul, n, String.join("\", \"", seen));
+		System.out.printf(java.util.Locale.ROOT, "swearing: clean mouth %d/%d lines, foul mouth just talking %d/%d, furious %d/%d (\"%s\")%n", clean, n, calm, n, foul, n, String.join("\", \"", seen));
 	}
 
 	/** XenTalk: the jar's model, greedy, gives the replies Python's gave (on the same bytes); and it's quick. */

@@ -2677,6 +2677,9 @@ public final class Companion {
 		return Math.max(32, Math.min(mod.config.sight, server.getPlayerList().getViewDistance() * 16));
 	}
 
+	/** Its eye on the goal: a goal cut short is gone back to, if it's worth it (see {@link Focus}). */
+	final Focus focus = new Focus(this);
+
 	/** Its anger and bloodlust (hidden; see {@link Rage}). */
 	final Rage rage = new Rage(this);
 	/** What hurt it, remembered (once burnt, twice shy). */
@@ -3436,6 +3439,7 @@ public final class Companion {
 		habits.died();
 		prepared.died();
 		goals.notItsDoing = source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) || source.is(net.minecraft.world.damagesource.DamageTypes.FELL_OUT_OF_WORLD);   // (/kill, the void: nothing it chose did that)
+		focus.forget();                                                  // (dead: whatever it was doing, it starts over)
 		if (goals.option >= 0) goals.finishOption(true);
 		goals.notItsDoing = false;                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
@@ -3601,7 +3605,8 @@ public final class Companion {
 						+ (personality.loner ? " (a loner)" : ""), lastThought)
 				+ String.format(java.util.Locale.ROOT, " Xen 2.0: %s, reactions %d ms on average; choices %d (%d yes, %d no, %d later)%s%s",
 						confusion.says(), reflexes.averageMs(), choices.made, choices.yes, choices.no, choices.later,
-						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing);
+						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing)
+				+ (focus.describe().isEmpty() ? "" : "; " + focus.describe());
 	}
 
 	/** How far along it is, in one line (for a long run's log): where, health, its pickaxe, the things that mark progress, its adventure. */

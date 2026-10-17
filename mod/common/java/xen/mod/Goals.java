@@ -84,6 +84,8 @@ final class Goals {
 	private int[] origin;
 	int achieved;
 	private long next, until;
+	/** When the short goal going now began. */
+	private long goalAt;
 
 	/** Think again now (not in a few seconds): it just finished something that wasn't a goal (its first look around). */
 	void thinkNow() {
@@ -202,7 +204,27 @@ final class Goals {
 					: current == Short.FARM ? !c.farmer.on && !c.chores.busy()
 					: building(current) ? !c.builder.busy() : current == Short.STORE ? !c.storage.busy()
 					: current == Short.ADVENTURE ? !c.adventure.on : current == Short.TRIALS ? !c.trials.on : !c.chores.busy();
-			if (!over) return c.chores.busy() && !building(current);
+			if (!over) {
+				c.focus.watch();
+				return c.chores.busy() && !building(current);
+			}
+			if (Focus.WATCHED.contains(current) && (c.focus.holding() || c.focus.cutOff(current) && c.focus.hold(current.what))) {   // cut off, not over: it holds on
+				String stale = c.focus.stale();
+				if (stale != null) {
+					c.journal("focus", "lets go of " + current.what + ": " + stale);
+					c.focus.letGo++;
+				} else if (!c.focus.quiet()) {
+					return false;                                                 // (whatever cut it off has its turn)
+				} else {
+					String plan = chore(current);
+					if (!cant(plan)) {
+						c.chores.own = true;
+						c.focus.back(current.what);
+						return c.chores.busy();
+					}
+					c.journal("focus", "can't get back to " + current.what + ": " + plan);
+				}
+			}
 			learn();
 			next = now;                                                      // done: straight on to the next thing, like a player
 		}
@@ -213,6 +235,7 @@ final class Goals {
 		Short best = null;
 		float bestScore = 0.25f;                                         // below this it's happy doing whatever it does
 		for (Short s : Short.values()) {
+			if (c.focus.resting(s)) continue;                                    // (it came to nothing at once, just now)
 			if (nearby && (s == Short.TRADE || s == Short.EXPLORE || s == Short.MINE || s == Short.HOUSE || s == Short.FARM || s == Short.MOBFARM
 					|| s == Short.ADVENTURE || s == Short.TRIALS || s == Short.STORE)) continue;   // those would take it away from its friend
 			float score = (urgency(s) + dreamPull(s)) * (0.5f + liking.get(s)) + random.nextFloat() * 0.15f * c.personality.curiosity;
@@ -238,7 +261,32 @@ final class Goals {
 	/** Get on with a short goal (it chose it, or Xen 2.0 did). False if it can't right now. */
 	private boolean begin(Short best, boolean nearby, long now) {
 		buildingHome = best == Short.SHELTER && dream == Long.HOME && home == null && !c.player.level().isDarkOutside();
-		String plan = switch (best) {
+		String plan = chore(best);
+		if (!nearby) c.mode = Companion.Mode.FREE;                      // (a shelter would have it stay; it's still free)
+		else if (best == Short.SHELTER) c.mode = Companion.Mode.FOLLOW;   // it builds it where it is, next to its friend
+		if (cant(plan)) {
+			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} wanted to {}, but: {}", c.name, best.what, plan);
+			liking.merge(best, -0.05f, (a, b) -> Math.max(0f, a + b));       // it can't right now: a little less keen
+			c.chores.cancel();
+			return false;
+		}
+		current = best;
+		rewardAtStart = c.genReward;
+		until = now + EXPLORE_TICKS;
+		goalAt = now;
+		c.chores.own = true;
+		c.focus.started(best);
+		c.chatter(buildingHome ? "I'm going to build my home here!" : nearby ? pickNearby(best) : "I want to " + best.what + ".", nearby);
+		return true;
+	}
+
+	private static boolean cant(String plan) {
+		return plan.startsWith("You can't") || plan.startsWith("You have no") || plan.startsWith("You don't");
+	}
+
+	/** Its goal's work, set going: what it's told it will do ("You can't ..." if it can't). */
+	private String chore(Short best) {
+		return switch (best) {
 			case FOOD -> food();
 			case SHELTER -> buildingHome ? c.chores.shelter("fort") : c.chores.shelter();
 			case WOOD -> c.chores.gather("wood", c.crafter.pickTier() == 0 ? 5 : 10);
@@ -285,20 +333,6 @@ final class Goals {
 			case TRADE -> c.trader.withVillager(null);
 			case EXPLORE -> "";
 		};
-		if (!nearby) c.mode = Companion.Mode.FREE;                      // (a shelter would have it stay; it's still free)
-		else if (best == Short.SHELTER) c.mode = Companion.Mode.FOLLOW;   // it builds it where it is, next to its friend
-		if (plan.startsWith("You can't") || plan.startsWith("You have no") || plan.startsWith("You don't")) {
-			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} wanted to {}, but: {}", c.name, best.what, plan);
-			liking.merge(best, -0.05f, (a, b) -> Math.max(0f, a + b));       // it can't right now: a little less keen
-			c.chores.cancel();
-			return false;
-		}
-		current = best;
-		rewardAtStart = c.genReward;
-		until = now + EXPLORE_TICKS;
-		c.chores.own = true;
-		c.chatter(buildingHome ? "I'm going to build my home here!" : nearby ? pickNearby(best) : "I want to " + best.what + ".", nearby);
-		return true;
 	}
 
 	/** What it says when it gets on with something while its friend is close. */
@@ -688,8 +722,10 @@ final class Goals {
 		}
 		buildingHome = false;
 		c.chores.own = false;
+		Short was = current;
 		current = null;
-		if (option >= 0) finishOption(false);
+		boolean worked = option >= 0 ? finishOption(false) : outcome > 0.05f;
+		if (was != null) c.focus.ended(was, worked, c.player.level().getGameTime() - goalAt);
 	}
 
 	/** No new goal for a while (it's catching up with its friend). */
@@ -712,6 +748,7 @@ final class Goals {
 	void drop() {
 		exploreAskedUntil = 0;
 		current = null;
+		c.focus.forget();
 		buildingHome = false;
 		c.chores.own = false;
 		if (option >= 0) finishOption(false);
@@ -792,7 +829,7 @@ final class Goals {
 		boolean[] can = MindSense.allowed(c, f, nearby);
 		Plans.Step planNext = c.plans.advice();                                // (what its plan says next is something it can do: one of its choices, not an order)
 		if (planNext != null && (planNext.option == Mind.CRAFT || planNext.option == Mind.SMELT)) can[planNext.option] = true;
-		for (int i = 0; i < can.length && i < quickUntil.length; i++) if (now < quickUntil[i]) can[i] = false;
+		for (int i = 0; i < can.length && i < quickUntil.length; i++) if (now < quickUntil[i] || AS_SHORT[i] != null && c.focus.resting(AS_SHORT[i])) can[i] = false;
 		float caution = c.personality.cautionScale() * (0.7f + 0.6f * c.emotions.fear);
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
 		int planned = agenda(f, can);                                          // the usual next step, like any player: advice, not an order
@@ -1065,6 +1102,8 @@ final class Goals {
 				Mind.SAYS[option], p.getHealth(), near == 0 ? "nothing about" : near + " monster" + (near > 1 ? "s" : "") + " about"), 600)) return false;
 		c.journal("does", (outdoorWork ? "night fell" : String.format(java.util.Locale.ROOT, "hurt (%.0f health) out in the dark", c.player.getHealth()))
 				+ ": drops " + Mind.SAYS[option] + " for a shelter");
+		c.focus.forget();                                                    // (night: what it was doing out here can wait for the morning)
+		current = null;
 		finishOption(false);
 		c.chores.cancel();
 		next = now;
@@ -1678,7 +1717,7 @@ final class Goals {
 	/** The choice going now is a step of its plan. */
 	private boolean planStep;
 
-	void finishOption(boolean died) {
+	boolean finishOption(boolean died) {
 		int o = option;
 		float[] before = optionFeatures;
 		if (planStep) {
@@ -1697,7 +1736,7 @@ final class Goals {
 		fleeFrom = null;
 		guardWho = null;
 		followWho = null;
-		if (o < 0 || before == null || c.mod.mind == null || c.player == null) return;
+		if (o < 0 || before == null || c.mod.mind == null || c.player == null) return false;
 		long now = c.player.level().getGameTime();
 		float minutes = Math.max(0.5f, (now - optionAt) / 1200f);           // (a choice counts as half a minute at least: many quick ones in a row mustn't look like no time at all)
 		float[] after = MindSense.features(c);
@@ -1725,6 +1764,7 @@ final class Goals {
 		c.journal("learns", String.format(Locale.ROOT, "Xen 2.0: %s took %.1f min, reward %+.2f, harm %.2f%s", Mind.OPTIONS[o], minutes, r, h, died ? " (died)" : ""));
 		c.diary.spent(Mind.OPTIONS[o], (now - optionAt) / 1200f, r > 0.05f, died);
 		if (!notItsDoing) c.rules.finished(o, r, h, died);
+		return r > 0.05f;
 	}
 
 	// -------------------------------------------------------------------------------- words

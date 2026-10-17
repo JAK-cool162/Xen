@@ -385,6 +385,7 @@ final class Habits {
 			c.journal("does", "got bored of " + Mind.SAYS[o]);
 			c.chatter(boredLine(o), false);
 			c.goals.finishOption(false);
+			c.focus.forget();                                                    // (bored of it: nothing to go back to)
 			c.chores.cancel();
 			return null;
 		}

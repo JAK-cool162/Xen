@@ -1,7 +1,41 @@
-XEN COMPANION 2.0.0-beta.38: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.39: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.39
+===========================
+
+Focus (Companion.focus): watches the short goals a chore does (FOOD, SHELTER, WOOD, STONE, ORE, MINE, SMELT).
+Chores.serial goes up with every begin(); Chores.cancel() (anything from outside) sets endedItself = false, the chore's
+own ends (finish, done, gave up) call the private stop() and keep it true. Goals.think(): a watched goal whose chore
+isn't busy any more is cut off when the serial moved on (another chore started over it) or it didn't end itself; then
+Focus.hold() weighs it: chance = logistic(w[goal] . x), x = {1, minutes in / 10, ground covered / 64, cuts / 4, night,
+Ex1 danger, health / 20, hunger, underground}; it lets go when chance < 0.25 or after 4 cuts, else holds (think()
+returns false: the interruption has its turn). While held: stale() (held over 400 ticks, or dark outside under the
+sky for an outdoor goal) lets it go; quiet() (30 ticks on, no chore, not fighting, hands free, Ex1 danger < 0.5) goes
+back: Goals.chore(goal) starts the same goal's chore again, without resetting its start, its reward baseline or its
+time. Goals.learn() -> Focus.ended(goal, worked = finishOption()'s reward > 0.05, ticks): every moment it weighed the
+goal (the start and each cut-off) is a training example, label worked, rate max(0.05, 0.5 / sqrt(goals of that kind
+seen)), L2 0.001; the weights are shared by every Xen, saved as focus.tsv next to the brain. A goal that came to
+nothing in under 60 ticks rests 400 << min(4, streak - 1) ticks (thinkMind: can[] false; the classic chooser skips
+it). Dropped on purpose (drop(): asked for something; nightfall(); bored; died): forget(). /xen status: "focus: cut off
+N times, went back N, let go N".
+
+Cursing: just talking (not heated), an opener (damn, / bro wtf, / shit, / hell, / fuck it,) with chance amount * 0.18,
+and more swaps: yes/yeah -> hell yeah, no -> hell no, why/where/what at the start -> why the hell..., wow -> holy shit,
+awesome/cool/great/nice/sick -> fucking ..., this is -> this shit is, I'm tired/hungry/lost/bored/done -> I'm so fucking
+..., lucky -> fucking lucky. Rage.swearing = foul^1.5 * 1.3 * tone * (0.7 + 0.9 * anger) (+0.15 * foul hurt). CrossCheck:
+clean 0/500, foul just talking (0.6, anger 0) 277/500, furious 428/500.
+
+Tests (prog_test, 6 Xens, 2 game days, seed 20261014, tick rate 40; different Xens each run): beta.38 (last run) choices
+157, 26% came to something (food 57 at 4%, mine 41 at 24%, explore 20 at 10%), 6 deaths; beta.39 first version (holds
+up to 1200 ticks, the night check only in quiet()): 117 choices, 33% (food 1, mine 16 at 50%, explore 51 at 2%), 11
+deaths (9 the first night: held goals kept the mind from choosing a shelter), Acquire Hardware 3, Isn't It Iron Pick 2;
+released version: 97 choices, 55% (mine 32 at 34%, wood 23 at 87%, explore 12 at 75%, food 3 at 100%), 12 deaths (3,
+2, 2, 1, 1, 1; drowned 2, in a wall 1, the rest monsters while mining or out), 10 gut dig-ins, Acquire Hardware 1,
+Isn't It Iron Pick 1; 13.3-15.5 ms a tick.
 
 
 WHAT'S NEW IN 2.0.0-beta.38

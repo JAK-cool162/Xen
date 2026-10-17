@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.38
+# Xen Companion (Fabric mod) 2.0.0-beta.39
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.38+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.38+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.39+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.39+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.38+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.39+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -158,10 +158,21 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
 
+### Focus: Xens keep their eye on the goal (2.0.0-beta.39)
+
+A Xen's goal (wood, stone, ore, a mine, food, a shelter, smelting) gets done by a chore, and a fight, a hit, its gut,
+something to pick up or someone talking to it can cut that short. **Focus** holds on to a goal that was cut off and
+goes back to it when things are quiet again, if it's still worth it: a small model it learns (shared by every Xen in
+the world, saved in the world folder as `xen/focus.tsv`) of how likely a goal like this still comes to something. It lets go below
+25%, after 4 cut-offs, after waiting 20 seconds, or when night falls on outdoor work. A goal that comes to nothing at
+once isn't picked again right away (20 seconds, doubling up to 5 minutes). `/xen status` shows how often it went back
+and how often it let go. In a test, the share of a Xen's choices that came to something went from 26% to 55%.
+
 ### Anger, bloodlust and swearing (2.0.0-beta.38)
 
-**Swearing**: Xens swear like players in chat ("oh shit, a creeper", "wtf was that", "Ow, fuck!", "ffs stop!!"), each
-as much as its mouth is foul (a hidden stat: some never do) and more when it's angry. Never a slur. Off: `swearing`
+**Swearing**: Xens swear like players in chat ("oh shit, a creeper", "wtf was that", "Ow, fuck!", "ffs stop!!", and
+from 2.0.0-beta.39 just talking too: "this shit is so far", "hell yeah"), each as much as its mouth is foul (a hidden
+stat: some never do) and more when it's angry. Never a slur. Off: `swearing`
 (Chat tab). Swearing at a Xen counts as an insult.
 
 **Anger** and **bloodlust** are hidden (never shown; you find out from what it does). Anger stacks: a hit (a hard

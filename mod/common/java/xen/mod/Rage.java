@@ -130,7 +130,7 @@ final class Rage {
 		return trust < grudge && bloodlust >= 20;
 	}
 
-	/** How much it swears right now (0 to 1): how foul its mouth is, and how angry it is. */
+	/** How much it swears right now (0 to 1): how foul its mouth is (most of it), and how angry it is (more). */
 	float swearing(boolean hurt) {
 		float foul = c.personality.hidden(Personality.FOUL_MOUTH);
 		float tone = switch (c.personality.tone) {
@@ -138,7 +138,7 @@ final class Rage {
 			case "grumpy", "bold" -> 1.2f;
 			default -> 1f;
 		};
-		return Math.max(0f, Math.min(1f, foul * foul * 1.4f * tone * (0.4f + 1.2f * mad()) + (hurt ? 0.15f * foul : 0f)));
+		return Math.max(0f, Math.min(1f, (float) Math.pow(foul, 1.5) * 1.3f * tone * (0.7f + 0.9f * mad()) + (hurt ? 0.15f * foul : 0f)));   // (just talking too, the foul-mouthed ones)
 	}
 
 	JsonObject save() {

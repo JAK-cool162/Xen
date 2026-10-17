@@ -1,7 +1,40 @@
-**Xen Companion 2.0.0-beta.38**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.39**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.39: Focus (Xens keep their eye on the goal), and they swear like players
+
+* **Xen Focus, a new part of its brain.** Its mind picks what to do (wood, a mine, food, a shelter) and a chore does
+  it, and a lot of things cut a chore short on the way: a fight, a hit, its gut, something lying on the ground,
+  someone talking to it. Until now a chore cut short was the end of the goal: the Xen forgot what it was doing and
+  chose again, often something else. Focus tells a goal that's over (done, or given up on) from one that was cut off,
+  holds on to the cut-off one while the interruption lasts, and goes back to it when it's quiet ("back to get some
+  wood"). Whether it's still worth it, it learns: a small model for each kind of goal of how likely a goal like this
+  comes to something (how long it's been at it, how much ground it covered, how often it was cut off, night, danger,
+  health, hunger, underground or not), trained on how every goal ended and shared by all Xens in the world. It lets go
+  when that's below 25%, after 4 cut-offs, after 20 seconds of waiting, or when night falls on work out in the open (a
+  shelter matters more then).
+* **No more trying the same thing over and over.** A goal that comes to nothing the moment it starts (no animals about
+  to hunt) isn't chosen again straight away, and the more often it does that, the longer it waits (20 seconds, up to
+  5 minutes).
+* **Swearing like players, not only when angry.** A foul-mouthed Xen swears just talking too: "this shit is so far",
+  "hell yeah", "why the hell is it dark already", "fucking awesome", "damn, I'm hungry". Anger makes it worse. A
+  clean-mouthed one still hardly ever does (it's each Xen's own hidden stat), and still never a slur.
+  (CrossCheck: a clean mouth 0 of 500 lines, a foul mouth just talking 277, furious 428.)
+* **Measured** (6 Xens, 2 game days, the same world; one run each and different Xens each run, so luck plays a part):
+
+  | | 2.0.0-beta.38 | 2.0.0-beta.39 |
+  |---|---|---|
+  | choices that came to something | 26% (41 of 157) | **55%** (53 of 97) |
+  | going for food | 57 times, 4% came to something | **3 times, 100%** |
+  | mining | 41 times, 24% | **32 times, 34%** |
+  | wood | 100% (10) | 87% (23) |
+  | deaths | 6 | 12 (none from going back to a goal: drowning, a wall, skeletons and zombies while mining) |
+
+  Deaths go 6 to 13 from run to run without Focus too (11 and 12 in the two runs with it), so that isn't a change
+  either way yet. A first version held goals for up to a minute and kept a Xen out at dusk (9 deaths the first night):
+  fixed before release.
 
 ### 2.0.0-beta.38: Xens swear, get angry, and some want blood
 
