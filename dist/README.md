@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.35
+# Xen Companion (Fabric mod) 2.0.0-beta.36
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.35+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.35+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.36+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.36+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.35+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.36+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -158,6 +158,23 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
 
+### Xen Ex1 v4: learned from a player's endgame play (2.0.0-beta.36)
+
+Ex1 (how a person moves, turns and looks, and when a hit is coming) now also learned from 26 minutes of one player's
+recordings: diamond mining at y -55 with fights, an enderman XP farm, a base, a mace and wind charges, elytra. On
+held-out play (the last fifth of each recording, never trained on), against the same network trained on the older
+recordings alone:
+
+| | older recordings alone | Ex1 v4 |
+|---|---|---|
+| that player's play: seeing a hit coming (AUC) | 0.80 | **0.92** |
+| that player's play: forward / jump / attack keys | 85.7% / 86.6% / 88.7% | **91.5% / 88.7% / 90.0%** |
+| the older players' play: seeing a hit coming | 0.844 | **0.856** |
+| the older players' play: forward / jump / attack | 92.7% / 91.7% / 94.8% | 93.1% / 91.2% / 93.3% |
+
+Better at seeing danger on both; on the older play the attack key is 1.5 points worse and where it looks next 0.5 deg
+worse. How that plays in a world wasn't measured.
+
 ### Recording your play without the lag (2.0.0-beta.35)
 
 Hours of real play (trial chambers, trading, the End, an XP farm, elytra, a mace fight, looting chests) is what teaches
@@ -173,7 +190,8 @@ Xen Ex1 how people play. Two ways to record it now, both in the form Ex1 learns 
   sight lines twice a second), with no pictures. One file, `.minecraft/xen_recordings/play_<date>.jsonl.gz`, about
   1 MB an hour. No chat, no names, no server address. Measured on a test client (no real graphics card): 0.42 ms of
   the game's time a tick on average, against 1.15 ms for the old recording with pictures; your machine may differ.
-  **Hold sneak (Shift) and press F8** for the old recording with pictures (for Xen's eyes, and for `/xen tour`).
+  **F7** for the old recording with pictures (for Xen's eyes, and for `/xen tour`; from 2.0.0-beta.36, its own key, so a
+  held or toggled sneak can't pick it by accident).
 * **Notes:** F9 while recording, or `/xen note <what you're doing>` on a server that logs you ("trading with
   villagers", "XP farm in the End"). A note can come before or after; one recording for one thing is easiest to read.
 
@@ -219,7 +237,7 @@ them, what they just said) and writes a line word by word. Nothing is picked fro
 
 **Data without playing for hours: `/xen tour [minutes]`** (operators, or the host in singleplayer). You float through the
 world as a spectator, a new view every 3 seconds: out on the land, inside caves, high over it, your view turning
-slowly, further and further from where you started (1,200 views an hour). Hold sneak and press F8 first (the recording with pictures) and it saves it all
+slowly, further and further from where you started (1,200 views an hour). Press F7 first (the recording with pictures) and it saves it all
 while you're away from the keyboard. These are marked as spectator views, so they teach
 Xen's eyes (colours, what things look like), not how a person plays. `/xen tour stop` puts you back where you were.
 For how a person plays, a short session doing one thing (10 minutes of caving, with a note or two on F9) teaches more
@@ -244,7 +262,7 @@ than hours of everything. And the Xens' own play can be logged with no one at th
 * **Chests it sees** up to 40 blocks off, it goes and opens; one it can't reach, it leaves alone after.
 
 **Recording your play for Xen** (training data, for whoever wants to help train it). The recorder is in the same jar,
-on your own game, and off until you hold sneak and press **F8** (since 2.0.0-beta.35; plain F8 is the light recording above. F8 again stops it; **F9** adds a note, like "going for iron"; both keys
+on your own game, and off until you press **F7** (since 2.0.0-beta.36; F8 is the light recording above. Press it again to stop; **F9** adds a note, like "going for iron"; both keys
 can be changed in Controls). It saves, a few times a second, a small picture of your screen, what each part of it is,
 Xen's picture of the same view, where you look, your keys, the item in hand, health, hunger and the time of day, and
 what you mine, place and hit, into `.minecraft/xen_recordings/session_.../`. It never records chat, names or the server

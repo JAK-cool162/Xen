@@ -1,7 +1,23 @@
-XEN COMPANION 2.0.0-beta.35: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.36: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.36
+===========================
+
+Ex1 v4 (assets/xen/ex1.json): python -m xen.ex1.train recordings/*.jsonl recordings/player/session_* (the 8 older
+recordings and 18 recorder sessions of one player: 14 from 2.0.0-beta.34, format 1, 8.6 minutes; 4 from .35, format 2,
+18 minutes, read through xen/ex1/recorder.py). 31,380 frames (965 just before a hurt), 7,860 held out (the last fifth
+of each recording). Same network and training as v3 (119 -> 64 -> 64, four heads, 25 epochs, seed 7). Held out, v3
+(retrained on the older recordings alone) against v4: older play forward 0.927 / 0.931, jump 0.917 / 0.912, attack
+0.948 / 0.933, pitch error 7.3 / 7.8 deg, danger AUC 0.844 / 0.856 (168 hurts); the player's forward 0.857 / 0.915,
+jump 0.866 / 0.887, attack 0.887 / 0.900, pitch error 10.2 / 8.7 deg, danger AUC 0.801 / 0.918 (134 hurts). All held
+out together: danger AUC 0.89. The recordings themselves stay out of the repository (recordings/ is ignored).
+
+client/Recorder.java: the recording with pictures has its own key, F7 ("key.xen.record_pictures"); F8 is always the
+light one (sneak + F8 picked the heavy one whenever sneak was held or toggled on: all 4 of the player's .35 sessions).
 
 
 WHAT'S NEW IN 2.0.0-beta.35

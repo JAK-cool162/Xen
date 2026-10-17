@@ -1,7 +1,21 @@
-**Xen Companion 2.0.0-beta.35**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.36**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.36: Xen Ex1 v4, learned from a player's endgame play
+
+* **Ex1 v4.** Ex1 (how a person moves, turns and looks, and when a hit is coming) learned from 26 minutes of a
+  player's recordings on top of what it had: diamond mining at y -55 with fights (386 moments just before a hit), an
+  enderman XP farm, a base, a mace and wind charges, elytra. On held-out play it never trained on (before: the same
+  network trained on the older recordings alone):
+  * that player's: seeing a hit coming 0.80 -> **0.92** (AUC); forward key 85.7% -> 91.5%, jump 86.6% -> 88.7%,
+    attack 88.7% -> 90.0%; where it looks next 10.2 -> 8.7 deg off.
+  * the older players': seeing a hit coming 0.844 -> 0.856; forward 92.7% -> 93.1%; attack 94.8% -> 93.3% and where it
+    looks 7.3 -> 7.8 deg (a little worse).
+  * How that plays out in a world wasn't measured.
+* **F7 records with pictures, F8 without** (in 2.0.0-beta.35 it was sneak + F8, so a toggled or held sneak picked the
+  heavy one by accident).
 
 ### 2.0.0-beta.35: record hours of play without the lag
 

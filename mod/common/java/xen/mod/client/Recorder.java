@@ -51,9 +51,9 @@ public final class Recorder {
 	/** Ticks between notes of what you do and see (4 a second), and between screen pictures (2 a second). */
 	private static final int STATE_EVERY = 5, SHOT_EVERY = 10;
 
-	private static KeyMapping recordKey, noteKey;
+	private static KeyMapping recordKey, picturesKey, noteKey;
 	private static boolean on;
-	/** Recording with pictures (sneak + F8): heavy. Without (F8): what you do and see, as the gameplay log writes it. */
+	/** Recording with pictures (F7): heavy. Without (F8): what you do and see, as the gameplay log writes it. */
 	private static boolean full;
 	private static long moments;
 	/** Time the recording took on the game's thread (said when a test recording ends). */
@@ -91,6 +91,7 @@ public final class Recorder {
 
 	static void init() {
 		recordKey = register(new KeyMapping("key.xen.record", 297, KeyMapping.Category.MISC));   // F8
+		picturesKey = register(new KeyMapping("key.xen.record_pictures", 296, KeyMapping.Category.MISC));   // F7
 		noteKey = register(new KeyMapping("key.xen.note", 298, KeyMapping.Category.MISC));       // F9
 		net.fabricmc.fabric.api.event.player.AttackBlockCallback.EVENT.register((player, level, hand, pos, dir) -> {
 			if (on && level.isClientSide()) {
@@ -131,7 +132,11 @@ public final class Recorder {
 		if (recordKey == null) return;
 		while (recordKey.consumeClick()) {
 			if (on) stop(client);
-			else start(client, client.options.keyShift.isDown());
+			else start(client, false);
+		}
+		while (picturesKey != null && picturesKey.consumeClick()) {                         // (its own key: never by accident, as a held sneak was)
+			if (on) stop(client);
+			else start(client, true);
 		}
 		while (noteKey != null && noteKey.consumeClick()) {
 			if (on && Screens.current(client) == null) Screens.open(client, new NoteScreen());

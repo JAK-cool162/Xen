@@ -1,4 +1,5 @@
 {
 	"key.xen.record": "Xen recorder: start / stop",
+	"key.xen.record_pictures": "Xen recorder with pictures: start / stop",
 	"key.xen.note": "Xen recorder: add a note"
 }
