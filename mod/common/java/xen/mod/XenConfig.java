@@ -103,6 +103,18 @@ public final class XenConfig {
 	 * own rules and its chat. Light (a row or two of sight lines a tick); off for a slow server.
 	 */
 	public boolean vision = true;
+	/**
+	 * Swearing: Xens swear like players do ("oh shit", "wtf", "fucking creepers"), each as much as its mouth is foul
+	 * (a hidden stat: some never do) and more when it's angry. Off: nobody swears.
+	 */
+	public boolean swearing = true;
+	/**
+	 * How far Xens see, in blocks: their render distance (128 = 8 chunks, as most players play): what they notice and
+	 * remember (trees, water, lava, houses; never less than 96) and the picture of their view (half that while no player
+	 * is near: nobody's watching, it saves the server the work). Never past the chunks the server has loaded (its view
+	 * distance). Further costs the server more.
+	 */
+	public int sight = 128;
 	/** XenTalk: Xen's own small talk model words its chats (from what's true for it; the classic voice when it has nothing that sticks to the facts). */
 	public boolean xentalk = true;
 	/**

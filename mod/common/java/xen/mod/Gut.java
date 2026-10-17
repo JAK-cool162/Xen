@@ -258,13 +258,15 @@ final class Gut {
 			near++;
 			closest = Math.min(closest, m.distanceTo(p));
 		}
-		boolean coming = danger >= 0.6f || near > 0 && p.getHealth() <= 10 || near >= 3;
+		boolean bare = !c.hands.hasWeapon();
+		boolean fresh = level.getGameTime() - c.respawnedAt < 600;                 // (just back from dying, at the spawn, with nothing)
+		boolean coming = danger >= 0.6f || near > 0 && (p.getHealth() <= 10 || bare) || near >= 3 || fresh && bare;
 		if (!coming || closest < 3.5) return null;
 		String plan = c.chores.digIn();
 		if (plan == null) return null;
 		c.chores.own = true;
-		c.journal("gut", String.format(java.util.Locale.ROOT, "its gut knows what's coming (danger %.0f%%, %d monsters within 12, %.0f health): digs in until morning",
-				100 * danger, near, p.getHealth()));
+		c.journal("gut", String.format(java.util.Locale.ROOT, "its gut knows what's coming (danger %.0f%%, %d monsters within 12, %.0f health%s%s): digs in until morning",
+				100 * danger, near, p.getHealth(), bare ? ", no weapon" : "", fresh ? ", just respawned" : ""));
 		XenMod.LOG.info("{} digs in for the night: its gut knows what's coming ({} monsters near, {} health)", c.name, near, Math.round(p.getHealth()));
 		c.chatter(c.pick3("Nope. Digging in till morning.", "Not out here in the dark. Hiding!", "I'm getting underground. Now."), false);
 		return c.chores.next();

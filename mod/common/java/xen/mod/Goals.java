@@ -1097,6 +1097,8 @@ final class Goals {
 		if (c.player.isCreative() || c.mode == Companion.Mode.STAY || c.mode == Companion.Mode.FOLLOW) return -1;
 		if (can[Mind.FIGHT] && f[Mind.DANGER] < 0.2f && c.player.getHealth() >= 14 && MindSense.enemy(c) != null
 				&& c.mod.config.teams < 0) return why(Mind.FIGHT, "a rival");             // (teams on auto: it takes the fight to them)
+		if (can[Mind.FIGHT] && f[Mind.DANGER] < 0.2f && c.player.getHealth() >= 14 && c.rage.wantsBlood() && MindSense.enemy(c) != null)
+			return why(Mind.FIGHT, "bloodlust");                                         // (out for blood: it goes for them)
 		boolean calm = f[Mind.DANGER] < 0.3f && !can[Mind.HELP];
 		if (!calm && (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD])) return -1;   // danger, a friend in need: its own call
 		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);

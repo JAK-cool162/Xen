@@ -88,7 +88,8 @@ final class MindSense {
 
 	/**
 	 * Someone it would fight: a player (or Xen) it distrusts or its tribe is fighting, and, if it's aggressive and
-	 * power drives it, a stranger it doesn't trust much (it picks fights). Within 24 blocks, in sight.
+	 * power drives it, a stranger it doesn't trust much (it picks fights); with its bloodlust up, a smaller grudge, or
+	 * someone it picked for no reason (see {@link Rage}). Within 24 blocks, in sight.
 	 */
 	static ServerPlayer enemy(Companion c) {
 		Tribe t = c.tribe();
@@ -110,7 +111,8 @@ final class MindSense {
 			boolean weaker = p.getHealth() + 2 * armor(p) < c.player.getHealth() + 2 * armor(c.player) + 4;   // a bully picks on the weaker
 			Companion other = p instanceof XenPlayer x ? x.companion : null;
 			boolean ours = t != null && other != null && t.members.contains(other);   // (its own village: not someone to pick on)
-			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker && !ours;
+			boolean foe = trust < -0.25f || t != null && t.enemy(p, now) || bully && trust < 0.35f && weaker && !ours
+					|| !c.mod.config.pvp.equals("off") && c.rage.wouldKill(p, trust);   // (bloodlust: a smaller grudge is reason enough, or someone it picked for no reason)
 			var theirTeam = c.server.getScoreboard().getPlayersTeam(p.getScoreboardName());
 			boolean rival = other == null ? myTeam == null || theirTeam != myTeam                   // a player: anyone not on its team
 					: myTeam != null && theirTeam != null && theirTeam != myTeam                          // a Xen: only one of another team (team wars)

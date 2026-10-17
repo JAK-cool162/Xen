@@ -109,16 +109,19 @@ public final class Personality {
 	/**
 	 * Xen 2.0: hidden stats, given at birth (an older Xen: from its name), passed on to children, never shown. Each 0 to
 	 * 1 (0.5 is anyone): how quick its reflexes are, how well it keeps its head, how much it jokes, how casually it
-	 * types, how soon it gets hungry, how picky a miner it is, how much it likes fishing, whether it's a night owl, and
-	 * how stubborn it is once it has made up its mind.
+	 * types, how soon it gets hungry, how picky a miner it is, how much it likes fishing, whether it's a night owl, how
+	 * stubborn it is once it has made up its mind, how foul its mouth is (how much it swears) and how bloodthirsty it is
+	 * (its bloodlust never quite goes away: see {@link Rage}).
 	 */
 	public float[] hidden;
-	static final String[] HIDDEN = {"reflexes", "composure", "humor", "typing", "appetite", "pickiness", "angler", "night owl", "stubborn"};
-	static final int REFLEXES = 0, COMPOSURE = 1, HUMOR = 2, TYPING = 3, APPETITE = 4, PICKINESS = 5, ANGLER = 6, NIGHT_OWL = 7, STUBBORN = 8;
+	static final String[] HIDDEN = {"reflexes", "composure", "humor", "typing", "appetite", "pickiness", "angler", "night owl", "stubborn",
+			"foul mouth", "bloodthirst"};
+	static final int REFLEXES = 0, COMPOSURE = 1, HUMOR = 2, TYPING = 3, APPETITE = 4, PICKINESS = 5, ANGLER = 6, NIGHT_OWL = 7, STUBBORN = 8,
+			FOUL_MOUTH = 9, BLOODTHIRST = 10;
 
 	/** A hidden stat (0.5 for anyone without them). */
 	float hidden(int i) {
-		return hidden == null || i >= hidden.length ? 0.5f : hidden[i];
+		return hidden == null || i >= hidden.length || Float.isNaN(hidden[i]) ? 0.5f : hidden[i];
 	}
 
 	/** Hidden stats for a newborn: most near the middle, a few far out (like people). */
@@ -132,7 +135,8 @@ public final class Personality {
 	String hiddenInWords() {
 		String[][] words = {{"slow reflexes", "quick reflexes"}, {"easily rattled", "keeps a cool head"}, {"serious", "a joker"},
 				{"types properly", "types like on a phone"}, {"rarely hungry", "always hungry"}, {"mines anything", "a picky miner"},
-				{"no patience for fishing", "loves fishing"}, {"an early bird", "a night owl"}, {"easily swayed", "stubborn"}};
+				{"no patience for fishing", "loves fishing"}, {"an early bird", "a night owl"}, {"easily swayed", "stubborn"},
+				{"never swears", "swears a lot"}, {"wouldn't hurt a fly", "bloodthirsty"}};
 		List<String> out = new ArrayList<>();
 		for (int i = 0; i < HIDDEN.length; i++) {
 			float v = hidden(i);
@@ -151,6 +155,7 @@ public final class Personality {
 			knobs = null;
 		}
 		if (hidden == null) hidden = hiddenStats(r);                     // (after its sins: an older Xen's sins stay the ones it had)
+		else for (int i = 0; i < hidden.length; i++) if (Float.isNaN(hidden[i])) hidden[i] = Math.max(0f, Math.min(1f, 0.5f + (float) r.nextGaussian() * 0.22f));   // (one it didn't have yet: from its name)
 	}
 
 	float sin(int i) {
@@ -476,7 +481,7 @@ public final class Personality {
 		if (plan >= 0) o.addProperty("plan", Strategy.NAMES[plan]);
 		if (hidden != null) {
 			com.google.gson.JsonObject hd = new com.google.gson.JsonObject();
-			for (int i = 0; i < HIDDEN.length; i++) hd.addProperty(HIDDEN[i], hidden[i]);
+			for (int i = 0; i < HIDDEN.length && i < hidden.length; i++) if (!Float.isNaN(hidden[i])) hd.addProperty(HIDDEN[i], hidden[i]);
 			o.add("hidden", hd);
 		}
 		return o;
@@ -516,7 +521,7 @@ public final class Personality {
 		if (o.has("hidden") && o.get("hidden").isJsonObject()) {
 			var hd = o.getAsJsonObject("hidden");
 			p.hidden = new float[HIDDEN.length];
-			for (int i = 0; i < HIDDEN.length; i++) p.hidden[i] = hd.has(HIDDEN[i]) ? Math.max(0f, Math.min(1f, hd.get(HIDDEN[i]).getAsFloat())) : 0.5f;
+			for (int i = 0; i < HIDDEN.length; i++) p.hidden[i] = hd.has(HIDDEN[i]) ? Math.max(0f, Math.min(1f, hd.get(HIDDEN[i]).getAsFloat())) : Float.NaN;   // (not had yet: bornWith gives it)
 		}
 		return p;
 	}

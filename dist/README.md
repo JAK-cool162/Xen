@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.37
+# Xen Companion (Fabric mod) 2.0.0-beta.38
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.37+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.37+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.38+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.38+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.37+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.38+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -158,6 +158,32 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
 
+### Anger, bloodlust and swearing (2.0.0-beta.38)
+
+**Swearing**: Xens swear like players in chat ("oh shit, a creeper", "wtf was that", "Ow, fuck!", "ffs stop!!"), each
+as much as its mouth is foul (a hidden stat: some never do) and more when it's angry. Never a slur. Off: `swearing`
+(Chat tab). Swearing at a Xen counts as an insult.
+
+**Anger** and **bloodlust** are hidden (never shown; you find out from what it does). Anger stacks: a hit (a hard
+one, two), an insult, dying (killed by someone: four), someone getting away from it, now and then a monster's hit;
+each stack is 1 to 6 anger and 1 to 3 bloodlust, so bloodlust climbs about half as fast. Anger cools in about a
+quarter of an hour; bloodlust lingers for an hour or two, and a bloodthirsty Xen (hidden stat) never loses all of it.
+
+| | what it does |
+|---|---|
+| anger | swears more; hits back sooner (from 60%, even at its owner who keeps hitting it); doesn't let a friend's hit go (from 70%) |
+| bloodlust 20% and up | a smaller grudge is reason enough to fight someone (from 60%, any grudge) |
+| bloodlust 50% and up | now and then (up to 3 in 10 a minute) it picks someone near it that it has nothing against and goes after them for two minutes, for no reason |
+| a kill | takes the edge off both |
+
+Never its owner or a close friend for no reason (its own village only from 85%), never in a truce, never with PvP off,
+and only a free Xen (one that follows you or stays doesn't go hunting). It's still its own call.
+
+**Sight** (`sight`, default 128 blocks = 8 chunks): how far Xens see and remember trees, water, lava and houses (before:
+96), and how far the picture of their view goes (before: 64; half of it while no player is near). Never past the
+server's view distance. What it makes of the view (a cave mouth, a village,
+dark ground, what it turns to look at) reads as far as its mind was trained on (64 blocks; 32 with nobody near).
+
 ### Getting through the night (2.0.0-beta.37)
 
 A Xen out in the dark that can tell what's coming (Xen Ex1's danger high, monsters close and its health low, or three
@@ -166,7 +192,9 @@ the hole, and waits for morning (mining from there if it has a pickaxe, food and
 light). It also digs in when night catches it outside, weaves left and right running from skeletons, and after dying
 at night without a weapon it waits for the day before going back for its things (items only age while a player keeps
 their ground running, so it counts only that time). In a test of 6 Xens over 2 game days: 8 deaths, against 21 in
-2.0.0-beta.36, and 3 Xens alive the whole time, against 1.
+2.0.0-beta.36, and 3 Xens alive the whole time, against 1. From 2.0.0-beta.38 having no weapon counts too: at night
+with a monster near and no sword or axe, or just respawned in the dark without one, it digs in (6 deaths in the same
+test, none more than 2 for one Xen).
 
 ### Xen Ex1 v4: learned from a player's endgame play (2.0.0-beta.36)
 
@@ -1060,7 +1088,8 @@ A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
   goes on anyway ("My gut says no... going anyway."). Hurt after that, it trusts its gut more; fine, a little less.
 * **Reaction time and confusion**: about a quarter second to notice something, more when it didn't see it coming. A
   confused Xen hesitates, looks around, sometimes changes its mind.
-* **Hidden stats**: reflexes, composure, humor, typing, appetite, pickiness, love of fishing, night owl, stubbornness.
+* **Hidden stats**: reflexes, composure, humor, typing, appetite, pickiness, love of fishing, night owl, stubbornness;
+  from 2.0.0-beta.38 a foul mouth and bloodthirst too (and anger and bloodlust that come and go, [below](#anger-bloodlust-and-swearing-200-beta38)).
   Never shown, they shape who it is and pass to its children.
 * **Talks like a player**: "gonna", "ngl", short replies ("lol", "fr"), banter, "this is peak". At most a line every
   45 seconds on its own, notes on signs when nobody's around ("I died here (skeleton). Careful.").
@@ -1434,6 +1463,8 @@ away in single player. On a server, operators use:
 | `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
 | `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
 | `vision` | `true` | Xen vision: a picture of what each Xen sees (64 by 36 sight lines, no textures) and what it makes of it, for its mind, its own rules and its chat |
+| `swearing` | `true` | Xens swear like players do ("oh shit", "wtf"), each as much as its mouth is foul (some never do), more when it's angry ([more](#anger-bloodlust-and-swearing-200-beta38)) |
+| `sight` | `128` | how far Xens see, in blocks: their render distance (128 = 8 chunks; the picture of their view: half while no player is near); never past the server's view distance |
 | `xentalk` | `true` | XenTalk, its own small talk model: chats between Xens, remarks and answers in its own words, from what's true of it (off: its classic voice) |
 | `adventures` | `true` | free Xens go for the Ender Dragon on their own when ready, and take on trial chambers |
 | `smartsAtGeneration` | `4` | from this generation of evolution Xens know the Nether portal math (x/8) and triangulating strongholds |

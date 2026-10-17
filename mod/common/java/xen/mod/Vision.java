@@ -47,7 +47,7 @@ import java.util.Map;
 public final class Vision {
 	public static final int W = 64, H = 36;
 	private static final double TAN_V = Math.tan(Math.toRadians(35)), TAN_H = TAN_V * 16 / 9;
-	/** How far it draws (near a player; half that out of everyone's sight). */
+	/** How far the recorder's picture of a player's view goes (a Xen's own: its sight setting, see Companion.sight). */
 	public static final int FAR = 64;
 
 	/** How the picture is shaded: the game's own directional shading and light curve (tuned from recordings: config/xen/vision.txt). */
@@ -299,6 +299,11 @@ public final class Vision {
 	private int pass;
 	/** The creatures in view this pass (their boxes are read each row: they move). */
 	private final List<Entity> inView = new ArrayList<>();
+	/**
+	 * How far what it makes of its view reaches (a cave mouth, buildings, dark ground, what it turns its head to): as far
+	 * as its mind learned it (64 near a player, 32 otherwise), however far it sees.
+	 */
+	private int reads = FAR / 2;
 	private final BlockPos.MutableBlockPos prev = new BlockPos.MutableBlockPos();
 
 	/** What it made of its last whole view. */
@@ -330,7 +335,8 @@ public final class Vision {
 		double yaw = Math.toRadians(yawD), pitch = Math.toRadians(pitchD);
 		double sy = Math.sin(yaw), cy = Math.cos(yaw), sp = Math.sin(pitch), cp = Math.cos(pitch);
 		double fx = -sy * cp, fy = -sp, fz = cy * cp, rx = -cy, rz = -sy, ux = -sy * sp, uy = cp, uz = cy * sp;   // forward, right, up
-		int far = near ? FAR : FAR / 2;
+		int far = near ? c.sight() : c.sight() / 2;                                  // (its render distance; half when nobody's near)
+		reads = near ? FAR : FAR / 2;
 		boolean outside = level.canSeeSky(p.blockPosition());
 		for (int k = 0, guard = 0; k < rows && guard < H; guard++) {               // (rows it skips don't count)
 			if (row == 0) startPass(level, eye, far);
@@ -442,6 +448,7 @@ public final class Vision {
 			}
 			BlockPos b = BlockPos.of(hit[px]);
 			float d = dist[px];
+			if (d > reads) continue;                                                   // (further off: seen, drawn, not read into)
 			int j = px / W;
 			// a cave mouth: out under the sky, looking into dark that the sky doesn't reach
 			if (outside && d >= 3 && d <= 32 && face[px] != 1 && light[px] <= 7) {   // (dark there: is that the sky's dark, or a cave's?)
@@ -482,6 +489,7 @@ public final class Vision {
 		int items = 0;
 		boolean villagers = false;
 		for (int px = 0; px < W * H; px++) {
+			if (dist[px] > reads) continue;
 			String n = labelName(what[px]);
 			if (n.equals("mob:item")) items++;
 			if (n.equals("mob:villager")) villagers = true;
@@ -525,6 +533,7 @@ public final class Vision {
 		Vec3 best = null;
 		float score = 0;
 		for (Entity e : inView) {
+			if (e.distanceTo(p) > reads) continue;                                     // (something far off doesn't turn its head)
 			Integer was = lastPixels.get(e.getId());
 			int shown = shownPx.getOrDefault(e.getId(), 0);
 			lastPixels.put(e.getId(), shown);
@@ -540,7 +549,7 @@ public final class Vision {
 			Map<Integer, Integer> count = new HashMap<>();
 			for (int px = 0; px < W * H; px++) count.merge(what[px], 1, Integer::sum);
 			for (int px = 0; px < W * H; px++) {
-				if (count.get(what[px]) > 4 || hit[px] == Long.MIN_VALUE) continue;
+				if (count.get(what[px]) > 4 || hit[px] == Long.MIN_VALUE || dist[px] > reads) continue;
 				BlockPos b = BlockPos.of(hit[px]);
 				String k = Eyes.kind(level.getBlockState(b));
 				if (k == null || k.equals("grass") || k.equals("log") || k.equals("water")) continue;
@@ -576,8 +585,8 @@ public final class Vision {
 		var p = c.player;
 		Camera snap = new Camera(W, H);                                          // (one whole view now: its own, row by row, is a little smeared when it turns)
 		List<Entity> near = new ArrayList<>();
-		for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(FAR), e -> e.isAlive() && (e instanceof LivingEntity || e instanceof ItemEntity))) near.add(e);
-		snap.shoot(p.level(), p.getEyePosition(), p.getYHeadRot(), p.getXRot(), TAN_V, 16.0 / 9, FAR, near, p.level().canSeeSky(p.blockPosition()));
+		for (Entity e : p.level().getEntities(p, p.getBoundingBox().inflate(c.sight()), e -> e.isAlive() && (e instanceof LivingEntity || e instanceof ItemEntity))) near.add(e);
+		snap.shoot(p.level(), p.getEyePosition(), p.getYHeadRot(), p.getXRot(), TAN_V, 16.0 / 9, c.sight(), near, p.level().canSeeSky(p.blockPosition()));
 		int[] rgb = snap.rgb, what = snap.what;
 		float[] dist = snap.dist;
 		byte[] light = snap.light, face = snap.face;

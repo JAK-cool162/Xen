@@ -1452,6 +1452,7 @@ public class XenMod implements ModInitializer {
 			part.accept("adventure", () -> c.adventure.on = known.has("adventure") && known.get("adventure").getAsBoolean());
 			part.accept("band", () -> { if (known.has("band")) c.band = known.get("band").getAsString(); });
 			part.accept("gutTrust", () -> { if (known.has("gutTrust")) c.gut.faith = known.get("gutTrust").getAsFloat(); });
+			part.accept("rage", () -> { if (known.has("rage")) c.rage.load(known.getAsJsonObject("rage")); });
 			part.accept("selfBelief", () -> { if (known.has("selfBelief")) c.belief.value = known.get("selfBelief").getAsFloat(); });
 			part.accept("experience", () -> { if (known.has("experience")) c.experience.load(known.getAsJsonArray("experience")); });
 			part.accept("experienceLearned", () -> { if (known.has("experienceLearned")) c.experience.loadLearned(known.getAsJsonObject("experienceLearned")); });

@@ -1,7 +1,44 @@
-**Xen Companion 2.0.0-beta.37**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.38**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.38: Xens swear, get angry, and some want blood
+
+* **Swearing.** Xens swear the way players do in chat: "oh shit, a creeper", "wtf was that", "Ow, fuck!", "this is so
+  damn far", "ffs stop!!". How much is each Xen's own (a new hidden stat, a foul mouth: some never swear, some do it
+  all the time) and goes up with its anger. Only the words players use in a heated moment: never a slur. Their chats
+  with each other, remarks, answers and whispers all swear. `/xen set swearing false` (or the Chat tab) turns it off.
+  Swearing at a Xen ("fuck you", "stfu", "fuck off") is an insult now.
+* **Anger** (hidden, never shown). It stacks: a hit, a hard hit (two), an insult, dying (two; killed by someone: four),
+  someone getting away, now and then a monster's hit. Each stack is 1 to 6 anger. Anger cools in about a quarter of an
+  hour (slower for a wrathful one, quicker for a cool head). An angry Xen swears more, hits back sooner (at 60%, even
+  at its owner when they keep hitting it) and doesn't let a friend's hit go (at 70%).
+* **Bloodlust** (hidden). Each stack of anger also adds 1 to 3 bloodlust, so it climbs about half as fast: 100% anger
+  isn't 100% bloodlust. It lingers for an hour or two, and a bloodthirsty Xen (a new hidden stat) never loses all of
+  it. From 20%, a smaller grudge is reason enough to fight someone (from 60%, any). From 50%, now and then (up to 3 in
+  10 a minute) it picks someone near it that it has nothing against and goes after them, for no reason at all, for
+  two minutes. Never its owner or a close friend for no reason (its own village only at its worst, 85%), never in a
+  truce, never with PvP off. It's still its
+  own call: its mind weighs the fight like anything else. A kill takes the edge off both.
+* **Sight.** Xens see 128 blocks now (8 chunks, as most players play): what they notice and remember (trees, water,
+  lava, houses) up from 96 blocks, the picture of their view up from 64 (half of it while no player is near). New
+  setting `sight` (64 to 256 blocks; never past the server's view distance). What it makes of its view (a cave mouth, a
+  village, dark ground, what it turns its head to) still reads as far as its mind was trained on.
+* **Back from dying in the dark with nothing, it digs in.** Its gut also counts having no weapon: at night with a
+  monster near and no sword or axe, or just respawned without one, it digs in instead of punching zombies. (In one
+  test two Xens kept respawning at the spawn into zombies: 11 deaths in a few minutes.)
+* **Measured** on the test server:
+  * 4 Xens, a player hitting them with a sword and insulting them for 3 minutes, another standing by: anger 100%
+    within about a minute and a half of hits, bloodlust 60 to 100%; they went after the one who hit them (3 to 6
+    fights picked) and, 1 to 3 times a run, after someone they had nothing against (another Xen); 17% to 60% of their
+    lines swore, depending on whose mouths they had; no errors; 6.0 to 6.6 ms a tick.
+  * 6 Xens on their own, 2 game days, the same world as before (one run each, different Xens each run, so luck plays
+    a part): 2.0.0-beta.37 8 deaths (one Xen 4), 2.0.0-beta.38 **6** (none more than 2); the gut dug in 12 times;
+    Stone Age and Getting an Upgrade 6 of 6, Monster Hunter 5, Acquire Hardware, Isn't It Iron Pick, Sweet Dreams and
+    A Seedy Place 1 each; 2 alive the whole 2 days (3 before). Nobody picked a fight out of anger there: nobody hurt
+    them but monsters. 14 to 21 ms a tick at 2x speed, as before.
+  * Sight 128 against 64: eyes and vision 0.76 against 1.01 ms a tick (different Xens: no cost that shows).
 
 ### 2.0.0-beta.37: Xens get through the night
 

@@ -27,7 +27,9 @@ import java.util.Random;
  */
 final class Eyes {
 	static final int RANGE = 96, NEAR_IN_DARK = 16;                  // (in the dark: the shape of a cave 16 blocks out, as a player at normal brightness; 8 left it guessing the rest was rock)
-	/** Ore it can make out up to here (past that, a player sees stone: the speckles don't show); trees, water, lava, houses to RANGE. */
+	/** How far its sight lines go this sweep (its sight setting, and never less than RANGE). */
+	private int range = RANGE;
+	/** Ore it can make out up to here (past that, a player sees stone: the speckles don't show); trees, water, lava, houses as far as it sees. */
 	static final int ORE_SIGHT = 64;
 	private static final double H_FOV = Math.toRadians(110), V_FOV = Math.toRadians(90), STEP = Math.toRadians(3);
 	static final int COLS = (int) (H_FOV / STEP) + 1, ROWS = (int) (V_FOV / STEP) + 1;
@@ -97,6 +99,7 @@ final class Eyes {
 		ServerLevel level = (ServerLevel) c.player.level();
 		Vec3 eye = c.player.getEyePosition();
 		double yaw = Math.toRadians(c.player.getYRot()), pitch = Math.toRadians(c.player.getXRot());
+		range = Math.max(RANGE, c.sight());
 		for (int i = 0; i < PER_TICK; i++) {
 			if (cursor >= COLS * ROWS) {                                         // a whole sweep done: the next one shifted a little
 				cursor = 0;
@@ -128,7 +131,7 @@ final class Eyes {
 		net.minecraft.world.level.chunk.LevelChunk chunk = null;
 		boolean lit = true;
 		double t = 0;
-		while (t < RANGE) {
+		while (t < range) {
 			if (tx < ty && tx < tz) {
 				x += sx;
 				t = tx;
@@ -287,7 +290,7 @@ final class Eyes {
 	String describe() {
 		StringBuilder sb = new StringBuilder();
 		for (String k : new String[] {"diamond", "iron", "gold", "coal", "log", "chest", "water"}) {
-			BlockPos p = nearest(k, RANGE * 2, null);
+			BlockPos p = nearest(k, range * 2, null);
 			if (p == null) continue;
 			sb.append(sb.length() == 0 ? "Seen lately:" : ",").append(' ').append(k.equals("log") ? "a tree" : k.equals("water") ? "water" : k.equals("chest") ? "a chest" : k + " ore")
 					.append(String.format(java.util.Locale.ROOT, " %.0f blocks away", Math.sqrt(p.distSqr(c.player.blockPosition()))));

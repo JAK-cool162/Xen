@@ -98,6 +98,7 @@ final class Roster {
 		if (c.adventure.on) o.addProperty("adventure", true);
 		if (c.band != null) o.addProperty("band", c.band);
 		if (c.gut.faith >= 0) o.addProperty("gutTrust", c.gut.faith);   // (how much it trusts its gut, learned)
+		if (c.rage.anger > 0 || c.rage.bloodlust > 0) o.add("rage", c.rage.save());   // (its anger and bloodlust, as they are)
 		if (c.belief.value >= 0) o.addProperty("selfBelief", c.belief.value);   // (how much it believes in itself, earned)
 		if (!c.experience.cases.isEmpty()) o.add("experience", c.experience.save());   // (what happened the times it chose something)
 		if (c.experience.predicted > 0) o.add("experienceLearned", c.experience.saveLearned());   // (what it learned to weigh, and how good its guesses were)

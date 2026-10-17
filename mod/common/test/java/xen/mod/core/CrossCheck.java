@@ -222,11 +222,39 @@ public final class CrossCheck {
 					exf.getAsJsonArray("cases").size(), worstEx, kindsOk, kinds, before, after, ex1.report.has("danger_auc") ? ex1.report.get("danger_auc").getAsString() : "?");
 		}
 
+		swearing();
+
 		// Learning works in Java too: fear conditioning in a tiny lava room.
 		check(learnsToFearLava(), "Java brain did not learn to fear lava");
 
 		System.out.println(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
 		if (failures > 0) System.exit(1);
+	}
+
+	/** Swearing: never from a clean mouth, most lines from a furious foul one; coordinates said straight; a line already swearing left as it is. */
+	static void swearing() {
+		String[] lines = {"Oh no, a creeper!", "Ow! What was that for?", "This is so far.", "Nope, not going down there.", "I really need wood.",
+				"What?", "Hey, stop hitting me!", "The zombies are everywhere.", "Got 3 iron.", "Come to 120 64 -30."};
+		java.util.Random r = new java.util.Random(7);
+		int clean = 0, foul = 0, n = 0, again = 0;
+		boolean coords = true;
+		List<String> seen = new ArrayList<>();
+		for (int k = 0; k < 50; k++) {
+			for (String l : lines) {
+				n++;
+				if (!xen.mod.talk.Cursing.swear(l, 0.01f, 0f, r).equals(l)) clean++;
+				String f = xen.mod.talk.Cursing.swear(l, 1f, 1f, r);
+				if (!f.equals(l)) foul++;
+				if (l.contains("120 64") && !f.equals(l)) coords = false;
+				if (!f.equals(l) && !xen.mod.talk.Cursing.swear(f, 1f, 1f, r).equals(f)) again++;
+				if (k == 0 && seen.size() < 3 && !f.equals(l)) seen.add(f);
+			}
+		}
+		check(clean == 0, "a clean mouth swore " + clean + " times");
+		check(foul > n / 2, "a furious foul mouth swore in only " + foul + "/" + n + " lines");
+		check(coords, "swearing changed coordinates");
+		check(again == 0, "a line already swearing got more (" + again + ")");
+		System.out.printf(java.util.Locale.ROOT, "swearing: clean mouth %d/%d lines, furious foul mouth %d/%d (\"%s\")%n", clean, n, foul, n, String.join("\", \"", seen));
 	}
 
 	/** XenTalk: the jar's model, greedy, gives the replies Python's gave (on the same bytes); and it's quick. */

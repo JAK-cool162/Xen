@@ -366,7 +366,11 @@ public final class Companion {
 		if (hurtNow && player.getLastHurtByMob() != null && !WorldSenses.sees(player, hands.yaw, hands.pitch, player.getLastHurtByMob())) {
 			confusion.surprise(0.12f);                                  // a hit from out of view: a moment's "what was that?"
 		}
+		if (hurtNow && player.getLastHurtByMob() instanceof net.minecraft.world.entity.monster.Enemy && random.nextFloat() < 0.25f) {
+			rage.provoke(1, "hit by a " + BuiltInRegistries.ENTITY_TYPE.getKey(player.getLastHurtByMob().getType()).getPath().replace('_', ' '));   // (now and then a monster's hit gets to it)
+		}
 		if (player.tickCount % 20 == 13) confusion.second();
+		if (player.tickCount % 20 == 9) rage.second();                  // (anger cooling; bloodlust that picks someone)
 		if (player.tickCount % 1200 == 17) aversions.fade();
 		if (player.tickCount % 40 == 21) diamondsWatch();
 		if (player.tickCount % 100 == 37) ideas.tick();
@@ -2170,6 +2174,7 @@ public final class Companion {
 		if (!e.isAlive() || e.isRemoved()) {
 			if (now - hands.lastHitAt < 60) {
 				if (e instanceof net.minecraft.world.entity.monster.Monster || e instanceof ServerPlayer) belief.up(0.03f, "beat " + e.getName().getString());
+				rage.killed(e);                                                     // (a kill takes the edge off its anger and bloodlust)
 				fighter.beat(e);                                                    // (what that one cost it: learned)
 				killed.addLast(new long[] {e.blockPosition().asLong(), now});
 				while (killed.size() > 16) killed.removeFirst();
@@ -2340,6 +2345,7 @@ public final class Companion {
 		}
 		if (d > 4 && (now - closestAt > 300 || now - chaseSince > 1200)) {
 			journal("fight", "gives up chasing " + foe.getName().getString());
+			rage.provoke(1, foe.getName().getString() + " got away");
 			chosenFoe = null;
 			chasing = null;
 			lastPickedFight = now;
@@ -2666,6 +2672,13 @@ public final class Companion {
 	final Reflexes reflexes = new Reflexes(this);
 	final Confusion confusion = new Confusion(this);
 	final Gut gut = new Gut(this);
+	/** How far it sees (its render distance, in blocks): the sight setting, as far as the server has the world loaded. */
+	int sight() {
+		return Math.max(32, Math.min(mod.config.sight, server.getPlayerList().getViewDistance() * 16));
+	}
+
+	/** Its anger and bloodlust (hidden; see {@link Rage}). */
+	final Rage rage = new Rage(this);
 	/** What hurt it, remembered (once burnt, twice shy). */
 	final Aversions aversions = new Aversions(this);
 	/** Teaching (Xens and players), and the talk of a fight (a crouch after a hit: a sorry it may take or not). */
@@ -2855,12 +2868,14 @@ public final class Companion {
 		watchUntil = player.tickCount + 100;                           // it looks at them
 		if (attack) {
 			armedHitAt.put(u, now);
+			rage.provoke(armed || crit || hard ? 2 : 1, "hit by " + by.getName().getString());   // (a hit gets to it: more for a hard one)
 			String how = crit ? "a critical hit" : armed ? "a weapon" : recent >= 2 ? "hit after hit" : sneaking ? "a sneaky hit" : "a hit out of nowhere";
 			if (u.equals(owner)) {                                      // its owner: told off first, then (its nature) it hits back or backs off
 				int n = 0;
 				for (long t : q) if (now - t <= 200) n++;
 				journal("does", "hit by its owner (" + how + ", " + n + " in 10 s)");
-				boolean hitsBack = personality.aggressive() || personality.sin(xen.mod.core.Sins.WRATH) >= 0.5f || personality.sin(xen.mod.core.Sins.PRIDE) >= 0.7f;
+				boolean hitsBack = personality.aggressive() || personality.sin(xen.mod.core.Sins.WRATH) >= 0.5f || personality.sin(xen.mod.core.Sins.PRIDE) >= 0.7f
+						|| rage.anger >= 60;                                     // (angry enough, anyone hits back)
 				int level = Math.min(n, 3);                                 // how bad it's getting: it says so when it gets worse (even right after a "what's up?")
 				boolean speak = now - scoldedAt > 60 || level > scoldLevel && now - scoldedAt > 8;
 				if (n >= 3 && hitsBack && !mod.config.pvp.equals("off")) {
@@ -3069,7 +3084,7 @@ public final class Companion {
 			if (victim == player && !attackedBy(a, now)) continue;                // a poke to get its attention isn't a fight
 			if (victim == o && a instanceof ServerPlayer sp && !isWeapon(sp.getMainHandItem())) continue;   // nor someone poking its owner
 			if (own && a instanceof ServerPlayer sp) {                            // its own call: who, and whether it can win
-				if (trust(sp.getUUID()) >= 0.6f && player.getHealth() > 10) continue;   // a friend's mistake: it lets it go
+				if (trust(sp.getUUID()) >= 0.6f && player.getHealth() > 10 && rage.anger < 70) continue;   // a friend's mistake: it lets it go (not when it's furious)
 				if (player.getHealth() < 6 || personality.bravery < 0.3f && player.getHealth() < 12) continue;   // losing: it gets away instead
 			}
 			if (player.distanceTo(a) <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, a)) return a;   // near: it feels them
@@ -3216,6 +3231,7 @@ public final class Companion {
 
 	/** A line as this Xen types it (Xen 2.0: like a player: "gonna", "ngl", no full stop; never "2.7 blocks"). */
 	String typed(String text) {
+		if (mod.config.swearing && !minion) text = xen.mod.talk.Cursing.swear(text, rage.swearing(emotions.pain > 0.15f), rage.mad(), typing);   // (how foul its mouth is, how angry it is)
 		return xen.mod.talk.Texting.casual(text, casual(), typing);
 	}
 
@@ -3423,6 +3439,7 @@ public final class Companion {
 		if (goals.option >= 0) goals.finishOption(true);
 		goals.notItsDoing = false;                  // Xen 2.0 learns what that choice led to
 		if (source.getEntity() instanceof ServerPlayer) lostFight = true; // (beaten by someone: it may want to train)
+		if (!source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL)) rage.provoke(source.getEntity() instanceof ServerPlayer ? 4 : 2, "died");   // (killed by someone: that gets to it most)
 		belief.down(source.getEntity() != null ? 0.06f : 0.04f, "died");
 		if (skills.partner != null) skills.endSpar(false);
 		if (obs != null && !inArena) {
@@ -3567,7 +3584,11 @@ public final class Companion {
 			XenMod.quietJoin = false;
 		}
 		habits.respawned();
+		respawnedAt = player.level().getGameTime();
 	}
+
+	/** When it last came back from dying (game time): back at the spawn in the dark with nothing, it digs in (see Gut.refuge). */
+	long respawnedAt = -100_000;
 
 	public String status() {
 		if (player == null) return name + " is not here.";
@@ -3747,6 +3768,7 @@ public final class Companion {
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
 		if (trust(u) >= 0.3f && knowledge.heard(words)) return null;   // how to handle something it didn't know ("in a storm, wait in a shelter"): learned, not an order
 		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
+		if (told.insult && from != null && !xen.mod.talk.Texting.banter(said)) rage.provoke(random.nextFloat() < 0.4f ? 2 : 1, "insulted by " + from.getName().getString());   // (a joke isn't an insult)
 		boolean aboutThem = words.toLowerCase(java.util.Locale.ROOT).matches("(?s)^\\s*i('m| am| really| just| also)? ?(love|like|hate|found|got|have|had|made|saw|think|mined|killed|built|am|was)\\b.*");
 		if ((told.news || told.feelMe || aboutThem) && !told.question && GATHERING.contains(r.intent())) r = new xen.mod.talk.Chat.Request("chat", "", 0);   // "I found diamonds!", "I love diamonds": talk, not "go mine diamonds"
 		xen.mod.talk.Words.Meaning grammar = said == null ? null : xen.mod.talk.Words.parse(said, name);

@@ -161,6 +161,7 @@ public class XenSettingsScreen extends Screen {
 				choice("Chat range", "chatRange", List.of(32, 16, 48, 64, 128), n -> n + " blocks" + (n == 32 ? " (2 chunks)" : ""), "How far local chat and local death messages carry.");
 				onOff("Local death messages", "localDeaths", "A death message only reaches those within the chat range of where it happened (it turns the show_death_messages game rule off and sends them itself).");
 				onOff("Talks on its own", "talk", "Xen says what's on its mind now and then, greets people it knows and asks things you can answer with yes or no.");
+				onOff("Swearing", "swearing", "Xens swear like players do (\"oh shit\", \"wtf\"), each as much as it's that kind (some never do), and more when it's angry.");
 				onOff("Talks with Xens", "talkToXens", "Xens that meet have a short chat and tell each other where they saw trees and ore.");
 				onOff("Trading", "trading", "Xen trades with villagers (on their trading screen) and bargains with players.");
 				onOff("Can say no", "refuse", "Xen may refuse: when it's badly hurt, scared, needs what you ask for, or you hurt it. Saying please changes its mind (unless you hurt it).");
@@ -212,6 +213,8 @@ public class XenSettingsScreen extends Screen {
 						"Fewer decisions for slower computers and phones.");
 			}
 			case 8 -> {
+				choice("Sight", "sight", List.of(128, 64, 96, 160, 192, 256), n -> n + " blocks (" + n / 16 + " chunks)",
+						"How far Xens see: their render distance (8 chunks is how most players play): what they notice and remember (trees, water, lava, houses) and the picture of their view (half of it while no player is near). Never past what the server has loaded (its view distance). Further costs the server more.");
 				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
 				choice("Says on its own", "talkAmount", List.of("normal", "quiet", "chatty"), s -> s.equals("normal") ? "normal (45 s apart)" : s.equals("quiet") ? "quiet (2 min apart)" : "chatty (20 s apart)",
 						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");

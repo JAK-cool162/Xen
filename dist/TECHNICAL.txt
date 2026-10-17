@@ -1,7 +1,63 @@
-XEN COMPANION 2.0.0-beta.37: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.38: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.38
+===========================
+
+talk/Cursing.swear(text, amount, anger, random): applied in Companion.typed (everything it says, whispers and its
+Xen-to-Xen chats go through it) when config.swearing (default true), before the casual typing. A line already swearing
+or with coordinates is left as it is. Swaps (oh no -> oh shit, what? -> wtf?, nope -> hell nah, really/very/so before
+an adjective -> fucking/so damn, a mob name -> fucking <mob>, Ow!/Ugh -> Ow, fuck, shut up -> stfu, go away -> fuck
+off, heck -> hell, ...), each with chance 0.25 + 0.65 * amount; else an opener (shit, / fuck, / damn, / ffs / bro wtf,)
+on a heated line (ends with ! or anger >= 0.4; half as likely without !); a tail (ffs, damn it, wtf, fuck this, fml)
+when furious (! or anger >= 0.8), never one already in the line. At most one swear a line, two at anger >= 0.7.
+amount = Rage.swearing(hurt) = foul^2 * 1.4 * tone (shy/calm 0.7, grumpy/bold 1.2) * (0.4 + 1.2 * anger) + 0.15 * foul
+when hurt, clamped 0..1 (foul: the hidden stat). CrossCheck: a clean mouth (0.01) 0/500 lines, a furious foul one 428/500,
+coordinates never touched, a swearing line never made worse. Voice.hear: "fuck you", "fuck off", "screw you", "stfu",
+"piss off", "kys" are insults.
+
+Personality: two more hidden stats, "foul mouth" (FOUL_MOUTH = 9) and "bloodthirst" (BLOODTHIRST = 10); a Xen saved
+before them gets them from its name (bornWith, seeded by the name, fills the ones it didn't have).
+
+Rage (Companion.rage, saved as "rage" {anger, bloodlust}, each 0..100): provoke(stacks, why): each stack anger +=
+1..6, bloodlust += 1..3 (uniform). Stacks: hit by a player as an attack 1 (armed, crit or a hard hit: 2), insulted 1
+(40%: 2; banter isn't), died 2 (killed by a player: 4; /kill: none), a foe got away 1, hit by a monster 1 with chance
+0.25. second(): anger -= 8 * cool * (1 - 0.5 * wrath) a minute, bloodlust -= 1 * cool * (1 - 0.5 * wrath) a minute,
+cool = 0.5 + composure; bloodlust never below floor = max(0, (bloodthirst - 0.6) * 100). killed(a player): anger -=
+10..20, bloodlust -= 8..20. A mark (for no reason): checked once a minute at bloodlust >= 50, free mode, PvP not off,
+3 minutes in the world; chance (bloodlust - 40) / 200; the nearest player in sight within 24 that isn't its owner,
+trusted >= 0.6, distrusted (< 0: that's with a reason), at peace, its sparring partner or (below 85) of its village;
+held 2 minutes (or until they're gone, at peace, or bloodlust < 30). Effects: hitBy (its owner): hits back also at
+anger >= 60; foe() (pvp own): a friend's hit (trust >= 0.6) is let go only below anger 70; MindSense.enemy: also
+Rage.wouldKill (the mark, or trust < -0.25 + 0.25 * min(1, bloodlust / 60) at bloodlust >= 20) when PvP isn't off;
+Goals.agenda: FIGHT ("bloodlust") when allowed, danger < 0.2, health >= 14, wantsBlood (a mark or bloodlust >= 40)
+and enemy() has someone (free mode only, as the agenda is).
+
+Sight: config.sight (default 128), Companion.sight() = clamp to [32, the server's view distance * 16]. Vision draws to
+sight (half while no player is near; was 64 / 32) and Eyes casts to max(96, sight) (was 96). Vision.understand, the
+items and villagers it counts, and notice() (head turns) read only what's within reads = 64 near a player, 32
+otherwise, as before: with all of the picture read (one run: 12 deaths, no iron, against 6 and iron with sight 64)
+the mind got inputs it wasn't trained on. Chunks: a player's loading tickets follow the server's view distance
+(ChunkMap.setServerViewDistance -> DistanceManager.updatePlayerTickets), not the client's requested distance, so a
+Xen's world is loaded that far.
+
+Gut.refuge also counts no weapon (Hands.hasWeapon: a sword or an axe): coming = danger >= 0.6, or a monster within 12
+and (health <= 10 or no weapon), or 3 or more, or no weapon within 600 ticks of respawning (Companion.respawnedAt).
+
+Tests (quick server): rage_test (4 Xens on flat ground by day, Alex hitting with an iron sword every 1.5 s and
+insulting them for 3 minutes, Bob idle, 7 minutes in all), three runs: anger 100% in about 90 s of hits, bloodlust
+60-100%; fights picked 3 / 6 / 2, marks for no reason 1 / 1 / 3 (other Xens: the nearest one it had nothing
+against); swearing in 76/126 lines (before the tone-down: one swear a line, two when furious; no repeats), then
+18/105 and 43/107; 0 exceptions; 6.0-6.6 ms a tick; xen perf eyes + vision 0.38 + 0.38 ms (sight 128) and 0.51 + 0.50
+(sight 64). prog_test (6 Xens, 2 game days, seed 20261014, tick rate 40; different Xens each run): 2.0.0-beta.37 8
+deaths (worst Xen 4); beta.38 with the whole picture read 12 (4, 4, 3, 1; no iron), the same jar at sight 64 6;
+reading kept to 64 / 32: 13 (6, 6, 1: two respawning into zombies at night) but the test's first Diamonds!, 2 Isn't It
+Iron Pick, 2 Acquire Hardware; with the respawn dig-in: 6 (2, 2, 1, 1), 12 gut dig-ins, Stone Age 6, Getting an
+Upgrade 6, Monster Hunter 5, Acquire Hardware 1, Isn't It Iron Pick 1, Sweet Dreams 1, A Seedy Place 1, 2 alive the
+whole run; no fights picked and no marks (no player hurt them); 13.7-20.6 ms a tick.
 
 
 WHAT'S NEW IN 2.0.0-beta.37

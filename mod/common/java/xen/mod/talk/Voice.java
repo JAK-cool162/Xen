@@ -278,7 +278,8 @@ public final class Voice {
 		h.tellMe = s.contains(" tell me ") || s.contains(" say something ") || s.contains(" talk to me ") || s.contains(" entertain me ");
 		boolean insultWord = false;
 		for (String x : w) insultWord |= INSULTS.contains(x);
-		insultWord |= s.contains(" shut up ") || s.contains(" go away ");
+		insultWord |= s.contains(" shut up ") || s.contains(" go away ") || s.contains(" fuck you ") || s.contains(" fuck off ") || s.contains(" screw you ")
+				|| s.contains(" stfu ") || s.contains(" piss off ") || s.contains(" kys ");
 		h.insult = (h.aboutYou && h.polarity < 0 && !h.question && !h.feelMe) || insultWord && !s.contains(" not ");
 		h.praise = !h.insult && (h.aboutYou && h.polarity > 0 && !h.question && !h.likeQ) || s.contains(" good job ") || s.contains(" nice job ")
 				|| s.contains(" well done ") || s.contains(" good game ") || s.contains(" great job ")
