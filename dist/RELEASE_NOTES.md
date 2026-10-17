@@ -1,7 +1,47 @@
-**Xen Companion 2.0.0-beta.33**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.34**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.34: XenTalk, Xens talk in their own words
+
+* **XenTalk: a small language model of Xen's own**, made for this and nothing else: 4 layers, about 2 million
+  numbers, 2 MB in the jar, no download, no GPU, no internet. It reads what's true of the Xen right now (what it's
+  doing and why, what it has, what it saw, how it feels, its nature, who it's talking to and how much it trusts them,
+  what they just said) and writes a line word by word. Nothing is picked from a list. It speaks in chats between Xens
+  (each line answers the last), in its remarks, and in answers to you when its word library has nothing that fits.
+  ```
+  <mikomisz> hey, Hiemberz__. got wood for my pickaxe.
+  <Hiemberz__> got some wood, gonna get stone.
+  <mikomisz> um, see you later.
+  <soda99> um, i'm bored digging. want to go mining?
+  <mikomisz> get more wood for a pickaxe?
+  <Hiemberz__> i'm chopping wood for my pickaxe. feeling a bit uneasy at night, now.
+  <byte_nova> i'm swimming back to heal. the cave. it's too far out?
+  ```
+* **It can't make things up.** A line that names something that isn't true of it (iron it doesn't have, a creeper
+  that isn't there, a number it doesn't have) is thrown away and it tries again; after 3 tries its old voice answers.
+* **It never slows the game**: it works on its own low-priority thread, about 140 ms a line on one core.
+  `xentalk` in the settings turns it off.
+* **How it was made**: a bigger open model (Qwen2.5-1.5B-Instruct, Apache-2.0) ran once on a computer of ours and wrote
+  replies for situations made from 631 real Xen states on a test server. Replies that named anything not in the facts,
+  ran long or sounded like an assistant were thrown out (about 7 in 10 kept, 4,246 in all), and XenTalk learned from
+  the rest. The big model isn't in the jar. `scripts/xentalk/` has the scripts to make your own.
+* **Honest limits**: it's small. Lines are short (about 9 words) and lowercase, and sometimes don't follow what
+  was said. On situations it never trained on, 91% of its first tries stuck to the facts (only those are said).
+* **`/xen tour [minutes]`: training data without playing for hours.** You float through the world as a spectator, a new
+  view every 3 seconds (out on the land, inside caves, high over it), your view turning slowly, further and further
+  from where you started. Press F8 and the recorder saves it while you're away from the keyboard. These are marked as
+  spectator views (for Xen's eyes, not for how a person plays). `/xen tour stop` puts you back where you were.
+* In tests:
+  * XenTalk on its held-out situations (never trained on): 91% of first tries stick to the facts, about 9 words, 97%
+    different. Java gives the same words as Python (12 of 12) at about 140 ms a line on one core.
+  * In game (4 Xens kept close on flat ground with trees, a player talking to one, 5 minutes a run): 9 to 11 chats and 20
+    to 34 remarks a run, no errors, the server at 5.4 ms a tick (the limit is 50). Words spelt out letter by letter
+    ("icky.") went from 6 lines in 69 to none in 99 with the rule that stops it; broken contractions ("i's") from 5 in
+    56 to 1 in 43, and the rule was tightened after that.
+  * 10 Xens on a normal world for 4 minutes never met, so no chats: XenTalk talks when Xens or players are together.
+  * Tour (a test client, 1.8 minutes): 36 places, 411 of 440 frames marked spectator, about 134 MB an hour.
 
 ### 2.0.0-beta.33: eyes, rules of its own, and chats that mean something
 

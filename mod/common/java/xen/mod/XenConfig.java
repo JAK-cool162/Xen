@@ -103,6 +103,8 @@ public final class XenConfig {
 	 * own rules and its chat. Light (a row or two of sight lines a tick); off for a slow server.
 	 */
 	public boolean vision = true;
+	/** XenTalk: Xen's own small talk model words its chats (from what's true for it; the classic voice when it has nothing that sticks to the facts). */
+	public boolean xentalk = true;
 	/**
 	 * Adventures: free Xens go for the Ender Dragon on their own when they're ready (the Nether for blaze rods, pearls,
 	 * the stronghold, the End), and take on trial chambers they find.

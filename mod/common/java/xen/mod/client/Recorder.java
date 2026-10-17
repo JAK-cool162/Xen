@@ -262,12 +262,12 @@ public final class Recorder {
 		String line = String.format(Locale.ROOT,
 				"{\"t\":%d,\"frame\":%d,\"pos\":[%.2f,%.2f,%.2f],\"dim\":\"%s\",\"yaw\":%.1f,\"pitch\":%.1f,\"turn\":[%.1f,%.1f],\"fov\":%.0f,"
 						+ "\"keys\":{\"w\":%b,\"a\":%b,\"s\":%b,\"d\":%b,\"jump\":%b,\"sneak\":%b,\"sprint\":%b,\"attack\":%b,\"use\":%b},\"slot\":%d,\"hand\":\"%s\","
-						+ "\"hp\":%.1f,\"food\":%d,\"air\":%d,\"day_time\":%d,\"on_ground\":%b,\"in_water\":%b,\"looking_at\":\"%s\","
+						+ "\"hp\":%.1f,\"food\":%d,\"air\":%d,\"day_time\":%d,\"on_ground\":%b,\"in_water\":%b,\"spectator\":%b,\"looking_at\":\"%s\","
 						+ "\"what\":\"%s\",\"dist\":\"%s\",\"light_face\":\"%s\"}",
 				System.currentTimeMillis() - started, shotNow ? frame : -1, p.getX(), p.getY(), p.getZ(), dim, yaw, pitch, dYaw, dPitch, fov,
 				o.keyUp.isDown(), o.keyLeft.isDown(), o.keyDown.isDown(), o.keyRight.isDown(), o.keyJump.isDown(), o.keyShift.isDown(), o.keySprint.isDown(),
 				o.keyAttack.isDown(), o.keyUse.isDown(), p.getInventory().getSelectedSlot(), item(p.getMainHandItem()), p.getHealth(), p.getFoodData().getFoodLevel(),
-				p.getAirSupply(), Screens.dayTime(level), p.onGround(), p.isInWater(), lookingAt(client), rle(cam.what), b64.encodeToString(dist), b64.encodeToString(lf));
+				p.getAirSupply(), Screens.dayTime(level), p.onGround(), p.isInWater(), p.isSpectator(), lookingAt(client), rle(cam.what), b64.encodeToString(dist), b64.encodeToString(lf));
 		write(line);
 		if (shotNow) {                                                                      // Xen's own picture of this view, next to yours
 			int[] mine = cam.rgb.clone();

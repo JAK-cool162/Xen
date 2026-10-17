@@ -172,7 +172,10 @@ public class XenMod implements ModInitializer {
 			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.digging(player, pos));
 			return InteractionResult.PASS;
 		});
-		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> ownerLeft(handler.getPlayer()));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, srv) -> {
+			Tour.left(handler.getPlayer());                                  // (mid-tour: back to how they were)
+			ownerLeft(handler.getPlayer());
+		});
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> ownerJoined(handler.getPlayer()));
 		UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
 			if (!(entity instanceof XenPlayer xen) || !(player instanceof ServerPlayer sp) || xen.companion == null) return InteractionResult.PASS;
@@ -450,6 +453,7 @@ public class XenMod implements ModInitializer {
 	 */
 	private void tick(MinecraftServer s) {
 		try {
+			Tour.tickAll(s);                                                     // (anyone on a /xen tour: their next view)
 			tickWorld(s);
 		} catch (RuntimeException e) {
 			long now = System.currentTimeMillis();
@@ -1087,6 +1091,15 @@ public class XenMod implements ModInitializer {
 					ctx.getSource().sendSuccess(() -> Component.literal(out), false);
 					return 1;
 				}))
+				.then(Commands.literal("tour").requires(XenMod::mayRun)          // training data without playing: a spectator flight, a new view every 3 s, for the recorder
+						.executes(ctx -> tour(ctx, 30))
+						.then(Commands.literal("stop").executes(ctx -> {
+							ServerPlayer p = ctx.getSource().getPlayer();
+							String out = p == null ? "Only a player can tour." : Tour.stop(p);
+							ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+							return 1;
+						}))
+						.then(Commands.argument("minutes", IntegerArgumentType.integer(1, 600)).executes(ctx -> tour(ctx, IntegerArgumentType.getInteger(ctx, "minutes")))))
 				.then(Commands.literal("vision").executes(ctx -> {              // what each Xen sees, what it makes of it, what it costs
 					StringBuilder sb = new StringBuilder();
 					for (Companion c : companions) if (!c.minion) sb.append(sb.length() > 0 ? "\n" : "").append(c.vision.status());
@@ -1273,6 +1286,13 @@ public class XenMod implements ModInitializer {
 		}
 		ctx.getSource().sendFailure(Component.literal("No Xen called " + who + " here."));
 		return 0;
+	}
+
+	private static int tour(CommandContext<CommandSourceStack> ctx, int minutes) {
+		ServerPlayer p = ctx.getSource().getPlayer();
+		String out = p == null ? "Only a player can tour." : Tour.start(p, minutes);
+		ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+		return 1;
 	}
 
 	private boolean op(CommandContext<CommandSourceStack> ctx) {

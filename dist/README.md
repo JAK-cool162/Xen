@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.33
+# Xen Companion (Fabric mod) 2.0.0-beta.34
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.33+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.33+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.34+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.34+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.33+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.34+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -109,6 +109,8 @@ Measured on a 4-core cloud PC (x86-64):
   watching cost little (under 3% of the server's time).
 * **Its talk model**: reading a line and picking an answer takes well under a millisecond (a few thousand
   multiplications); it's 2 MB inside the jar.
+* **XenTalk** (its own words, 2.0.0-beta.34): about 140 ms to write a line, on its own low-priority thread (never the
+  game's), one line at a time for the whole server; 2 MB inside the jar.
 * **Phones** weren't measured. Their cores are slower, but the brain and the talk model are light.
 
 
@@ -155,6 +157,52 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### It talks in its own words: XenTalk (2.0.0-beta.34)
+
+Xens now have a small language model of their own, **XenTalk**, made for this and nothing else: 4 layers, about 2
+million numbers, 2 MB in the jar, no download, no GPU, no internet. It reads what's true of the Xen right now (what it's
+doing and why, what it has, what it saw, how it feels, its mood and nature, who it's talking to and how much it trusts
+them, what they just said) and writes a line word by word. Nothing is picked from a list:
+
+```
+<mikomisz> hey, Hiemberz__. got wood for my pickaxe.
+<Hiemberz__> got some wood, gonna get stone.
+<mikomisz> um, see you later.
+<soda99> um, i'm bored digging. want to go mining?
+<mikomisz> get more wood for a pickaxe?
+<Hiemberz__> i'm chopping wood for my pickaxe. feeling a bit uneasy at night, now.
+<byte_nova> i'm swimming back to heal. the cave. it's too far out?
+```
+
+* It speaks in **chats between Xens** (each line answers the last), **its remarks** now and then, and **answers to you**
+  when its word library has nothing that fits.
+* A line that names something that isn't true of it (iron it doesn't have, a creeper that isn't there, a number it
+  doesn't have) is thrown away and it tries again; after 3 tries its old voice answers instead.
+* It works on its own low-priority thread, never the game's: about 140 ms a line on one core of a cloud PC.
+* `xentalk` in the settings turns it off (then everything is as in 2.0.0-beta.33).
+* Honest limits: it's small. Its lines are short (about 9 words), lowercase like a lot of players type, and
+  sometimes don't follow (a reply that ignores what you said, like "get more wood for a pickaxe?" to "want to go
+  mining?"). 91% of its first tries stick to the facts on situations it never trained on, and only those are said.
+  Early on most Xens want the same few things (wood, a pickaxe, stone), so they talk about the same few things.
+* When it talks: two Xens chat when they meet (within 12 blocks); its remarks only when a player is near enough to
+  hear them; answers to you only when its word library has nothing that fits. In a 4-minute test with 10 Xens on a
+  normal world they never met, so there were no chats at all; kept close together, 4 Xens had 9 to 11 chats and 20 to
+  34 remarks in 5 minutes.
+* How it was made: a bigger open model (Qwen2.5-1.5B-Instruct, Apache-2.0) ran once on a computer of ours and wrote
+  replies for situations made from 631 real Xen states on a test server (more things, night, hurt, danger, someone to
+  talk to, a line they heard); replies that named anything not in the facts, ran long or sounded like an assistant
+  were thrown out (about 7 in 10 kept, 4,246 in all). XenTalk learned from those. The big model isn't in the jar and
+  nothing calls out to it. `scripts/xentalk/` (`teach.py`, `train.py`) to make your own.
+
+**Data without playing for hours: `/xen tour [minutes]`** (operators, or the host in singleplayer). You float through the
+world as a spectator, a new view every 3 seconds: out on the land, inside caves, high over it, your view turning
+slowly, further and further from where you started (1,200 views an hour). Press F8 first and the recorder saves it all
+while you're away from the keyboard. These are marked as spectator views, so they teach
+Xen's eyes (colours, what things look like), not how a person plays. `/xen tour stop` puts you back where you were.
+For how a person plays, a short session doing one thing (10 minutes of caving, with a note or two on F9) teaches more
+than hours of everything. And the Xens' own play can be logged with no one at the keyboard at all
+(`/xen set gameplayLog xens`).
 
 ### It sees, writes its own rules, and talks about real things (2.0.0-beta.33)
 
@@ -1336,6 +1384,7 @@ away in single player. On a server, operators use:
 | `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
 | `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
 | `vision` | `true` | Xen vision: a picture of what each Xen sees (64 by 36 sight lines, no textures) and what it makes of it, for its mind, its own rules and its chat |
+| `xentalk` | `true` | XenTalk, its own small talk model: chats between Xens, remarks and answers in its own words, from what's true of it (off: its classic voice) |
 | `adventures` | `true` | free Xens go for the Ender Dragon on their own when ready, and take on trial chambers |
 | `smartsAtGeneration` | `4` | from this generation of evolution Xens know the Nether portal math (x/8) and triangulating strongholds |
 | `pathAssist` | `true` | its legs find the way: sprint, jump, drop, jump gaps, swim, climb, doors, dig, bridge, tower up ([more](#path-assist)) |
@@ -1398,6 +1447,7 @@ away in single player. On a server, operators use:
 | `/xen society` | each village's constitution, tax and amendments, its jobs, and each faith with its followers |
 | `/xen rules` | the if/then rules each Xen wrote itself from what worked and what didn't, and how sure it is of each |
 | `/xen vision` | what each Xen sees right now (a cave mouth, a drop, buildings, dark ground...) and what its eyes cost |
+| `/xen tour [minutes]` | operators: you fly through the world as a spectator, a new view every 3 s (land, caves, high up), for the recorder (F8); `/xen tour stop` ends it |
 | `/xen vision dump` | each Xen's view as a picture (PPM) and what every pixel is (text), in the world's `xen/vision` folder |
 | `/xen dismiss` | it goes home (operators and the console send every Xen home) |
 

@@ -1,7 +1,83 @@
-XEN COMPANION 2.0.0-beta.33: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.34: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.34
+===========================
+
+talk/XenTalk.java (new): Xen's own generative talk model, a decoder-only transformer: vocab 1,281 pieces (PAD, BOS, SEP,
+EOS, then letters, " "+letters, then words with the space before them; a word it doesn't know goes " w" + letters),
+d=192, 4 layers, 4 heads, ff 768, context 192, learned positions, pre-LN, GELU (tanh), tied embeddings. Weights in
+assets/xen/xentalk.bin (magic XTK1, little-endian; matrices int8 with a float scale per row, dequantized at load;
+vectors float32), pieces in xentalk.json. Input: BOS + facts + SEP, the reply after it up to EOS (28 pieces at most).
+Facts line (facts(Voice.Self, to, trust, heard)): me|tone|mood|feel=hurt,hungry|time=day/night|danger=some/high|doing|
+why|next|has|saw|lately|dream|friend|to|trust=enemy (<= -0.3)/stranger/friend (>= 0.3)/best friend (>= 0.7)|heard,
+values lowercased, '|' and '=' taken out. masked(): me, to and friend become the words xme, xto, xfriend in the facts
+and what was heard (longest name first, whole words, ignoring case), put back in the reply after (a model this small
+can't spell a name back; it used to say a common one). Decoding: a KV cache per run, matvec with 4 accumulators;
+a piece said already in this reply gets its logit divided by 1.3 if positive (x1.3 if negative), a piece that
+would repeat a trigram -inf; no spelling: a word with no space before it can't follow a piece that ends in a letter or
+digit (in game, 6 of 69 lines had a word spelt out letter by letter, like "icky."; 0 after); after a word and "'",
+only the endings the teacher wrote after that word (xentalk.json "contractions": "i" -> m, ll, ve, d), so no "i's" or
+"i're"; never xme (it said its own name to others). All identical in train.py. Top-k 30 at temperature 0.8. reply():
+up to 3 tries until grounded() (every Minecraft thing in THINGS and every number in the line must be in the facts),
+2..100 characters and no xme/xto/xfriend left with no name to put back (an "xto" in a remark); else null and the
+classic voice answers. samey(a, b): 3 in 5 of the shorter line's words shared. One worker thread ("xen-talk", daemon, minimum priority) for the whole server: ask(facts, done) and
+async(supplier); results go back with server.execute. VoiceSelf.has(): pickaxe tier, logs, cobblestone, coal, iron,
+diamonds, food, a bed. Measured: 130-145 ms a reply (greedy, one thread, crossCheck).
+
+Where it speaks (config.xentalk, default true, and the model loaded): Talker.chatWithXen -> talkFirst(o): facts for
+both taken on the server thread, turns 2..8 by both Xens' chattiness, each turn the speaker's facts + "|heard=<last
+line>", stopping at null or a line samey() with one said already (nothing new to say); then converse(o, now, lines) plays them 45..70 ticks apart after intent.chat
+(busy() while waiting, so neither starts another chat). Remarks (only with a player within 48 blocks, as before): half of the
+non-question remarks go to XenTalk, kept to itself when samey() with its last remark (journal "thinks xentalk: ...";
+a chat is journalled as "xentalk: a chat with <name>: line / line / ..."). Player chat: when no grounded answer was found, XenTalk gets the facts with to= the
+player, trust and heard=what they said, and its line is said (else the classic reply). xen.dumpFacts=true (system
+property): every 400 ticks each Xen's facts line goes to talkfacts.txt next to the brain file (how the training
+situations were collected).
+
+scripts/xentalk/teach.py: the teacher (any OpenAI-style /v1/chat/completions server; used: llama.cpp llama-server with
+Qwen2.5-1.5B-Instruct Q4_K_M, Apache-2.0, --cache-ram 256, 4 threads). situations(): real facts lines (talkfacts.txt,
+631 lines from 10 Xens on a test server), half of them changed (more things, day/night flipped, hurt, danger), 15%
+remarks, else to a random name with trust stranger 4 : friend 4 : best friend 2 : enemy 1, an opener (30%) or a reply
+to a line from data/talk/corpus.txt. The system prompt is the same for every call (so the server reuses its cache);
+the Xen's name and nature come first in the user message. ok(): no assistant phrases, no "facts"/"mood"/"personality",
+no quotes, emoji or markdown, <= 80 characters, <= 15 words; grounded() as in the mod. data/xentalk/pairs.jsonl:
+4,246 kept (about 7 in 10 of what the teacher wrote).
+
+scripts/xentalk/train.py: replies lowercased, names masked, a reply with a word seen <= 2 times that isn't in its facts
+dropped (made up); 5% held out. AdamW lr 1e-3 (OneCycle), weight decay 0.05, dropout 0.2, GPT-2 init (std 0.02,
+residual projections 0.02/sqrt(2L)); loss on the reply only; every other epoch thin() leaves out facts the reply
+doesn't use (35% each; never me, tone, to, trust, heard). The best held-out epoch is kept. Exports xentalk.bin/.json and
+the crossCheck fixture (greedy ids of 12 held-out cases from the int8 weights, and masked() cases). judge(): one
+sampled reply per held-out situation, as the mod samples (made_up() counts words it doesn't know). --again: no
+training; the model from xentalk.bin (load()), the contractions written to xentalk.json, the fixture and the scores. This model: 3,424 training and 180 held out (642 dropped
+for a made-up word), 2.06M numbers, 16 epochs (about 70 s each on 4 cores), best held-out loss 2.156 (perplexity 8.6;
+2.305 / 10.0 before names were masked); one sample per held-out situation: 91% stick to the facts, 8.8 words, 97%
+different, 0% with a made-up word.
+
+CrossCheck: XenTalk greedy ids against Python's (>= 80% the same; float sums in another order can flip a close call),
+grounded() cases, masked() against Python's.
+
+Tour.java (new): /xen tour [minutes] (1..600, default 30; operators or the singleplayer host), /xen tour stop. Keeps
+the game mode, place and look; spectator; a hop every 60 ticks: kind = hops % 6 (0-3 land, 4 cave, 5 high). Land: a
+random spot within 96 of the centre (the chunk made if it isn't yet), MOTION_BLOCKING height + 0.1..5, open water
+skipped 70% of the time, pitch -8..32. Cave: down from the top - 8 to the first 3 air blocks over ground with sky light
+0, pitch -10..20. High: top + 20..45, pitch 25..50. Every 10 hops the centre moves up to 80 blocks. The view turns
+2..7 deg every 5 ticks (pitch drifts within -60..70). Ends when the time runs out, on /xen tour stop, or on leaving
+(XenMod DISCONNECT -> Tour.left: put back first). Recorder state lines have "spectator" (true on a tour). Measured (a
+test client, 1.8 minutes): 36 places, 411 of 440 states spectator, labels water 24%, sky 22%, deepslate 12%, sand 10%;
+63 dark cave views; 4.1 MB (about 134 MB an hour).
+
+Tested (quick server): 4 Xens kept close on flat ground with 8 oak trees, peaceful, a player (a script) beside them
+talking to one (talk_lines.txt), 5 minutes a run, 3 runs as the decoding rules came in: 9/11/10 XenTalk chats and
+34/26/20 remarks, no exceptions, 5.4 ms a tick. Lines with a word spelt out: 6 of 69, then 0 of 56 and 0 of 43; broken
+contractions 1, 5, then 1 ("i' from": after that, nothing but a known ending may follow "i'"; checked by the unit
+test and crossCheck, not in game). The player's lines all had library answers, so XenTalk didn't answer them. 10 Xens
+on a normal world, 4 minutes: no chats (they never came within 12 blocks of each other), so no XenTalk; tick times
+24-27 ms with the setting on or off (with nothing to say it does nothing).
 
 
 WHAT'S NEW IN 2.0.0-beta.33

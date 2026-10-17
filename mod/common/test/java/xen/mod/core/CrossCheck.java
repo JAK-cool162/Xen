@@ -179,6 +179,7 @@ public final class CrossCheck {
 
 		// The talk model (Banter): the same tokens, hashes and answers as scripts/train_talk.py, and answers that fill in only what's true.
 		check(talkTest(dir), "the talk model differs from Python's");
+		check(xentalkTest(dir), "XenTalk differs from Python's");
 
 		// Finding a way on foot through what it knows.
 		check(pathTest(), "path finding failed");
@@ -226,6 +227,44 @@ public final class CrossCheck {
 
 		System.out.println(failures == 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED");
 		if (failures > 0) System.exit(1);
+	}
+
+	/** XenTalk: the jar's model, greedy, gives the replies Python's gave (on the same bytes); and it's quick. */
+	static boolean xentalkTest(Path dir) throws IOException {
+		var m = xen.mod.talk.XenTalk.get();
+		if (m == null) {
+			System.out.println("xentalk: not loaded");
+			return false;
+		}
+		JsonObject fx = new Gson().fromJson(Files.readString(dir.resolve("xentalk.json")), JsonObject.class);
+		int same = 0, total = 0;
+		long t0 = System.nanoTime();
+		for (var e : fx.getAsJsonArray("cases")) {
+			JsonObject c = e.getAsJsonObject();
+			int[] ids = m.generate(c.get("facts").getAsString(), 0, 0, 30, null);
+			var want = c.getAsJsonArray("ids");
+			boolean one = ids.length == want.size();
+			for (int i = 0; one && i < ids.length; i++) one = ids[i] == want.get(i).getAsInt();
+			if (!one) System.out.println("xentalk: \"" + m.decode(ids) + "\", Python \"" + c.get("text").getAsString() + "\"");
+			same += one ? 1 : 0;
+			total++;
+		}
+		double ms = (System.nanoTime() - t0) / 1e6 / Math.max(1, total);
+		boolean grounded = xen.mod.talk.XenTalk.grounded("got 3 iron lol", "has=a stone pickaxe, 3 iron") && !xen.mod.talk.XenTalk.grounded("found diamonds!", "has=a stone pickaxe")
+				&& !xen.mod.talk.XenTalk.grounded("got 12 logs", "has=3 logs");
+		boolean names = fx.has("masked");
+		if (names)
+			for (var e : fx.getAsJsonArray("masked")) {
+				JsonObject c = e.getAsJsonObject();
+				String got = xen.mod.talk.XenTalk.masked(c.get("raw").getAsString(), new java.util.ArrayList<>());
+				if (!got.equals(c.get("masked").getAsString())) {
+					System.out.println("xentalk: names out \"" + got + "\", Python \"" + c.get("masked").getAsString() + "\"");
+					names = false;
+				}
+			}
+		System.out.printf(java.util.Locale.ROOT, "xentalk: %d/%d replies as in Python, %.0f ms a reply (greedy, one thread); grounding check %s; names out %s%n", same, total, ms,
+				grounded ? "ok" : "WRONG", names ? "as in Python" : "DIFFERENT");
+		return grounded && names && total > 0 && same * 10 >= total * 8;                      // (float sums in another order can flip a close call now and then)
 	}
 
 	static boolean talkTest(Path dir) throws IOException {

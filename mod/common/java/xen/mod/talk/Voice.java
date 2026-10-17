@@ -91,6 +91,11 @@ public final class Voice {
 		}
 
 		/** How dangerous it is around it now (0..1: monsters near, how it's doing). */
+		/** What it carries that matters, in words ("a stone pickaxe, 12 logs, 3 coal, no food"; empty: it doesn't say). */
+		default String has() {
+			return "";
+		}
+
 		default float danger() {
 			return 0;
 		}

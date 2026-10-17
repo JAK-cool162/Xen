@@ -1,0 +1,226 @@
+{
+ "cases": [
+  {
+   "facts": "me=xme|tone=calm|mood=bored|time=night|danger=high|doing=digging a staircase down|why=i need air|next=get some wool for a bed|has=a stone pickaxe, 24 logs, 18 cobblestone, no food|saw=a cave entrance|lately=got some wood and got some stone|dream=see places 300 blocks away",
+   "ids": [
+    204,
+    58,
+    205,
+    166,
+    42,
+    137,
+    189,
+    41
+   ],
+   "text": "digging a staircase down, need air.",
+   "teacher": "i'm digging a staircase down. i need air."
+  },
+  {
+   "facts": "me=xme|tone=bold|mood=calm|time=night|doing=taking the ore on my way|why=i need stone tools|next=get stone for better tools|has=a wooden pickaxe, 7 logs, 2 cobblestone, no food|lately=got some wood|dream=find diamonds|to=xto|trust=stranger|heard=confused",
+   "ids": [
+    12,
+    45,
+    16,
+    285,
+    42,
+    137,
+    111,
+    140,
+    41
+   ],
+   "text": "i'm bored, need stone tools.",
+   "teacher": "confused? i'm on my way to get stone tools. gonna need them for better tools."
+  },
+  {
+   "facts": "me=xme|tone=shy|mood=uneasy|feel=hungry|time=day|danger=some|doing=swimming up for air|why=i'm too far out in the water|next=get wood for a pickaxe|has=an iron pickaxe, 31 iron, no food|saw=a cave entrance|lately=went mining, got some wood and explored|dream=grow a village with my tribe|to=xto|trust=friend|heard=i need sleep",
+   "ids": [
+    164,
+    42,
+    66,
+    45,
+    16,
+    256,
+    292,
+    184,
+    219,
+    149,
+    290,
+    41
+   ],
+   "text": "um, i'm too far out in the water.",
+   "teacher": "um i need sleep too but i can't find a place to sleep"
+  },
+  {
+   "facts": "me=xme|tone=silly|mood=uneasy|feel=hurt,hungry|time=day|doing=getting wood|why=you always need wood|next=get wood for a pickaxe|has=no pickaxe, no food|saw=a cave entrance|lately=got some wood, went mining and made a shelter|dream=grow a village with my tribe|to=xto|trust=stranger",
+   "ids": [
+    201,
+    198,
+    42,
+    118,
+    112,
+    113,
+    114,
+    147,
+    115,
+    44
+   ],
+   "text": "hey xto, got some wood for my pickaxe?",
+   "teacher": "hey xto, saw a cave entrance over there. looks like fun to explore."
+  },
+  {
+   "facts": "me=xme|tone=calm|mood=bored|time=day|doing=exploring|why=you always need wood|next=get some wool for a bed|has=a stone pickaxe, 4 logs, 16 cobblestone, no food|lately=got some stone, got some wood and explored|dream=find diamonds|to=xto|trust=friend|heard=what should we do",
+   "ids": [
+    201,
+    42,
+    66,
+    45,
+    16,
+    392,
+    41,
+    137,
+    113,
+    114,
+    58,
+    135,
+    41
+   ],
+   "text": "hey, i'm exploring. need wood for a bed.",
+   "teacher": "oh, hi xto. let's go exploring more. i need more wood for my bed."
+  },
+  {
+   "facts": "me=xme|tone=shy|mood=bored|time=night|doing=digging a staircase down|why=i need air|next=get some wool for a bed|has=a stone pickaxe, 4 logs, 15 cobblestone, 4 coal, no food|saw=a cave mouth|lately=explored, went mining and got some stone|dream=make three friends|to=xto|trust=friend|heard=stupid creeper",
+   "ids": [
+    164,
+    42,
+    281,
+    41
+   ],
+   "text": "um, hi.",
+   "teacher": "um, got bored digging, need some air."
+  },
+  {
+   "facts": "me=xme|tone=silly|mood=calm|time=day|doing=digging a staircase down|why=i need air|next=get some wool for a bed|has=a stone pickaxe, 4 logs, 16 cobblestone, no food|saw=a cave entrance|lately=went mining, got some stone and got some wood|dream=grow a village with my tribe|to=xto|trust=best friend|heard=lets go on a trip",
+   "ids": [
+    352,
+    42,
+    254,
+    45,
+    22,
+    229,
+    330,
+    488,
+    43
+   ],
+   "text": "ok, let's go explore together!",
+   "teacher": "ok, let's go on a trip! what are we exploring?"
+  },
+  {
+   "facts": "me=xme|tone=grumpy|mood=calm|time=night|doing=picking up gravel|why=i need stone tools|next=get some wool for a bed|has=a stone pickaxe, 5 logs, 3 cobblestone, no food|lately=got some wood|dream=gather a big stockpile of wood and stone|to=xto|trust=stranger|heard=yo diamonds",
+   "ids": [
+    201,
+    42,
+    265,
+    161,
+    236,
+    41,
+    137,
+    111,
+    140,
+    114,
+    152,
+    140,
+    41
+   ],
+   "text": "hey, picking up dirt. need stone tools for better tools.",
+   "teacher": "oh yeah, i found some diamonds. thanks, gonna need them for stone tools."
+  },
+  {
+   "facts": "me=xme|tone=silly|mood=afraid|feel=hungry|time=day|doing=digging a staircase down|why=i need air|next=get some wool for a bed|has=an iron pickaxe, 38 logs, 9 cobblestone, no food, a bed|lately=went mining, got some stone and got some wood|dream=make three friends|to=xto|trust=stranger",
+   "ids": [
+    201,
+    198,
+    42,
+    212,
+    45,
+    22,
+    161,
+    44,
+    137,
+    112,
+    189,
+    41
+   ],
+   "text": "hey xto, what's up? need some air.",
+   "teacher": "yo, xto! you got any wood for a bed?"
+  },
+  {
+   "facts": "me=xme|tone=silly|mood=calm|time=day|doing=digging a staircase down|why=i need air|next=get some wool for a bed|has=a stone pickaxe, 4 logs, 16 cobblestone, no food|lately=got some stone and got some wood|dream=grow a village with my tribe",
+   "ids": [
+    204,
+    58,
+    205,
+    166,
+    42,
+    137,
+    189,
+    41
+   ],
+   "text": "digging a staircase down, need air.",
+   "teacher": "hey there! just digging this staircase down to get some air. feeling good!"
+  },
+  {
+   "facts": "me=xme|tone=bold|mood=afraid|feel=hurt|time=night|doing=getting stone for a furnace|why=raw iron is no use till it's smelted|next=get some wool for a bed|has=a stone pickaxe, 19 cobblestone, 11 food|saw=a cave mouth|lately=made better gear, got some wood and made a shelter|dream=find diamonds|friend=xfriend|to=xto|trust=friend|heard=join my team",
+   "ids": [
+    12,
+    45,
+    16,
+    257,
+    319,
+    42,
+    198,
+    41,
+    66,
+    137,
+    112,
+    141,
+    114,
+    58,
+    135,
+    41
+   ],
+   "text": "i'm not sure, xto. i need some wool for a bed.",
+   "teacher": "nah, too afraid to join your team. getting stone and wool first."
+  },
+  {
+   "facts": "me=xme|tone=shy|mood=calm|time=night|doing=going to my mine|why=i want to go mining|next=get wood for a pickaxe|has=no pickaxe, no food|saw=a cave entrance|lately=went mining, got some wood and explored|dream=grow a village with my tribe|to=xto|trust=best friend",
+   "ids": [
+    164,
+    42,
+    66,
+    45,
+    16,
+    269,
+    153,
+    147,
+    194,
+    41
+   ],
+   "text": "um, i'm going to my mine.",
+   "teacher": "um, xto, i was just going to my mine. want to come?"
+  }
+ ],
+ "masked": [
+  {
+   "raw": "me=Meelu|tone=bold|friend=bfnuf|to=Alex|trust=friend|heard=hey meelu, seen bfnuf? alexander says hi",
+   "masked": "me=xme|tone=bold|friend=xfriend|to=xto|trust=friend|heard=hey xme, seen xfriend? alexander says hi"
+  },
+  {
+   "raw": "me=xLyzeyx|tone=shy|to=Milkghost941|trust=stranger|heard=milkghost941 here. xlyzeyx?",
+   "masked": "me=xme|tone=shy|to=xto|trust=stranger|heard=xto here. xme?"
+  },
+  {
+   "raw": "me=Kai|tone=silly|time=day|doing=getting wood",
+   "masked": "me=xme|tone=silly|time=day|doing=getting wood"
+  }
+ ]
+}

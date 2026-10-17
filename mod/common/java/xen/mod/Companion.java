@@ -219,6 +219,9 @@ public final class Companion {
 		mod.roster.remember(this, mod.teamOf(this));
 	}
 
+	/** -Dxen.dumpFacts=true: every 20 s each Xen writes what it knows of itself (XenTalk's facts) to the world's xen/talkfacts.txt. */
+	static final boolean DUMP_FACTS = Boolean.getBoolean("xen.dumpFacts");
+
 	/** Is it in the world someone keeps loaded (a minion only lives there)? */
 	boolean awake() {
 		return player != null && (!minion || ((ServerLevel) player.level()).isPositionEntityTicking(player.blockPosition()));
@@ -327,6 +330,14 @@ public final class Companion {
 			if (player.onGround() && !player.isInWater()) lastDry = player.blockPosition();   // (the last dry ground under its feet: to swim back to)
 			noteKills();                                                 // (something it hit died: its drops are its own)
 			tips.tick();                                                 // (a tip it took, or didn't: how did that go?)
+			if (DUMP_FACTS && player.tickCount % 400 == 0 && !minion) {       // (-Dxen.dumpFacts=true: what it knows of itself, for training XenTalk)
+				try {
+					java.nio.file.Files.writeString(mod.brainFile().resolveSibling("talkfacts.txt"), xen.mod.talk.XenTalk.facts(me, "", 0, "") + "\n",
+							java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+				} catch (java.io.IOException ignored) {
+					// (a test aid only)
+				}
+			}
 			if (player.tickCount % 100 == 0) {
 				rules.tick();                                            // (stuck? what's true now, for its rules)
 				intent.tick();                                           // (a promise it can keep now)
@@ -4063,6 +4074,15 @@ public final class Companion {
 				String grounded = heard.question && !heard.likeQ && xen.mod.talk.Chat.asksAboutThing(said) && !simple.equals(xen.mod.talk.Chat.NOT_UNDERSTOOD) ? simple : null;   // (a question about a thing: what it knows; an opinion: its own words)
 				String reply = voice.reply(from == null ? "you" : from.getName().getString(), said, grounded, true);
 				journal("thinks", "own words: " + voice.lastAct + " (heard: " + voice.lastHeard + ")");
+				if (grounded == null && mod.config.xentalk && xen.mod.talk.XenTalk.get() != null && said != null) {   // its own talk model: a moment later, like typing
+					String facts = xen.mod.talk.XenTalk.facts(me, who, from == null ? 0 : trust(from.getUUID()), said);
+					xen.mod.talk.XenTalk.ask(facts, own -> server.execute(() -> {
+						if (player == null) return;
+						if (own != null) journal("thinks", "xentalk: " + own);
+						say(own != null ? own : reply);
+					}));
+					return null;
+				}
 				say(reply);
 				return null;
 			}
@@ -4509,6 +4529,22 @@ public final class Companion {
 			if (did.isEmpty()) return "";
 			if (did.size() == 1) return did.get(0);
 			return String.join(", ", did.subList(0, did.size() - 1)) + " and " + did.get(did.size() - 1);
+		}
+
+		@Override public String has() {
+			if (player == null) return "";
+			var it = items();
+			int tier = crafter.pickTier();
+			java.util.List<String> out = new java.util.ArrayList<>();
+			out.add(new String[] {"no pickaxe", "a wooden pickaxe", "a stone pickaxe", "an iron pickaxe", "a diamond pickaxe", "a netherite pickaxe"}[Math.max(0, Math.min(5, tier))]);
+			int iron = it.getOrDefault("raw_iron", 0) + it.getOrDefault("iron_ingot", 0), coal = it.getOrDefault("coal", 0) + it.getOrDefault("charcoal", 0);
+			String[][] kinds = {{"log", "logs"}, {"cobblestone", "cobblestone"}, {"coal", "coal"}, {"iron", "iron"}, {"diamond", "diamonds"}};
+			int[] n = {it.getOrDefault("log", 0), it.getOrDefault("cobblestone", 0), coal, iron, it.getOrDefault("diamond", 0)};
+			for (int i = 0; i < n.length; i++) if (n[i] > 0) out.add(n[i] + " " + (n[i] == 1 && !kinds[i][0].equals("cobblestone") ? kinds[i][0] : kinds[i][1]));
+			int food = it.getOrDefault("food", 0);
+			out.add(food == 0 ? "no food" : food + " food");
+			if (hasBed()) out.add("a bed");
+			return String.join(", ", out);
 		}
 
 		@Override public float danger() {

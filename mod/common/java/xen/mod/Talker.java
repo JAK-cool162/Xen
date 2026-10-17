@@ -71,8 +71,11 @@ final class Talker {
 	}
 
 	boolean busy() {
-		return !lines.isEmpty() || asked != null && now() < askedUntil;
+		return !lines.isEmpty() || waitingTalk || asked != null && now() < askedUntil;
 	}
+
+	/** XenTalk is working out a chat (on its own thread): who with, and the chat starts when it's done. */
+	private boolean waitingTalk;
 
 	/** Players (not Xens) within this distance hear it. */
 	private List<ServerPlayer> listeners(double distance) {
@@ -113,6 +116,18 @@ final class Talker {
 			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.talkative()) * (0.7f + 0.6f * random.nextFloat())));
 			String r = random.nextFloat() < (FAST ? 0.7f : 0.35f) ? question() : null;
 			boolean asking = r != null;
+			if (r == null && c.mod.config.xentalk && xen.mod.talk.XenTalk.get() != null && random.nextFloat() < 0.5f) {   // its own talk model, a moment later
+				anyoneSpoke = now;
+				String facts = xen.mod.talk.XenTalk.facts(c.me, "", 0, "");
+				xen.mod.talk.XenTalk.ask(facts, own -> c.server.execute(() -> {
+					if (own == null || c.player == null || lastRemark != null && xen.mod.talk.XenTalk.samey(own, lastRemark) || !c.fresh(own)) return;   // (the same thing again: keeps it to itself)
+					c.mod.lastRemarkAt = System.currentTimeMillis();
+					lastRemark = own;
+					c.journal("thinks", "xentalk: " + own);
+					sayNear(own);
+				}));
+				return;
+			}
 			if (r == null && random.nextFloat() < 0.65f) r = c.banter.event("idle", null);   // (said the way a player would, from what's true of it now)
 			if (r == null) r = random.nextFloat() < 0.08f ? c.voice.remark() : remark();   // (now and then something in its own words)
 			if (r == null) r = remark();
@@ -326,13 +341,48 @@ final class Talker {
 			o.talker.lastWith.put(c.name, now);
 			o.talker.nextXenTalk = now + 1200;
 			nextXenTalk = now + 1200;
-			converse(o, now);
+			if (c.mod.config.xentalk && xen.mod.talk.XenTalk.get() != null) talkFirst(o);   // (its own talk model: worked out first, off the server's thread)
+			else converse(o, now, null);
 			return;
 		}
 	}
 
+	/**
+	 * XenTalk works the free part of the chat out first: what each says to the other, turn by turn, from what's true
+	 * for each (taken now, on the server's thread) and what the other just said; then the chat starts.
+	 */
+	private void talkFirst(Companion o) {
+		waitingTalk = true;
+		o.talker.waitingTalk = true;
+		String fa = xen.mod.talk.XenTalk.facts(c.me, o.name, c.trust(o.player().getUUID()), ""), fb = xen.mod.talk.XenTalk.facts(o.me, c.name, o.trust(c.player.getUUID()), "");
+		float keen = 0.7f + 0.3f * (c.personality.chattiness + o.personality.chattiness) / 2;
+		int turns = 1;
+		for (float k = keen; turns < 8 && random.nextFloat() < k; turns++) k *= 0.8f;
+		final int n = Math.max(2, turns);
+		var model = xen.mod.talk.XenTalk.get();
+		xen.mod.talk.XenTalk.async(() -> {
+			List<String> said = new ArrayList<>();
+			String last = "";
+			Random r = new Random();
+			for (int i = 0; i < n; i++) {
+				String f = (i % 2 == 0 ? fa : fb) + (last.isEmpty() ? "" : "|heard=" + last.toLowerCase(Locale.ROOT).replace('|', ',').replace('=', ' '));
+				String text = model.reply(f, r);
+				if (text == null || said.stream().anyMatch(s -> xen.mod.talk.XenTalk.samey(s, text))) break;   // (nothing new to say: the chat ends)
+				said.add(text);
+				last = text;
+			}
+			return said;
+		}).whenComplete((said, err) -> c.server.execute(() -> {
+			waitingTalk = false;
+			o.talker.waitingTalk = false;
+			if (c.player == null || o.player() == null || o.inArena || c.inArena) return;
+			if (err == null && said != null && !said.isEmpty()) c.journal("thinks", "xentalk: a chat with " + o.name + ": " + String.join(" / ", said));
+			converse(o, now(), err == null && said != null && !said.isEmpty() ? said : null);
+		}));
+	}
+
 	/** A short chat: hello, what they're up to, a tip (which the other one learns), a thank-you. */
-	private void converse(Companion o, long now) {
+	private void converse(Companion o, long now, List<String> ownWords) {
 		UUID them = o.player().getUUID(), me = c.player.getUUID();
 		boolean met = c.trust.containsKey(them);
 		long t = now;
@@ -350,7 +400,13 @@ final class Talker {
 			}
 		}
 		t = c.intent.chat(o, t, this::line);                                  // what they're really up to: how it went, why, what one needs, going together
-		if (random.nextFloat() < 0.85f) {                                      // a chat in their own words, as long as they both have something to say
+		if (ownWords != null) {                                                 // XenTalk's lines, turn by turn
+			Companion a = c;
+			for (String text : ownWords) {
+				line(a, text, t += 45 + random.nextInt(25), null);
+				a = a == c ? o : c;
+			}
+		} else if (random.nextFloat() < 0.85f) {                               // a chat in their own words, as long as they both have something to say
 			Companion a = c, b = o;
 			String last = null;
 			Set<String> saidHere = new HashSet<>();
