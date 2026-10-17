@@ -1879,6 +1879,13 @@ public final class Companion {
 	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lostDimension;
 	private long lostUntil;
 	private boolean saidGoingBack;
+	/**
+	 * How long its things have really been lying there: dropped things only count down their five minutes while a player
+	 * is close enough to keep that ground going (the server's simulation distance). Away from everyone, they wait.
+	 */
+	private long lostAged, lostAgedAt;
+	/** It found some of its things there (or none: they were gone). */
+	private boolean lostFoundAny;
 
 	/** Back for its things after dying, like a player (before they're gone, and not straight into what killed it). */
 	/** Going back for its things (they're lying where it died)? */
@@ -1894,13 +1901,29 @@ public final class Companion {
 	private Action backForMyThings() {
 		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
 		long now = player.level().getGameTime();
-		if (now > lostUntil || emotions.fear > 0.8f) {
+		if (now - lostAgedAt >= 20) {                                            // (once a second: is the ground there going?)
+			if (lostThingsTicking()) lostAged += now - lostAgedAt;
+			lostAgedAt = now;
+		}
+		if (now > lostUntil || lostAged >= 5800 || emotions.fear > 0.8f) {
 			lostAt = null;
 			saidGoingBack = false;
 			return null;
 		}
+		double far = Vec3.atCenterOf(lostAt).distanceTo(player.position());
+		if (player.level().isDarkOutside() && player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && far > 12 && !hands.hasWeapon()) {   // night, nothing to fight with: dug in until morning, then back for them
+			goals.instant = "waiting for morning to go back for its things";
+			if (!chores.sheltered() && chores.digIn() != null) {
+				chores.own = true;
+				journal("thinks", String.format(java.util.Locale.ROOT, "night, no weapon, its things %.0f blocks off: digs in and goes back in the morning (%s)",
+						far, lostThingsTicking() ? "they'll be gone by then if someone's near them" : "nobody's near them, so they'll wait"));
+				chatter(pick3("Not going back out there in the dark. Morning.", "I'll get my stuff when it's light.", "Digging in. My things can wait till morning."), true);
+				return chores.next();
+			}
+			return null;
+		}
 		if (goals.outAtNight() && !hands.hasWeapon() && player.level().canSeeSky(lostAt.above())     // night, out in the open, no sword: a tip comes to mind (its call)
-				&& tips.take(Tips.Tip.NO_SWORD_NIGHT, 0.4f + (diedOf.isEmpty() || diedOf.contains("fall") ? 0 : 0.3f) + 0.2f * Math.min(1, (float) (Vec3.atCenterOf(lostAt).distanceTo(player.position()) / 64)),
+				&& tips.take(Tips.Tip.NO_SWORD_NIGHT, 0.4f + (diedOf.isEmpty() || diedOf.contains("fall") ? 0 : 0.3f) + 0.2f * Math.min(1, (float) (far / 64)),
 						"no sword, night, its things out where it died" + (diedOf.isEmpty() ? "" : " (" + diedOf + ")"), 600)) {
 			goals.instant = "waiting for morning to go back for its things";
 			return null;
@@ -1923,6 +1946,7 @@ public final class Companion {
 					lostItemNext = lostItem;
 					break;
 				}
+				lostFoundAny = true;
 				double score = pickValue(item.getItem()) / (1 + 0.25 * item.distanceTo(player));   // its best things first, then the nearest
 				if (target == null || score > bestScore) {
 					target = item.position();
@@ -1935,7 +1959,7 @@ public final class Companion {
 			if (target == null) {
 				lostAt = null;
 				saidGoingBack = false;
-				chatter("Got my things back!", true);
+				chatter(lostFoundAny ? "Got my things back!" : pick3("My stuff's gone. Starting over.", "Nothing left. Oh well.", "Gone. Should've been quicker."), true);
 				note(diedOf.isEmpty() ? "I died here. Careful." : "I died here (" + diedOf + "). Careful.");   // (a sign for whoever comes by)
 				return null;
 			}
@@ -1954,6 +1978,18 @@ public final class Companion {
 			return null;
 		}
 		return walkTo(target);
+	}
+
+	/** Is the ground its things lie on going (a player, a Xen too, within the server's simulation distance of it)? */
+	private boolean lostThingsTicking() {
+		var server = ((net.minecraft.server.level.ServerLevel) player.level()).getServer();
+		double reach = (server.getPlayerList().getSimulationDistance() + 1) * 16.0;
+		for (var other : server.getPlayerList().getPlayers()) {
+			if (other.level().dimension() != lostDimension) continue;
+			double dx = other.getX() - lostAt.getX(), dz = other.getZ() - lostAt.getZ();
+			if (Math.max(Math.abs(dx), Math.abs(dz)) <= reach) return true;
+		}
+		return false;
 	}
 
 	/** Armor it made or found: on, like a player shift-clicking it in the inventory (the better piece if it has two). */
@@ -3428,7 +3464,10 @@ public final class Companion {
 		lostAt = gone || inArena || again ? null : here;              // its things are lying there: back for them after
 		saidGoingBack = false;
 		lostDimension = player.level().dimension();
-		lostUntil = player.level().getGameTime() + 5200;              // (items last five minutes)
+		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
+		lostAged = 0;
+		lostAgedAt = player.level().getGameTime();
+		lostFoundAny = false;
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
 		if (hardcore() && !inArena) {                                 // one life: that was it
 			goneHow = source.getLocalizedDeathMessage(player).getString();

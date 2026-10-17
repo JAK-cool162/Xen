@@ -133,10 +133,12 @@ final class Gut {
 			last = null;
 			return null;
 		}
+		float danger = c.ex1Out == null ? 0f : c.ex1Out.danger;
+		Action refuge = refuge(danger);                                          // it knows what's coming, out in the dark: it digs in
+		if (refuge != null) return refuge;
 		float[] all = c.mod.brain.fears(c.perceived);
 		float[] fear = new float[MOVES.length];
 		for (int i = 0; i < MOVES.length; i++) fear[i] = all[MOVES[i].ordinal()];
-		float danger = c.ex1Out == null ? 0f : c.ex1Out.danger;
 		Action move = weigh(fear, danger, c.personality.cautionScale());
 		if (DEBUG && p.tickCount % 20 == 0) {
 			c.journal("gut", String.format(java.util.Locale.ROOT, "feels: stay %.2f on %.2f back %.2f left %.2f right %.2f jump %.2f, danger %.0f%% -> %s",
@@ -238,11 +240,41 @@ final class Gut {
 	 * reason it goes on anyway, or null: the gut wins (most of the time, more so the surer the gut and the more it
 	 * trusts it). A weighed chance, not a rule: the same Xen in the same spot may go either way.
 	 */
+	/**
+	 * Its gut knows what's coming (Ex1 sees a hit on its way, or it's hurt with monsters about, or there are many) and it's
+	 * dark out with nowhere safe: it digs in now, whatever it was doing. The one time the gut has the keys, as a player's
+	 * would. Not with a monster right on it (digging takes a moment: the fight, or getting away, comes first), not in water,
+	 * not if it's in a shelter (or making one) already.
+	 */
+	private Action refuge(float danger) {
+		var p = c.player;
+		var level = p.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD || !level.isDarkOutside() || p.isInWater() || c.chores.sheltered()
+				|| c.commandedTo != null || c.mode == Companion.Mode.FOLLOW) return null;
+		int near = 0;
+		double closest = 99;
+		for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(12),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+			near++;
+			closest = Math.min(closest, m.distanceTo(p));
+		}
+		boolean coming = danger >= 0.6f || near > 0 && p.getHealth() <= 10 || near >= 3;
+		if (!coming || closest < 3.5) return null;
+		String plan = c.chores.digIn();
+		if (plan == null) return null;
+		c.chores.own = true;
+		c.journal("gut", String.format(java.util.Locale.ROOT, "its gut knows what's coming (danger %.0f%%, %d monsters within 12, %.0f health): digs in until morning",
+				100 * danger, near, p.getHealth()));
+		XenMod.LOG.info("{} digs in for the night: its gut knows what's coming ({} monsters near, {} health)", c.name, near, Math.round(p.getHealth()));
+		c.chatter(c.pick3("Nope. Digging in till morning.", "Not out here in the dark. Hiding!", "I'm getting underground. Now."), false);
+		return c.chores.next();
+	}
+
 	private String argue(Action move, float[] fear, float danger) {
 		var p = c.player;
 		var pe = c.personality;
 		if (faith < 0) faith = Math.max(0.2f, Math.min(0.9f, 0.55f + 0.25f * (pe.cautionScale() - 1f)));
-		if (danger >= DREAD && p.getHealth() < 10) return null;                 // (scared and hurt: no arguing)
+		if (danger >= DREAD || danger >= 0.5f && p.getHealth() < 12) return null;   // (a hit it can see coming, or hurt and scared: no coin flip, the gut has it)
 		arguments++;
 		float keep = Math.max(fear[0], fear[1]), low = fear[0];
 		for (float f : fear) low = Math.min(low, f);

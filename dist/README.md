@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.36
+# Xen Companion (Fabric mod) 2.0.0-beta.37
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.36+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.36+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.37+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.37+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.36+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.37+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -157,6 +157,16 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### Getting through the night (2.0.0-beta.37)
+
+A Xen out in the dark that can tell what's coming (Xen Ex1's danger high, monsters close and its health low, or three
+or more around it) is made to dig in by its gut, whatever it was doing: it digs into the ground or a hillside, closes
+the hole, and waits for morning (mining from there if it has a pickaxe, food and health, then mining up when it's
+light). It also digs in when night catches it outside, weaves left and right running from skeletons, and after dying
+at night without a weapon it waits for the day before going back for its things (items only age while a player keeps
+their ground running, so it counts only that time). In a test of 6 Xens over 2 game days: 8 deaths, against 21 in
+2.0.0-beta.36, and 3 Xens alive the whole time, against 1.
 
 ### Xen Ex1 v4: learned from a player's endgame play (2.0.0-beta.36)
 

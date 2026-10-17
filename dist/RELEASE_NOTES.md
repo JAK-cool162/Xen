@@ -1,7 +1,35 @@
-**Xen Companion 2.0.0-beta.36**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.37**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.37: Xens get through the night
+
+* **Its gut can make it dig in.** Out in the dark when it can tell a hit is coming (Ex1's danger high, or monsters
+  close with its health low, or three or more around it), a Xen doesn't wait for the next decision or a coin flip: it
+  digs into the ground or the hillside, closes the hole behind it, and waits for the day. With a pickaxe, food and
+  health it mines from there through the night, then mines its way up when it's light. When danger is that high its
+  gut also wins every argument with its plan.
+* **Caught outside after dark, it digs in** instead of trying to build a hut it has no time for.
+* **Zig-zag.** Running from a skeleton or anything else that shoots, it weaves left and right every third of a second.
+* **Its things can wait till morning.** After dying at night without a weapon, it doesn't run back into the dark for
+  its things (that's how one Xen died 13 times in a row in the last test): it digs in where it is and goes back when
+  it's light. Items left on the ground only age while a player is close enough to keep that ground running (the
+  server's simulation distance), so the Xen counts only that time against the 5 minutes they last, and knows when
+  they're really gone.
+* **Measured** (6 Xens, 2 game days, the same world seed, one run each, so luck plays a part):
+
+  | | 2.0.0-beta.36 | 2.0.0-beta.37 |
+  |---|---|---|
+  | deaths | 21 (18 at night) | **8** (all at night) |
+  | Xens alive the whole 2 days | 1 | **3** |
+  | Acquire Hardware (iron) | 1 | **2** |
+  | iron pickaxe | 0 | **1** |
+  | iron on hand at the end | 0 | **11** |
+  | dug in for the night | 0 | 10 (8 by its gut, 2 waiting to go back for its things) |
+  | time per game tick | 14 to 21 ms | 15 to 18 ms |
+
+  One Xen still died 4 times, and no one got diamonds or went to the Nether in 2 days.
 
 ### 2.0.0-beta.36: Xen Ex1 v4, learned from a player's endgame play
 

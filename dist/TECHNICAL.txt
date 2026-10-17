@@ -1,7 +1,38 @@
-XEN COMPANION 2.0.0-beta.36: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.37: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.37
+===========================
+
+Gut.refuge (checked first in Gut.override): in the overworld, dark outside, not in water, not already in a shelter, not
+told to do something and not following: with Enemy mobs within 12 blocks, if Ex1's danger >= 0.6, or one is near and
+health <= 10, or three or more are near, and the closest is at least 3.5 blocks off (closer, fighting or running is
+better than turning its back to dig), it starts Chores.digIn() as its own chore and acts on it at once. Gut.argue: the
+gut wins outright when danger >= 0.8 (DREAD), or danger >= 0.5 with health under 12 (before: only DREAD with health
+under 10; anything else was a weighted coin flip).
+
+Chores.digIn: the dugout (into a hillside, when none of its blocks is too slow to mine with what's in hand), else a pit
+two deep and covered over at its feet or up to 2 blocks off, kept until it's light and 1200 ticks have passed; the
+existing night rule (mineFromShelter: pickaxe, health >= 12, food >= 8) mines from it. Chores.shelter digs in first when
+it's already dark (the hut was being started at dusk and never finished). Chores.sheltered(): in a SHELTER or HIDE
+chore.
+
+Fighter.weave: running from a shooter in sight (and in runFrom, from a kind that shoots), the run direction turns 30
+degrees one way and then the other, every 7 ticks.
+
+Companion.backForMyThings: dark, in the overworld, more than 12 blocks from its things and no weapon: it waits for
+morning (digs in if it isn't sheltered). Items age only within the simulation distance of a player (and despawn at
+6000 ticks of age), so lostThingsTicking() counts the ticks a player of the same dimension is within (simulation
+distance + 1) chunks of where it died, and it gives up at 5800 of those (as before, also after 72000 ticks or when
+fear > 0.8). "Got my things back!" only if it saw one of them.
+
+Test (prog_test.sh: 6 Xens, 2 game days, seed 20261014, tick rate 40, one run each), 2.0.0-beta.36 / .37: deaths 21 /
+8 (at night 18 / 8), alive both days 1 / 3, Acquire Hardware 1 / 2, Isn't It Iron Pick 0 / 1, iron held at the end 0 /
+11, Stone Age and Getting an Upgrade 6 / 6, Monster Hunter 5 / 5, Sweet Dreams 2 / 1; the gut dug in 8 times, the night
+wait after a death 2; ms per tick 14.4-20.9 / 15.4-18.3; no exceptions.
 
 
 WHAT'S NEW IN 2.0.0-beta.36

@@ -388,12 +388,13 @@ final class Fighter {
 			h.lowerShield();
 			if (d > (outmatched ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);
-			LivingEntity shooter = outmatched ? shooterInSight() : null;     // one shooting at it: out of its sight, not just away (it'd be shot in the back)
-			if (shooter != null) {
+			LivingEntity shooter = shooterInSight();                           // one shooting at it: out of its sight, not just away (it'd be shot in the back)
+			if (shooter != null && outmatched) {
 				Action cover = takeCover(shooter);
 				if (cover != null) return cover;
 			}
 			Vec3 dir = escapeDir(foe);
+			if (shooter != null) dir = weave(dir);                              // zig-zag: an arrow aimed where it was going misses
 			if (outmatched && clearRun(dir)) return runAlong(dir, sprintable);   // a clear way: just sprint off (no time to work out a way)
 			return c.walkTo(p.position().add(dir.scale(8)));
 		}
@@ -631,11 +632,18 @@ final class Fighter {
 		return c.walkTo(Vec3.atBottomCenterOf(cover));
 	}
 
+	/** The way it runs, turned 30 degrees one way, then the other, every third of a second: a zig-zag, like a player dodging arrows. */
+	private Vec3 weave(Vec3 dir) {
+		double a = (c.player.tickCount / 7 % 2 == 0 ? 1 : -1) * 0.52, cos = Math.cos(a), sin = Math.sin(a);
+		return new Vec3(dir.x * cos - dir.z * sin, dir.y, dir.x * sin + dir.z * cos);
+	}
+
 	/** Turn its back on it and sprint away (jumping up a step if one is in the way): no pathfinding, no time lost. */
 	private Action runFrom(LivingEntity foe, boolean sprintable) {
 		Vec3 away = c.player.position().subtract(foe.position()).multiply(1, 0, 1);
 		if (away.lengthSqr() < 1e-4) away = new Vec3(1, 0, 0);
-		return runAlong(away.normalize(), sprintable);
+		away = away.normalize();
+		return runAlong(shoots(kind(foe)) ? weave(away) : away, sprintable);   // (from one that shoots: zig-zag)
 	}
 
 	/** Sprint that way (jumping up a step if one is in the way). */

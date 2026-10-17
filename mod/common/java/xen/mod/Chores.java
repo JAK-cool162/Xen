@@ -389,6 +389,10 @@ final class Chores {
 		BlockPos feet = c.player.blockPosition();
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (!c.player.onGround()) return "You can't build a shelter because you are not standing on the ground.";
+		if (level.isDarkOutside() && !build.equals("fort")) {                 // dark already: no time for a hut (they took too long and fell through); dig in
+			String quick = digIn();
+			if (quick != null) return quick;
+		}
 		if (c.crafter.pickTier() >= 1 || c.crafter.canMake(1)) {               // a hill right here: dig in, like a player's first night
 			List<BlockPos> tunnel = dugoutPlan(level, feet);
 			if (tunnel != null) {
@@ -542,6 +546,56 @@ final class Chores {
 			if (grounded) return plan;
 		}
 		return null;
+	}
+
+	/**
+	 * Dig in, now: into the hill beside it, or a hole two deep under it (or a step away) with a block over its head, and
+	 * there it waits for the morning. The quick shelter: no blocks needed, nothing to build. Null: no ground here it can
+	 * dig (or it's sheltering already).
+	 */
+	String digIn() {
+		if (sheltered()) return null;
+		BlockPos feet = c.player.blockPosition();
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (!c.player.onGround() || c.player.isInWater()) return null;
+		List<BlockPos> tunnel = dugoutPlan(level, feet);
+		if (tunnel != null && tunnel.stream().noneMatch(c.hands::tooSlowToMine)) {
+			begin(Kind.SHELTER);
+			dugout = tunnel;
+			walls = List.of();
+			shape = "dugout";
+			waited = 0;
+			resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+			c.mode = Companion.Mode.STAY;
+			until = now() + 20 * 60;
+			return "You will dig into the hill here for the night and seal the way in behind you.";
+		}
+		for (int r = 0; r <= 2; r++) {                                          // under it, or a step or two away
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+					BlockPos spot = feet.offset(dx, 0, dz);
+					if (!level.getBlockState(spot).getCollisionShape(level, spot).isEmpty() || !level.getFluidState(spot).isEmpty()) continue;
+					List<BlockPos> hole = pitPlan(level, spot);
+					if (hole == null) continue;
+					begin(Kind.SHELTER);
+					pit = hole;
+					walls = List.of();
+					shape = "hole";
+					waited = 0;
+					resume = c.mode == Companion.Mode.STAY ? null : c.mode;
+					c.mode = Companion.Mode.STAY;
+					until = now() + 20 * 60;
+					return "You will dig a hole two deep here and put a block over your head until morning.";
+				}
+			}
+		}
+		return null;
+	}
+
+	/** In a shelter, or making one, for the night. */
+	boolean sheltered() {
+		return kind == Kind.SHELTER || kind == Kind.HIDE;
 	}
 
 	/** A hole two deep under its feet (dug straight down, rock or dirt all round, a floor under it); null if not here. */
