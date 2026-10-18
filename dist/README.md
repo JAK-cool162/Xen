@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.39
+# Xen Companion (Fabric mod) 2.0.0-beta.40
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -12,8 +12,8 @@ learned mind that weighs what it wants against what it fears (below).
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.39+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.39+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.40+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.40+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -73,7 +73,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.39+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.40+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -157,6 +157,13 @@ ownerless Xens from `/xen spawn`). Anyone can chat with it.
 
 How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
 later", is talk too). `/xen status` shows what it's doing right now.
+
+### Xen Ex1 v5 and the cabin palette (2.0.0-beta.40)
+
+Ex1 learned from 55 more minutes of a player's light recordings (F8): building a house. On held-out building play it
+gets the forward key right 89% of the time (79% before) and sprinting 99.5% (84%), and plays about the same as before
+on everything else. Their house is a new palette, **cabin** (oak plank walls in a spruce log frame, a deepslate tile
+roof, spruce trim, lanterns), which Xens building a designed house pick in forests, taiga, snowy places and the plains.
 
 ### Focus: Xens keep their eye on the goal (2.0.0-beta.39)
 

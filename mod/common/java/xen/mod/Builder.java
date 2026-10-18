@@ -758,14 +758,14 @@ final class Builder {
 		if (biome.contains("cherry")) return new String[] {"cherry"};
 		if (biome.contains("swamp") || biome.contains("mangrove")) return new String[] {"swamp"};
 		if (biome.contains("snow") || biome.contains("frozen") || biome.contains("ice") || biome.contains("grove") || biome.contains("peaks")) {
-			return new String[] {"spruce", "stone"};
+			return new String[] {"spruce", "stone", "cabin"};
 		}
-		if (biome.contains("taiga") || biome.contains("dark_forest")) return new String[] {"autumn", "spruce", "medieval"};
+		if (biome.contains("taiga") || biome.contains("dark_forest")) return new String[] {"autumn", "spruce", "medieval", "cabin"};
 		if (biome.contains("jungle")) return new String[] {"teal", "autumn"};
 		if (biome.contains("savanna")) return new String[] {"autumn", "desert"};
 		if (biome.contains("birch")) return new String[] {"birch", "teal"};
-		if (biome.contains("forest")) return new String[] {"autumn", "medieval", "oak"};
-		return new String[] {"oak", "medieval", "teal", "stone", "autumn"};
+		if (biome.contains("forest")) return new String[] {"autumn", "medieval", "oak", "cabin"};
+		return new String[] {"oak", "medieval", "teal", "stone", "autumn", "cabin"};
 	}
 
 	/**

@@ -79,6 +79,10 @@ final class Architect {
 				"spruce_door", "spruce_fence", "spruce_trapdoor", "lantern"));
 		PALETTES.put("cherry", new Palette("cherry", "calcite", "dark_oak_log", "stone_bricks", "cherry", "cherry_planks", "glass_pane",
 				"cherry_door", "cherry_fence", "cherry_trapdoor", "lantern"));
+		// a player's own house (from their recording, 2.0.0-beta.40): oak walls in a spruce log frame, a deepslate tile
+		// roof trimmed with spruce, spruce floor, doors and trapdoors, lanterns
+		PALETTES.put("cabin", new Palette("cabin", "oak_planks", "spruce_log", "spruce_log", "deepslate_tile", "spruce_planks", "glass_pane",
+				"spruce_door", "spruce_fence", "spruce_trapdoor", "lantern"));
 		PALETTES.put("swamp", new Palette("swamp", "mud_bricks", "mangrove_log", "cobblestone", "mangrove", "mangrove_planks", "glass_pane",
 				"mangrove_door", "mangrove_fence", "mangrove_trapdoor", "lantern"));
 	}

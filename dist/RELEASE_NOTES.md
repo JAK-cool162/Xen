@@ -1,7 +1,25 @@
-**Xen Companion 2.0.0-beta.39**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.40**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen only knows what it can see and only acts through a player's
 controls.
+
+### 2.0.0-beta.40: Xen Ex1 v5, learned from a player building a house
+
+* **Ex1 v5.** Ex1 (how a person moves, turns and looks, and when a hit is coming) learned from 55 more minutes of a
+  player's recordings (the light F8 kind): building a house from scratch, 2,231 blocks placed and 1,059 broken. On
+  held-out play it never trained on (the same network trained without those recordings, against with them):
+  * building: forward key 79.2% -> **89.1%**, sprint 84.3% -> **99.5%**, attack 96.6% -> 97.5%, where it looks next
+    11.3 -> 11.0 deg off.
+  * the older recordings (mining, fights, an XP farm, elytra): forward 92.9% -> 92.5%, attack 92.9% -> 93.9%, seeing a
+    hit coming 0.890 -> 0.884 (AUC), where it looks 7.9 -> 8.0 deg: about the same.
+  * In a world (6 Xens, 2 game days, the same test as before; one run): 10 deaths (12 the run before), the gut dug in 12
+    times, 54% of their choices came to something (55%), Acquire Hardware, Isn't It Iron Pick, Sweet Dreams and A
+    Seedy Place 1 each: about the same, as it should be (it's how a person moves while building it learned).
+* **A new house palette, "cabin", from that player's house**: oak plank walls in a spruce log frame, a deepslate tile
+  roof trimmed with spruce stairs, spruce floor, doors and trapdoors, glass panes, lanterns. Xens building a designed
+  house (creative, or upgrading theirs) pick it in forests, taiga, snowy places and the plains. (Survival Xens still
+  build with the wood they have.) The house itself could be read back from the recording (where each block went:
+  about 1,190 placements) but not which way each stair faces, so it's the materials it learned, not a copy.
 
 ### 2.0.0-beta.39: Focus (Xens keep their eye on the goal), and they swear like players
 

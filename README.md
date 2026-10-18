@@ -221,8 +221,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.39+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.39+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.40+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.40+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 

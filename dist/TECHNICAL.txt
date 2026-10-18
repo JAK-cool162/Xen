@@ -1,7 +1,33 @@
-XEN COMPANION 2.0.0-beta.39: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.40: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.40
+===========================
+
+Ex1 v5 (assets/xen/ex1.json): python -m xen.ex1.train recordings/*.jsonl recordings/player/session_*
+recordings/player/play_*.jsonl.gz: v4's data plus two of a player's light recordings (play_*.jsonl.gz, GameplayLog
+format 1.2.0; 38.2 and 16.9 minutes, a house: 2,231 blocks placed, 1,059 broken, no hurts). 40,496 frames (965 just
+before a hurt), 10,140 held out (the last fifth of each recording). Same network and training (119 -> 64 -> 64, four
+heads, 25 epochs, seed 7). Held out, trained without / with the new recordings: building forward 0.792 / 0.891, sprint
+0.843 / 0.995, attack 0.966 / 0.975, sneak 0.996 / 1.000, jump 0.965 / 0.964, pitch error 11.3 / 11.0 deg, yaw 0.564 /
+0.564; older play forward 0.929 / 0.925, sprint 0.724 / 0.716, attack 0.929 / 0.939, jump 0.909 / 0.911, pitch error
+7.9 / 8.0 deg, danger AUC 0.890 / 0.884 (302 hurts). All held out together: danger AUC 0.908. CrossCheck: 6 frames
+like Python (max difference 5.4e-06).
+
+Architect.PALETTES "cabin": wall oak_planks, frame spruce_log, base spruce_log, roof deepslate_tile, floor
+spruce_planks, window glass_pane, door spruce_door, fence spruce_fence, trapdoor spruce_trapdoor, light lantern; from
+the same recordings: each "use" event against the state before it (looking_at pos + face, at most 5 ticks earlier)
+gives where the block went (758 + 429 positions; 33 without a block in view), the materials by count (oak_planks 666,
+spruce_log 423, spruce_stairs 209, deepslate_tiles 209, deepslate_tile_stairs 165, shelves 161, ...). Block states
+(stairs facing) aren't in the light recording. Builder.paletteFor: snowy places, taiga and dark forest, forest and the
+default list include it.
+
+Tests: prog_test (6 Xens, 2 game days, seed 20261014, tick rate 40): 10 deaths (5, 2, 2, 1), 12 gut dig-ins, 59 choices,
+54% came to something (mine 17 at 41%, stone 10 at 60%, wood 13 at 92%, food 7 at 43%), Stone Age 5, Getting an Upgrade
+5, Monster Hunter 3, Acquire Hardware 1, Isn't It Iron Pick 1, Sweet Dreams 1, A Seedy Place 1; 7.9-13.0 ms a tick.
 
 
 WHAT'S NEW IN 2.0.0-beta.39
