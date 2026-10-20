@@ -321,6 +321,41 @@ final class Hunch {
 		return best;
 	}
 
+	/**
+	 * Hunting, and none in sight: where the animals are, exactly (luck: the server knows), the best herd within 128
+	 * blocks (sheep, if it's after wool), or null (luck off, none about). Always when it needs food: it goes straight there.
+	 */
+	BlockPos animalsAt(boolean sheep) {
+		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return null;
+		var p = c.player;
+		BlockPos best = null;
+		double bestScore = 0;
+		Map<Long, int[]> cells = new HashMap<>();
+		for (var a : p.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, p.getBoundingBox().inflate(128, 40, 128),
+				x -> x.isAlive() && !x.isBaby() && Chores.food(x) && (!sheep || x instanceof net.minecraft.world.entity.animal.sheep.Sheep))) {
+			long cell = ((long) (a.getBlockX() >> 4) << 32) ^ ((a.getBlockZ() >> 4) & 0xffffffffL);
+			int[] k = cells.computeIfAbsent(cell, q -> new int[] {0, a.getBlockX(), a.getBlockY(), a.getBlockZ()});
+			k[0]++;
+		}
+		for (int[] k : cells.values()) {
+			BlockPos at = new BlockPos(k[1], k[2], k[3]);
+			double score = Math.min(4, k[0]) / (1 + Math.sqrt(at.distSqr(p.blockPosition())) / 32);   // (more of them, and nearer)
+			if (score > bestScore) {
+				bestScore = score;
+				best = at;
+			}
+		}
+		if (best == null) return null;
+		if (toward == null || toward.distSqr(best) > 24 * 24) {
+			times++;
+			XenMod.LOG.info("{}'s luck: {} at {}", c.name, sheep ? "sheep" : "animals", best.toShortString());
+		}
+		toward = best;
+		steered = sheep ? "sheep (where they are)" : "animals (where they are)";
+		steeredAt = p.level().getGameTime();
+		return best;
+	}
+
 	/** Hunting and no animals in sight: which way it happens to wander to look for some (radians), or NaN: no luck this time. */
 	double animalWay() {
 		if (c.player == null || !lucky()) return Double.NaN;

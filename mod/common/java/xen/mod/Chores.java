@@ -2652,8 +2652,28 @@ final class Chores {
 		return false;
 	}
 
+	/** Its wander is where it has a feeling the animals are (luck), not just somewhere new. */
+	private boolean herdHunch;
+
 	/** Knows of nothing to go for: look all around (its view is only 90 degrees), then walk somewhere new. */
 	private Action lookAround() {
+		if (kind == Kind.HUNT && (wander == null || now() > wanderUntil || c.player.position().distanceTo(wander) < 3)) {   // luck: it knows where the animals are, and goes straight there
+			BlockPos herd = c.hunch.animalsAt(forWool);
+			if (herd != null && !herd.closerThan(c.player.blockPosition(), 6)) {
+				if (wander == null || wander.distanceTo(Vec3.atBottomCenterOf(herd)) > 8)
+					c.journal("thinks", String.format(java.util.Locale.ROOT, "has a feeling there are %s at %d %d %d (%.0f blocks): goes there", forWool ? "sheep" : "animals",
+							herd.getX(), herd.getY(), herd.getZ(), Math.sqrt(herd.distSqr(c.player.blockPosition()))));
+				wander = Vec3.atBottomCenterOf(herd);
+				wanderUntil = now() + 20 * 60;
+				scans = 0;
+				herdHunch = true;
+			} else herdHunch = false;
+		}
+		if (kind == Kind.HUNT && herdHunch && wander != null && now() <= wanderUntil) {
+			doing = forWool ? "going to the sheep it has a feeling about" : "going to the animals it has a feeling about";
+			c.run(c.player.position().distanceTo(wander) > 20);
+			return c.walkTo(wander);
+		}
 		if (scans < 4) {
 			scans++;
 			if (c.hands.pitch != 0) return c.hands.pitch > 0 ? Action.LOOK_DOWN : Action.LOOK_UP;
@@ -2665,6 +2685,7 @@ final class Chores {
 			double a = Double.isNaN(lucky) ? random.nextDouble() * Math.PI * 2 : lucky;
 			wander = here.add(Math.cos(a) * 24, 0, Math.sin(a) * 24);
 			wanderUntil = now() + 400;
+			herdHunch = false;
 			if (scans++ > 4) scans = 0;                                  // and look around again when it gets there
 		}
 		return c.walkTo(wander);
