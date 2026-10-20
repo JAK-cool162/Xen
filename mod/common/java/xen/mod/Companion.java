@@ -4834,6 +4834,21 @@ public final class Companion {
 				"made a shelter", "slept", "worked on a house", "worked on a farm", "went mining", "smelted my ores", "put my things away", "explored",
 				"traded", "stayed with a friend", "helped out", "kept watch", "fought", "ran from a fight", "went on an adventure", "enchanted my gear"};
 
+		@Override public String whyPlaced() {
+			if (hands.placedAt == null || player.level().getGameTime() - hands.placedWhen > 20 * 120) return "";
+			String i = hands.placedFor;                                           // what it was doing when it put the block down: that's why
+			return i.contains("water") ? "the water was coming in and I'd have drowned or lost my tunnel"
+					: i.contains("lava") ? "there was lava right there"
+					: i.contains("towering") || i.contains("pillar") ? "I needed to get up there and there was no other way up"
+					: i.contains("bridg") ? "there was a gap I had to get over"
+					: i.contains("shelter") || i.contains("hut") || i.contains("night") || i.contains("dugout") || i.contains("fort") ? "night was coming and I needed walls round me"
+					: i.contains("mine entrance") ? "it's the door to my mine, so mobs stay out"
+					: i.contains("craft") || i.contains("table") || i.contains("furnace") ? "I needed it to make something"
+					: i.contains("torch") ? "it was dark, a torch keeps mobs from spawning"
+					: i.contains("build") || i.contains("house") ? "I'm building"
+					: i.isEmpty() ? "" : "I was " + i;
+		}
+
 		@Override public String why() {
 			if (chores.busy() && !chores.own) return askedBy != null ? askedBy.getName().getString() + " asked me to" : "I was asked to";
 			String i = goals.instant;                                             // what an instinct has it doing right now

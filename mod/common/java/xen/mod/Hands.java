@@ -1003,6 +1003,11 @@ public final class Hands {
 		}
 	}
 
+	/** The last block it put down, when, and what it was doing then (its reason, if asked). */
+	BlockPos placedAt;
+	long placedWhen;
+	String placedFor = "";
+
 	boolean placeItem(BlockPos pos, java.util.function.Predicate<ItemStack> item, BlockPos against, Direction side, int facing) {
 		ServerLevel level = (ServerLevel) p.level();
 		if (!level.getBlockState(pos).canBeReplaced()) {
@@ -1044,6 +1049,11 @@ public final class Hands {
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 4;
+		if (!level.getBlockState(pos).canBeReplaced()) {                         // (put down: what it was doing then is why, if it's asked)
+			placedAt = pos.immutable();
+			placedWhen = level.getGameTime();
+			placedFor = p.companion == null || p.companion.goals.instant == null ? "" : p.companion.goals.instant;
+		}
 		cantPlace = level.getBlockState(pos).canBeReplaced() ? "it didn't stay (" + result + ", clicked " + level.getBlockState(against).getBlock()
 				+ " " + side + ", holding " + p.getInventory().getSelectedItem() + ")" : "";
 		return cantPlace.isEmpty();

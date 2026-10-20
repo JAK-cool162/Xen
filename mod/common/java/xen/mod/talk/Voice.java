@@ -75,6 +75,11 @@ public final class Voice {
 			return "";
 		}
 
+		/** Why it put its last block down, as "the water was coming into my tunnel" (empty: it hasn't lately). */
+		default String whyPlaced() {
+			return "";
+		}
+
 		/** What it'll do next, as "get stone for better tools" (empty: no idea). */
 		default String next() {
 			return "";
@@ -878,7 +883,8 @@ public final class Voice {
 	private boolean answer(Heard h, String speaker, List<Sent> out) {
 		switch (h.ask) {
 			case "why" -> {
-				String why = me.why();
+				String placed = h.flat.matches(".* (place|placed|put|block|blocks|dirt|pillar|tower|towered|bridge|build|built|cobble|cobblestone) .*") ? me.whyPlaced() : "";
+				String why = placed.isEmpty() ? me.why() : placed;
 				if (why.isEmpty()) out.add(new Sent(pickOf("no big reason, it just felt right", "why not", "I just felt like it", "honestly? no idea"), false));
 				else out.add(new Sent(pickOf("because ", "well, ", "", "because ") + why, false));
 			}
