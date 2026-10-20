@@ -352,8 +352,8 @@ final class Fighter {
 		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
 		if (c.personality.believes("warrior_never_runs")) retreat = Math.min(retreat, 0.12f);   // (it stands its ground till the very end)
 		if (c.personality.believes("live_to_fight")) retreat = Math.max(retreat, 0.45f);        // (it backs off early and lives)
-		if (!(foe instanceof Player) && !c.inArena)                             // the first rule: never below five hearts against monsters (back off, heal, then again)
-			retreat = Math.max(retreat, c.personality.believes("warrior_never_runs") ? 0.4f : 0.5f);
+		if (!(foe instanceof Player) && !c.inArena)                             // the first rule: don't get low against monsters (back off, heal, then again); how low is its style's call
+			retreat = Math.max(retreat, c.personality.believes("warrior_never_runs") ? Math.min(0.4f, floor()) : floor());
 		if (!(foe instanceof Player) && !c.inArena) {                          // mobs: outnumbered, or in the dark, anyone backs off sooner (most of its deaths were two or three mobs, at night)
 			int mobs = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(10), m -> m.isAlive()).size();
 			float more = Math.min(0.3f, 0.12f * Math.max(0, mobs - 1)) + (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7 ? 0.08f : 0);
@@ -378,7 +378,9 @@ final class Fighter {
 			escapedAt = now;
 		}
 		if (!outmatched && escaping) escaping = false;
-		if (perched || outmatched && canPerch(foe)) {
+		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6),
+				m -> m.isAlive() && m.getTarget() == p).size() >= 2;           // (the terrain is its weapon: two on it, it takes the high ground before it's low)
+		if (perched || (outmatched || crowd) && canPerch(foe)) {
 			Action up = perch(foe, d);
 			if (up != null) return up;
 		}
@@ -394,8 +396,18 @@ final class Fighter {
 		boolean bareInTheDark = !h.hasWeapon() && !(foe instanceof Player) && p.level().isDarkOutside() && !(foe instanceof net.minecraft.world.entity.monster.Creeper)
 				&& expected(foe) > p.getHealth() * 0.4f;                       // (just respawned at night with nothing, say: fists against a zombie is how it died)
 		boolean desperate = !c.inArena && !c.skills.sparringWith(foe.getUUID()) && (p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal()) || bareInTheDark);
-		if (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
-			if (!fleeing && !c.inArena) c.chatter(c.personality.say("flee"), false);
+		boolean finishing = !(foe instanceof Player) && !desperate && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && d <= p.entityInteractionRange() + 0.5
+				&& p.getHealth() >= 6 && foe.getHealth() <= hitNow() && p.getAttackStrengthScale(0.5f) >= 0.8f;   // nearly dead and in reach: it takes the hit to finish it (a trade worth making)
+		if (finishing && (health < retreat || outmatched) && now - saidWhyAt > 100) {
+			saidWhyAt = now;
+			c.journal("fight", String.format(java.util.Locale.ROOT, "takes a hit to finish the %s (%.0f health left on it, %.0f on itself)", kind(foe).replace('_', ' '), foe.getHealth(), p.getHealth()));
+		}
+		if (!finishing && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f))) {
+			if (!fleeing && !c.inArena) {
+				c.chatter(c.personality.say("flee"), false);
+				c.journal("fight", String.format(java.util.Locale.ROOT, "backs off at %.0f health (%s: keeps %.0f in hand)%s", p.getHealth(), style().words, retreat * p.getMaxHealth(),
+						outmatched ? ", the fight would cost more than it has" : desperate ? ", nothing to fight with" : ""));
+			}
 			fleeing = true;                                                    // back off until it has healed a bit
 			c.goals.instant = desperate ? "running for its life" : "backing off to heal";
 			h.lowerShield();
@@ -418,11 +430,13 @@ final class Fighter {
 		}
 		fleeing = false;
 
-		if (p.getHealth() <= 13 && d > 2.2 && now - gappleAt > 600 && h.carries("golden_apple")) {   // a hard fight wearing it down: a golden apple mid-fight (absorption, regen), like a player in a trial chamber
+		float healAt = style().healAt;
+		if (p.getHealth() <= healAt && d > 2.2 && now - gappleAt > 600 && h.carries("golden_apple")) {   // under pressure: a golden apple before it's low (absorption, regen), like a player in a trial chamber
 			int on = 0;
 			for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
 					x -> x.isAlive() && x.getTarget() == p)) on++;
-			if (on >= 2 || p.getHealth() <= 9) {
+			if (on >= 2 || p.getHealth() <= healAt - 4) {
+				c.journal("fight", String.format(java.util.Locale.ROOT, "a golden apple at %.0f health with %d at it: before it gets low (%s)", p.getHealth(), on, style().words));
 				gappleAt = now;
 				c.goals.instant = "a golden apple mid-fight";
 				h.watching = foe;
@@ -581,6 +595,60 @@ final class Fighter {
 		if (p == null) return false;
 		return around >= 2 || p.getHealth() < 14 || p.level().getMaxLocalRawBrightness(p.blockPosition()) < 5;
 	}
+
+	/**
+	 * How it likes to fight, from its nature (after a player's notes on their own play): each a reasonable way to live
+	 * through a fight, none the right one. How much health it keeps in hand, when it heals, whether it starts fights.
+	 */
+	enum Style {
+		TACTICIAN("a defensive tactician", 0.6f, 15), OPPORTUNIST("an aggressive opportunist", 0.4f, 11), CONTROLLER("a terrain controller", 0.5f, 13),
+		EXPLORER("a cautious explorer", 0.55f, 14), TEAM("a team player", 0.5f, 13);
+		final String words;
+		final float keep, healAt;
+
+		Style(String words, float keep, float healAt) {
+			this.words = words;
+			this.keep = keep;
+			this.healAt = healAt;
+		}
+	}
+
+	private Style style;
+
+	Style style() {
+		if (style == null) {
+			var who = c.personality;
+			float[] score = new float[Style.values().length];
+			score[Style.TACTICIAN.ordinal()] = 0.6f * (1 - who.bravery) + 0.4f * gene(9) + (who.believes("live_to_fight") ? 0.3f : 0);
+			score[Style.OPPORTUNIST.ordinal()] = 0.5f * who.bravery + 0.4f * who.sin(xen.mod.core.Sins.PRIDE) + 0.4f * who.sin(xen.mod.core.Sins.WRATH) + 0.2f * gene(0);
+			score[Style.CONTROLLER.ordinal()] = 0.5f * c.skills.get(Skills.BUILD) + 0.3f * who.diligence + 0.2f * who.curiosity;
+			score[Style.EXPLORER.ordinal()] = 0.6f * who.curiosity + 0.4f * (1 - who.bravery) - 0.2f * who.sin(xen.mod.core.Sins.WRATH);
+			score[Style.TEAM.ordinal()] = 0.5f * who.kindness + 0.5f * who.loyalty - (who.loner ? 0.6f : 0);
+			int best = 0;
+			for (int i = 1; i < score.length; i++) if (score[i] > score[best]) best = i;
+			style = Style.values()[best];
+			c.journal("is", "fights like " + style.words);
+		}
+		return style;
+	}
+
+	/** The health it keeps in hand against monsters (a share of all of it): its style, and its gear shifts it (no shield and no armor: more). */
+	private float floor() {
+		var p = c.player;
+		float f = style().keep;
+		if (!c.hands.carries("shield") && p.getArmorValue() < 6) f += 0.05f;
+		else if (p.getArmorValue() >= 15) f -= 0.05f;
+		return Math.max(0.35f, Math.min(0.65f, f));
+	}
+
+	/** About what its next hit does (its weapon, how charged the swing is). */
+	private float hitNow() {
+		var p = c.player;
+		float charge = p.getAttackStrengthScale(0.5f);
+		return (float) p.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE) * (0.2f + 0.8f * charge * charge);
+	}
+
+	private int saidWhyAt = -1000;
 
 	/** When it last ate a golden apple in a fight (one at a time: they're precious). */
 	private long gappleAt = -10000;

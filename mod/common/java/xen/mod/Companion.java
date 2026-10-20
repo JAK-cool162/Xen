@@ -3540,6 +3540,23 @@ public final class Companion {
 		else if (random.nextFloat() < 0.4f) mod.later(10 + random.nextInt(20), () -> say(pick3("Sorry, I can't!", "Run!", "I can't help, get out of there!")));
 	}
 
+	/** A team player, armed and fit: a teammate fighting a monster close by gets a hand without having to ask. */
+	private void teamHelp() {
+		if (inArena || minion || fighter.style() != Fighter.Style.TEAM || !hands.hasWeapon() || player.getHealth() < 12) return;
+		for (Companion o : mod.companions) {
+			if (o == this || o.player == null || o.player.level() != player.level() || o.player.distanceTo(player) > 16) continue;
+			if (!player.isAlliedTo(o.player) && trust(o.player.getUUID()) < 0.5f) continue;
+			LivingEntity f = o.lastFoe;
+			if (f == null || !f.isAlive() || !(f instanceof net.minecraft.world.entity.monster.Enemy) || f.level() != player.level() || f.distanceTo(o.player) > 10
+					|| player.level().getGameTime() - o.lastFoeAt > 60 || !player.hasLineOfSight(f)) continue;
+			helpAgainst = f;
+			helpGoing = true;
+			helpUntil = player.level().getGameTime() + 20 * 20;
+			journal("fight", "helps " + o.name + " with the " + BuiltInRegistries.ENTITY_TYPE.getKey(f.getType()).getPath().replace('_', ' ') + " (a team player: nobody had to ask)");
+			return;
+		}
+	}
+
 	/** Who Xen 2.0 chose to fight (its own call: a monster, or a player it's against, even one of its team). */
 	LivingEntity chosenFoe;
 	private int saidComingAt = -10000;
@@ -3582,6 +3599,7 @@ public final class Companion {
 			}
 		}
 		if (best != null) return best;
+		if (!helpGoing && player.tickCount % 20 == 0) teamHelp();                    // a team player: a friend's fight close by is its fight too, called or not
 		if (helpGoing && helpAgainst != null) {                                     // a friend called for help, and it chose to go
 			LivingEntity a = helpAgainst;
 			if (player.level().getGameTime() > helpUntil || !a.isAlive() || a.level() != player.level() || a == player || player.distanceTo(a) > 32

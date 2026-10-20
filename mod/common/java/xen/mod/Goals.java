@@ -815,6 +815,8 @@ final class Goals {
 		b[Mind.FARM] += 0.3f * (k.get(Skills.FARM) - 0.5f);
 		b[Mind.TRADE] += 0.3f * (k.get(Skills.TRADE) - 0.5f);
 		b[Mind.FIGHT] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
+		var st = c.fighter.style();                                            // (whether it starts a fight is its style's call: an explorer rather not, an opportunist sooner)
+		b[Mind.FIGHT] += st == Fighter.Style.EXPLORER ? -0.25f : st == Fighter.Style.OPPORTUNIST ? 0.15f : 0;
 		b[Mind.GUARD] += 0.2f * (k.get(Skills.FIGHT) - 0.5f);
 		if (c.caves.nearest(160) != null && c.crafter.pickTier() >= 1) b[Mind.MINE] += 0.35f;   // a cave it knows: ore, easy
 		if (crowdedBy() != null) {                                              // someone else's base here: off to find its own land
