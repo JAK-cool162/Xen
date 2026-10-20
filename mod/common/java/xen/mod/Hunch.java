@@ -449,6 +449,36 @@ final class Hunch {
 		return out;
 	}
 
+	/**
+	 * A cave close by with a way in from the surface (luck: the server knows): where on the ground over it to go and
+	 * look (it finds the mouth itself, by sight), or null. Not one another Xen is mining, not where it's been.
+	 */
+	BlockPos caveNear(BlockPos from, int within) {
+		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return null;
+		ServerLevel level = (ServerLevel) c.player.level();
+		Map<Long, Chunk> known = WORLD.get(dim(level));
+		if (known == null) return null;
+		BlockPos best = null;
+		double bestD = (double) within * within;
+		for (Chunk ch : known.values())
+			for (Find f : ch.finds()) {
+				if (!f.kind().equals("cave") || taken.contains(f.at().asLong()) || claimedBy(c, f.at())) continue;
+				double d = f.at().distSqr(new BlockPos(from.getX(), f.at().getY(), from.getZ()));
+				if (d >= bestD || d < 64) continue;
+				BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, f.at());
+				if (!level.getFluidState(top.below()).isEmpty() || top.getY() - f.at().getY() > 40) continue;   // (under the sea, or too deep under the ground to show)
+				bestD = d;
+				best = top;
+			}
+		if (best != null) {
+			taken.add(best.asLong());
+			steered = "a cave (a feeling where it is)";
+			steeredAt = level.getGameTime();
+			times++;
+		}
+		return best;
+	}
+
 	/** Ore it already went for (mined, or no way to it): not again. */
 	private final Set<Long> taken = new java.util.HashSet<>();
 

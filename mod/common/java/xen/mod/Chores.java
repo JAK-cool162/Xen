@@ -1242,7 +1242,8 @@ final class Chores {
 		// A cave it knows: the quickest way to ore (the walls show it). In, with torches, down it goes.
 		caveMode = false;
 		caveTarget = null;
-		BlockPos cave = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD ? c.caves.nearest(dark ? 24 : 160) : null;
+		boolean under = !c.player.level().canSeeSky(c.player.blockPosition().above());
+		BlockPos cave = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && (!dark || under) ? c.caves.nearest(dark ? 16 : 160) : null;   // (at night: its own mine, strip mining, safe under the ground; not out to a cave)
 		if (cave != null) {
 			caveMode = true;
 			toMine = cave;
@@ -1256,10 +1257,8 @@ final class Chores {
 		caveLook = 0;
 		if (!dark && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && c.player.getBlockY() > 40
 				&& c.player.level().canSeeSky(c.player.blockPosition().above()) && now() - lastCaveLook > 20 * 60 * 4) {
-			var p = c.personality;
-			float look = 0.3f + 0.5f * p.curiosity - 0.25f * p.sin(xen.mod.core.Sins.SLOTH) + (c.places.find("cave") != null ? 0.1f : 0);
-			if (random.nextFloat() < look) {
-				caveLook = now() + 20 * 45;
+			{                                                                  // (by day a cave first, like a player: the walls show the ore; none close by, its own mine)
+				caveLook = now() + 20 * 60;
 				lastCaveLook = now();
 				caveLookTo = null;
 				c.journal("thinks", "has a look round for a cave first (the walls show the ore; quicker than digging), its own mine if there's none");
@@ -1727,6 +1726,14 @@ final class Chores {
 		BlockPos feet = c.player.blockPosition();
 		if (caveLookTo == null || feet.closerThan(caveLookTo, 3) || now() - caveLookToAt > 300) {
 			ServerLevel level = (ServerLevel) c.player.level();
+			BlockPos felt = c.hunch.caveNear(feet, 72);                           // luck: a feeling there's a cave over there (the server knows): it goes and has a look
+			if (felt != null && !felt.closerThan(feet, 6)) {
+				caveLookTo = felt;
+				caveLookToAt = now();
+				doing = "going to have a look for the cave it has a feeling about";
+				Action a = c.walkTo(Vec3.atBottomCenterOf(felt));
+				if (a != null) return a;
+			}
 			BlockPos best = null;
 			double bestScore = Double.MAX_VALUE;
 			for (int i = 0; i < 8; i++) {                                         // low ground first: valleys and hillsides show their caves
