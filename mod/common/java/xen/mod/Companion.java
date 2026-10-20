@@ -1064,6 +1064,8 @@ public final class Companion {
 		}
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
+		Action come = comeOver();                                     // "come here": right over to them, then waits to see what they want
+		if (come != null) return come;
 		boolean toHeal = player.getHealth() <= player.getMaxHealth() - 4 && player.getFoodData().getFoodLevel() < 18;   // (two hearts down: under 18 food it doesn't heal, so a player eats)
 		if ((player.getFoodData().getFoodLevel() <= personality.eatAt() || toHeal) && hands.canEat() && player.getFoodData().needsFood()
 				&& choices.eat().yes()) {                                 // (a monster right on it: it fights first, eats after)
@@ -1258,7 +1260,7 @@ public final class Companion {
 			ServerPlayer o = server.getPlayerList().getPlayer(leader);
 			if (o != null && o.level() == player.level()) {
 				double d = o.position().distanceTo(player.position());
-				if ((d > mod.config.followDistance || catchingUp && d > 2.5) && d < 96) goal = o.position();   // close up, then wait
+				if ((d > mod.config.followDistance || catchingUp && d > 2.5) && (d < 96 || leader.equals(comeFor))) goal = o.position();   // close up, then wait
 				catchingUp = goal != null;
 			}
 		} else if (mode == Mode.STAY && anchor != null && Vec3.atCenterOf(anchor).distanceTo(player.position()) > 8) {
@@ -1276,6 +1278,36 @@ public final class Companion {
 	}
 
 	private boolean catchingUp;
+	/** Called over ("come here"): who, till when, and when it got there (then it waits a while for what they want: a tool to take...). */
+	private java.util.UUID comeFor;
+	private long comeUntil, cameAt = -1;
+
+	private Action comeOver() {
+		if (comeFor == null) return null;
+		long now = player.level().getGameTime();
+		ServerPlayer o = server.getPlayerList().getPlayer(comeFor);
+		if (o == null || o.level() != player.level() || now > comeUntil || fighting || cameAt >= 0 && (now - cameAt > 20 * 30 || o.distanceTo(player) > 8)) {
+			comeFor = null;                                              // (there a while, or they walked off: plain following now)
+			return null;
+		}
+		double d = o.distanceTo(player);
+		if (d > 2.5 && cameAt < 0) {
+			goals.instant = "coming over to " + o.getName().getString();
+			if (hands.busy() && hands.interruptible()) hands.stop();
+			return walkTo(o.position());
+		}
+		if (cameAt < 0) {
+			cameAt = now;
+			walker.stop();
+			journal("does", "came over to " + o.getName().getString());
+			chatter(pick3("Here. What's up?", "I'm here.", "Yeah? What do you need?"), true);
+		}
+		Action pick = pickUpNearby();                                  // something tossed to it (a pickaxe, an axe): it takes it
+		if (pick != null) return pick;
+		goals.instant = "here with " + o.getName().getString() + ", waiting to see what they want";
+		hands.face(o.getEyePosition());
+		return Action.IDLE;
+	}
 	/** Where its friend was standing, and since when they've stayed about there (following: moving means keep up). */
 	private Vec3 leaderSpot;
 	private long leaderStillSince;
@@ -2215,6 +2247,14 @@ public final class Companion {
 	/** Blocks it broke lately (where, when): what drops there is its own, and it picks it up, like a player. */
 	/** The blocks it broke lately: where, when, and whether it was a tree (a log: its leaves drop saplings and sticks for minutes after). */
 	private final java.util.ArrayDeque<long[]> broke = new java.util.ArrayDeque<>();
+
+	/** Did it mine a block right by this spot just now (it opened the way for what's there: water coming in, say)? */
+	boolean openedNear(BlockPos at, long within) {
+		if (player == null) return false;
+		long now = player.level().getGameTime();
+		for (long[] b : broke) if (now - b[1] <= within && BlockPos.of(b[0]).distManhattan(at) <= 2) return true;
+		return false;
+	}
 
 	void broke(BlockPos pos, boolean log) {
 		broke.addLast(new long[] {pos.asLong(), player == null ? 0 : player.level().getGameTime(), log ? 1 : 0});
@@ -4263,7 +4303,13 @@ public final class Companion {
 					leaderSpot = null;
 					mode = Mode.FOLLOW;
 					leader = from.getUUID();
-					plan = "You will follow " + who + ".";
+					boolean come = words.matches("(?s).*\\b(come|cmere|over here|to me|here)\\b.*") && !words.matches("(?s).*\\b(follow|with me|keep up)\\b.*");
+					if (come) {                                                // over to them, right up close (wherever they are), then it waits
+						comeFor = from.getUUID();
+						comeUntil = player.level().getGameTime() + 20 * 120;
+						cameAt = -1;
+					}
+					plan = come ? "You will come over to " + who + "." : "You will follow " + who + ".";
 				}
 				case "ride" -> {
 					if (mode == Mode.STAY) mode = Mode.FOLLOW;

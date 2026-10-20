@@ -768,6 +768,20 @@ public class XenMod implements ModInitializer {
 		return a.level() == b.level() && a.distanceTo(b) <= config.chatRange;
 	}
 
+	/** Its own name called out (a shout carries): four times as far as talk does, in the same world. */
+	private boolean hearsItsName(Companion c, ServerPlayer sender) {
+		return c.player() != null && c.player().level() == sender.level() && c.player().distanceTo(sender) <= config.chatRange * 4;
+	}
+
+	/** Called by name from too far off to hear it: the one calling is told so (and how to reach it anyway). */
+	private void tooFar(ServerPlayer sender, Companion c) {
+		String where = c.player() == null ? "" : c.player().level() != sender.level() ? " (it's in another dimension)"
+				: String.format(java.util.Locale.ROOT, " (it's %.0f blocks away)", c.player().distanceTo(sender));
+		sender.sendSystemMessage(net.minecraft.network.chat.Component.literal(c.name + " is too far away to hear you" + where
+				+ ". Chat carries " + config.chatRange + " blocks, a name called out " + config.chatRange * 4 + "; /msg " + c.name + " reaches it anywhere.")
+				.withStyle(net.minecraft.ChatFormatting.GRAY));
+	}
+
 	/** Can this Xen hear what that player says? (With local chat only close by; else anywhere.) */
 	private boolean hears(Companion c, ServerPlayer sender) {
 		return c.player() != null && (!config.localChat || inRange(c.player(), sender));
@@ -875,7 +889,7 @@ public class XenMod implements ModInitializer {
 		Companion named = null;                                               // the one named first ("Bex, help Aria build": Bex)
 		int namedAt = Integer.MAX_VALUE;
 		for (Companion c : companions) {
-			if (!hears(c, sender)) continue;
+			if (!hears(c, sender) && !hearsItsName(c, sender)) continue;           // (its own name, called out: it hears that further off)
 			var m = java.util.regex.Pattern.compile("\\b" + java.util.regex.Pattern.quote(c.name) + "\\b", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
 			if (m.find() && m.start() < namedAt) {
 				named = c;
@@ -890,12 +904,15 @@ public class XenMod implements ModInitializer {
 		}
 		for (Companion c : companions) {                                       // said to a Xen by name that can't hear it: not for anyone else
 			if (c.player() != null && java.util.regex.Pattern.compile("^\\W*" + java.util.regex.Pattern.quote(c.name) + "\\b",
-					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) return;
+					java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) {
+				tooFar(sender, c);                                                    // (and they're told, so they don't stand waiting)
+				return;
+			}
 		}
 		Companion byStart = null;                                              // "riv, come here": the start of its name will do
 		String asked = null;
 		for (Companion c : companions) {
-			if (!hears(c, sender) || c.player().level() != sender.level()) continue;
+			if (!hears(c, sender) && !hearsItsName(c, sender) || c.player().level() != sender.level()) continue;
 			String t = calledByStart(text, c.name);
 			if (t != null && (byStart == null || c.player().distanceTo(sender) < byStart.player().distanceTo(sender))) {
 				byStart = c;

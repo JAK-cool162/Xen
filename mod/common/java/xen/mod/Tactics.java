@@ -197,9 +197,12 @@ final class Tactics {
 		if (under && c.knowledge.knows("block_water")) {
 			BlockPos w = flowingIn(level, feet);
 			if (w != null && w.equals(waterNoBlock) && now < waterNoBlockUntil) w = null;   // (it tried there just now and couldn't: not again and again)
+			// only with a reason: it let this water in itself (mined next to it just now), or its tunnel down in the ground is
+			// filling (its feet wet, deep under the surface). Water lying beside it under a tree or at a lake's edge: it walks on.
+			if (w != null && !c.openedNear(w, 100) && !(p.isInWater() && feet.getY() < level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()) - 3)) w = null;
 			if (w != null && c.hands.placeAt(w, "any")) {                    // a block in the way of the water
 				c.goals.instant = "blocking the water flooding in";
-				c.journal("does", "blocked the water flowing into its tunnel");
+				c.journal("does", "blocked the water flowing into its tunnel (" + (c.openedNear(w, 100) ? "it opened the way for it just now" : "its tunnel was filling") + ")");
 				c.walker.stop();                                              // (and another way from here)
 				c.acted = true;
 				return Action.PLACE;
