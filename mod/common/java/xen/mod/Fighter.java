@@ -416,6 +416,18 @@ final class Fighter {
 		}
 		fleeing = false;
 
+		if (p.getHealth() <= 13 && d > 2.2 && now - gappleAt > 600 && h.carries("golden_apple")) {   // a hard fight wearing it down: a golden apple mid-fight (absorption, regen), like a player in a trial chamber
+			int on = 0;
+			for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
+					x -> x.isAlive() && x.getTarget() == p)) on++;
+			if (on >= 2 || p.getHealth() <= 9) {
+				gappleAt = now;
+				c.goals.instant = "a golden apple mid-fight";
+				h.watching = foe;
+				return Action.EAT;
+			}
+		}
+
 		Action surprise = c.antics.surprise(foe, d);                          // not in the script
 		if (surprise != null) return surprise;
 
@@ -550,6 +562,9 @@ final class Fighter {
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
 	}
+
+	/** When it last ate a golden apple in a fight (one at a time: they're precious). */
+	private long gappleAt = -10000;
 
 	/** How many monsters were round it (within 6) at the last look. */
 	private int around;

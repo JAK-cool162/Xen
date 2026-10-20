@@ -494,6 +494,7 @@ final class Walker {
 		blocks = throwaway();
 		worth = placeWorth();
 		dig = true;
+		if (h >= 16 && c.mimic.skill(Mimic.CLUTCH) >= 0.6f && c.hands.carries("water_bucket")) maxFall = Math.max(maxFall, 12);   // (good at the water clutch, a bucket on it: a drop is the quick way down, like a player)
 		if (now() < daringUntil) {                                           // (the solver said: be bolder)
 			maxFall += h >= 16 ? 4 : 2;
 			maxGap = 3;
