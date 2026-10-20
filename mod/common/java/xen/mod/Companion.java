@@ -1626,6 +1626,8 @@ public final class Companion {
 		}
 		if (mode != Mode.FREE || builder.busy() && !builder.ownHouse() || goals.exploringAsked()) return null;   // (its own house can wait while it gets wool: the building picks up after; not what it was asked)
 		if (chores.busy() && (!chores.own || chores.forWool && chores.kind == Chores.Kind.HUNT)) return null;   // (asked for something: that first; already after wool)
+		if (chores.busy() && chores.kind == Chores.Kind.MINE && (!player.level().canSeeSky(player.blockPosition().above())
+				|| items().getOrDefault("raw_iron", 0) + items().getOrDefault("iron_ingot", 0) == 0 && Compat.timeOfDay(player.level()) % 24000 < 12000)) return null;   // (down its mine, or after its first iron: the wool can wait)
 		if (now - bedCheckAt < 100) return null;
 		bedCheckAt = now;
 		long time = Compat.timeOfDay(player.level()) % 24000;

@@ -1751,8 +1751,10 @@ final class Goals {
 		float[] after = MindSense.features(c);
 		if (died) after[Mind.HEALTH] = 0;
 		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);
-		if (r > 0.05f) failsInRow[o] = 0;
-		else if (++failsInRow[o] >= 3 && o != Mind.EAT && o != Mind.FLEE && o != Mind.FIGHT && o != Mind.FOLLOW && o != Mind.HELP && o != Mind.GUARD
+		boolean gotDeeper = o == Mind.MINE && optionWhere != null && optionWhere.getY() - c.player.getBlockY() >= 6;   // (down its staircase: on its way, not nothing)
+		boolean cutOff = !c.chores.endedItself;                               // (something else cut it short: not that it came to nothing)
+		if (r > 0.05f || gotDeeper) failsInRow[o] = 0;
+		else if (!cutOff && ++failsInRow[o] >= 3 && o != Mind.EAT && o != Mind.FLEE && o != Mind.FIGHT && o != Mind.FOLLOW && o != Mind.HELP && o != Mind.GUARD
 				&& o != Mind.REST && o != Mind.SLEEP) {                                    // (the same choice, again and again, and nothing: a flooded staircase, a night by the sea)
 			quickUntil[o] = now + (2400L << Math.min(3, failsInRow[o] - 3));
 			c.journal("thinks", String.format(Locale.ROOT, "%s came to nothing %d times in a row: something else for %d min", Mind.SAYS[o], failsInRow[o], (2400 << Math.min(3, failsInRow[o] - 3)) / 1200));

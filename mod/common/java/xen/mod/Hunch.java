@@ -395,8 +395,7 @@ final class Hunch {
 		Map<Long, Chunk> known = WORLD.get(dim(level));
 		if (known == null) return null;
 		String kind = what.equals("diamonds") ? "diamond" : what;
-		BlockPos best = null;
-		double bestCost = Double.MAX_VALUE;
+		List<double[]> found = new ArrayList<>();                                  // (cost, x, y, z)
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
 				if (!f.kind().equals(kind)) continue;
@@ -404,17 +403,17 @@ final class Hunch {
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
 				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.5 * Math.max(0, dy) + (f.open() ? -4 : 0);   // (digging down costs more than walking; one in a cave wall, less)
-				if (cost < bestCost) {
-					bestCost = cost;
-					best = at;
-				}
+				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
 			}
-		if (best == null) return null;
-		BlockPos real = stillThere(level, best, kind);
-		if (real == null) {                                                         // (mined since it looked: the next one)
-			taken.add(best.asLong());
-			return oreNear(what, from, flat, deep);
+		found.sort((a, b) -> Double.compare(a[0], b[0]));
+		BlockPos real = null;
+		for (int i = 0; i < Math.min(12, found.size()) && real == null; i++) {     // (the cheapest still there and dry: mined since, under the sea, by water: the next)
+			BlockPos at = new BlockPos((int) found.get(i)[1], (int) found.get(i)[2], (int) found.get(i)[3]);
+			BlockPos r = stillThere(level, at, kind);
+			if (r != null && dry(level, r)) real = r;
+			else taken.add(at.asLong());
 		}
+		if (real == null) return null;
 		steered = kind + " (a feeling where it is)";
 		steeredAt = level.getGameTime();
 		times++;
@@ -427,6 +426,16 @@ final class Hunch {
 	void taken(BlockPos at) {
 		taken.add(at.asLong());
 		if (taken.size() > 4096) taken.clear();
+	}
+
+	/** No water by it (two blocks round) and none over the ground above it (not under the sea, a lake or a river). */
+	private static boolean dry(ServerLevel level, BlockPos at) {
+		if (!level.isLoaded(at)) return true;
+		for (BlockPos q : BlockPos.betweenClosed(at.offset(-2, -1, -2), at.offset(2, 2, 2)))
+			if (!level.getFluidState(q).isEmpty()) return false;
+		int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ()),
+				floor = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, at.getX(), at.getZ());
+		return top - floor < 1;
 	}
 
 	/** That block, or another of its kind in its 8-block cell, still ore (not mined since); null if none. */
