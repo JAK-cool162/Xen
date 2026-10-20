@@ -846,7 +846,7 @@ public final class Companion {
 			step = stepToAir(level, start, false);                     // ...or through gaps one block high, swimming flat
 			tall = false;
 		}
-		if (step == null) return null;
+		if (step == null) return airPocket(level, start);
 		goals.instant = "swimming to air";
 		hands.steer = Vec3.atBottomCenterOf(step);
 		if (step.getY() < start.getY()) {                              // the way out starts down (under the edge of the roof): it dives
@@ -870,6 +870,35 @@ public final class Companion {
 		player.setSprinting(false);                                    // up: hold space
 		hands.face(Vec3.atCenterOf(step));
 		return Action.JUMP;
+	}
+
+	/** No way to air near, under a roof, short of breath: a door put down beside it holds no water (an air pocket, a player's trick). */
+	private Action airPocket(ServerLevel level, BlockPos feet) {
+		if (player.getAirSupply() > player.getMaxAirSupply() * 0.5 || level.getGameTime() - pocketAt < 60) return null;
+		java.util.function.Predicate<ItemStack> door = s -> s.getItem() instanceof net.minecraft.world.item.DoubleHighBlockItem
+				&& ((net.minecraft.world.item.BlockItem) s.getItem()).getBlock() instanceof net.minecraft.world.level.block.DoorBlock;
+		if (!has(door)) return null;
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos at = feet.relative(d);
+			if (!level.getFluidState(at).is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(at).canBeReplaced()
+					|| !level.getBlockState(at.above()).canBeReplaced() || !level.getBlockState(at.below()).isFaceSturdy(level, at.below(), net.minecraft.core.Direction.UP)) continue;
+			if (hands.placeItem(at, door, at.below(), net.minecraft.core.Direction.UP, -1)) {
+				pocketAt = level.getGameTime();
+				journal("water", "out of air under a roof: put a door down for a pocket of air at " + at.toShortString());
+				goals.instant = "breathing in a door's air pocket";
+				hands.steer = Vec3.atBottomCenterOf(at);
+				return Action.FORWARD;
+			}
+		}
+		return null;
+	}
+
+	private long pocketAt = -1000;
+
+	private boolean has(java.util.function.Predicate<ItemStack> want) {
+		var inv = player.getInventory();
+		for (int i = 0; i < 36; i++) if (!inv.getItem(i).isEmpty() && want.test(inv.getItem(i))) return true;
+		return false;
 	}
 
 	/** The first block of the shortest swim to air (breathing room over it), through water its body fits in; null if none near. */
@@ -1020,7 +1049,8 @@ public final class Companion {
 		if (survive != null) return survive;
 		Action taught = tactics.next();                               // water flooding in, lava beside it, powder snow, a spawner
 		if (taught != null) return taught;
-		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())) {
+		if (player.isInWater() && (player.isUnderWater() || player.getAirSupply() < player.getMaxAirSupply())
+				&& !(walker.swimmingUnder() && player.getAirSupply() >= player.getMaxAirSupply() * 0.6)) {   // (swimming along under the top: its walk minds its air)
 			if (player.getAirSupply() < player.getMaxAirSupply() * 0.6) {
 				walker.stop();                                        // (its way led under: air first)
 				walker.noDiveUntil = player.level().getGameTime() + 600;   // and no ways under water for a while
@@ -1925,7 +1955,9 @@ public final class Companion {
 			return null;
 		}
 		double far = Vec3.atCenterOf(lostAt).distanceTo(player.position());
-		if (player.level().isDarkOutside() && player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && far > 12 && !hands.hasWeapon()) {   // night, nothing to fight with: dug in until morning, then back for them
+		long day = Compat.timeOfDay(player.level()) % 24000, toMorning = day < 23000 ? 23000 - day : 0;
+		boolean vanishing = lostThingsTicking() && 5800 - lostAged < toMorning && far <= 64 && player.getHealth() >= 10;   // (by morning they'd be gone: near enough, it runs for them now)
+		if (player.level().isDarkOutside() && player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && far > 12 && !hands.hasWeapon() && !vanishing) {   // night, nothing to fight with: dug in until morning, then back for them
 			goals.instant = "waiting for morning to go back for its things";
 			if (!chores.sheltered() && chores.digIn() != null) {
 				chores.own = true;
@@ -1936,7 +1968,7 @@ public final class Companion {
 			}
 			return null;
 		}
-		if (goals.outAtNight() && !hands.hasWeapon() && player.level().canSeeSky(lostAt.above())     // night, out in the open, no sword: a tip comes to mind (its call)
+		if (goals.outAtNight() && !hands.hasWeapon() && !vanishing && player.level().canSeeSky(lostAt.above())     // night, out in the open, no sword: a tip comes to mind (its call)
 				&& tips.take(Tips.Tip.NO_SWORD_NIGHT, 0.4f + (diedOf.isEmpty() || diedOf.contains("fall") ? 0 : 0.3f) + 0.2f * Math.min(1, (float) (far / 64)),
 						"no sword, night, its things out where it died" + (diedOf.isEmpty() ? "" : " (" + diedOf + ")"), 600)) {
 			goals.instant = "waiting for morning to go back for its things";
@@ -1948,7 +1980,24 @@ public final class Companion {
 			lostProgressAt = now;
 			chatter("My stuff! I'm going back for it.", true);
 		}
+		if (far > 8 && crafter.pickTier() == 0 && !crafter.canMake(1) && 5800 - lostAged > 2400 && !player.level().canSeeSky(lostAt.above())
+				&& lostAt.getY() < player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, lostAt.getX(), lostAt.getZ()) - 4) {
+			if (lostToolUntil == 0) {                                            // its things are down in the ground, no pickaxe: a basic one first
+				lostToolUntil = now + 2400;
+				journal("thinks", "its things are underground and it has no pickaxe: a few logs for one first, then back for them");
+			}
+			if (now < lostToolUntil) {
+				if (!chores.busy()) {
+					chores.gather("wood", 3);
+					chores.own = true;
+				}
+				goals.instant = "a few logs for a pickaxe, then back for its things";
+				Action a = chores.next();
+				if (a != null) return a;
+			}
+		}
 		goals.instant = "going back for its things";
+		rushingBack = now;                                                     // (straight there: no ore on the way, it runs)
 		Vec3 target = Vec3.atBottomCenterOf(lostAt);
 		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) <= 3) {        // there: its things, the ones it can see (or right by it)
 			target = null;
@@ -1993,6 +2042,9 @@ public final class Companion {
 		}
 		return walkTo(target);
 	}
+
+	/** When it last ran back for its things (no stopping for ore meanwhile), and till when it gets a pickaxe first. */
+	private long rushingBack = -100, lostToolUntil;
 
 	/** Is the ground its things lie on going (a player, a Xen too, within the server's simulation distance of it)? */
 	private boolean lostThingsTicking() {
@@ -2464,6 +2516,7 @@ public final class Companion {
 	 */
 	private Action oreOnTheWay() {
 		if (player.tickCount - lookedOnTheWay < 10 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
+				|| player.level().getGameTime() - rushingBack < 5                    // (running back for its things before they go: no stopping)
 				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy() || commandedTo != null && visiting == null   // (sent somewhere: there first)
 				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return null;   // (out at night: keep going)
 		lookedOnTheWay = player.tickCount;
@@ -3678,6 +3731,7 @@ public final class Companion {
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
 		lostAged = 0;
+		lostToolUntil = 0;
 		lostAgedAt = player.level().getGameTime();
 		lostFoundAny = false;
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());

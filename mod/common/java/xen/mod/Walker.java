@@ -1328,12 +1328,27 @@ final class Walker {
 				if (p.onGround() && along > 0.25 && p.blockPosition().equals(m.from())) p.setJumping(true);
 			}
 			case SWIM -> {
-				doing = "swimming";
 				double dy = m.to().getY() + 0.1 - p.getY();
-				p.setJumping(dy > -0.3 || p.isUnderWater() && dy > -1.2 && flat > 0.3);   // up for air, like a player holding space
-				if (flat > 1 && p.isInWater() && p.getFoodData().getFoodLevel() > 6) p.setSprinting(true);   // swimming fast (against a current too)
-				p.setShiftKeyDown(dy < -0.8);
-				if (dy < -0.8) face(to.add(0, -1, 0));
+				int air = p.getAirSupply(), max = p.getMaxAirSupply();
+				if (air >= max) shortOfBreath = false;
+				else if (air < max * 0.7) shortOfBreath = true;              // short of breath: up to the top till it breathes freely again
+				boolean deep = deepAt(p.blockPosition()) && deepAt(m.to());  // two blocks of water: room to swim (one deep, it just wades)
+				if (deep && !shortOfBreath && p.getFoodData().getFoodLevel() > 6 && dy < 0.6 && (p.isSwimming() || swimAhead() >= 3)) {
+					doing = "swimming";                                      // a player's swim: sprinting with its head under, flat and fast
+					swamAt = now();
+					p.setSprinting(true);
+					if (!p.isUnderWater()) p.setDeltaMovement(p.getDeltaMovement().add(0, -0.04, 0));   // (head still out: it ducks under, like holding shift)
+					face(new Vec3(to.x, m.to().getY() + 0.45, to.z));          // eyes just under the top (or down, to where it's going)
+					p.zza = 1;
+				} else {
+					doing = shortOfBreath && p.isUnderWater() ? "swimming up for air" : "swimming";
+					p.setSprinting(flat > 1 && !p.isUnderWater() && p.getFoodData().getFoodLevel() > 6);   // (along the top: a little faster)
+					p.setJumping(dy > -0.3 || p.isUnderWater() && (shortOfBreath || dy > -1.2 && flat > 0.3));   // up, like a player holding space
+					if (dy < -0.8 && !shortOfBreath) {                       // down: like holding shift
+						p.setDeltaMovement(p.getDeltaMovement().add(0, -0.04, 0));
+						face(to.add(0, -1, 0));
+					}
+				}
 			}
 			case FALL -> {
 				doing = "going down";
@@ -1345,11 +1360,17 @@ final class Walker {
 					p.setJumping(true);
 					lastHop = now();
 					doing = "sprint-jumping";
+				} else if (sprint && p.onGround() && straight && roofAhead(3) && now() - lastHop > 3) {   // a ceiling two blocks up: head-hitting,
+					p.setJumping(true);                                       // short hops that keep the sprint's speed and add to it
+					lastHop = now();
+					doing = "head-hitting";
 				}
 			}
 		}
-		// in water and the way goes up (a waterfall, flowing water, a bank): hold space and it swims up it, like a player
-		if (p.isInWater() && m.to().getY() + 0.2 >= p.getY() && m.kind() != Kind.FALL) p.setJumping(true);
+		// in water and the way goes up (a waterfall, flowing water, a bank), or afloat in deep water: hold space, like a player
+		// (wading in water one block deep it just walks; swimming under it doesn't bob up)
+		if (p.isInWater() && m.kind() != Kind.FALL && now() - swamAt > 2
+				&& (m.to().getY() > p.getY() + 0.4 || deepAt(p.blockPosition()) && m.to().getY() + 0.2 >= p.getY())) p.setJumping(true);
 		// stuck against a block edge (it happens): a hop, like a player
 		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 10) p.setJumping(true);
 		// an edge it doesn't mean to go over (a cliff, a ravine, a dark one too: a player sees a pit is deep): it
@@ -1383,6 +1404,42 @@ final class Walker {
 	}
 
 	private long lastHop;
+	/** When it last swam with its head under (its mind leaves it be meanwhile), and whether it's on its way up for air. */
+	long swamAt = -100;
+	private boolean shortOfBreath;
+
+	boolean swimmingUnder() {
+		return now() - swamAt < 6;
+	}
+
+	/** Water two blocks deep here (or it's under the top): it can swim, not wade. */
+	private boolean deepAt(BlockPos feet) {
+		return wet(feet) && (wet(feet.below()) || wet(feet.above()));
+	}
+
+	private boolean wet(BlockPos q) {
+		return c.player.level().getFluidState(q).is(net.minecraft.tags.FluidTags.WATER);
+	}
+
+	/** How many swims are next on its way (a short one isn't worth ducking under for). */
+	private int swimAhead() {
+		int n = 0;
+		for (int i = index; i < path.size() && path.get(i).kind() == Kind.SWIM && n < 8; i++) n++;
+		return n;
+	}
+
+	/** The next n moves are walking straight on the level with a ceiling two blocks up (a tunnel: head-hitter jumps). */
+	private boolean roofAhead(int n) {
+		if (index + n > path.size()) return false;
+		Move first = path.get(index);
+		if (passable(c.player.blockPosition().above(2))) return false;
+		for (int i = index; i < index + n; i++) {
+			Move m = path.get(i);
+			if (m.kind() != Kind.WALK && m.kind() != Kind.DIAGONAL || !m.dig().isEmpty() || m.to().getY() != first.from().getY() || direction(m) != direction(first)) return false;
+			if (passable(m.to().above(2)) || !passable(m.to().above())) return false;
+		}
+		return true;
+	}
 
 	/** The next move keeps about the same heading (45 degrees at most): it runs on through, sprinting, like a player. */
 	private boolean smooth() {

@@ -321,7 +321,7 @@ final class Goals {
 			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
-			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+			case MINE -> fuelRun && c.chores.fuel() == 0 ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < 3 && readyForDiamonds() ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (an iron pickaxe: down for diamonds, the iron on the way comes too; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
@@ -375,7 +375,7 @@ final class Goals {
 					: home != null && !busyBuilding && !evening() && !c.player.isCreative() && c.taste.wantsBigger(items.getOrDefault("log", 0))
 					? 0.35f * (0.5f + p.diligence) : 0;                                // a better house once it has the wood
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
-					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? 0.5f * (0.5f + p.bravery)
+					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? (readyForDiamonds() ? 0.5f : 0.4f) * (0.5f + p.bravery)
 					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
 			case FARM -> home != null && c.farmer.middle == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
@@ -650,6 +650,24 @@ final class Goals {
 	/** How much ore it goes down for: a greedy Xen wants more (up to twice as much). */
 	private int more(int n) {
 		return Math.round(n * (1 + c.personality.sin(Sins.GREED)));
+	}
+
+	/** Iron, nothing to burn it with: down for coal (its guide shows the way to some), a little only. */
+	private boolean fuelRun;
+	private long coalTriedAt = -10000;
+
+	private String fuelRun() {
+		fuelRun = false;
+		coalTriedAt = now();
+		return c.chores.mine(c.lessons.depth("coal", 40), "coal", 4);
+	}
+
+	/** An iron pickaxe: diamonds now, or armor first? Its own choice: armor on (or a shield, if it's good in a fight), or bold enough to go without. */
+	boolean readyForDiamonds() {
+		boolean armored = c.crafter.has("_chestplate"), shield = c.crafter.hasShield();
+		float fight = c.skills.get(Skills.FIGHT);
+		return armored || shield && fight >= 0.5f || c.personality.bravery > 0.7f
+				|| shield && c.personality.bravery > 0.5f && fight >= 0.35f || c.items().getOrDefault("iron_ingot", 0) + c.items().getOrDefault("raw_iron", 0) >= 24;
 	}
 
 	private int diamonds() {
@@ -1204,7 +1222,13 @@ final class Goals {
 		}
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
 		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
-		if (items.getOrDefault("raw_iron", 0) >= 3 && !can[Mind.SMELT] && c.chores.fuel() == 0 && can[Mind.WOOD]) return why(Mind.WOOD, "wood to smelt its iron");   // (iron, nothing to burn: a tree)
+		if (items.getOrDefault("raw_iron", 0) >= 3 && !can[Mind.SMELT] && c.chores.fuel() == 0) {   // (iron, nothing to burn: from the end back, coal first)
+			if (can[Mind.MINE] && now() - coalTriedAt > 2400) {
+				fuelRun = true;
+				return why(Mind.MINE, "coal to smelt its iron");
+			}
+			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood to smelt its iron");   // (no coal last time: a tree burns too)
+		}
 		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {
 			c.chores.forWool = false;
 			return why(Mind.FOOD, "low on food");
