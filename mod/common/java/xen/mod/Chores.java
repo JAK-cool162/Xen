@@ -1553,12 +1553,12 @@ final class Chores {
 		if (!caveMode && toMine == null && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
 			if (!c.guide.leading() && now() >= guideNext) {                   // its guide: a way to the nearest ore it's after (it follows, or goes its own way)
 				guideNext = now() + 20 * 20;
-				boolean deep = what.equals("diamonds");
-				c.guide.offer(deep ? "diamond" : what.equals("iron") ? "iron" : "coal", 40, deep ? 140 : 72);
+				boolean deep = what.equals("diamonds"), down = mineBase != null;   // (down its mine: ore by its tunnels; on its way down: wherever it'd dig to)
+				c.guide.offer(deep ? "diamond" : what.equals("iron") ? "iron" : "coal", down ? 10 : 40, down ? 4 : deep ? 140 : 72);
 			}
 			if (c.guide.check()) {
 				BlockPos t = c.guide.target, here = c.player.blockPosition();
-				if (t.closerThan(here, 8)) {                                    // close: straight to it
+				if (t.closerThan(here, 11)) {                                   // close: straight to it
 					doing = c.guide.doing(got, want);
 					Action a = reach(t);
 					if (a != null) return a;
