@@ -2719,8 +2719,8 @@ public final class Companion {
 		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
 		double bestScore = 0, currentScore = 0;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
-				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
-						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem()) || minedIt(x)))) {   // (a tool or armor lying there too; what a friend just tossed to it; what it mined)
+				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && x.getOwner() != player && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
+						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem()) || minedIt(x)))) {   // (a tool or armor lying there too; what a friend just tossed to it; what it mined; never what it threw itself)
 			if (!player.hasLineOfSight(e)) continue;
 			double score = Math.max(pickValue(e.getItem()), minedIt(e) ? 1 : 0) / (1 + 0.25 * e.distanceTo(player));   // the best first, then the nearest
 			if (e.getUUID().equals(goingFor)) {
@@ -3690,8 +3690,12 @@ public final class Companion {
 	private static final java.util.regex.Pattern TEAM_JOIN = java.util.regex.Pattern.compile(
 			"\\b(join|be on|come to|switch to|be in)\\s+(my|our|the)?\\s*(team|side)\\b|\\bjoin\\s+(the\\s+)?(red|blue|green|yellow|purple|aqua)(\\s+team)?\\b|\\bjoin us\\b");
 
+	/** The player's own team ("let's make a team", "I made a team called ...", "my team is called ..."): not one the Xen founds ("make a team"). */
 	private static final java.util.regex.Pattern TEAM_MAKE = java.util.regex.Pattern.compile(
-			"\\b(make|create|start|form|found)\\s+(a|our|my|an)?\\s*(new\\s+)?team\\b(?:\\s+(?:called|named))?\\s*([a-z0-9 ]{0,24})");
+			"\\b(?:let'?s|let us|i(?:'m| am|'ll| will)?(?:\\s+(?:gonna|going to|just))?|we(?:'re| are|'ll| will)?(?:\\s+(?:gonna|going to|just))?)\\s+"
+			+ "(?:make|made|making|create|created|creating|start|started|starting|form|formed|forming|found|founded)\\s+(?:a|our|my|an)?\\s*(?:new\\s+)?team\\b"
+			+ "(?:\\s+(?:called|named))?\\s*(?<name>[a-z0-9 ]{0,24})"
+			+ "|\\b(?:my|our) team(?:'s| is)? (?:called|named) (?<name2>[a-z0-9 ]{1,24})");
 
 	/**
 	 * A player starts a team in chat ("let's make a team called Night Owls", "make a team with me"): it's made for them,
@@ -3700,7 +3704,8 @@ public final class Companion {
 	private String teamMade(ServerPlayer from, String words) {
 		var m = TEAM_MAKE.matcher(words.toLowerCase(java.util.Locale.ROOT));
 		if (!m.find()) return null;
-		String wanted = m.group(4) == null ? "" : m.group(4).replaceAll("\\b(with|me|us|and|you|please|now|together)\\b", " ").trim();
+		String said = m.group("name") != null ? m.group("name") : m.group("name2");
+		String wanted = said == null ? "" : said.replaceAll("\\b(with|me|us|and|you|please|now|together|join|it|for|of)\\b", " ").replaceAll("\\s+", " ").trim();
 		var team = mod.playerTeam(from, wanted);
 		if (team == null) team = server.getScoreboard().getPlayersTeam(from.getScoreboardName());   // (they have one: that one)
 		if (team == null) return "Couldn't make a team, sorry.";
@@ -3710,6 +3715,11 @@ public final class Companion {
 		return pick3("The " + name + "? ", "A team, the " + name + ". ", "Team " + name + ", huh. ") + join;
 	}
 
+	/** Who last asked it onto their team, when, and whether it said no (asked again soon: the same answer). */
+	private UUID teamAskedBy;
+	private long teamAskedAt;
+	private boolean teamSaidNo;
+
 	/** Join this player's team? Its call (trust in them, loyalty to its own team; a loner never): what it says. */
 	private String joinOrNot(ServerPlayer from, net.minecraft.world.scores.PlayerTeam team) {
 		if (personality.loner) return pick3("I don't do teams. I work alone.", "Thanks, but I'm better on my own.", "No teams for me. Nothing personal.");
@@ -3717,8 +3727,21 @@ public final class Companion {
 		if (mine == team) return "I'm already on it!";
 		float trust = trust(from.getUUID());
 		boolean onOne = mine != null && (mod.ownTeam(mine.getName()) || mod.onPlayersTeam(this));
-		boolean agree = trust >= 0.45f && (!onOne || personality.loyalty < 0.7f || trust >= 0.8f);
-		if (!agree) return trust < 0.2f ? "Why would I join you? I don't even know you." : "No thanks, I'm staying with my team.";
+		if (onOne) {                                                   // on a team already: only for someone it trusts, if it's not that loyal to its own
+			if (trust < 0.45f || personality.loyalty >= 0.7f && trust < 0.8f) return "No thanks, I'm staying with my team.";
+		} else {                                                      // no team: its call (trust, kindness, how social it is, wanting to lead its own)
+			long now = player.level().getGameTime();
+			if (from.getUUID().equals(teamAskedBy) && now - teamAskedAt < 2400 && teamSaidNo)
+				return pick3("Still no. Let me get to know you first.", "I said not yet.", "Ask me again some other time.");
+			float chance = 0.2f + 0.6f * Math.max(0f, trust) + 0.2f * personality.kindness + 0.15f * personality.chattiness - 0.25f * personality.power;
+			boolean agree = trust >= 0.9f || trust >= 0.05f && random.nextFloat() < chance;
+			teamAskedBy = from.getUUID();
+			teamAskedAt = now;
+			teamSaidNo = !agree;
+			journal("thinks", String.format(java.util.Locale.ROOT, "asked onto %s's team (trust %.2f): %s", from.getName().getString(), trust, agree ? "joins" : "not yet"));
+			if (!agree) return trust < 0.05f ? "Why would I join you? I don't even know you."
+					: pick3("Not yet. I don't really know you.", "Maybe later, once I know you better.", "Hmm, not right now.");
+		}
 		mod.joinPlayersTeam(this, team);
 		return pick3("I'm in!", "Count me in, " + from.getName().getString() + ".", "Sure, I'll join.");
 	}
@@ -3730,7 +3753,7 @@ public final class Companion {
 		String color = m.group(5);
 		if (color == null) {
 			var t = server.getScoreboard().getPlayersTeam(from.getScoreboardName());
-			if (t == null) return "You don't have a team for me to join. Make one first (say \"let's make a team\"), or tell me a color.";
+			if (t == null) return "You don't have a team for me to join. Make one first (say \"let's make a team called ...\"), or tell me a color.";
 			if (!t.getName().startsWith("xen_") || mod.ownTeam(t.getName())) return joinOrNot(from, t);   // (a team they made, in chat or with /team)
 			color = t.getName().substring(4);
 		}
@@ -4566,6 +4589,11 @@ public final class Companion {
 			}
 		}
 		String words = said == null ? "" : xen.mod.talk.Chat.requestWords(said, name);
+		String made = teamMade(from, words);                           // "let's make a team called ...": theirs, and it decides whether to join (before talk reads it as chat)
+		if (made != null) {
+			say(made);
+			return null;
+		}
 		if (trust(u) >= 0.3f && knowledge.heard(words)) return null;   // how to handle something it didn't know ("in a storm, wait in a shelter"): learned, not an order
 		xen.mod.talk.Voice.Heard told = xen.mod.talk.Voice.hear(said == null ? "" : said, name);
 		if (told.insult && from != null && !xen.mod.talk.Texting.banter(said)) rage.provoke(random.nextFloat() < 0.4f ? 2 : 1, "insulted by " + from.getName().getString());   // (a joke isn't an insult)
@@ -4675,8 +4703,7 @@ public final class Companion {
 			say(train);
 			return null;
 		}
-		String teamAnswer = teamMade(from, words);                     // "let's make a team called ...": made for them, and it decides whether to join
-		if (teamAnswer == null) teamAnswer = teamAsked(from, words);   // "join my team", "join the red team": its call
+		String teamAnswer = teamAsked(from, words);                    // "join my team", "join the red team": its call
 		if (teamAnswer != null) {
 			say(teamAnswer);
 			return null;
