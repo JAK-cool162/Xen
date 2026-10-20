@@ -1727,6 +1727,15 @@ final class Chores {
 		return kind == Kind.MINE && caveLook > 0 && !caveMode && now() < caveLook;
 	}
 
+	/** The felt cave it's walking to; the felt ones it went to or turned down (not asked about again). */
+	private BlockPos feltAt;
+	private final List<BlockPos> caveTried = new ArrayList<>();
+
+	private void caveTried(BlockPos at) {
+		caveTried.add(at);
+		if (caveTried.size() > 32) caveTried.remove(0);
+	}
+
 	/** Looking round for a cave before it digs: one found (it saw it), in it goes; none in a while, its own mine. Null: done looking. */
 	private Action lookForCave() {
 		BlockPos cave = c.caves.nearest(64);
@@ -1753,10 +1762,19 @@ final class Chores {
 			return null;
 		}
 		BlockPos feet = c.player.blockPosition();
-		if (caveLookTo == null || feet.closerThan(caveLookTo, 3) || now() - caveLookToAt > 300) {
+		boolean toFelt = caveLookTo != null && caveLookTo.equals(feltAt);
+		if (caveLookTo == null || feet.closerThan(caveLookTo, 3) || now() - caveLookToAt > (toFelt ? 1200 : 300)) {
+			if (toFelt) caveTried(feltAt);                                        // (there, or a minute on, and no cave to see: not that one again)
+			feltAt = null;
 			ServerLevel level = (ServerLevel) c.player.level();
-			BlockPos felt = c.hunch.caveNear(feet, 112);                          // luck: a feeling there's a cave over there (the server knows, a big one first): it goes and has a look
-			if (felt != null && !felt.closerThan(feet, 6) && c.guide.follows(c.hunch.lastCave, felt)) {   // (its guide's feeling: it follows it or not)
+			BlockPos sensed = c.hunch.caveNear(feet, 112);                        // luck: a feeling there's a cave over there (the server knows, a big one first): it goes and has a look
+			BlockPos felt = sensed != null && caveTried.stream().anyMatch(t -> t.closerThan(sensed, 32)) ? null : sensed;   // (one it went to, or made up its mind about, already: not again)
+			if (felt != null && !felt.closerThan(feet, 6) && !c.guide.follows(c.hunch.lastCave, felt)) {
+				caveTried(felt);
+				felt = null;
+			}
+			if (felt != null && !felt.closerThan(feet, 6)) {                      // (its guide's feeling: it follows it)
+				feltAt = felt;
 				caveLookTo = felt;
 				caveLookToAt = now();
 				caveFelt = true;

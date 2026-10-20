@@ -332,6 +332,14 @@ final class Nether {
 			return null;
 		}
 		if (obsidian() < obsidianWanted()) return getObsidian();
+		if (c.enchanter.on || !enchanted() && c.enchanter.possible() && now() > c.enchanter.retryAt) {   // the obsidian for the table's in its bag too: its gear enchanted first (a few seconds), then the portal
+			if (!c.enchanter.on) {
+				c.enchanter.start();
+				c.journal("thinks", "has the obsidian: makes its enchanting table and enchants its gear before the portal");
+			}
+			c.goals.instant = "enchanting";
+			return c.enchanter.next();
+		}
 		BlockPos near = c.goals.home != null && c.player.blockPosition().distSqr(c.goals.home) < 64 * 64 ? c.goals.home.offset(6, 0, 6) : null;
 		String plan = c.builder.startNear("nether portal", near);
 		if (!plan.startsWith("You will")) {
@@ -479,6 +487,13 @@ final class Nether {
 			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
 		}
 		return best;
+	}
+
+	/** Something it carries or wears is enchanted. */
+	private boolean enchanted() {
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) if (inv.getItem(i).isEnchanted()) return true;
+		return false;
 	}
 
 	/** The portal it just built: light it (a flint and steel on the obsidian at the bottom, from outside). */

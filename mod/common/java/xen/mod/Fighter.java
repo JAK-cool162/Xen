@@ -226,7 +226,7 @@ final class Fighter {
 	private Action perch(LivingEntity foe, double d) {
 		XenPlayer p = c.player;
 		Hands h = c.hands;
-		if (perched && !meleeOnly(kind(foe))) {                              // one that shoots (or climbs): no use up there, down and away
+		if (perched && (!meleeOnly(kind(foe)) || p.tickCount % 10 == 0 && shooterInSight() != null)) {   // one that shoots (or climbs), or a skeleton come along: no use up there, down and away
 			perched = false;
 			return null;
 		}
@@ -363,10 +363,19 @@ final class Fighter {
 		// Can it win this? What this kind (and the others at it) have cost it before, against the health it has: if it would
 		// come out of it with next to nothing, a player gets out of reach first (two blocks up: a zombie can't hit that) or
 		// away, heals, and only then takes it on again. Its own nerve says how close it cuts it (a warrior never runs).
-		boolean outmatched = false;
+		boolean outmatched = false, rush = false;
 		if (!(foe instanceof Player) && !c.inArena) {
 			float left = p.getHealth() - expected(foe), want = margin();
-			if (escaping || perched) outmatched = left < want + 4 && p.getHealth() < 18;   // (it took the tip: away till it has healed, then back at it)
+			// A skeleton close by and a weapon that kills it in two crits: a player rushes it (walking off to cover, it's shot
+			// in the back all the way); only it after it, and health for the two or three arrows on the way in.
+			rush = archer(foe) && d <= 6 && Math.min(critsToKill(foe, best("_axe")), critsToKill(foe, best("_sword"))) <= 2 && p.getHealth() >= 6
+					&& p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(10), m -> m.isAlive() && m != foe && m.getTarget() == p).isEmpty();
+			if (rush) {
+				if (now - rushSaidAt > 600) {
+					rushSaidAt = now;
+					c.journal("fight", String.format(java.util.Locale.ROOT, "rushes the %s %.0f blocks off (two crits kill it; cover is further than that)", kind(foe).replace('_', ' '), d));
+				}
+			} else if (escaping || perched) outmatched = left < want + 4 && p.getHealth() < 18;   // (it took the tip: away till it has healed, then back at it)
 			else if (left < want || now < gutUntil && p.getHealth() < 16) {    // it sees it going badly (or feels it): a tip comes to mind, and it's its call
 				float pull = Math.max(0, Math.min(1, (want - left) / Math.max(4, want))) + (now < gutUntil ? 0.3f : 0);
 				outmatched = c.tips.take(Tips.Tip.CANT_WIN, pull, String.format(java.util.Locale.ROOT, "%.0f health, the %s would cost it about %.0f%s",
@@ -402,7 +411,7 @@ final class Fighter {
 			saidWhyAt = now;
 			c.journal("fight", String.format(java.util.Locale.ROOT, "takes a hit to finish the %s (%.0f health left on it, %.0f on itself)", kind(foe).replace('_', ' '), foe.getHealth(), p.getHealth()));
 		}
-		if (!finishing && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f))) {
+		if (!finishing && !rush && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f))) {
 			if (!fleeing && !c.inArena) {
 				c.chatter(c.personality.say("flee"), false);
 				c.journal("fight", String.format(java.util.Locale.ROOT, "backs off at %.0f health (%s: keeps %.0f in hand)%s", p.getHealth(), style().words, retreat * p.getMaxHealth(),
@@ -720,6 +729,9 @@ final class Fighter {
 
 	/** When it last noted why the axe (once a minute at most). */
 	private long axeSaidAt = -10000;
+
+	/** When it last noted rushing a skeleton. */
+	private long rushSaidAt = -10000;
 
 	private boolean archer(LivingEntity e) {
 		String k = kind(e);

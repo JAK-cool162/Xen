@@ -87,10 +87,10 @@ final class Instinct {
 		p.setJumping(true);
 		p.setShiftKeyDown(false);
 		p.setSprinting(false);
-		if (p.horizontalCollision) {                                   // (into a wall: up, not forward)
-			p.zza = 0;
-			p.xxa = 0;
-		}
+		p.zza = 0;                                                     // straight up, where it's open (it only knows it's open over its head: a drift sideways takes it under the rock)
+		p.xxa = 0;
+		var v = p.getDeltaMovement();
+		p.setDeltaMovement(v.x * 0.6, v.y, v.z * 0.6);
 		return "swimming up for air";
 	}
 

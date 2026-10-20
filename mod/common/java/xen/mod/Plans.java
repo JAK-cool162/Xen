@@ -491,9 +491,11 @@ final class Plans {
 		if (s.getOrDefault("bucket", 0) + s.getOrDefault("water_bucket", 0) == 0) wants.add("bucket");
 		if (tier >= 3 && s.getOrDefault("iron_chestplate", 0) + s.getOrDefault("diamond_chestplate", 0) == 0) wants.add("iron_chestplate");
 		if (wants.isEmpty() && tier >= 3) {                                  // then like a player: a diamond pickaxe, the enchanting table, lapis for it
+			boolean table = c.enchanter.table() != null || s.getOrDefault("enchanting_table", 0) > 0;
 			if (tier < 4) wants.add("diamond_pickaxe");
-			else if (c.enchanter.table() == null && s.getOrDefault("enchanting_table", 0) == 0) wants.add("enchanting_table");
+			else if (!table && s.getOrDefault("book", 0) == 0) wants.add("book");   // (the book first: the obsidian may be a Nether trip's, and a plan with it unknown gets nowhere)
 			else if (s.getOrDefault("lapis_lazuli", 0) < 3) wants.add("lapis_lazuli*3");
+			else if (!table) wants.add("enchanting_table");
 		}
 		return wants.isEmpty() ? null : wants.get(0);
 	}
