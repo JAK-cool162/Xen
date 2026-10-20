@@ -433,6 +433,7 @@ final class Chores {
 			if (tunnel != null) {
 				begin(Kind.SHELTER);
 				dugout = tunnel;
+				dugoutDug = false;
 				walls = List.of();
 				shape = "dugout";
 				waited = 0;
@@ -599,6 +600,7 @@ final class Chores {
 		if (tunnel != null && tunnel.stream().noneMatch(c.hands::tooSlowToMine)) {
 			begin(Kind.SHELTER);
 			dugout = tunnel;
+			dugoutDug = false;
 			walls = List.of();
 			shape = "dugout";
 			waited = 0;
@@ -2855,6 +2857,8 @@ final class Chores {
 
 	/** The dugout: the blocks it digs (feet and head, three deep into the hill), in order; null if it's building walls instead. */
 	private List<BlockPos> dugout;
+	/** Its dugout dug out (from then on it only goes in and closes the way behind it: no digging out its own door again). */
+	private boolean dugoutDug;
 
 	/**
 	 * A hillside to dig into from here: three blocks deep, two high, natural ground all round (a floor under it, a roof
@@ -2886,7 +2890,7 @@ final class Chores {
 
 	private Action dugoutNext() {
 		ServerLevel level = (ServerLevel) c.player.level();
-		for (int i = 0; i < dugout.size(); i++) {                           // dig it out, front to back
+		for (int i = 0; i < dugout.size() && !dugoutDug; i++) {             // dig it out, front to back (once: then the door it puts back stays put)
 			BlockPos b = dugout.get(i);
 			if (level.getBlockState(b).getCollisionShape(level, b).isEmpty()) continue;
 			doing = "digging into the hill for the night";
@@ -2897,6 +2901,7 @@ final class Chores {
 			BlockPos stand = i < 2 ? c.player.blockPosition() : dugout.get(i - 2 - (i % 2));   // one step further in
 			return c.walkTo(Vec3.atBottomCenterOf(stand));
 		}
+		dugoutDug = true;
 		BlockPos inner = dugout.get(dugout.size() - 2), door = dugout.get(0);
 		if (!c.player.blockPosition().equals(inner)) {                      // in, to the back
 			doing = "going into its dugout";
