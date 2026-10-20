@@ -502,8 +502,12 @@ final class Walker {
 	 * tools), about what mining one more costs. That stone it would rather get by digging its way up a staircase,
 	 * which also leaves it a way back down.
 	 */
+	/** Till when it plans no ways that put blocks down (going for something not worth a block: a bit of cobblestone). */
+	long noBuildingUntil;
+
 	private double placeWorth() {
 		if (c.player.isCreative()) return 0;
+		if (now() < noBuildingUntil) return 1e6;                              // (no reason to build for this)
 		int dirt = 0, stone = 0, furnace = 0;
 		var inv = c.player.getInventory();
 		for (int i = 0; i < inv.getContainerSize(); i++) {

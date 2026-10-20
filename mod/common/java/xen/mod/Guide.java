@@ -85,6 +85,27 @@ final class Guide {
 		return false;
 	}
 
+	/** A feeling there's a cave over there (a big one: quicker iron than any mine): does it follow it? Its trust decides, as with ore. */
+	boolean follows(String what, BlockPos at) {
+		offered++;
+		if (c.random().nextFloat() >= faith()) {
+			ignored++;
+			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d, but goes its own way (trusts its feelings %.0f%%)",
+					what, at.getX(), at.getY(), at.getZ(), 100 * faith()));
+			return false;
+		}
+		followed++;
+		c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and goes to look (trusts its feelings %.0f%%)",
+				what, at.getX(), at.getY(), at.getZ(), 100 * faith()));
+		return true;
+	}
+
+	/** It followed a feeling about a cave and found one there (or didn't): its trust learns, as with ore. */
+	void caveFeeling(boolean right) {
+		faith = Math.max(0.1f, Math.min(0.95f, faith() + (right ? 0.05f : -0.06f)));
+		if (right) paid++;
+	}
+
 	/**
 	 * A way to dig there, like Baritone: a step toward it at a time (along the longer way), one down with each step
 	 * while it's below (a staircase, never straight down; close over it, round it in a spiral), then straight in to

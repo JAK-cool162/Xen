@@ -1549,11 +1549,11 @@ final class Chores {
 			oreWay = null;
 			return null;
 		}
-		if (!caveMode && toMine == null && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+		if (toMine == null && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
 			if (!c.guide.leading() && now() >= guideNext) {                   // its guide: a way to the nearest ore it's after (it follows, or goes its own way)
 				guideNext = now() + 20 * 20;
-				boolean deep = what.equals("diamonds"), down = mineBase != null;   // (down its mine: ore by its tunnels; on its way down: wherever it'd dig to)
-				c.guide.offer(deep ? "diamond" : what.equals("iron") ? "iron" : "coal", down ? 10 : 40, down ? 4 : deep ? 140 : 72);
+				boolean deep = what.equals("diamonds"), down = mineBase != null;   // (down its mine: ore by its tunnels; on its way down: wherever it'd dig to; in a cave: round it, the ore showing first)
+				c.guide.offer(deep ? "diamond" : what.equals("iron") ? "iron" : "coal", caveMode ? 20 : down ? 10 : 40, caveMode ? 12 : down ? 4 : deep ? 140 : 72);
 			}
 			if (c.guide.check()) {
 				BlockPos t = c.guide.target, here = c.player.blockPosition();
@@ -1561,7 +1561,7 @@ final class Chores {
 					doing = c.guide.doing(got, want);
 					Action a = reach(t);
 					if (a != null) return a;
-				} else if (mineBase == null && tunnelIn == null && t.getY() < here.getY() - 3) {   // far and below: its staircase goes that way (as deep as it was going: it takes the ore as it passes)
+				} else if (!caveMode && mineBase == null && tunnelIn == null && t.getY() < here.getY() - 3) {   // far and below: its staircase goes that way (as deep as it was going: it takes the ore as it passes)
 					net.minecraft.core.Direction d = c.guide.way();
 					if (!wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
 				}
@@ -1697,6 +1697,9 @@ final class Chores {
 		return a;
 	}
 
+	/** It's following a feeling about a cave (its guide learns whether that was right). */
+	private boolean caveFelt;
+
 	/** Out looking round for a cave (for its mining), not in one yet. */
 	boolean lookingForCave() {
 		return kind == Kind.MINE && caveLook > 0 && !caveMode && now() < caveLook;
@@ -1714,22 +1717,31 @@ final class Chores {
 			intoHill = false;
 			tunnelIn = null;
 			c.journal("does", "found a cave to mine in at " + cave.toShortString() + ": in there, not its own staircase");
+			if (caveFelt) c.guide.caveFeeling(true);
+			caveFelt = false;
 			XenMod.LOG.info("{} mines in the cave at {}", c.name, cave.toShortString());
 			c.chatter(c.pick3("A cave. Way quicker than digging.", "Found a cave, going in.", "Cave! The ore's in the walls there."), false);
 			return null;
 		}
 		if (now() > caveLook || c.player.level().isDarkOutside()) {
 			caveLook = 0;
+			if (caveFelt) c.guide.caveFeeling(false);
+			caveFelt = false;
 			c.journal("thinks", "no cave close by: digs its own mine");
 			return null;
 		}
 		BlockPos feet = c.player.blockPosition();
 		if (caveLookTo == null || feet.closerThan(caveLookTo, 3) || now() - caveLookToAt > 300) {
 			ServerLevel level = (ServerLevel) c.player.level();
-			BlockPos felt = c.hunch.caveNear(feet, 72);                           // luck: a feeling there's a cave over there (the server knows): it goes and has a look
-			if (felt != null && !felt.closerThan(feet, 6)) {
+			BlockPos felt = c.hunch.caveNear(feet, 112);                          // luck: a feeling there's a cave over there (the server knows, a big one first): it goes and has a look
+			if (felt != null && !felt.closerThan(feet, 6) && c.guide.follows(c.hunch.lastCave, felt)) {   // (its guide's feeling: it follows it or not)
 				caveLookTo = felt;
 				caveLookToAt = now();
+				caveFelt = true;
+				if (c.hunch.lastCaveWorth >= 1500) {                              // a big one: worth the walk, more than digging a mine (more time to find its mouth)
+					caveLook = Math.max(caveLook, now() + 20 * 120);
+					c.journal("thinks", "a big cave should be over there: quicker iron than strip mining, so it goes for that first");
+				}
 				doing = "going to have a look for the cave it has a feeling about";
 				Action a = c.walkTo(Vec3.atBottomCenterOf(felt));
 				if (a != null) return a;

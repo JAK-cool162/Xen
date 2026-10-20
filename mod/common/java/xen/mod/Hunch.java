@@ -437,7 +437,8 @@ final class Hunch {
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
-				found.add(new double[] {Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy), at.getX(), at.getY(), at.getZ()});
+				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy);
+				found.add(new double[] {f.open() ? cost * 0.5 : cost + 24, at.getX(), at.getY(), at.getZ()});   // (showing in a cave wall: those first, mostly)
 			}
 		found.sort((a, b) -> Double.compare(a[0], b[0]));
 		for (int i = 0; i < found.size() && out.size() < max && i < 4 * max; i++) {
@@ -454,30 +455,54 @@ final class Hunch {
 	 * look (it finds the mouth itself, by sight), or null. Not one another Xen is mining, not where it's been.
 	 */
 	BlockPos caveNear(BlockPos from, int within) {
+		lastCave = "";
+		lastCaveWorth = 0;
 		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return null;
 		ServerLevel level = (ServerLevel) c.player.level();
 		Map<Long, Chunk> known = WORLD.get(dim(level));
 		if (known == null) return null;
-		BlockPos best = null;
-		double bestD = (double) within * within;
+		List<Find> caves = new ArrayList<>(), iron = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
-				if (!f.kind().equals("cave") || taken.contains(f.at().asLong()) || claimedBy(c, f.at())) continue;
-				double d = f.at().distSqr(new BlockPos(from.getX(), f.at().getY(), from.getZ()));
-				if (d >= bestD || d < 64) continue;
-				BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, f.at());
-				if (!level.getFluidState(top.below()).isEmpty() || top.getY() - f.at().getY() > 40) continue;   // (under the sea, or too deep under the ground to show)
-				bestD = d;
-				best = top;
+				int dx = Math.abs(f.at().getX() - from.getX()), dz = Math.abs(f.at().getZ() - from.getZ());
+				if (dx > within + 24 || dz > within + 24) continue;
+				if (f.kind().equals("cave")) caves.add(f);
+				else if (f.open() && f.kind().equals("iron")) iron.add(f);
 			}
+		BlockPos best = null;
+		double bestScore = Double.MAX_VALUE;
+		int bestSize = 0, bestIron = 0;
+		for (Find f : caves) {                                                 // big and near first: a big cave is the quickest iron there is
+			if (taken.contains(f.at().asLong()) || claimedBy(c, f.at())) continue;
+			double d = Math.sqrt(f.at().distSqr(new BlockPos(from.getX(), f.at().getY(), from.getZ())));
+			if (d > within || d < 8) continue;
+			BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, f.at());
+			if (!level.getFluidState(top.below()).isEmpty() || top.getY() - f.at().getY() > 40) continue;   // (under the sea, or too deep under the ground to show)
+			int size = 0, ores = 0;
+			for (Find g : caves) if (g.at().distSqr(f.at()) <= 24 * 24) size += g.amount();   // (the air joined up round it)
+			for (Find g : iron) if (g.at().distSqr(f.at()) <= 24 * 24) ores++;
+			double score = d / Math.sqrt(Math.max(1, size + 250.0 * ores));
+			if (score < bestScore) {
+				bestScore = score;
+				best = top;
+				bestSize = size;
+				bestIron = ores;
+			}
+		}
 		if (best != null) {
 			taken.add(best.asLong());
-			steered = "a cave (a feeling where it is)";
+			lastCaveWorth = bestSize + 250 * bestIron;
+			lastCave = (lastCaveWorth >= 1500 ? "a big cave" : "a cave") + String.format(java.util.Locale.ROOT, " (about %d blocks of air, %d iron showing)", bestSize, bestIron);
+			steered = lastCave + " (a feeling where it is)";
 			steeredAt = level.getGameTime();
 			times++;
 		}
 		return best;
 	}
+
+	/** What the last cave feeling was about (for its journal), and how much it looked worth (1500 and up: a big one). */
+	String lastCave = "";
+	int lastCaveWorth;
 
 	/** Ore it already went for (mined, or no way to it): not again. */
 	private final Set<Long> taken = new java.util.HashSet<>();

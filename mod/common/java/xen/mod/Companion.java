@@ -629,8 +629,8 @@ public final class Companion {
 			case ATTACK -> {
 				return hostileInFront() ? null : idle();
 			}
-			case PLACE -> {
-				return emotions.fear > 0.5f || player.isInWater() ? null : idle();
+			case PLACE -> {                                              // a block put down needs a reason: a monster on it (a pillar up), sinking out of air
+				return emotions.fear > 0.5f && danger() > 0.3f || player.isUnderWater() && player.getAirSupply() < player.getMaxAirSupply() / 2 ? null : idle();
 			}
 			default -> {
 				return null;
@@ -2323,6 +2323,10 @@ public final class Companion {
 		return false;
 	}
 
+	/** Things not worth building a way to (it puts down the same blocks to get there). */
+	private static final java.util.Set<String> CHEAP = java.util.Set.of("cobblestone", "cobbled_deepslate", "dirt", "gravel", "sand", "netherrack",
+			"andesite", "diorite", "granite", "tuff", "deepslate", "stone", "flint", "wheat_seeds");
+
 	private Action pickUpNearby() {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
 		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
@@ -2351,7 +2355,9 @@ public final class Companion {
 			leftLying.add(best.getUUID());
 			return null;
 		}
-		goals.instant = "picking up " + BuiltInRegistries.ITEM.getKey(best.getItem().getItem()).getPath().replace('_', ' ');
+		String what = BuiltInRegistries.ITEM.getKey(best.getItem().getItem()).getPath();
+		goals.instant = "picking up " + what.replace('_', ' ');
+		if (CHEAP.contains(what)) walker.noBuildingUntil = now + 20;         // (a block of stone isn't worth putting a block down for: walking to it, or leaving it)
 		return stepTo(best.position());                                   // (right by it: a step or two straight there; further: the usual way)
 	}
 
