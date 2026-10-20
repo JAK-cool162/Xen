@@ -2117,8 +2117,11 @@ public final class Companion {
 		}
 		goals.instant = "going back for its things";
 		rushingBack = now;                                                     // (straight there: no ore on the way, it runs)
-		Vec3 target = Vec3.atBottomCenterOf(lostAt);
-		if (Vec3.atCenterOf(lostAt).distanceTo(player.position()) <= 3) {        // there: its things, the ones it can see (or right by it)
+		BlockPos spot = lostAt;                                                // under water: its things float up, so it goes to the top over the spot
+		for (int k = 0; k < 96 && player.level().getFluidState(spot).is(net.minecraft.tags.FluidTags.WATER); k++) spot = spot.above();   // (never down to the sea floor: that's how it drowned)
+		if (!spot.equals(lostAt)) spot = spot.below();
+		Vec3 target = Vec3.atBottomCenterOf(spot);
+		if (Vec3.atCenterOf(spot).distanceTo(player.position()) <= 3) {         // there: its things, the ones it can see (or right by it)
 			target = null;
 			double bestScore = 0;
 			for (var item : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(6),
@@ -3996,15 +3999,33 @@ public final class Companion {
 			if (where != null && where.isLoaded(lostAt) && where.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
 					new net.minecraft.world.phys.AABB(lostAt).inflate(5), e -> e.isAlive()).isEmpty()) lostAt = null;
 		}
+		Vec3 at = dryNear(spot.newLevel(), spot.position());          // (the world's spawn out in the sea: on the nearest dry land, as the game does for players)
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
 		try {
-			join(spot.newLevel(), spot.position(), spot.yRot());
+			join(spot.newLevel(), at, spot.yRot());
 		} finally {
 			XenMod.quietJoin = false;
 		}
 		habits.respawned();
 		goals.freshStart();
 		respawnedAt = player.level().getGameTime();
+	}
+
+	/** That spot, or the nearest dry ground to it (32 blocks round) if it's in water: somewhere to stand and breathe. */
+	private static Vec3 dryNear(ServerLevel level, Vec3 pos) {
+		BlockPos b = BlockPos.containing(pos);
+		if (level.getFluidState(b).isEmpty() && level.getFluidState(b.above()).isEmpty()) return pos;
+		for (int r = 1; r <= 32; r++)
+			for (int dx = -r; dx <= r; dx++)
+				for (int dz = -r; dz <= r; dz++) {
+					if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;   // (ring by ring: the nearest first)
+					BlockPos q = b.offset(dx, 0, dz);
+					if (!level.isLoaded(q)) continue;
+					BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, q);
+					if (level.getFluidState(top.below()).isEmpty() && level.getFluidState(top).isEmpty()
+							&& !level.getBlockState(top.below()).getCollisionShape(level, top.below()).isEmpty()) return Vec3.atBottomCenterOf(top);
+				}
+		return pos;
 	}
 
 	/** When it last came back from dying (game time): back at the spawn in the dark with nothing, it digs in (see Gut.refuge). */

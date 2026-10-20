@@ -310,6 +310,14 @@ final class Walker {
 				XenMod.LOG.info("[walk] {} plan from {} to {} (goal {}, partial {}, moved {}, was {}): {}", c.name, p.blockPosition().toShortString(),
 						BlockPos.containing(to).toShortString(), want, partial, moved, was == null ? "-" : was.kind() + ">" + was.to().toShortString(), w);
 			}
+			if (longDive()) {                                                  // a long way with its head under water and no air on it: it'd drown (it thinks first)
+				c.journal("way", "won't go: a long way under water to " + BlockPos.containing(to).toShortString());
+				lastProblem = "it's too far under water";
+				badSince = now();
+				path = null;
+				release();
+				return null;
+			}
 			String plan = summary();
 			if (!plan.equals(journaled)) c.journal("way", path.size() + " moves to " + BlockPos.containing(to).toShortString() + ": " + plan);
 			journaled = plan;
@@ -1223,6 +1231,18 @@ final class Walker {
 		}
 		drive(m);
 		return true;
+	}
+
+	/** Twelve moves or more in a row with its head under water (no air on the way): a dive it wouldn't come back from. */
+	private boolean longDive() {
+		int run = 0;
+		for (int i = index; i < path.size(); i++) {
+			Move m = path.get(i);
+			if (m.kind() == Kind.SWIM && wet(m.to().above())) {
+				if (++run >= 12) return true;
+			} else run = 0;
+		}
+		return false;
 	}
 
 	/** The far end of the first long swim on its way (twelve swims or more in a row), or null: a boat's worth of water. */
