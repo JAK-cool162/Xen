@@ -1556,11 +1556,16 @@ final class Chores {
 				boolean deep = what.equals("diamonds");
 				c.guide.offer(deep ? "diamond" : what.equals("iron") ? "iron" : "coal", 40, deep ? 140 : 72);
 			}
-			if (c.guide.leading()) {
-				Action a = c.guide.step();
-				if (a != null) {
+			if (c.guide.check()) {
+				BlockPos t = c.guide.target, here = c.player.blockPosition();
+				if (t.closerThan(here, 8)) {                                    // close: straight to it
 					doing = c.guide.doing(got, want);
-					return a;
+					Action a = reach(t);
+					if (a != null) return a;
+				} else if (mineBase == null && tunnelIn == null) {             // far: its staircase goes that way, down to it
+					mineY = t.getY();
+					net.minecraft.core.Direction d = c.guide.way();
+					if (!wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
 				}
 			}
 		}

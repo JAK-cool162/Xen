@@ -2,8 +2,6 @@ package xen.mod;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.phys.Vec3;
-import xen.mod.core.Action;
 import xen.mod.core.Blocks;
 
 import java.util.ArrayList;
@@ -23,8 +21,6 @@ final class Guide {
 	/** The ore it's leading to now (null: none), what kind, and the way there. */
 	BlockPos target;
 	private String kind;
-	private final List<BlockPos> trail = new ArrayList<>();
-	private int next;
 	private double closest;
 	private long closerAt, since;
 	/** How much it trusts the guide, 0 to 1 (learned). Negative: not set yet (from its nature). */
@@ -75,9 +71,6 @@ final class Guide {
 			}
 			target = ore;
 			kind = what;
-			trail.clear();
-			trail.addAll(way);
-			next = 0;
 			closest = Double.MAX_VALUE;
 			closerAt = since = now();
 			followed++;
@@ -130,29 +123,37 @@ final class Guide {
 		return true;
 	}
 
-	/** Its next move along the way; null: none (there: the ore's in reach, or it gave up on this one). */
-	Action step() {
-		if (target == null || c.player == null) return null;
+	/**
+	 * Still leading? (Mined: it paid off. Thirty seconds and no closer: not this one.) Its mining does the digging:
+	 * its staircase toward it while it's far, straight to it once it's close.
+	 */
+	boolean check() {
+		if (target == null || c.player == null) return false;
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
-		int cat = WorldSenses.category(level, target, level.getBlockState(target));
-		if (cat == Blocks.AIR || cat == Blocks.STONE || level.getBlockState(target).isAir()) {   // mined (by it, right there: it paid off)
-			done(feet.closerThan(target, 5), "mined it");
-			return null;
+		var st = level.getBlockState(target);
+		int cat = WorldSenses.category(level, target, st);
+		if (st.isAir() || cat == Blocks.AIR || cat == Blocks.STONE) {               // mined (by it, right there: it paid off)
+			done(feet.closerThan(target, 6), "mined it");
+			return false;
 		}
-		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(target)) <= c.player.blockInteractionRange() - 0.3) return null;   // (in reach: its mining takes it)
-		while (next < trail.size() - 1 && feet.closerThan(trail.get(next), 1.6)) next++;
 		double d = Math.sqrt(feet.distSqr(target));
 		if (d < closest - 0.5) {
 			closest = d;
 			closerAt = now();
-		} else if (now() - closerAt > 20 * 20) {                                      // twenty seconds and no closer: not this way
-			done(false, "no closer in 20 s");
-			return null;
+		} else if (now() - closerAt > 20 * 30) {
+			done(false, "no closer in 30 s");
+			return false;
 		}
-		Action a = c.walkTo(Vec3.atBottomCenterOf(trail.get(next)));
-		if (a == null) done(false, "no way along it");
-		return a;
+		return true;
+	}
+
+	/** Which way (of the four) its staircase goes toward it. */
+	net.minecraft.core.Direction way() {
+		BlockPos feet = c.player.blockPosition();
+		int dx = target.getX() - feet.getX(), dz = target.getZ() - feet.getZ();
+		return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
+				: (dz > 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH);
 	}
 
 	/** What it's doing, for its status. */
@@ -171,13 +172,11 @@ final class Guide {
 		c.journal("learns", String.format(Locale.ROOT, "following its feeling to the %s: %s (%s, %.1f min); trusts its feelings %.0f%%", kind, worked ? "paid off" : "didn't",
 				why, (now() - since) / 1200f, 100 * faith()));
 		target = null;
-		trail.clear();
 	}
 
 	/** Not this time (the trip ended, a fight, the night...). */
 	void drop() {
 		target = null;
-		trail.clear();
 	}
 
 	String describe() {
