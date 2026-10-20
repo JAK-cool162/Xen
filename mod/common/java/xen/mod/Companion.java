@@ -462,6 +462,8 @@ public final class Companion {
 	}
 
 	private float lastHealthBefore = 20;
+	private int tierAlive;
+	private boolean armedAlive;
 
 	/**
 	 * Xen Ex1, twice a second: what it senses (the recorder's 119 senses), what it makes of it, and what it learns. A
@@ -519,6 +521,10 @@ public final class Companion {
 		lastHealthBefore = lastHealth;
 		lastHealth = player.getHealth();
 		lastFood = player.getFoodData().getFoodLevel();
+		if (player.tickCount % 20 == 0) {                                    // (what it had, for the death line: the bag is dropped by then)
+			tierAlive = crafter.pickTier();
+			armedAlive = hands.hasWeapon();
+		}
 		lastItems = items;
 		pillaring = acted = false;
 		walker.touched = false;
@@ -3044,6 +3050,10 @@ public final class Companion {
 		lookedOnTheWay = player.tickCount;
 		BlockPos ore = chores.oreWithinReach();
 		if (ore == null) return null;
+		if (nether.busy() && !nether.inNether()) {                      // on its way to the Nether: only what's worth the stop (diamonds, lapis, gold for the piglins)
+			String n = BuiltInRegistries.BLOCK.getKey(player.level().getBlockState(ore).getBlock()).getPath();
+			if (!n.contains("diamond") && !n.contains("lapis") && !n.contains("gold")) return null;
+		}
 		if (hands.busy()) {                                              // (digging its way: that block can wait, the ore first)
 			hands.stop();
 			walker.stop();
@@ -4315,7 +4325,7 @@ public final class Companion {
 		String how = source.type().msgId();
 		if (mod.config.journal && mod.journal != null && !inArena) mod.journal.died(name, cause + " at " + player.blockPosition().toShortString());
 		if (!inArena) XenMod.LOG.info("{} died of {} at y {} ({}, pickaxe tier {}, {} health before, {}) while {}", name, cause, player.blockPosition().getY(),
-				player.level().isDarkOutside() ? "night" : "day", crafter.pickTier(), Math.round(lastHealthBefore), hands.hasWeapon() ? "armed" : "no weapon",
+				player.level().isDarkOutside() ? "night" : "day", tierAlive, Math.round(lastHealthBefore), armedAlive ? "armed" : "no weapon",
 				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant);   // (for the test runs: what it was doing)
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)

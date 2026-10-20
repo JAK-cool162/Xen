@@ -1232,6 +1232,9 @@ final class Goals {
 				return why(Mind.FOOD, "hurt: food to heal");
 			}
 		}
+		if (tier >= 3 && can[Mind.ENCHANT] && !c.enchanter.on && now() > c.enchanter.retryAt) {   // the makings of an enchantment (lapis, levels, the table): a few seconds, before anything long (crafting too: enchanted gear is the better gear)
+			return why(Mind.ENCHANT, "enchant its gear (lapis, " + c.player.experienceLevel + " levels)");
+		}
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
 		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
 		if (items.getOrDefault("raw_iron", 0) >= 3 && !can[Mind.SMELT] && c.chores.fuel() == 0) {   // (iron, nothing to burn: from the end back, coal first)
@@ -1252,9 +1255,6 @@ final class Goals {
 		}
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
-		if (tier >= 3 && can[Mind.ENCHANT] && !c.enchanter.on && now() > c.enchanter.retryAt) {   // the makings of an enchantment (lapis, levels, the table): a few seconds, before anything long
-			return why(Mind.ENCHANT, "enchant its gear (lapis, " + c.player.experienceLevel + " levels)");
-		}
 		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
 				&& (enchantedSomething() || c.enchanter.table() == null && MindSense.count(c, n -> n.equals("obsidian") || n.equals("enchanting_table")) < 4
 						|| now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted, or no obsidian for a table yet (the trip gets it), or two days on: a first look at the Nether

@@ -394,11 +394,19 @@ public final class Hands {
 			case EAT -> { if (!p.isUsingItem() && ticks > 2) limit = ticks; }
 			default -> {}
 		}
-		if ((p.zza != 0 || p.xxa != 0) && edgeAhead()) {                   // a real drop that way: it stops at the edge
+		if ((p.zza != 0 || p.xxa != 0) && edgeAhead()) {                   // a real drop that way: it stops at the edge (crouched a moment, like a player: no sliding over)
 			p.xxa = p.zza = 0;
 			p.setJumping(false);
 			p.setSprinting(false);
+			if (!p.isShiftKeyDown()) {
+				p.setShiftKeyDown(true);
+				edgeCrouchUntil = p.tickCount + 8;
+			}
 			limit = ticks;
+		}
+		if (edgeCrouchUntil > 0 && p.tickCount >= edgeCrouchUntil) {      // (up again once it's stopped)
+			edgeCrouchUntil = 0;
+			p.setShiftKeyDown(false);
 		}
 		if (current != Action.ATTACK) look();
 		if (!busy()) {
@@ -411,6 +419,9 @@ public final class Hands {
 	 * Would the keys it's holding take it over an edge with a real drop (more than 4 blocks, no water below)? A player
 	 * looks where they walk: it stops there. (The walker has its own guard; this is for plain steps and strafes.)
 	 */
+	/** Crouched at an edge till this tick (0: not), so it doesn't slide over with the speed it had. */
+	private int edgeCrouchUntil;
+
 	private boolean edgeAhead() {
 		if (!p.onGround() || p.isInWater() || p.isCreative() || p.isSpectator()) return false;
 		double yaw = Math.toRadians(p.getYRot());
@@ -418,7 +429,8 @@ public final class Hands {
 		double len = Math.hypot(dx, dz);
 		if (len < 1e-3) return false;
 		var lv = p.level();
-		BlockPos.MutableBlockPos q = BlockPos.containing(p.getX() + dx / len * 0.8, p.getY() + 0.01, p.getZ() + dz / len * 0.8).mutable();
+		double ahead = 0.8 + 3 * p.getDeltaMovement().horizontalDistance();       // (further at a run: it slides on a bit)
+		BlockPos.MutableBlockPos q = BlockPos.containing(p.getX() + dx / len * ahead, p.getY() + 0.01, p.getZ() + dz / len * ahead).mutable();
 		for (int k = 0; k < 6; k++) {
 			var st = lv.getBlockState(q);
 			if (!st.getFluidState().isEmpty() || !st.getCollisionShape(lv, q).isEmpty()) return false;

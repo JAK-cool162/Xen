@@ -281,7 +281,7 @@ final class Nether {
 		if (c.chores.busy() || c.builder.busy() || c.crafter.hasOrder()) return null;   // getting something for the trip
 		String dim = Places.dim(c.player.level());
 		if (dim.equals("the_end")) return null;                                   // (the dragon is another story)
-		if (now() - tripSince > 20 * 60 * 20) {
+		if (now() - tripSince > (c.places.nearest("portal") == null && !inNether() ? 20 * 60 * 40 : 20 * 60 * 20)) {   // (two days when it has a portal to make first)
 			finishTrip("This trip is taking too long. I'll try again later.");
 			return null;
 		}
