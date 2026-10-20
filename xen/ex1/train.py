@@ -20,24 +20,50 @@ H = 64
 HEADS = {"keys": len(F.KEYS), "yaw": len(F.YAW_BINS) + 1, "pitch": 1, "danger": 1}
 
 
-def load(paths, with_xen=False):
+def good_moments(records, before_ms=10000):
+    """A Xen's log without the ten seconds before each of its deaths: what led to dying isn't play to copy."""
+    deaths = [r.get("t_ms", 0) for r in records if r.get("type") == "event" and r.get("kind") == "death"]
+    if not deaths:
+        return records
+    return [r for r in records if r.get("type") == "event" or not any(d - before_ms <= r.get("t_ms", 0) <= d for d in deaths)]
+
+
+def load(paths, with_xen=False, elite=None, xen_share=0.3, seed=7):
     """Frames from every log (the last fifth of each held out). A Xen's own log is left out unless with_xen: Ex1 learns
-    how people play, not how Xens do."""
-    train, test = [], []
+    how people play, not how Xens do. With elite (names), only those Xens' logs, without the moments before they died,
+    and at most xen_share as many of their frames as there are people's (so people's play still leads)."""
+    train, test, xtrain, xtest = [], [], [], []
     for path in paths:
         if R.is_session(path):                                # (the mod's recorder: a session folder)
             records = R.records(path)
         else:                                                 # (a gameplay log, or the recorder's light play_*.jsonl.gz)
             with (gzip.open(path, "rt", encoding="utf-8") if path.endswith(".gz") else open(path)) as fh:
                 records = [json.loads(line) for line in fh if line.strip()]
-        if F.source(records) == "xen" and not with_xen:
-            print(f"(left out {path}: a Xen's own play; --with-xen to use it)", file=sys.stderr)
+        xen = F.source(records) == "xen"
+        if xen and not with_xen and elite is None:
+            print(f"(left out {path}: a Xen's own play; --with-xen or --elite to use it)", file=sys.stderr)
             continue
+        if xen and elite is not None:
+            name = path.replace("\\", "/").split("/")[-1]
+            if not any(name.startswith("xen_" + e + "_") for e in elite):
+                continue                                          # (not one of the best: not to learn from)
+            records = good_moments(records)
         records = [r for r in records if not r.get("assisted")]   # (a Xen's moments its luck steered: not what it saw, not to learn from)
         fr = F.frames(records)
         cut = int(len(fr) * 0.8)
-        train += fr[:cut]
-        test += fr[cut:]
+        if xen and elite is not None:
+            xtrain += fr[:cut]
+            xtest += fr[cut:]
+        else:
+            train += fr[:cut]
+            test += fr[cut:]
+    if xtrain:
+        rng = np.random.default_rng(seed)
+        cap = max(1, int(len(train) * xen_share)) if train else len(xtrain)
+        if len(xtrain) > cap:
+            xtrain = [xtrain[i] for i in rng.choice(len(xtrain), cap, replace=False)]
+        print(f"(learning from the best Xens too: {len(xtrain)} of their frames next to {len(train)} of people's)", file=sys.stderr)
+        train += xtrain
     return train, test
 
 
@@ -65,8 +91,8 @@ def forward(net, X):
     return h1, h2, out
 
 
-def train(paths, out, epochs=25, seed=7, lr=2e-3, wd=1e-2, with_xen=False):
-    tr, te = load(paths, with_xen)
+def train(paths, out, epochs=25, seed=7, lr=2e-3, wd=1e-2, with_xen=False, elite=None, xen_share=0.3):
+    tr, te = load(paths, with_xen, elite, xen_share, seed)
     X, K, Y, P, D = arrays(tr)
     Xt, Kt, Yt, Pt, Dt = arrays(te)
     mean, std = X.mean(0), X.std(0) + 1e-3
@@ -183,8 +209,14 @@ def main(argv=None):
     ap.add_argument("--fixture", default="mod/common/test/fixtures/ex1.json")
     ap.add_argument("--epochs", type=int, default=25)
     ap.add_argument("--with-xen", action="store_true", help="also learn from Xens' own gameplay logs")
+    ap.add_argument("--elite", help="a file of the best Xens' names (python -m xen.ex1.elite): only their logs, not the moments before they died")
+    ap.add_argument("--xen-share", type=float, default=0.3, help="at most this many of the best Xens' frames for each of people's")
     a = ap.parse_args(argv)
-    model, net, mean, std = train(a.recordings, a.out, a.epochs, with_xen=a.with_xen)
+    elite = None
+    if a.elite:
+        with open(a.elite) as fh:
+            elite = [line.strip() for line in fh if line.strip()]
+    model, net, mean, std = train(a.recordings, a.out, a.epochs, with_xen=a.with_xen, elite=elite, xen_share=a.xen_share)
     fixture(net, mean, std, a.recordings, a.fixture)
     print(json.dumps({"trained_on": model["trained_on"], "report": model["report"]}, indent=1))
 
