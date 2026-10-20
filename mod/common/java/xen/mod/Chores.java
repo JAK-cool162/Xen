@@ -125,11 +125,21 @@ final class Chores {
 	/** Stopped from outside (a fight, its gut, something to pick up, someone asking): the chore didn't end, it was cut off (see {@link Focus}). */
 	void cancel() {
 		if (kind != null) endedItself = false;
+		if (DEBUG && kind != null) endWhy("cut off");
 		stop();
+	}
+
+	static final boolean DEBUG = Boolean.getBoolean("xen.choreDebug");
+
+	/** (-Dxen.choreDebug: who ended a chore, for its journal) */
+	private void endWhy(String how) {
+		var at = StackWalker.getInstance().walk(f -> f.skip(2).limit(3).map(x -> x.getClassName().replace("xen.mod.", "") + "." + x.getMethodName() + ":" + x.getLineNumber()).toList());
+		c.journal("debug", kind + " " + how + " after " + (now() - started) / 20 + " s, doing " + doing + ": " + String.join(" < ", at));
 	}
 
 	/** It ends (done, or it gave up). */
 	private void stop() {
+		if (DEBUG && kind != null && endedItself) endWhy("ended");
 		kind = null;
 		target = null;
 		prey = null;
@@ -140,8 +150,11 @@ final class Chores {
 		return c.player.level().getGameTime();
 	}
 
+	private long started;
+
 	private void begin(Kind k) {
 		stop();
+		started = now();
 		serial++;
 		endedItself = true;
 		dugout = null;
@@ -189,6 +202,10 @@ final class Chores {
 			lastGain = now();
 			return false;
 		}
+		if (kind == Kind.MINE && toMine != null && now() - started < 20 * 60 * 3) {   // still on its way to the mine: nothing to show yet is no wonder
+			lastGain = now();
+			return false;
+		}
 		if (kind == Kind.MINE && mineBase == null) {                         // down the staircase (or the cave): it isn't there yet, nothing to show is no wonder
 			int y = c.player.getBlockY();
 			if (y < deepest) {
@@ -201,8 +218,13 @@ final class Chores {
 		float patience = Math.max(kind == Kind.MINE ? 0.7f : 0.3f, c.personality.patience());   // (a trip down takes a while, even for a lazy one)
 		if (now() - lastGain < (long) (20 * 60 * minutes * patience)) return false;   // (a lazy one gives up sooner, a hard worker later)
 		if (kind == Kind.MINE) {
-			if (!caveMode) c.places.forget("mine");
-			mineRecordY = Integer.MIN_VALUE;
+			if (!caveMode && mineBase != null) {                                // a mine that got down: these tunnels gave nothing, the next ones further out may (a player keeps their mine)
+				mineRecordLeg = mineLeg + 4;
+			} else {
+				if (!caveMode) c.places.forget("mine");
+				mineRecordY = Integer.MIN_VALUE;
+				MINES.removeIf(m -> m.by == c && m.base == null);
+			}
 			if (caveMode) c.caves.done(c.caves.nearest(200));                 // (that cave's done)
 		}
 		c.journal("does", String.format(java.util.Locale.ROOT, "gives up: nothing for %.1f minutes (%s)", minutes * patience, what));
@@ -1090,6 +1112,76 @@ final class Chores {
 	private long legStarted;
 
 	/**
+	 * A Xen's own mine (its staircase): where it starts, how deep it goes, which way, its foot once it's dug that far.
+	 * Others may use it too, like on an SMP: down the same stairs, then tunnels of their own off the bottom (each the
+	 * next way round), not a new half-dug hole each.
+	 */
+	static final class Mine {
+		final Companion by;
+		final BlockPos entrance;
+		volatile int y;
+		final net.minecraft.core.Direction dir;
+		final String dim;
+		volatile BlockPos base;
+		int users;
+
+		Mine(Companion by, BlockPos entrance, int y, net.minecraft.core.Direction dir, String dim) {
+			this.by = by;
+			this.entrance = entrance;
+			this.y = y;
+			this.dir = dir;
+			this.dim = dim;
+		}
+	}
+
+	static final List<Mine> MINES = new java.util.concurrent.CopyOnWriteArrayList<>();
+	/** How long each branch of a strip mine runs off the main tunnel. */
+	private static final int STRIP = 16;
+	/** The mine it's using (its own, or another's), and ore it has a feeling about (luck) that it's digging to. */
+	private Mine using;
+	private BlockPos luckyOre;
+	private long lastWet;
+	private int luckyTries;
+	private long luckyAt, luckyNext;
+
+	/** The way (of the four) from a toward b. */
+	private static net.minecraft.core.Direction toward(BlockPos a, BlockPos b) {
+		int dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+		return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
+				: (dz > 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH);
+	}
+
+	private String dimName() {
+		return c.player.level().dimension().toString();
+	}
+
+	/** Its mine, known to the others (its own, started now: where, how deep, which way). */
+	private Mine ownMine(BlockPos entrance) {
+		for (Mine m : MINES) if (m.by == c && m.entrance.closerThan(entrance, 3)) return m;
+		MINES.removeIf(m -> m.by == c);                                            // (one mine each: its newest)
+		Mine m = new Mine(c, entrance.immutable(), mineY, mineDir, dimName());
+		MINES.add(m);
+		while (MINES.size() > 64) MINES.remove(0);
+		return m;
+	}
+
+	/** Someone else's mine near enough, for about this depth, from someone it doesn't hold a grudge against; null if none. */
+	private Mine sharedMine(int y, double within) {
+		Mine best = null;
+		double bestD = within * within;
+		for (Mine m : MINES) {
+			if (m.by == c || !m.dim.equals(dimName()) || m.y < y - 8 || m.by.player == null) continue;   // (deeper than it needs: no; shallower: on down from its foot)
+			if (c.trust(m.by.player.getUUID()) < 0f || c.diplomacy.wary(m.by.player.getUUID())) continue;
+			double d = m.entrance.distSqr(c.player.blockPosition());
+			if (d < bestD) {
+				bestD = d;
+				best = m;
+			}
+		}
+		return best;
+	}
+
+	/**
 	 * Go mining, like a player: a staircase down to where the ore is (iron and coal around y 16, diamonds deep down in
 	 * the deepslate), then branch tunnels two high, three blocks apart. It mines the ore it sees in the tunnel walls
 	 * (never ore it can't see), lights the way with torches if it has them, and stops when it has what it came for.
@@ -1116,10 +1208,71 @@ final class Chores {
 		mineY = y;
 		mineLeg = 0;
 		legStarted = now();
+		using = null;
+		luckyTries = 0;
+		luckyOre = null;
+		luckyAt = now();
+		boolean dark = c.player.level().isDarkOutside();                      // at night: no long walks in the dark to get there
+		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
+		BlockPos entrance = c.places.get("mine");
+		toMine = null;
+		if (entrance != null && mineRecordY != Integer.MIN_VALUE && entrance.closerThan(c.player.blockPosition(), dark ? 32 : 300)) {
+			toMine = entrance;
+			mineDir = mineRecordDir;
+			if (y < mineRecordY - 8) {                                         // deeper this time (diamonds): on down the same staircase
+				mineY = y;
+				mineLeg = 0;
+				mineBase = null;
+			} else {
+				mineY = mineRecordY;
+				mineLeg = mineRecordLeg;
+				mineBase = c.places.get("mine base");
+			}
+			using = ownMine(entrance);
+			return "You will go back to your mine for " + what + " (down the staircase at " + entrance.getX() + " " + entrance.getZ() + ", on with tunnel "
+					+ (mineLeg / 2 + 1) + ").";
+		}
+		Mine theirs = sharedMine(y, dark ? 32 : 160);                           // someone's mine close by: down their stairs, its own tunnels off the bottom
+		if (theirs != null) {
+			using = theirs;
+			theirs.users++;
+			toMine = theirs.entrance;
+			boolean deeper = y < theirs.y - 8;
+			mineY = deeper ? y : theirs.y;
+			mineBase = deeper ? null : theirs.base;
+			mineLeg = 0;
+			mineDir = mineBase == null ? theirs.dir : theirs.users % 2 == 1 ? theirs.dir.getClockWise() : theirs.dir.getCounterClockWise();   // (the next way round from theirs)
+			mineRecordY = mineY;
+			mineRecordDir = mineDir;
+			mineRecordLeg = 0;
+			caveLook = 0;
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "uses %s's mine at %d %d (down to y %d), not a new hole of its own", theirs.by.name,
+					theirs.entrance.getX(), theirs.entrance.getZ(), theirs.y));
+			return "You will use " + theirs.by.name + "'s mine for " + what + " (down the staircase at " + theirs.entrance.getX() + " " + theirs.entrance.getZ() + ").";
+		}
+		// None: a new one. Luck: ore it "has a feeling" about close by (the server knows the world): its new staircase
+		// goes straight toward it, down to its depth, no wandering for a cave first. (Luck off: none.)
+		luckyOre = !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
+				? c.hunch.oreNear(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : "coal", c.player.blockPosition(), 40, what.equals("diamonds") ? 140 : 72) : null;
+		if (luckyOre != null) {
+			luckyAt = now();
+			caveLook = 0;
+			toMine = null;
+			mineY = luckyOre.getY();
+			mineDir = toward(c.player.blockPosition(), luckyOre);
+			net.minecraft.core.Direction dry = wet(c.player.blockPosition(), mineDir, 4) ? dryWay(c.player.blockPosition(), c.player.getBlockY() - mineY) : null;
+			if (dry != null) mineDir = dry;
+			mineRecordY = mineY;
+			mineRecordDir = mineDir;
+			mineRecordLeg = 0;
+			c.places.forget("mine base");
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "has a feeling there's %s that way (%s, about %d down): its mine goes toward it", what, mineDir.getName(),
+					Math.max(0, c.player.getBlockY() - luckyOre.getY())));
+			return "You will dig your own mine toward the " + what + " you have a feeling about: a staircase " + mineDir.getName() + " down to about y " + mineY + ".";
+		}
 		// A cave it knows: the quickest way to ore (the walls show it). In, with torches, down it goes.
 		caveMode = false;
 		caveTarget = null;
-		boolean dark = c.player.level().isDarkOutside();                      // at night: no long walks in the dark to get there
 		BlockPos cave = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD ? c.caves.nearest(dark ? 24 : 160) : null;
 		if (cave != null) {
 			caveMode = true;
@@ -1142,18 +1295,6 @@ final class Chores {
 				caveLookTo = null;
 				c.journal("thinks", "has a look round for a cave first (the walls show the ore; quicker than digging), its own mine if there's none");
 			}
-		}
-		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
-		BlockPos entrance = c.places.get("mine");
-		toMine = null;
-		if (entrance != null && mineRecordY != Integer.MIN_VALUE && Math.abs(mineRecordY - y) <= 8 && entrance.closerThan(c.player.blockPosition(), dark ? 32 : 300)) {
-			toMine = entrance;
-			mineDir = mineRecordDir;
-			mineY = mineRecordY;
-			mineLeg = mineRecordLeg;
-			mineBase = c.places.get("mine base");
-			return "You will go back to your mine for " + what + " (down the staircase at " + entrance.getX() + " " + entrance.getZ() + ", on with tunnel "
-					+ (mineLeg / 2 + 1) + ").";
 		}
 		BlockPos home = c.goals.home;                                          // a new one: by its home, like players dig theirs
 		if (home != null && home.closerThan(c.player.blockPosition(), 48)) toMine = home.relative(c.player.getDirection(), 6);
@@ -1350,6 +1491,7 @@ final class Chores {
 		if (toMine != null) {                                                  // first to the mine's entrance
 			if (c.player.blockPosition().closerThan(toMine, 2.5)) {
 				if (!caveMode && (c.places.get("mine") == null || !c.places.get("mine").closerThan(toMine, 3))) c.places.remember("mine", toMine);
+				if (!caveMode && using == null) using = ownMine(toMine);
 				toMine = null;
 				mineStart = c.player.blockPosition();
 				legStarted = now();
@@ -1439,6 +1581,37 @@ final class Chores {
 			oreWay = null;
 			return null;
 		}
+		BlockPos here = c.player.blockPosition();
+		if (!caveMode && toMine == null && luckyTries < 8 && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+			if (luckyOre != null && (!luckyOre.closerThan(here, 12) || now() - luckyAt > 20 * 40)) {   // (far off: its staircase goes that way; there too long: another)
+				if (now() - luckyAt > 20 * 40 && luckyOre.closerThan(here, 12)) {
+					c.hunch.taken(luckyOre);
+					luckyOre = null;
+					luckyTries++;
+				}
+			}
+			if ((luckyOre == null || !luckyOre.closerThan(here, 12)) && now() >= luckyNext && (mineBase != null || here.getY() <= mineStart.getY() - 4)) {
+				luckyNext = now() + 60;                                            // (now and then, down here: a feeling there's some right by it)
+				BlockPos near = c.hunch.oreNear(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : what.equals("coal") ? "coal" : what, here, 8, 8);
+				if (near != null && !near.equals(luckyOre)) {
+					luckyOre = near;
+					luckyAt = now();
+				}
+			}
+			if (luckyOre != null && luckyOre.closerThan(here, 12)) {
+				var st = c.player.level().getBlockState(luckyOre);
+				if (WorldSenses.category((ServerLevel) c.player.level(), luckyOre, st) == Blocks.STONE || st.isAir()) {   // (mined: gone)
+					luckyOre = null;
+				} else {
+					doing = String.format(java.util.Locale.ROOT, "digging to the %s it has a feeling is right here (%d of %d so far)", what, got, want);
+					Action a = c.walkTo(Goal.nextTo(luckyOre));
+					if (a != null) return a;
+					c.hunch.taken(luckyOre);                                       // (no way to it: lava, water)
+					luckyOre = null;
+					luckyTries++;
+				}
+			}
+		}
 		int[] ore = glance(seek);                                            // ore showing in the walls (the tunnel shows it)
 		if (ore != null && ore[4] == Blocks.STONE && !java.util.Arrays.stream(cats).anyMatch(k -> k == Blocks.STONE))
 			ore = null;                                                      // ("there may be ore in that stone": its own staircase and tunnels are for that)
@@ -1487,8 +1660,9 @@ final class Chores {
 		BlockPos goal;
 		if (mineBase == null) {                                              // down the staircase
 			if (c.player.isInWater() && tunnelIn == null) {
+				lastWet = now();
 				if (wetSince < 0) wetSince = now();
-				else if (now() - wetSince > 200) {                               // ten seconds swimming in its own staircase: not here
+				else if (now() - wetSince > 200) {                               // ten seconds in the water in its own staircase (up for air and back counts too): not here
 					wetSince = -1;
 					BlockPos away = drySpot(feet);
 					c.places.forget("mine");
@@ -1502,7 +1676,7 @@ final class Chores {
 						return null;
 					}
 				}
-			} else wetSince = -1;
+			} else if (now() - lastWet > 100) wetSince = -1;                   // (dry a good while: that was a splash, not a flood)
 			if (tunnelIn == null && !feet.equals(stairLooked)) {                // a look ahead each step: water, or daylight (out of the hill's side) that way? another way down
 				stairLooked = feet;
 				if (wet(feet, mineDir, 4) || opensUp(feet, mineDir)) {
@@ -1529,6 +1703,12 @@ final class Chores {
 				}
 				c.places.remember("mine base", feet);
 				if (c.places.get("mine") == null) c.places.remember("mine", mineStart);
+				if (using == null) using = ownMine(c.places.get("mine"));
+				if (using != null && (using.base == null || feet.getY() < using.base.getY() - 3)) {   // (the foot of the stairs, or deeper now)
+					using.base = feet.immutable();
+					using.y = feet.getY();
+				}
+				mineRecordY = feet.getY();
 				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
 				return null;
 			}
@@ -1536,12 +1716,16 @@ final class Chores {
 			if (tunnelIn != null && (feet.distManhattan(tunnelIn) <= 0 || feet.distManhattan(tunnelIn) > 6 || now() - legStarted > 300)) tunnelIn = null;   // (in, or no getting in there: down from here)
 			goal = tunnelIn != null ? tunnelIn : feet.relative(mineDir, step).below(step);
 			doing = tunnelIn != null ? "digging into the hillside" : "digging a staircase down (y " + feet.getY() + ")";
-		} else {                                                             // branch tunnels: 24 long, 3 apart, back and forth
-			int k = mineLeg;
-			int across = 3 * ((k + 1) / 2);
-			boolean far = k % 4 == 0 || k % 4 == 1;
-			goal = mineBase.relative(right, across).relative(mineDir, far ? 24 : 0);
-			doing = "branch mining, tunnel " + (k / 2 + 1);
+		} else {                                                             // a strip mine: a main tunnel, a branch each side every 3 blocks (two of rock between: every block shows), 16 long
+			int k = mineLeg, branch = k / 4, part = k % 4;
+			BlockPos main = mineBase.relative(mineDir, 3 * branch + 2);
+			goal = switch (part) {
+				case 1 -> main.relative(right, STRIP);
+				case 3 -> main.relative(right.getOpposite(), STRIP);
+				default -> main;                                               // (along the main tunnel to the next branch, or back to it)
+			};
+			doing = part == 0 ? "strip mining: on along the main tunnel" : part == 2 ? "strip mining: back to the main tunnel"
+					: String.format(java.util.Locale.ROOT, "strip mining, branch %d (%s)", 2 * branch + (part == 1 ? 1 : 2), part == 1 ? "right" : "left");
 			if (feet.distManhattan(goal) <= 1 || now() - legStarted > 20 * 60) {
 				mineLeg++;
 				mineRecordLeg = mineLeg;

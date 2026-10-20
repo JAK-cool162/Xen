@@ -389,7 +389,9 @@ final class Fighter {
 		if (gear != null) return gear;
 		// About to die with nothing to fight with: anyone runs (its gut, not a choice), to a friend if one's about (and
 		// shouts for help), else behind something it can't be seen through (a tree, a wall), else just away.
-		boolean desperate = !c.inArena && !c.skills.sparringWith(foe.getUUID()) && p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal());
+		boolean bareInTheDark = !h.hasWeapon() && !(foe instanceof Player) && p.level().isDarkOutside() && !(foe instanceof net.minecraft.world.entity.monster.Creeper)
+				&& expected(foe) > p.getHealth() * 0.4f;                       // (just respawned at night with nothing, say: fists against a zombie is how it died)
+		boolean desperate = !c.inArena && !c.skills.sparringWith(foe.getUUID()) && (p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal()) || bareInTheDark);
 		if (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
 			if (!fleeing && !c.inArena) c.chatter(c.personality.say("flee"), false);
 			fleeing = true;                                                    // back off until it has healed a bit

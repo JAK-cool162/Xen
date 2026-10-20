@@ -322,8 +322,9 @@ final class Goals {
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
 			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
-					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
-					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (iron armor first, then diamonds; greed: more; at the height it believes)
+					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24
+					|| c.crafter.hasShield() && Compat.timeOfDay(c.player.level()) >= 2 * 24000L) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (iron armor first, or a shield and a few days in; then diamonds; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
 			case MOBFARM -> {

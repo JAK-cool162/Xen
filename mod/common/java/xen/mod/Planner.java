@@ -138,7 +138,7 @@ final class Planner {
 			case SHIELD -> afternoon ? 0.9f : 0.55f;                           // (one iron, before the night: it stops nearly everything)
 			case COAL -> 0.35f;
 			case FOOD -> c.player.getFoodData().getFoodLevel() < 14 ? 0.8f : 0.4f;
-			case IRON -> 0.6f;
+			case IRON -> items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0) == 0 ? 0.95f : 0.6f;   // (its first iron: what every player goes for once they have stone tools)
 			case VILLAGE -> c.goals.home == null ? 0.55f : 0.35f;
 			case DIAMONDS -> 0.5f;
 		};
@@ -215,7 +215,8 @@ final class Planner {
 					else if (raw >= 1) b[Mind.SMELT] += 0.45f * s;
 					else b[Mind.MINE] += 0.3f * s;
 				}
-				case COAL, IRON, DIAMONDS -> b[Mind.MINE] += 0.3f * s;
+				case IRON -> b[Mind.MINE] += (items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0) == 0 ? 0.5f : 0.3f) * s;
+				case COAL, DIAMONDS -> b[Mind.MINE] += 0.3f * s;
 				case FOOD -> b[Mind.FOOD] += 0.35f * s;
 				case VILLAGE -> {                                                // (free, it goes and has a look: Visits)
 					b[Mind.MINE] -= 0.2f * s;

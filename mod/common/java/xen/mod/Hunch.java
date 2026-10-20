@@ -384,6 +384,61 @@ final class Hunch {
 		return way;
 	}
 
+	/**
+	 * Ore of this kind it "has a feeling" is close (luck: the server knows the world): the nearest real block of it
+	 * within flat blocks round and deep blocks down (or a few up), the cheapest to dig to first, still there; null if
+	 * none, or luck is off. What it's after decides it, not the hunch: it only says where.
+	 */
+	BlockPos oreNear(String what, BlockPos from, int flat, int deep) {
+		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return null;
+		ServerLevel level = (ServerLevel) c.player.level();
+		Map<Long, Chunk> known = WORLD.get(dim(level));
+		if (known == null) return null;
+		String kind = what.equals("diamonds") ? "diamond" : what;
+		BlockPos best = null;
+		double bestCost = Double.MAX_VALUE;
+		for (Chunk ch : known.values())
+			for (Find f : ch.finds()) {
+				if (!f.kind().equals(kind)) continue;
+				BlockPos at = f.at();
+				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
+				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
+				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.5 * Math.max(0, dy) + (f.open() ? -4 : 0);   // (digging down costs more than walking; one in a cave wall, less)
+				if (cost < bestCost) {
+					bestCost = cost;
+					best = at;
+				}
+			}
+		if (best == null) return null;
+		BlockPos real = stillThere(level, best, kind);
+		if (real == null) {                                                         // (mined since it looked: the next one)
+			taken.add(best.asLong());
+			return oreNear(what, from, flat, deep);
+		}
+		steered = kind + " (a feeling where it is)";
+		steeredAt = level.getGameTime();
+		times++;
+		return real;
+	}
+
+	/** Ore it already went for (mined, or no way to it): not again. */
+	private final Set<Long> taken = new java.util.HashSet<>();
+
+	void taken(BlockPos at) {
+		taken.add(at.asLong());
+		if (taken.size() > 4096) taken.clear();
+	}
+
+	/** That block, or another of its kind in its 8-block cell, still ore (not mined since); null if none. */
+	private static BlockPos stillThere(ServerLevel level, BlockPos at, String kind) {
+		if (!level.isLoaded(at)) return at;
+		if (kind.equals(ORES.get(level.getBlockState(at).getBlock()))) return at;
+		int x0 = at.getX() & ~7, y0 = at.getY() & ~7, z0 = at.getZ() & ~7;
+		for (BlockPos q : BlockPos.betweenClosed(x0, y0, z0, x0 + 7, y0 + 7, z0 + 7))
+			if (kind.equals(ORES.get(level.getBlockState(q).getBlock()))) return q.immutable();
+		return null;
+	}
+
 	// ------------------------------------------------------------------------- the grapevine
 	private static boolean friends(Companion a, Companion b) {
 		if (a == b || a.player == null || b.player == null || b.minion) return false;
