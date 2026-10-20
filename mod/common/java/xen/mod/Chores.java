@@ -2083,7 +2083,8 @@ final class Chores {
 		return "You will smelt " + raw + " raw ore and food in a furnace.";
 	}
 
-	private int fuel() {
+	/** What it could burn in a furnace (coal, charcoal, or wood: a log is four planks, three planks smelt two things). */
+	int fuel() {
 		return count("coal") + countItem("charcoal") + countItem("coal_block") * 9 + (count("log") * 4 + countPlanks()) / 3;
 	}
 

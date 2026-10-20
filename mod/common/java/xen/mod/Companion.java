@@ -3779,6 +3779,7 @@ public final class Companion {
 			XenMod.quietJoin = false;
 		}
 		habits.respawned();
+		goals.freshStart();
 		respawnedAt = player.level().getGameTime();
 	}
 

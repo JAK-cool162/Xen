@@ -274,7 +274,7 @@ final class MindSense {
 				&& (c.crafter.pickTier() >= 3 || food < 10 && c.items().getOrDefault("food", 0) == 0);   // iron first (farms come later, or when food runs out)
 		a[Mind.MINE] = c.crafter.pickTier() >= 1;
 		var items = c.items();
-		a[Mind.SMELT] = (items.getOrDefault("raw_iron", 0) >= 1 || c.chores.rawFood() >= 1) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
+		a[Mind.SMELT] = (items.getOrDefault("raw_iron", 0) >= 1 || c.chores.rawFood() >= 1) && c.chores.fuel() > 0
 				&& (items.getOrDefault("cobblestone", 0) >= 8 || items.getOrDefault("furnace", 0) > 0 || c.crafter.pickTier() >= 1);   // (a pickaxe: the stone for a furnace on the way)
 		a[Mind.STORE] = c.storage.wantsToStore() && (c.goals.home != null || c.tribe() != null && c.tribe().center != null);
 		a[Mind.EXPLORE] = !night && f[Mind.DUSK] < 0.5f;                       // (not off into the dark)

@@ -321,10 +321,8 @@ final class Goals {
 			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
-			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 && (!c.player.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEmpty()
-					|| MindSense.count(c, n -> n.equals("raw_iron") || n.equals("iron_ingot")) >= 24
-					|| c.crafter.hasShield() && Compat.timeOfDay(c.player.level()) >= 2 * 24000L) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
-					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (iron armor first, or a shield and a few days in; then diamonds; greed: more; at the height it believes)
+			case MINE -> c.crafter.pickTier() >= 3 && diamonds() < 3 ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (an iron pickaxe: down for diamonds, the iron on the way comes too; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
 			case MOBFARM -> {
@@ -819,6 +817,12 @@ final class Goals {
 	/** How many times in a row each choice came to nothing. */
 	private final int[] failsInRow = new int[Mind.N];
 
+	/** Back from dying with nothing: a fresh start (what didn't work before it died isn't held against it now). */
+	void freshStart() {
+		java.util.Arrays.fill(failsInRow, 0);
+		java.util.Arrays.fill(quickUntil, 0L);
+	}
+
 	private boolean thinkMind(boolean nearby, long now) {
 		if (option >= 0 && current == null) {                              // one of its own kind of choices (rest, follow, eat, help...)
 			if (!extraOver(now)) return c.chores.busy();
@@ -1200,6 +1204,7 @@ final class Goals {
 		}
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
 		if (can[Mind.SMELT] && (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3 && meals < 3)) return why(Mind.SMELT, "iron to smelt");
+		if (items.getOrDefault("raw_iron", 0) >= 3 && !can[Mind.SMELT] && c.chores.fuel() == 0 && can[Mind.WOOD]) return why(Mind.WOOD, "wood to smelt its iron");   // (iron, nothing to burn: a tree)
 		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {
 			c.chores.forWool = false;
 			return why(Mind.FOOD, "low on food");
