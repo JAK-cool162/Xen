@@ -128,6 +128,10 @@ final class Crafter {
 		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
 		String bed = bedFromWool();                                                  // the wool's in: a bed now (the night's coming)
 		if (bed != null) return bed;
+		if (tier >= 2 && !has("_boat") && !has("_raft") && wood() >= 16 && has("_axe")) {   // a boat to carry: a sea or a wide river is a ride, not a swim
+			String w = woodType();
+			if (!w.equals("crimson") && !w.equals("warped")) return w.equals("bamboo") ? "bamboo_raft" : w + "_boat";
+		}
 		if (tier >= 2 && has("_sword") && has("_axe") && (has("_shovel") || count(Crafter::isStoneMaterial) == 0)) return null;   // (most of the time: nothing to make)
 		if (wood() < 2 && count(n -> n.equals("stick")) == 0) return null;     // no wood, no tools
 		int stone = count(Crafter::isStoneMaterial);

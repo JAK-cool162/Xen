@@ -885,8 +885,9 @@ public final class Voice {
 			case "why" -> {
 				String placed = h.flat.matches(".* (place|placed|put|block|blocks|dirt|pillar|tower|towered|bridge|build|built|cobble|cobblestone) .*") ? me.whyPlaced() : "";
 				String why = placed.isEmpty() ? me.why() : placed;
-				if (why.isEmpty()) out.add(new Sent(pickOf("no big reason, it just felt right", "why not", "I just felt like it", "honestly? no idea"), false));
-				else out.add(new Sent(pickOf("because ", "well, ", "", "because ") + why, false));
+				if (why.isEmpty()) out.add(new Sent(pickOf("because I can. why", "eh, I was bored. why, need something", "just felt like it. why do you ask",
+						"no reason really, just killing time. you need me"), true));   // (a person's answer: a reason, even a small one, and a question back)
+				else out.add(new Sent(pickOf("oh, because ", "well, ", "because ", "cause ") + why, false));
 			}
 			case "next" -> {
 				String next = me.next();

@@ -433,12 +433,12 @@ final class Hunch {
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
-				if (!f.kind().equals(kind)) continue;
+				if (!f.kind().equals(kind) || !f.open()) continue;               // (only ore showing to the air, a cave wall or a tunnel's: ore in solid rock it acts as if it can't know of)
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
 				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy);
-				found.add(new double[] {f.open() ? cost * 0.5 : cost + 24, at.getX(), at.getY(), at.getZ()});   // (showing in a cave wall: those first, mostly)
+				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
 			}
 		found.sort((a, b) -> Double.compare(a[0], b[0]));
 		for (int i = 0; i < found.size() && out.size() < max && i < 4 * max; i++) {

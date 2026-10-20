@@ -1244,6 +1244,10 @@ final class Chores {
 		caveTarget = null;
 		boolean under = !c.player.level().canSeeSky(c.player.blockPosition().above());
 		BlockPos cave = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && (!dark || under) ? c.caves.nearest(dark ? 16 : 160) : null;   // (at night: its own mine, strip mining, safe under the ground; not out to a cave)
+		if (cave != null && !readyForCave(cave.getY())) {                     // not ready for that (no weapon, hurt, no food; deep: no armor or shield): its own mine
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "knows a cave at %d %d %d but isn't ready for it (%s): strip mines instead", cave.getX(), cave.getY(), cave.getZ(), unready(cave.getY())));
+			cave = null;
+		}
 		if (cave != null) {
 			caveMode = true;
 			toMine = cave;
@@ -1256,7 +1260,7 @@ final class Chores {
 		// A curious one nearly always, a lazy one seldom; not at night, not deep down already, not every trip.
 		caveLook = 0;
 		if (!dark && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && c.player.getBlockY() > 40
-				&& c.player.level().canSeeSky(c.player.blockPosition().above()) && now() - lastCaveLook > 20 * 60 * 4) {
+				&& c.player.level().canSeeSky(c.player.blockPosition().above()) && now() - lastCaveLook > 20 * 60 * 4 && readyForCave(40)) {
 			{                                                                  // (by day a cave first, like a player: the walls show the ore; none close by, its own mine)
 				caveLook = now() + 20 * 60;
 				lastCaveLook = now();
@@ -1695,6 +1699,22 @@ final class Chores {
 			legStarted = now();
 		}
 		return a;
+	}
+
+	/**
+	 * Ready for a cave? It's dark in there and the monsters are out day and night: a weapon, health, something to eat; a
+	 * deep one (deepslate, lava about) wants armor or a shield too. Not ready: strip mining, its own tunnels, is safer.
+	 */
+	boolean readyForCave(int y) {
+		return unready(y).isEmpty();
+	}
+
+	private String unready(int y) {
+		if (!c.hands.hasWeapon()) return "nothing to fight with";
+		if (c.player.getHealth() < 12) return "hurt";
+		if (y < 0 && !c.hands.canEat()) return "no food for a long way down";
+		if (y < 0 && !c.crafter.has("_chestplate") && !c.crafter.hasShield()) return "no armor or shield for a deep one";
+		return "";
 	}
 
 	/** It's following a feeling about a cave (its guide learns whether that was right). */

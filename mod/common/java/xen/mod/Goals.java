@@ -662,12 +662,17 @@ final class Goals {
 		return c.chores.mine(c.lessons.depth("coal", 40), "coal", 4);
 	}
 
-	/** An iron pickaxe: diamonds now, or armor first? Its own choice: armor on (or a shield, if it's good in a fight), or bold enough to go without. */
+	/**
+	 * An iron pickaxe: diamonds now, or armor first? Armor first, unless it's good with a shield and an axe (then that's
+	 * enough). Its nature has a say too: a confident one sees what it could get (and goes, with a shield at least), a
+	 * proud one sees only itself (and goes, ready or not).
+	 */
 	boolean readyForDiamonds() {
 		boolean armored = c.crafter.has("_chestplate"), shield = c.crafter.hasShield();
 		float fight = c.skills.get(Skills.FIGHT);
-		return armored || shield && fight >= 0.5f || c.personality.bravery > 0.7f
-				|| shield && c.personality.bravery > 0.5f && fight >= 0.35f || c.items().getOrDefault("iron_ingot", 0) + c.items().getOrDefault("raw_iron", 0) >= 24;
+		boolean shieldAndAxe = shield && c.crafter.has("_axe") && fight >= 0.5f;
+		boolean confident = shield && c.personality.bravery > 0.7f, ego = c.personality.sin(Sins.PRIDE) > 0.7f;
+		return armored || shieldAndAxe || confident || ego || c.items().getOrDefault("iron_ingot", 0) + c.items().getOrDefault("raw_iron", 0) >= 24;
 	}
 
 	private int diamonds() {

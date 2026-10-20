@@ -234,12 +234,39 @@ final class Rider {
 		return v.level().getFluidState(v.blockPosition()).is(FluidTags.WATER) || v.level().getFluidState(v.blockPosition().below()).is(FluidTags.WATER);
 	}
 
+	/** Across water on its own: where to (the far shore), and till when it tries (a boat beats swimming a sea). */
+	Vec3 sailTo;
+	private long sailUntil;
+
+	/**
+	 * Its way goes a long way over water: its own boat down, in, and across (a player doesn't swim a sea). True if it's
+	 * going by boat (it has one and there's water by it to put it on).
+	 */
+	boolean sail(Vec3 to) {
+		var p = c.player;
+		if (p == null || riding() || hasBoat() < 0 || now() - placedAt < 100 || c.fightingNow()) return false;
+		if (!putBoatDown(to)) return false;
+		sailTo = to;
+		sailUntil = now() + 20 * 120;
+		c.journal("way", "a long way over water: its boat, not swimming, to " + BlockPos.containing(to).toShortString());
+		return true;
+	}
+
 	/** Riding: it sits (and steers, per tick); it gets out when its friend did, or when it's there. */
 	private Action ride() {
 		var p = c.player;
 		Entity v = p.getVehicle();
 		c.acted = true;
 		c.walker.stop();
+		if (sailTo != null && v == ownBoat && v.getControllingPassenger() == p) {   // across on its own: out at the far shore
+			c.goals.instant = "crossing the water in its boat";
+			boolean there = v.position().distanceTo(sailTo) < 6 || nearShore(v) && v.position().distanceTo(sailTo) < 14;
+			if (there || now() > sailUntil || !v.isInWater() && !onWater(v)) {
+				sailTo = null;
+				leave();
+			}
+			return Action.IDLE;
+		}
 		boolean driving = v.getControllingPassenger() == p;
 		ServerPlayer friend = with != null ? c.server.getPlayerList().getPlayer(with) : null;
 		if (friend == null && c.mode == Companion.Mode.FOLLOW && c.leader != null) friend = c.server.getPlayerList().getPlayer(c.leader);
@@ -339,7 +366,7 @@ final class Rider {
 		if (v == null || v.getControllingPassenger() != p) return;
 		ServerPlayer friend = with != null ? c.server.getPlayerList().getPlayer(with) : null;
 		if (friend == null && c.leader != null) friend = c.server.getPlayerList().getPlayer(c.leader);
-		Vec3 to = friend != null && friend.level() == p.level() ? friend.position() : null;
+		Vec3 to = sailTo != null && v == ownBoat ? sailTo : friend != null && friend.level() == p.level() ? friend.position() : null;
 		if (v instanceof AbstractBoat b) paddle(b, to);
 		else if (v instanceof AbstractHorse h && h.isSaddled()) spur(h, to);
 	}

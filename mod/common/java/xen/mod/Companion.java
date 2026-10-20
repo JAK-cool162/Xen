@@ -1282,31 +1282,118 @@ public final class Companion {
 	private java.util.UUID comeFor;
 	private long comeUntil, cameAt = -1;
 
+	private int countAll() {
+		int n = 0;
+		var inv = player.getInventory();
+		for (int i = 0; i < 36; i++) n += inv.getItem(i).getCount();
+		return n;
+	}
+
+	/** What it was doing before it was called over (its own life: back to that after, unless asked to stay). */
+	private Mode modeBeforeCome;
+	/** Something given to it while it was there (then it says thanks, and it knows what that was about). */
+	private int comeGifts, comeCount;
+
 	private Action comeOver() {
 		if (comeFor == null) return null;
 		long now = player.level().getGameTime();
 		ServerPlayer o = server.getPlayerList().getPlayer(comeFor);
-		if (o == null || o.level() != player.level() || now > comeUntil || fighting || cameAt >= 0 && (now - cameAt > 20 * 30 || o.distanceTo(player) > 8)) {
-			comeFor = null;                                              // (there a while, or they walked off: plain following now)
+		boolean leftIt = cameAt >= 0 && o != null && o.distanceTo(player) > 10;                 // (they walked off: it keeps up, it was called)
+		if (o == null || o.level() != player.level() || now > comeUntil || cameAt >= 0 && now - cameAt > 20 * 75 && !leftIt) {
+			doneComing(o, false);                                        // (a good while there and nothing asked: its own things again)
 			return null;
 		}
+		if (fighting) return null;                                       // (a monster at them or at it first: its fight, then back here)
 		double d = o.distanceTo(player);
-		if (d > 2.5 && cameAt < 0) {
+		if (d > 2.5 && (cameAt < 0 || leftIt)) {
 			goals.instant = "coming over to " + o.getName().getString();
 			if (hands.busy() && hands.interruptible()) hands.stop();
 			return walkTo(o.position());
 		}
 		if (cameAt < 0) {
 			cameAt = now;
+			comeGifts = 0;
+			comeCount = countAll();
 			walker.stop();
-			journal("does", "came over to " + o.getName().getString());
-			chatter(pick3("Here. What's up?", "I'm here.", "Yeah? What do you need?"), true);
+			String sized = sizeUp(o);                                     // a look at them and round them first: what's wrong?
+			journal("does", "came over to " + o.getName().getString() + ": " + sized);
+			say(sized);
 		}
+		int now2 = countAll();
+		if (now2 > comeCount) comeGifts++;                             // (something given to it: it'll say thanks)
+		comeCount = now2;
 		Action pick = pickUpNearby();                                  // something tossed to it (a pickaxe, an axe): it takes it
 		if (pick != null) return pick;
 		goals.instant = "here with " + o.getName().getString() + ", waiting to see what they want";
 		hands.face(o.getEyePosition());
 		return Action.IDLE;
+	}
+
+	/** Called over: what it sees when it gets there, and what it says (or does: a monster at them, food for them). */
+	private String sizeUp(ServerPlayer o) {
+		String who = o.getName().getString();
+		net.minecraft.world.entity.Mob mob = null;
+		for (net.minecraft.world.entity.Mob m : o.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, o.getBoundingBox().inflate(12),
+				m -> m.isAlive() && hostile(m) && (m.getTarget() == o || m.distanceTo(o) < 6)))
+			if (mob == null || m.distanceTo(o) < mob.distanceTo(o)) mob = m;
+		if (mob != null && hands.hasWeapon()) {                          // that's why they called: it goes for it
+			helpAgainst = mob;
+			helpGoing = true;
+			helpUntil = o.level().getGameTime() + 20 * 25;
+			return pick3("Hang on, I got it!", "I see it, I'm on it!", "Leave that " + BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath().replace('_', ' ') + " to me!");
+		}
+		if (o.getHealth() <= 10 && foodFor(o)) return pick3("You're hurt, " + who + ". Here, eat something.", "You look rough. Take this, eat.", "Whoa, you're low. Here, food.");
+		if (o.getFoodData().getFoodLevel() <= 8 && foodFor(o)) return pick3("You hungry? Here.", "Here, I've got food. Eat.", "You look starving. Take some.");
+		if (!o.getMainHandItem().isEmpty() && o.getLookAngle().dot(player.getEyePosition().subtract(o.getEyePosition()).normalize()) > 0.9)
+			return pick3("Is that for me?", "What's that? For me?", "Oh, you got something for me?");
+		if (o.level().isDarkOutside() && o.level().canSeeSky(o.blockPosition())) return pick3("It's getting dark. Need a shelter?", "Night's coming. What's up, need help?", "Here. It's dark out, want a hand?");
+		return pick3("Here. What's wrong?", "I'm here. What's up, need something?", "Yeah? Something wrong?");
+	}
+
+	/** Some of its food tossed to them (not its golden apples), if it has any to give. */
+	private boolean foodFor(ServerPlayer o) {
+		var inv = player.getInventory();
+		int best = -1, bestFill = 0;
+		for (int i = 0; i < 36; i++) {
+			ItemStack s = inv.getItem(i);
+			if (s.isEmpty() || !s.has(net.minecraft.core.component.DataComponents.FOOD)) continue;
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			if (Survival.keep(n) || Survival.risky(n) != null) continue;
+			int fill = s.get(net.minecraft.core.component.DataComponents.FOOD).nutrition() * s.getCount();
+			if (fill > bestFill) {
+				best = i;
+				bestFill = fill;
+			}
+		}
+		if (best < 0) return false;
+		hands.face(o.position().add(0, 0.2, 0));
+		ItemStack out = inv.getItem(best).split(Math.max(1, Math.min(4, inv.getItem(best).getCount() / 2)));
+		if (!Compat.tossTo(player, out, o.getUUID())) {
+			inv.add(out);
+			return false;
+		}
+		return true;
+	}
+
+	/** Done being called over: back to what it was doing before (its own life), unless it was asked to stay with them. */
+	private void doneComing(ServerPlayer o, boolean saidSo) {
+		if (comeFor == null) return;
+		comeFor = null;
+		if (modeBeforeCome != null && mode == Mode.FOLLOW) {
+			mode = modeBeforeCome;
+			if (o != null && !saidSo && comeGifts > 0) say(pick3("Thanks for that! Back to it.", "Cheers! I'll get back to what I was doing.", "Nice, thanks. Back to work."));
+			else if (o != null && !saidSo) chatter(pick3("Alright, I'll get back to it then.", "Okay, shout if you need me.", "Back to work. Call me if you need anything."), true);
+		}
+		modeBeforeCome = null;
+	}
+
+	/** Called over and there: they said they're fine, or gave it something and are done ("nothing", "thanks", "go on"). */
+	boolean comeAnswered(ServerPlayer from, String words) {
+		if (comeFor == null || cameAt < 0 || !from.getUUID().equals(comeFor)) return false;
+		if (!words.matches("(?is).*\\b(nothing|nvm|never ?mind|nah|no|all good|i'?m (fine|good|ok)|thanks?|thx|ty|go( on| back)?|carry on|you can go|that'?s all|bye)\\b.*")) return false;
+		say(pick3("Alright. Shout if you need me.", "Okay! Back to it.", "Cool, I'll be around."));
+		doneComing(from, true);
+		return true;
 	}
 	/** Where its friend was standing, and since when they've stayed about there (following: moving means keep up). */
 	private Vec3 leaderSpot;
@@ -2400,7 +2487,28 @@ public final class Companion {
 		if (times >= 3 && player.tickCount - stuckSaidAt > 600) {
 			stuckSaidAt = player.tickCount;
 			if (DEBUG) XenMod.LOG.info("[xen debug] {} is stuck on its way ({} times): {}", name, times, why);
+			String plain = walker.stuckWhy();
+			BlockPos at = player.blockPosition();
+			if (times < 6) {                                          // it says why (in chat and in its journal), and works it out itself first
+				journal("way", "stuck " + times + " times: " + plain + "; working it out itself");
+				chatter(pick3("Ugh, stuck. " + capital(plain) + ". Let me figure this out.", "Hm, can't get through, " + plain + ". Trying another way.",
+						"Stuck again (" + plain + "). Hang on."), false);
+			} else {                                                  // still stuck after trying: it asks a teammate, or whoever's about
+				String helper = null;
+				for (Companion o : mod.companions)
+					if (o != this && o.player != null && o.player.level() == player.level() && o.player.distanceTo(player) < 64
+							&& (player.isAlliedTo(o.player) || trust(o.player.getUUID()) >= 0.5f)) { helper = o.name; break; }
+				ServerPlayer friend = leader == null ? null : server.getPlayerList().getPlayer(leader);
+				String to = helper != null ? helper : friend != null && friend.distanceTo(player) < 64 ? friend.getName().getString() : null;
+				journal("way", "stuck " + times + " times (" + plain + "), tried its own ways: asks " + (to == null ? "anyone" : to) + " for help");
+				say((to == null ? "Anyone around? " : "Hey " + to + ", ") + "I'm stuck at " + at.getX() + " " + at.getY() + " " + at.getZ()
+						+ " (" + plain + "). Tried everything I know. Can you help?");
+			}
 		}
+	}
+
+	private static String capital(String s) {
+		return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
 	}
 
 	private int stuckSaidAt = -10000;
@@ -2560,14 +2668,30 @@ public final class Companion {
 	 * Ore it passes on its way (showing, in sight, within reach, and its pickaxe can take it): it stops a moment and mines
 	 * it, then walks on. Not in a fight, running away, scared, in water or with its hands full of something else.
 	 */
+	/** Ore it stopped for on its way (it sees that through before walking or digging on). */
+	private BlockPos oreTaking;
+
 	private Action oreOnTheWay() {
-		if (player.tickCount - lookedOnTheWay < 10 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
+		if (oreTaking != null) {
+			if (!fightingNow() && hands.busy() && oreTaking.equals(hands.target()) && !player.level().getBlockState(oreTaking).isAir()) {
+				acted = true;
+				return Action.MINE;
+			}
+			oreTaking = null;
+		}
+		if (player.tickCount - lookedOnTheWay < 5 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
 				|| player.level().getGameTime() - rushingBack < 5                    // (running back for its things before they go: no stopping)
-				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy() || commandedTo != null && visiting == null   // (sent somewhere: there first)
+				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy() && !hands.interruptible() || commandedTo != null && visiting == null   // (sent somewhere: there first; digging its way: it stops for ore it passes, a diamond in the wall too)
 				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return null;   // (out at night: keep going)
 		lookedOnTheWay = player.tickCount;
 		BlockPos ore = chores.oreWithinReach();
-		if (ore == null || !hands.mine(ore)) return null;
+		if (ore == null) return null;
+		if (hands.busy()) {                                              // (digging its way: that block can wait, the ore first)
+			hands.stop();
+			walker.stop();
+		}
+		if (!hands.mine(ore)) return null;
+		oreTaking = ore.immutable();
 		goals.instant = "taking the ore on its way";
 		journal("does", "takes ore on its way at " + ore.toShortString());
 		acted = true;
@@ -4041,6 +4165,11 @@ public final class Companion {
 		String who = from.getName().getString();
 		Talk talk = talks.computeIfAbsent(u, k -> new Talk());         // what was said before: "what about cows?", "and you?", "is it good?"
 		long saidAt = player.level().getGameTime();
+		if (said != null && r.intent().equals("chat") && comeAnswered(from, said)) return null;   // (called over: "nothing, thanks": back to its own things)
+		if (!r.intent().equals("chat") && !r.intent().equals("follow") && comeFor != null) {   // called over and now asked for something: that's what it was for
+			comeFor = null;
+			modeBeforeCome = null;
+		}
 
 		if (said != null && r.intent().equals("chat")) {
 			boolean fresh = saidAt - talk.at < 20 * 60 * 3;
@@ -4307,14 +4436,18 @@ public final class Companion {
 					asked = null;                                              // (a new request: what it was asked before is over)
 					resumeAsked = false;
 					leaderSpot = null;
+					boolean come = words.matches("(?s).*\\b(come|cmere|over here|to me|here)\\b.*") && !words.matches("(?s).*\\b(follow|with me|keep up)\\b.*");
+					if (come) {                                                // over to them, right up close (wherever they are), then it sees what's up
+						if (comeFor == null) modeBeforeCome = mode;            // (after: back to its own life, unless they ask it to stay with them)
+						comeFor = from.getUUID();
+						comeUntil = player.level().getGameTime() + 20 * 180;
+						cameAt = -1;
+					} else {
+						comeFor = null;
+						modeBeforeCome = null;
+					}
 					mode = Mode.FOLLOW;
 					leader = from.getUUID();
-					boolean come = words.matches("(?s).*\\b(come|cmere|over here|to me|here)\\b.*") && !words.matches("(?s).*\\b(follow|with me|keep up)\\b.*");
-					if (come) {                                                // over to them, right up close (wherever they are), then it waits
-						comeFor = from.getUUID();
-						comeUntil = player.level().getGameTime() + 20 * 120;
-						cameAt = -1;
-					}
 					plan = come ? "You will come over to " + who + "." : "You will follow " + who + ".";
 				}
 				case "ride" -> {
@@ -4865,7 +4998,9 @@ public final class Companion {
 			if (goals.option >= 0 && goals.option < WHY.length) return WHY[goals.option];
 			var m = java.util.regex.Pattern.compile("\\(([^)]+)\\)").matcher(goals.instant);
 			if (m.find()) return reason(m.group(1));
-			return goals.current != null ? "I want to " + goals.current.what : "";
+			if (goals.current != null) return "I want to " + goals.current.what + ", " + xen.mod.talk.Chat.firstPerson(goals.current.why);   // ("I want to go mining, I want iron and diamonds for better tools")
+			if (!walker.stuckWhy().isEmpty()) return "I'm stuck, " + walker.stuckWhy();
+			return "";
 		}
 
 		/** A reason in its words: "night: crafting inside" is "it's dark out, so I'm crafting inside". */

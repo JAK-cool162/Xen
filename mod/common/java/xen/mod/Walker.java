@@ -313,6 +313,12 @@ final class Walker {
 			String plan = summary();
 			if (!plan.equals(journaled)) c.journal("way", path.size() + " moves to " + BlockPos.containing(to).toShortString() + ": " + plan);
 			journaled = plan;
+			Vec3 shore = longSwim();                                          // a long swim on it (a sea, a wide river): by boat, if it has one
+			if (shore != null && c.rider.sail(shore)) {
+				path = null;
+				release();
+				return Action.IDLE;
+			}
 		}
 		c.acted = true;
 		return Action.FORWARD;
@@ -1219,6 +1225,25 @@ final class Walker {
 		return true;
 	}
 
+	/** The far end of the first long swim on its way (twelve swims or more in a row), or null: a boat's worth of water. */
+	private Vec3 longSwim() {
+		if (path == null) return null;
+		int run = 0;
+		for (int i = index; i < path.size(); i++) {
+			if (path.get(i).kind() == Kind.SWIM) run++;
+			else if (run >= 12) return Vec3.atBottomCenterOf(path.get(i).to());
+			else run = 0;
+		}
+		return run >= 12 ? Vec3.atBottomCenterOf(path.get(path.size() - 1).to()) : null;
+	}
+
+	/** Why it's stuck, in its words, if it was just now (empty: it isn't). */
+	String stuckWhy() {
+		if (lastProblem.isEmpty() || now() - badSince > 600) return "";
+		String w = lastProblem.replaceAll("\\s*at -?\\d+, -?\\d+, -?\\d+", "").replaceAll("\\(.*?\\)", "").trim();
+		return w.startsWith("stuck on a ") ? "the " + w.substring(11) + " I tried didn't work" : w;
+	}
+
 	private void problem(Move m, String why) {
 		lastProblem = why;
 		moved(m, true);
@@ -1360,7 +1385,7 @@ final class Walker {
 			}
 			default -> {
 				doing = sprint ? "sprinting" : "walking";
-				if (sprint && p.onGround() && flatAhead(4) && now() - lastHop > 12) {   // a long flat stretch: sprint-jumping, like players
+				if (sprint && p.onGround() && flatAhead(3) && now() - lastHop > 2) {   // a straight stretch: sprint-jumping all along it, like players (hop again as it lands)
 					p.setJumping(true);
 					lastHop = now();
 					doing = "sprint-jumping";
@@ -1483,7 +1508,7 @@ final class Walker {
 		Move first = path.get(index);
 		for (int i = index; i < index + n; i++) {
 			Move m = path.get(i);
-			if (m.kind() != Kind.WALK || !m.dig().isEmpty() || m.to().getY() != first.from().getY() || direction(m) != direction(first)) return false;
+			if (m.kind() != Kind.WALK && m.kind() != Kind.DIAGONAL || !m.dig().isEmpty() || m.to().getY() != first.from().getY() || direction(m) != direction(first)) return false;
 			if (!passable(m.to().above(2))) return false;
 		}
 		return true;

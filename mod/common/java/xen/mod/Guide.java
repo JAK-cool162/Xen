@@ -9,8 +9,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Xen's guide: another soul beside it that sees through the rock, the way Baritone's x-ray mining does. It knows
- * where the nearest ore really is (luck: the server knows the world) and works out a way to dig there, a staircase
+ * Xen's guide: another soul beside it, the way Baritone's x-ray mining works, but it only knows ore that shows to
+ * the air somewhere (a cave wall, a ravine, a tunnel): ore inside solid rock it acts as if nobody could know of, like
+ * a player. It knows where the nearest such ore really is (luck: the server knows the world) and works out a way there, a staircase
  * down toward it and then straight in, dry all the way (no water, no lava on it or by it). It only offers: the Xen
  * decides whether to follow it, by how much it trusts it, which it learns (following it paid off, or didn't) and its
  * nature gives it to start with (a curious one trusts it more, a proud one would rather find its own way).
