@@ -2699,6 +2699,8 @@ public final class Companion {
 	/** Its anger and bloodlust (hidden; see {@link Rage}). */
 	final Rage rage = new Rage(this);
 	final Hunch hunch = new Hunch(this);
+	/** Its guide: a soul beside it that sees through the rock, and offers a way to the ore (it follows or not). */
+	final Guide guide = new Guide(this);
 	final Planner planner = new Planner(this);
 	final Director director = new Director(this);
 	/** What hurt it, remembered (once burnt, twice shy). */
@@ -3795,7 +3797,7 @@ public final class Companion {
 				+ String.format(java.util.Locale.ROOT, " Xen 2.0: %s, reactions %d ms on average; choices %d (%d yes, %d no, %d later)%s%s",
 						confusion.says(), reflexes.averageMs(), choices.made, choices.yes, choices.no, choices.later,
 						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing)
-				+ (focus.describe().isEmpty() ? "" : "; " + focus.describe()) + (hunch.describe().isEmpty() ? "" : "; " + hunch.describe()) + (planner.describe().isEmpty() ? "" : "; " + planner.describe())
+				+ (focus.describe().isEmpty() ? "" : "; " + focus.describe()) + (hunch.describe().isEmpty() ? "" : "; " + hunch.describe()) + (guide.describe().isEmpty() ? "" : "; " + guide.describe()) + (planner.describe().isEmpty() ? "" : "; " + planner.describe())
 				+ (director.describe().isEmpty() ? "" : "; " + director.describe());
 	}
 

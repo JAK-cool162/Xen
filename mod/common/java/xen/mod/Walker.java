@@ -1118,11 +1118,16 @@ final class Walker {
 		BlockState s = state(p);
 		if ((cell(p) & K_NATURAL) == 0 || s.getDestroySpeed(level, p) < 0) return INF;
 		if (Hands.holdsSomeone(level, p, c.player)) return INF;                  // (someone stands on it: not that way)
-		for (Direction d : Direction.values()) {
+		for (Direction d : Direction.values()) {                              // what it would let in (the rules a good miner, or Baritone, keeps):
 			if (d == Direction.DOWN) continue;
-			var f = level.getFluidState(p.relative(d));
-			if (f.is(FluidTags.LAVA)) return INF;
-			if (f.is(FluidTags.WATER) && f.isSource()) return INF;
+			BlockPos n = p.relative(d);
+			var f = level.getFluidState(n);
+			if (f.is(FluidTags.LAVA)) return INF;                               // lava anywhere by it
+			if (f.is(FluidTags.WATER)) {
+				if (d == Direction.UP || f.isSource()) return INF;                // water over it (even running), or a source by it
+				if (level.getFluidState(n.below()).isEmpty()) return INF;         // running water by it that would run in (not just down)
+			}
+			if (d != Direction.UP && (cell(n) & K_FALLING) != 0 && !passable(n) && passable(n.below())) return INF;   // sand or gravel by it with nothing under: it'd come down
 		}
 		if ((cell(p.above()) & K_FALLING) != 0 && !passable(p.above())) return INF;
 		if (c.player.isCreative()) return 2;

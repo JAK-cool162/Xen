@@ -420,39 +420,33 @@ final class Hunch {
 	}
 
 	/**
-	 * Ore of this kind it "has a feeling" is close (luck: the server knows the world): the nearest real block of it
-	 * within flat blocks round and deep blocks down (or a few up), the cheapest to dig to first, still there; null if
-	 * none, or luck is off. What it's after decides it, not the hunch: it only says where.
+	 * Ore of this kind close by (luck: the server knows the world), for the guide: the few cheapest to dig to (within
+	 * flat blocks round, deep down or a few up) that are still there and dry, cheapest first. Empty with luck off.
 	 */
-	BlockPos oreNear(String what, BlockPos from, int flat, int deep) {
-		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return null;
+	List<BlockPos> oresNear(String what, BlockPos from, int flat, int deep, int max) {
+		List<BlockPos> out = new ArrayList<>();
+		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return out;
 		ServerLevel level = (ServerLevel) c.player.level();
 		Map<Long, Chunk> known = WORLD.get(dim(level));
-		if (known == null) return null;
+		if (known == null) return out;
 		String kind = what.equals("diamonds") ? "diamond" : what;
-		List<double[]> found = new ArrayList<>();                                  // (cost, x, y, z)
+		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
 				if (!f.kind().equals(kind)) continue;
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
-				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.5 * Math.max(0, dy) + (f.open() ? -4 : 0);   // (digging down costs more than walking; one in a cave wall, less)
-				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
+				found.add(new double[] {Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy), at.getX(), at.getY(), at.getZ()});
 			}
 		found.sort((a, b) -> Double.compare(a[0], b[0]));
-		BlockPos real = null;
-		for (int i = 0; i < Math.min(12, found.size()) && real == null; i++) {     // (the cheapest still there and dry: mined since, under the sea, by water: the next)
+		for (int i = 0; i < found.size() && out.size() < max && i < 4 * max; i++) {
 			BlockPos at = new BlockPos((int) found.get(i)[1], (int) found.get(i)[2], (int) found.get(i)[3]);
 			BlockPos r = stillThere(level, at, kind);
-			if (r != null && dry(level, r)) real = r;
+			if (r != null && dry(level, r)) out.add(r);
 			else taken.add(at.asLong());
 		}
-		if (real == null) return null;
-		steered = kind + " (a feeling where it is)";
-		steeredAt = level.getGameTime();
-		times++;
-		return real;
+		return out;
 	}
 
 	/** Ore it already went for (mined, or no way to it): not again. */
