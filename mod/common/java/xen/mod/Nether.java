@@ -186,7 +186,7 @@ final class Nether {
 		if (flat < 1.8 && Math.abs(in.y - c.player.getY()) < 1.2) {           // right next to it: step in
 			c.hands.steer = in;
 			c.hands.face(in.add(0, 1, 0));
-			return Action.FORWARD;
+			return in.y - c.player.getY() > 0.5 ? Action.JUMP : Action.FORWARD;   // (a step up onto the obsidian: a jump, a walk won't climb it)
 		}
 		return c.walkTo(in);
 	}
@@ -482,11 +482,19 @@ final class Nether {
 	}
 
 	/** The portal it just built: light it (a flint and steel on the obsidian at the bottom, from outside). */
-	void built(BlockPos insideBottom, Direction front) {
+	void built(BlockPos insideBottom, Direction front, net.minecraft.world.phys.AABB inside) {
 		lightAt = insideBottom.below();
 		portalFront = front;
+		lightSince = now();
+		hole.clear();
+		BlockPos.betweenClosed(BlockPos.containing(inside.minX, inside.minY, inside.minZ), BlockPos.containing(inside.maxX, inside.maxY, inside.maxZ))
+				.forEach(q -> hole.add(q.immutable()));
 		c.places.remember("portal", insideBottom);
 	}
+
+	/** The portal's hole (two wide, three tall): a block left in it (one it stood on to build) and the fire can't open it. */
+	private final java.util.List<BlockPos> hole = new java.util.ArrayList<>();
+	private long lightSince;
 
 	private Action light() {
 		ServerLevel level = (ServerLevel) c.player.level();
@@ -506,6 +514,34 @@ final class Nether {
 			return null;
 		}
 		BlockPos stand = inside.relative(portalFront);
+		if (now() - lightSince > 20 * 60 * 3) {                                   // (three minutes at it: something's wrong with this one)
+			c.journal("does", "gives up lighting its portal at " + inside.toShortString());
+			c.places.forget("portal");
+			lightAt = null;
+			return null;
+		}
+		for (BlockPos q : hole) {                                                  // the hole first: anything in it, out (a fire with no portal too: lit while the hole wasn't clear, it never opens)
+			var st = level.getBlockState(q);
+			if (st.isAir() || st.is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) continue;
+			boolean fire = st.is(net.minecraft.world.level.block.Blocks.FIRE);
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(q)) > c.player.blockInteractionRange() - 0.8) {
+				c.goals.instant = "clearing the portal's hole";
+				return c.walkTo(Vec3.atBottomCenterOf(stand));
+			}
+			c.goals.instant = "clearing the portal's hole";
+			if (fire) {                                                             // (a punch puts a fire out)
+				c.hands.face(Vec3.atCenterOf(q));
+				Compat.swing(c.player);
+				c.player.gameMode.destroyBlock(q);
+				c.acted = true;
+				return Action.IDLE;
+			}
+			if (c.hands.mine(q)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			return c.walkTo(Vec3.atBottomCenterOf(stand));
+		}
 		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(lightAt)) > c.player.blockInteractionRange() - 0.8
 				|| c.player.blockPosition().equals(inside) || c.player.blockPosition().equals(inside.above())) {
 			c.goals.instant = "going to light the portal";

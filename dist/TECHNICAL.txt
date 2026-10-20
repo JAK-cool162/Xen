@@ -22,10 +22,13 @@ after it waited). Goals.readyForDiamonds (a chestplate, a shield and an axe with
 shield, pride 0.7, or 24 iron) also sends the plan for diamonds. Plans.ownGoal after iron armor: a diamond pickaxe,
 the enchanting table, 3 lapis. Crafter keeps 2 diamonds for the table (book, 2 diamonds, 4 obsidian: made at once),
 the diamond sword only from more. Enchanting (Mind.ENCHANT) is the plan's step whenever it's possible (lapis, levels, a
-table, iron or better gear); Enchanter.retryAt: 2 minutes after a go, 20 after one that couldn't. A first look at the
+table, iron or better gear), ahead of crafting; Enchanter.retryAt: 2 minutes after a go, 20 after one that couldn't. A first look at the
 Nether (Nether.go "visit") once it has a diamond pickaxe and something enchanted (or two days on). Obsidian: 14 while it
 has no table; lava looked for deep down (a mine at y -40); flint from gravel underground when none shows up top; three
-minutes of looking and it remembers water on lava makes obsidian.
+minutes of looking and it remembers water on lava makes obsidian. On the trip it stops only for diamonds, lapis and gold
+on the way, and has 40 minutes while it still has a portal to make (20 after). Nether.light: before the flint and
+steel, anything left in the 2 by 3 hole comes out (a block it stood on to build the top, a fire lit while the hole
+wasn't clear: that never opens); three minutes without a portal and it gives that one up.
 
 The Nether: Knowledge ghast_fireball, zombified_piglins, piglin_anger, wither_skeleton, hoglin, blaze_cover,
 magma_split, nether_water, nether_lava_sea (60% of Xens start knowing each; the rest are told, or learn when hurt).
@@ -36,6 +39,10 @@ once it knows.
 Fights: Fighter.weaponHit / critsToKill: against a skeleton, the axe when it kills in fewer crits than the sword
 (stone axe 9, crit 13.5: two crits for 20 health; a stone sword three). Styles (tactician, opportunist, controller,
 explorer, team) from a player's notes: the health each keeps in hand, healing early, a finishing blow, the high ground.
+
+Edges: Hands stops a step or strafe toward a drop of 6+ blocks (no water under it), looking further ahead the faster
+it goes, and crouches 8 ticks there so its speed doesn't carry it over. The death line in the log has the pickaxe and
+weapon it had a second before (the bag is on the ground by then).
 
 Coming and going: "come here" walks over, waits 30 s looking about, sizes up what's wrong; tossed tools are taken
 (junk handed back, by kindness). After dying: back for its things, asking a friend along (their call: kindness,

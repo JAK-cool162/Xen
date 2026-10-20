@@ -1138,7 +1138,7 @@ final class Architect {
 		for (int u = -1; u <= 4; u++) {
 			for (int v = -2; v <= 2; v++) {
 				for (int y = 0; y <= 5; y++) if (v != 0 || u < 0 || u > 3) L.dig(u, v, y);   // room around it to stand and walk
-				L.put(u, v, -1, "cobblestone", SUPPORT);
+				L.put(u, v, -1, "dirt", SUPPORT);                                  // (ground to stand on: any will do, dirt only fills a hole)
 			}
 		}
 		for (int u = 0; u <= 3; u++) {

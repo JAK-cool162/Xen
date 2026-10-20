@@ -5605,7 +5605,7 @@ public final class Companion {
 			idleSince = now;
 			return null;
 		}
-		boolean doingNothing = !chores.busy() && (goals.instant.isEmpty() || goals.instant.startsWith("looking around") || goals.instant.equals("exploring"));
+		boolean doingNothing = !chores.busy() && !nether.busy() && (goals.instant.isEmpty() || goals.instant.startsWith("looking around") || goals.instant.equals("exploring"));
 		if (now - idleSince < (doingNothing ? 400 : 1200)) return null;      // (twenty seconds of nothing is a lot for a player; a stuck chore gets a minute)
 		standings++;
 		String was = goals.instant.isEmpty() ? chores.busy() ? "a chore" : "nothing" : goals.instant;

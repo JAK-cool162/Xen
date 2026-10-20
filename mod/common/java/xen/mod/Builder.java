@@ -1009,7 +1009,7 @@ final class Builder {
 			case "farm" -> c.goals.farm = plan.middle();
 			case "mob farm" -> c.goals.mobFarm = plan.middle();
 			case "animal pen" -> c.goals.pen = plan.middle();
-			case "nether portal" -> c.nether.built(plan.middle(), plan.front());
+			case "nether portal" -> c.nether.built(plan.middle(), plan.front(), plan.inside());
 			case "highway" -> c.highway.built(plan.middle());
 			case "mine entrance" -> c.places.remember("mine hut", plan.middle());
 			default -> {
