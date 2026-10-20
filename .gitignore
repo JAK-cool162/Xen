@@ -14,3 +14,4 @@ mod/*/run/
 *.gguf
 *.part
 /recordings/
+mod/*/logs/
