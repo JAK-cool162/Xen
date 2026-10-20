@@ -9,6 +9,46 @@ WHAT'S NEW IN 2.0.0-beta.41
 
 Xen gets a massive upgrade.
 
+Water: Walker SWIM moves swim for real (sprint-swim facing the next spot, up for air at 70%), a door for an air pocket,
+no path with 12+ moves under water, 24+ swim moves: its boat (Rider.sail). Respawns on dry land (Companion.dryNear).
+Blocks to dig are never ones with water on top (Chores.findVisible: a river bed, the sea floor).
+
+Caves and ore: Hunch.caveNear weighs a cave by its size within 24 blocks and the iron that shows; the guide leads only to
+ore with a face showing. Chores.readyForCave: a weapon, health 12+, and below y 0 food and armor or a shield; not ready:
+a strip mine at y -58/-59, branches every 3. Ore on the way (Chores.oreInReach) takes lapis too (stone pickaxe).
+
+Progression: Crafter.planksIn (a shield 6 planks, a boat 5, a chest 8: a shield never got made before, and the armor
+after it waited). Goals.readyForDiamonds (a chestplate, a shield and an axe with fight skill 0.5+, bravery 0.7 with a
+shield, pride 0.7, or 24 iron) also sends the plan for diamonds. Plans.ownGoal after iron armor: a diamond pickaxe,
+the enchanting table, 3 lapis. Crafter keeps 2 diamonds for the table (book, 2 diamonds, 4 obsidian: made at once),
+the diamond sword only from more. Enchanting (Mind.ENCHANT) is the plan's step whenever it's possible (lapis, levels, a
+table, iron or better gear); Enchanter.retryAt: 2 minutes after a go, 20 after one that couldn't. A first look at the
+Nether (Nether.go "visit") once it has a diamond pickaxe and something enchanted (or two days on). Obsidian: 14 while it
+has no table; lava looked for deep down (a mine at y -40); flint from gravel underground when none shows up top; three
+minutes of looking and it remembers water on lava makes obsidian.
+
+The Nether: Knowledge ghast_fireball, zombified_piglins, piglin_anger, wither_skeleton, hoglin, blaze_cover,
+magma_split, nether_water, nether_lava_sea (60% of Xens start knowing each; the rest are told, or learn when hurt).
+Companion.fireballComing: a ghast's fireball coming at it is punched back (in reach, knowing how), else the shield,
+else a side step; a ghast is only a foe with a bow and arrows. No water clutch there; no gold mined with piglins about
+once it knows.
+
+Fights: Fighter.weaponHit / critsToKill: against a skeleton, the axe when it kills in fewer crits than the sword
+(stone axe 9, crit 13.5: two crits for 20 health; a stone sword three). Styles (tactician, opportunist, controller,
+explorer, team) from a player's notes: the health each keeps in hand, healing early, a finishing blow, the high ground.
+
+Coming and going: "come here" walks over, waits 30 s looking about, sizes up what's wrong; tossed tools are taken
+(junk handed back, by kindness). After dying: back for its things, asking a friend along (their call: kindness,
+loyalty, trust, armed, busy); nobody comes: blocks (16 if there's time, at least 1) and stone tools first, within the
+time its things have left. Teams: "let's make a team called ...", "I made a team ...", "my team is called ..." make the
+player's team, and each Xen decides (no team: trust, kindness, how social, wanting its own; a no stands 2 minutes).
+TeamRole: on a team each picks keeper (farms, chests, walls), miner, fighter or explorer from its nature and what the
+team is short of, and says so; it leans its choices (Goals.bias), its mind still decides.
+
+Farms: Farmer.cane: sugar cane it carries planted on dirt, grass or sand by water near home (up to 16), the tall ones
+cut above the bottom. Critters.lure: fewer than 2 cows (or sheep) by its pen or home and wheat in its bag: it brings one,
+wheat in hand. The FARM choice builds an animal pen once the crop farm is done and 2+ farm animals are by its home.
+
 
 WHAT'S NEW IN 2.0.0-beta.40
 ===========================

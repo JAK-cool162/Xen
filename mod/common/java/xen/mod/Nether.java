@@ -312,8 +312,15 @@ final class Nether {
 				return null;
 			}
 			if (!has("flint")) {
-				say("I need flint for a flint and steel. Gravel drops it sometimes.");
-				c.chores.mineFor("gravel", "flint", 1, "flint");
+				if (c.chores.busy()) return c.chores.next();
+				boolean dry = visible("gravel", 16) != null && !wetGravel(visible("gravel", 16)) || c.eyes.nearest("gravel", Eyes.RANGE, k -> false) != null;
+				if (!dry && c.player.getY() > 30 && c.crafter.pickTier() >= 2) {          // none in sight up here: gravel's common in the stone, a tunnel down shows some
+					say("No gravel around here. There's always some underground.");
+					c.chores.mine(16, "iron", 3);
+				} else {
+					say("I need flint for a flint and steel. Gravel drops it sometimes.");
+					c.chores.mineFor("gravel", "flint", 1, "flint");
+				}
 				c.chores.own = true;
 				return null;
 			}
@@ -337,6 +344,14 @@ final class Nether {
 
 	private BlockPos lavaAt;
 	private long pouredAt = -1;
+
+	/** The chore it started to go down for lava (its serial number), so another of its own errands doesn't hold it up. */
+	private int lavaChore = -1;
+
+	/** Gravel with water on it (a river bed, the sea floor): not where it digs. */
+	private boolean wetGravel(BlockPos q) {
+		return q != null && c.player.level().getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER);
+	}
 
 	/** When it started looking around for obsidian it doesn't know how to make (0: not looking). */
 	private long lookingSince;
@@ -393,10 +408,12 @@ final class Nether {
 		if (lavaAt == null || !level.getFluidState(lavaAt).isSource()) lavaAt = visibleLava(20);
 		if (lavaAt == null) {
 			if (c.player.getY() > 10 && c.crafter.pickTier() >= 2 && !inNether()) {     // lava pools lie deep: down in the deepslate, where most are (diamonds too)
+				if (c.chores.busy() && c.chores.own && c.chores.serial != lavaChore) c.chores.cancel();   // (an errand of its own from before, the flint: done with)
 				if (!c.chores.busy()) {
 					say("Lava pools are deep down. Going down to find one.");
 					c.chores.mine(-40, "diamonds", 3);
 					c.chores.own = true;
+					lavaChore = c.chores.serial;
 				}
 				return c.chores.busy() ? c.chores.next() : null;
 			}

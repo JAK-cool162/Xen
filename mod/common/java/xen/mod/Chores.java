@@ -1815,14 +1815,23 @@ final class Chores {
 			if (!isKind(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath(), id)) continue;
 			if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;   // (one it gave up on)
 			boolean open = false;
-			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) open |= level.getBlockState(q.relative(d)).canBeReplaced();
-			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+				var n = level.getBlockState(q.relative(d));
+				open |= n.canBeReplaced() && n.getFluidState().isEmpty();               // (open to the air: under water doesn't count)
+			}
+			if (open && !wetTop(level, q) && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
 		}
 		if (best == null) {
 			String kind = id.equals("short_grass") || id.equals("tall_grass") ? "grass" : id;   // not close by: what its eyes saw further off
-			best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+			best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ()))
+					|| wetTop(level, BlockPos.of(k)));
 		}
 		return best;
+	}
+
+	/** Water on top of it (a river bed, the sea floor): not worth swimming down to dig, that's how they drown. */
+	private static boolean wetTop(ServerLevel level, BlockPos q) {
+		return level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER);
 	}
 
 	/** Pick up a block someone (or it) put down: a crafting table, a furnace, a chest, a bed, a door, torches... */

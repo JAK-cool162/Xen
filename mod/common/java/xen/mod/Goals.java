@@ -324,7 +324,11 @@ final class Goals {
 			case MINE -> fuelRun && c.chores.fuel() == 0 ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < 3 && readyForDiamonds() ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (an iron pickaxe: down for diamonds, the iron on the way comes too; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
-			case FARM -> c.farmer.start();                                    // (a real farm: tilled, planted, looked after)
+			case FARM -> {                                                       // (a real farm: tilled, planted, looked after; then a pen for the animals about)
+				if (c.farmer.middle == null) yield c.farmer.start();
+				String h = c.builder.startNear("animal pen", nextTo(home, 16));
+				yield h.startsWith("You will") ? h : "You can't: " + h;
+			}
 			case MOBFARM -> {
 				String h = c.builder.startNear("mob farm", nextTo(home, 24));
 				yield h.startsWith("You will") ? h : "You can't: " + h;
@@ -377,7 +381,7 @@ final class Goals {
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
 					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? (readyForDiamonds() ? 0.5f : 0.4f) * (0.5f + p.bravery)
 					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
-			case FARM -> home != null && c.farmer.middle == null && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
+			case FARM -> home != null && (c.farmer.middle == null || pen == null && animalsByHome() >= 2) && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
 					&& (c.player.isCreative() || items.getOrDefault("cobblestone", 0) >= 300) ? 0.45f * (0.5f + p.diligence) : 0;
 			case SMELT -> (items.getOrDefault("raw_iron", 0) >= 3 || c.chores.rawFood() >= 3) && (items.getOrDefault("coal", 0) > 0 || items.getOrDefault("log", 0) > 1)
@@ -1252,7 +1256,8 @@ final class Goals {
 			return why(Mind.ENCHANT, "enchant its gear (lapis, " + c.player.experienceLevel + " levels)");
 		}
 		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
-				&& (enchantedSomething() || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe, its gear enchanted (or two days on without): a first look at the Nether
+				&& (enchantedSomething() || c.enchanter.table() == null && MindSense.count(c, n -> n.equals("obsidian") || n.equals("enchanting_table")) < 4
+						|| now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted, or no obsidian for a table yet (the trip gets it), or two days on: a first look at the Nether
 			netherTryAt = now() + 20 * 60 * 20;
 			String trip = c.nether.go("visit", 0);
 			c.journal("thinks", "the plan: a first look at the Nether (" + trip + ")");
@@ -1278,7 +1283,7 @@ final class Goals {
 		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "iron");   // (nothing else open)
 		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
 		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) {
-			boolean diamonds = !(f[Mind.ARMOR] < 0.6f && iron < 24);
+			boolean diamonds = readyForDiamonds() || !(f[Mind.ARMOR] < 0.6f && iron < 24);   // (its own call: a chestplate, or a shield and an axe it can use, or nerve)
 			return trip(Mind.MINE, diamonds, can, items, diamonds ? "diamonds" : "iron for armor");
 		}
 		if (tier >= 3 && home == null && plan != Strategy.SPEEDRUN && !holeOnly) {
@@ -1411,6 +1416,15 @@ final class Goals {
 
 	private long now() {
 		return c.player.level().getGameTime();
+	}
+
+	/** Farm animals by its home (cows, sheep, pigs, chickens within 32): worth a pen. */
+	private int animalsByHome() {
+		if (home == null || !c.player.blockPosition().closerThan(home, 64)) return 0;
+		return c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, new net.minecraft.world.phys.AABB(home).inflate(32, 8, 32), a -> {
+			String n = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(a.getType()).getPath();
+			return a.isAlive() && (n.equals("cow") || n.equals("sheep") || n.equals("pig") || n.equals("chicken"));
+		}).size();
 	}
 
 	/** When it first had a diamond pickaxe (game time; -1 not yet). */

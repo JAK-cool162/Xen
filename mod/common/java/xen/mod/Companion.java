@@ -843,9 +843,10 @@ public final class Companion {
 		}
 		BlockPos start = player.blockPosition();
 		boolean tall = true;
-		BlockPos step = stepToAir(level, start, true);                 // a way its whole body fits (two blocks high)...
+		int far = player.getAirSupply() < player.getMaxAirSupply() / 2 ? 28 : 16;   // (short of breath: it thinks of the long way out too, back up a flooded staircase)
+		BlockPos step = stepToAir(level, start, true, far);            // a way its whole body fits (two blocks high)...
 		if (step == null) {
-			step = stepToAir(level, start, false);                     // ...or through gaps one block high, swimming flat
+			step = stepToAir(level, start, false, far);                // ...or through gaps one block high, swimming flat
 			tall = false;
 		}
 		if (step == null) return airPocket(level, start);
@@ -904,13 +905,13 @@ public final class Companion {
 	}
 
 	/** The first block of the shortest swim to air (breathing room over it), through water its body fits in; null if none near. */
-	private static BlockPos stepToAir(ServerLevel level, BlockPos start, boolean tall) {
+	private static BlockPos stepToAir(ServerLevel level, BlockPos start, boolean tall, int far) {
 		java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
 		Map<BlockPos, BlockPos> from = new HashMap<>();
 		open.add(start);
 		from.put(start, start);
 		BlockPos air = null;
-		while (!open.isEmpty() && from.size() < 1500) {
+		while (!open.isEmpty() && from.size() < (far > 16 ? 6000 : 1500)) {
 			BlockPos q = open.poll();
 			if (!q.equals(start) && breathable(level, q.above())) {
 				air = q;
@@ -918,7 +919,7 @@ public final class Companion {
 			}
 			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
 				BlockPos n = q.relative(d);
-				if (from.containsKey(n) || n.distManhattan(start) > 16 || !swimmable(level, n) || tall && !swimmable(level, n.above())) continue;
+				if (from.containsKey(n) || n.distManhattan(start) > far || !swimmable(level, n) || tall && !swimmable(level, n.above())) continue;
 				from.put(n, q);
 				open.add(n);
 			}
@@ -4313,6 +4314,9 @@ public final class Companion {
 		emotions.reset();
 		String how = source.type().msgId();
 		if (mod.config.journal && mod.journal != null && !inArena) mod.journal.died(name, cause + " at " + player.blockPosition().toShortString());
+		if (!inArena) XenMod.LOG.info("{} died of {} at y {} ({}, pickaxe tier {}, {} health before, {}) while {}", name, cause, player.blockPosition().getY(),
+				player.level().isDarkOutside() ? "night" : "day", crafter.pickTier(), Math.round(lastHealthBefore), hands.hasWeapon() ? "armed" : "no weapon",
+				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant);   // (for the test runs: what it was doing)
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
 		if (!inArena && !source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) && random.nextFloat() < 0.4f + 0.4f * personality.chattiness) {
