@@ -846,7 +846,7 @@ final class Walker {
 		if (inWater && water(p.below())) add(Kind.SWIM, p, p.below(), SWIM + under(p.below()), List.of());
 		if (blocks > 0 && onFloor && !inWater) {                          // tower up (out of a hole): jump, block under its feet
 			double br = breaks(p.above(2));
-			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 24 + worth + br, br > 0 ? List.of(p.above(2)) : List.of());   // (a last resort: a jump up a step is better)
+			if (br < INF) add(Kind.PILLAR, p, above, PLACE + JUMP + 90 + worth + br, br > 0 ? List.of(p.above(2)) : List.of());   // (only when there's no other way up: a long way round is better than a pillar)
 		}
 		if (dig && floor(p) && !inWater) {                                // straight down (players don't like to: only when there's no other way)
 			BlockPos b = p.below();
@@ -1245,16 +1245,16 @@ final class Walker {
 		return false;
 	}
 
-	/** The far end of the first long swim on its way (twelve swims or more in a row), or null: a boat's worth of water. */
+	/** The far end of the first long swim on its way (a lake, a sea: 24 swims or more in a row; a river it just swims), or null. */
 	private Vec3 longSwim() {
 		if (path == null) return null;
 		int run = 0;
 		for (int i = index; i < path.size(); i++) {
 			if (path.get(i).kind() == Kind.SWIM) run++;
-			else if (run >= 12) return Vec3.atBottomCenterOf(path.get(i).to());
+			else if (run >= 24) return Vec3.atBottomCenterOf(path.get(i).to());
 			else run = 0;
 		}
-		return run >= 12 ? Vec3.atBottomCenterOf(path.get(path.size() - 1).to()) : null;
+		return run >= 24 ? Vec3.atBottomCenterOf(path.get(path.size() - 1).to()) : null;
 	}
 
 	/** Why it's stuck, in its words, if it was just now (empty: it isn't). */
@@ -1422,6 +1422,17 @@ final class Walker {
 				&& (m.to().getY() > p.getY() + 0.4 || deepAt(p.blockPosition()) && m.to().getY() + 0.2 >= p.getY())) p.setJumping(true);
 		// stuck against a block edge (it happens): a hop, like a player
 		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 10) p.setJumping(true);
+		// caught on a block's edge a while (the hop didn't do it): back to the middle of its block to line up, then on again
+		if (p.horizontalCollision && p.onGround() && m.kind() != Kind.FALL && now() - stepStarted > 30 && (now() - stepStarted) % 20 < 6) {
+			Vec3 mid = Vec3.atBottomCenterOf(p.blockPosition());
+			if (Math.hypot(p.getX() - mid.x, p.getZ() - mid.z) > 0.25) {
+				face(mid.add(0, p.getEyeHeight(), 0));
+				p.zza = 0.6f;
+				p.setJumping(false);
+				p.setSprinting(false);
+				doing = "lining up";
+			}
+		}
 		// an edge it doesn't mean to go over (a cliff, a ravine, a dark one too: a player sees a pit is deep): it
 		// crouches there, like a player, and can't slip off (running on, it could fly past its turn)
 		if (p.onGround() && !p.isInWater() && m.kind() != Kind.FALL && m.kind() != Kind.PARKOUR && m.kind() != Kind.DIG_DOWN) {

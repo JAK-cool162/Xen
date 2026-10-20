@@ -41,6 +41,9 @@ public final class TwoCheck {
 		check(Survival.size() >= 40 && ender != null && ender.contains("roof") && creeper != null && creeper.contains("7 blocks") && hungry == null
 				&& Survival.answer("what are you doing") == null && Survival.risky("rotten_flesh") != null && Survival.risky("cooked_beef") == null && Survival.keep("golden_apple"),
 				"wiki facts: " + Survival.size() + ", enderman: " + ender + ", creeper: " + creeper + ", 'do you have food?': " + hungry);
+		String th = xen.mod.talk.Chat.fromThai("มานี่หน่อย"), why = xen.mod.talk.Chat.fromThai("ทำไมนายขุดตรงนั้น");
+		check(th.contains("come here") && why.startsWith("why") && why.contains("you") && why.contains("mine")
+				&& xen.mod.talk.Chat.fromThai("hello there").equals("hello there"), "thai: \"" + th + "\", \"" + why + "\"");
 		check(Skills.nameGrade("Steve") == Skills.nameGrade("Steve") && Skills.nameGrade("Steve") != Skills.nameGrade("Alex") && Skills.nameGrade("Alex") > 0.8f
 				&& Math.abs(Skills.nameKnack("Steve", 0)) <= 0.15f, "pvp knack from the name: Steve " + Skills.nameGrade("Steve") + ", Alex " + Skills.nameGrade("Alex"));
 		java.util.Random kr = new java.util.Random(5);

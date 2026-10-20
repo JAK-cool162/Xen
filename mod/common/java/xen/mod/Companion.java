@@ -1126,6 +1126,8 @@ public final class Companion {
 		if (spares != null) return spares;
 		Action pick = pickUpNearby();                                  // good things lying close by: it picks them up
 		if (pick != null) return pick;
+		Action water = fillBucket();                                   // an empty bucket and water right by it: filled (for a fall: the water clutch)
+		if (water != null) return water;
 		Action bed = bedtime();                                       // night, and a bed at home: it sleeps, like a player
 		if (bed != null) return bed;
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
@@ -1282,24 +1284,17 @@ public final class Companion {
 	private java.util.UUID comeFor;
 	private long comeUntil, cameAt = -1;
 
-	private int countAll() {
-		int n = 0;
-		var inv = player.getInventory();
-		for (int i = 0; i < 36; i++) n += inv.getItem(i).getCount();
-		return n;
-	}
-
 	/** What it was doing before it was called over (its own life: back to that after, unless asked to stay). */
 	private Mode modeBeforeCome;
 	/** Something given to it while it was there (then it says thanks, and it knows what that was about). */
-	private int comeGifts, comeCount;
+	private int comeGifts;
 
 	private Action comeOver() {
 		if (comeFor == null) return null;
 		long now = player.level().getGameTime();
 		ServerPlayer o = server.getPlayerList().getPlayer(comeFor);
 		boolean leftIt = cameAt >= 0 && o != null && o.distanceTo(player) > 10;                 // (they walked off: it keeps up, it was called)
-		if (o == null || o.level() != player.level() || now > comeUntil || cameAt >= 0 && now - cameAt > 20 * 75 && !leftIt) {
+		if (o == null || o.level() != player.level() || now > comeUntil || cameAt >= 0 && now - cameAt > 20 * 30 && !leftIt) {
 			doneComing(o, false);                                        // (a good while there and nothing asked: its own things again)
 			return null;
 		}
@@ -1313,20 +1308,94 @@ public final class Companion {
 		if (cameAt < 0) {
 			cameAt = now;
 			comeGifts = 0;
-			comeCount = countAll();
+			comeHad = items();
 			walker.stop();
 			String sized = sizeUp(o);                                     // a look at them and round them first: what's wrong?
 			journal("does", "came over to " + o.getName().getString() + ": " + sized);
 			say(sized);
 		}
-		int now2 = countAll();
-		if (now2 > comeCount) comeGifts++;                             // (something given to it: it'll say thanks)
-		comeCount = now2;
+		Map<String, Integer> nowHas = items();
+		for (var e : nowHas.entrySet())
+			if (e.getValue() > comeHad.getOrDefault(e.getKey(), 0)) {     // something given to it: worth keeping? (its call)
+				comeGifts++;
+				gift(o, e.getKey());
+			}
+		comeHad = items();
 		Action pick = pickUpNearby();                                  // something tossed to it (a pickaxe, an axe): it takes it
 		if (pick != null) return pick;
+		if ((now - cameAt) % 20 == 0) {                                 // while it waits it looks round: anything coming at them?
+			net.minecraft.world.entity.Mob mob = null;
+			for (net.minecraft.world.entity.Mob m : o.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, o.getBoundingBox().inflate(14),
+					m -> m.isAlive() && hostile(m) && player.hasLineOfSight(m)))
+				if (mob == null || m.distanceTo(o) < mob.distanceTo(o)) mob = m;
+			if (mob != null && hands.hasWeapon() && !helpGoing) {
+				helpAgainst = mob;
+				helpGoing = true;
+				helpUntil = now + 20 * 25;
+				say(pick3("Behind you!", "Watch out, " + BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()).getPath().replace('_', ' ') + "!", "Hold on, I got this one."));
+			}
+		}
 		goals.instant = "here with " + o.getName().getString() + ", waiting to see what they want";
-		hands.face(o.getEyePosition());
+		long phase = (now - cameAt) / 30 % 4;                           // eyes on them, a glance round, back to them (like a player waiting)
+		if (phase == 1 || phase == 3) {
+			double yaw = Math.toRadians(o.getYRot() + (phase == 1 ? 120 : -120));
+			hands.face(player.getEyePosition().add(-Math.sin(yaw) * 6, -0.3, Math.cos(yaw) * 6));
+		} else hands.face(o.getEyePosition());
 		return Action.IDLE;
+	}
+
+	/** What it had when it got there (to notice what it's given). */
+	private Map<String, Integer> comeHad = new HashMap<>();
+
+	/**
+	 * Given something: does it keep it? Junk it has no use for, or a tool worse than the one it has: its call (a kind one
+	 * keeps it anyway, to be nice). Else thanks.
+	 */
+	private void gift(ServerPlayer o, String item) {
+		boolean junk = GIFT_JUNK.contains(item);
+		boolean worse = toolTier(item) >= 0 && bestTier(item) > toolTier(item);
+		if (!junk && !worse) {
+			say(pick3("Oh nice, thanks!", "Thanks, I needed that.", "Ooh, a " + item.replace('_', ' ') + "! Thanks."));
+			return;
+		}
+		if (personality.kindness > 0.7f) {                              // (too nice to give it back)
+			say(pick3("Uh, thanks I guess.", "Oh... thanks!", "Haha, okay, thanks."));
+			return;
+		}
+		var inv = player.getInventory();
+		for (int i = 0; i < 36; i++) {
+			ItemStack st = inv.getItem(i);
+			if (st.isEmpty() || !BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals(item)) continue;
+			hands.face(o.position().add(0, 0.2, 0));
+			ItemStack out = st.split(st.getCount());
+			if (!Compat.tossTo(player, out, o.getUUID())) inv.add(out);
+			break;
+		}
+		say(worse ? pick3("Thanks, but I've got a better one. You keep it.", "I already have a better " + item.replaceAll("^[a-z]+_", "") + ", here.", "Nah, mine's better. Keep it!")
+				: pick3("What am I gonna do with this? Here.", "Uh, no thanks.", "I've got no use for that, here you go."));
+		journal("thinks", "was given " + item.replace('_', ' ') + ": " + (worse ? "it has a better one" : "no use for it") + ", gives it back");
+	}
+
+	private static final java.util.Set<String> GIFT_JUNK = java.util.Set.of("dirt", "rotten_flesh", "poisonous_potato", "spider_eye", "dead_bush",
+			"gravel", "sand", "andesite", "diorite", "granite", "tuff", "wheat_seeds", "stick");
+	private static final java.util.List<String> TOOL_TIERS = java.util.List.of("wooden", "golden", "stone", "copper", "iron", "diamond", "netherite");
+
+	/** How good a tool is (0 wood ... 6 netherite), -1 if it isn't one. */
+	private static int toolTier(String item) {
+		if (!item.matches(".*_(pickaxe|axe|sword|shovel|hoe)$")) return -1;
+		return TOOL_TIERS.indexOf(item.substring(0, item.indexOf('_')));
+	}
+
+	/** Its best tool of that kind (a pickaxe for a pickaxe...) other than this one, -1 if none. */
+	private int bestTier(String item) {
+		String kind = item.substring(item.lastIndexOf('_'));
+		int best = -1;
+		var inv = player.getInventory();
+		for (int i = 0; i < 36; i++) {
+			String n = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (!n.equals(item) && n.endsWith(kind)) best = Math.max(best, toolTier(n));
+		}
+		return best;
 	}
 
 	/** Called over: what it sees when it gets there, and what it says (or does: a monster at them, food for them). */
@@ -2413,6 +2482,36 @@ public final class Companion {
 		return false;
 	}
 
+	private long bucketLookAt;
+
+	/** An empty bucket and still water in reach, nothing else going on: it fills it, like a player keeping one for falls. */
+	private Action fillBucket() {
+		long now = player.level().getGameTime();
+		if (now - bucketLookAt < 40 || fighting || hands.busy() || player.isInWater()) return null;
+		bucketLookAt = now;
+		var inv = player.getInventory();
+		boolean empty = false, full = false;
+		for (int i = 0; i < 36; i++) {
+			String n = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (n.equals("bucket")) empty = true;
+			else if (n.equals("water_bucket")) full = true;
+		}
+		if (!empty || full) return null;
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos feet = player.blockPosition();
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -2, -3), feet.offset(3, 1, 3))) {
+			if (!level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER) || !level.getFluidState(q).isSource() || !level.getBlockState(q.above()).isAir()) continue;
+			Vec3 at = Vec3.atCenterOf(q).add(0, 0.4, 0);
+			if (player.getEyePosition().distanceTo(at) > player.blockInteractionRange() - 0.5) continue;
+			if (!hands.bucket(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"))) return null;
+			goals.instant = "filling its bucket with water";
+			journal("does", "filled its bucket at " + q.toShortString() + " (water for a fall)");
+			acted = true;
+			return Action.PLACE;
+		}
+		return null;
+	}
+
 	/** Things not worth building a way to (it puts down the same blocks to get there). */
 	private static final java.util.Set<String> CHEAP = java.util.Set.of("cobblestone", "cobbled_deepslate", "dirt", "gravel", "sand", "netherrack",
 			"andesite", "diorite", "granite", "tuff", "deepslate", "stone", "flint", "wheat_seeds");
@@ -2682,7 +2781,7 @@ public final class Companion {
 			}
 			oreTaking = null;
 		}
-		if (player.tickCount - lookedOnTheWay < 5 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
+		if (player.tickCount - lookedOnTheWay < 10 || fightingNow() || inArena || player.isInWater() || emotions.fear > 0.6f
 				|| player.level().getGameTime() - rushingBack < 5                    // (running back for its things before they go: no stopping)
 				|| goals.option == xen.mod.core.Mind.FLEE || hands.busy() && !hands.interruptible() || commandedTo != null && visiting == null   // (sent somewhere: there first; digging its way: it stops for ore it passes, a diamond in the wall too)
 				|| player.level().isDarkOutside() && player.level().canSeeSky(player.blockPosition())) return null;   // (out at night: keep going)
@@ -4186,6 +4285,7 @@ public final class Companion {
 		String who = from.getName().getString();
 		Talk talk = talks.computeIfAbsent(u, k -> new Talk());         // what was said before: "what about cows?", "and you?", "is it good?"
 		long saidAt = player.level().getGameTime();
+		if (said != null) said = xen.mod.talk.Chat.fromThai(said);             // (Thai: in the words it reads; what it asks for was read in Thai already)
 		if (said != null && r.intent().equals("chat") && comeAnswered(from, said)) return null;   // (called over: "nothing, thanks": back to its own things)
 		if (!r.intent().equals("chat") && !r.intent().equals("follow") && comeFor != null) {   // called over and now asked for something: that's what it was for
 			comeFor = null;

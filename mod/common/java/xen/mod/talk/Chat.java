@@ -121,6 +121,30 @@ public final class Chat {
 			{"build", "สร้างบ้าน", "บ้านใต้ดิน", "ฐานใต้ดิน", "ฟาร์ม", "คอก"}, {"shelter", "บ้าน", "ที่หลบ", "ที่พัก", "สร้าง"}, {"eat", "กิน"}};
 	private static final Pattern THAI_CHAR = Pattern.compile("[\\u0e00-\\u0e7f]");
 
+	/**
+	 * Thai said to it, in English words it reads (offline, no translator online: a phrase list, longest first, since
+	 * Thai has no spaces). What it doesn't know stays as it was.
+	 */
+	static final String[][] THAI_WORDS = {
+			{"ทำอะไรอยู่", "what are you doing"}, {"ไปไหน", "where are you going"}, {"ไม่มีอะไร", "nothing"}, {"ไม่เป็นไร", "never mind"},
+			{"มาตรงนี้", "come here"}, {"มานี่", "come here"}, {"มานี้", "come here"}, {"มาหา", "come here"}, {"ตามมา", "follow me"},
+			{"ขอบคุณ", "thanks"}, {"สวัสดี", "hello"}, {"บาย", "bye"}, {"ลาก่อน", "bye"}, {"ทำไม", "why"}, {"อะไร", "what"},
+			{"ที่ไหน", "where"}, {"ยังไง", "how"}, {"เท่าไหร่", "how many"}, {"ใช่", "yes"}, {"ไม่", "no"}, {"โอเค", "ok"},
+			{"หิว", "hungry"}, {"ช่วยด้วย", "help"}, {"ช่วย", "help"}, {"อันตราย", "danger"}, {"ระวัง", "watch out"},
+			{"เพชร", "diamonds"}, {"เหล็ก", "iron"}, {"ทอง", "gold"}, {"ถ่าน", "coal"}, {"หิน", "stone"}, {"ไม้", "wood"},
+			{"อาหาร", "food"}, {"บ้าน", "house"}, {"ถ้ำ", "cave"}, {"เตียง", "bed"}, {"กลางคืน", "night"}, {"ซอมบี้", "zombie"},
+			{"ครีปเปอร์", "creeper"}, {"โครงกระดูก", "skeleton"}, {"เก่ง", "good"}, {"ดีมาก", "great"}, {"เยี่ยม", "awesome"},
+			{"ให้", "give"}, {"ขุด", "mine"}, {"กิน", "eat"}, {"นอน", "sleep"}, {"หยุด", "stop"}, {"รอ", "wait"}, {"ไป", "go"},
+			{"ฉัน", "i"}, {"ผม", "i"}, {"เรา", "we"}, {"นาย", "you"}, {"แก", "you"}, {"คุณ", "you"}, {"มึง", "you"}};
+
+	/** Thai words it knows, as English (with spaces round them); the rest as it was. Not Thai: as it was. */
+	public static String fromThai(String said) {
+		if (said == null || !THAI_CHAR.matcher(said).find()) return said;
+		String out = said;
+		for (String[] t : THAI_WORDS) out = out.replace(t[0], " " + t[1] + " ");
+		return out.replaceAll("[\\u0e00-\\u0e7f]+", " ").replaceAll("\\s+", " ").trim();
+	}
+
 	/** What a player asks Xen to do, by keywords. Questions are just chat. */
 	public static Request understand(String message, String name) {
 		String words = requestWords(message, name);

@@ -246,6 +246,7 @@ final class Mimic {
 			return true;
 		}
 		float s = Math.max(c.mod.config.copy ? skill(CLUTCH) : 0, c.skills.get(Skills.MOVE) - 0.35f);   // (an agile Xen gets the idea by itself)
+		s = Math.max(s, 0.25f + 0.4f * c.skills.get(Skills.MOVE));               // (it carries water for this: it knows the trick, clumsy till it has done it a few times)
 		boolean falling = !p.onGround() && !p.isInWater() && p.getDeltaMovement().y < -0.4 && p.fallDistance > 4;
 		if (!falling || s <= 0) {
 			if (p.onGround() || p.isInWater()) {
