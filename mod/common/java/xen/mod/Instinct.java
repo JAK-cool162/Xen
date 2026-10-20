@@ -53,6 +53,11 @@ final class Instinct {
 		else if (p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply() * 0.6 && openAbove(level)) now = upForAir();
 		else if (inFire(level, p.blockPosition())) now = outOfFire(level);
 		else if (deadlyEdge(level)) now = backFromEdge();
+		if (now.isEmpty() && p.tickCount <= c.airUp && p.isInWater()) {                 // its mind said: straight up for air (the keys, last of all)
+			upForAir();
+			doing = "";
+			return;
+		}
 		doing = now;
 		if (now.isEmpty()) {
 			if (p.tickCount - lastAt > 20) last = "";                    // (bobbing out of it for a moment is still the same danger)
@@ -89,8 +94,10 @@ final class Instinct {
 		p.setSprinting(false);
 		p.zza = 0;                                                     // straight up, where it's open (it only knows it's open over its head: a drift sideways takes it under the rock)
 		p.xxa = 0;
+		BlockPos head = BlockPos.containing(p.getEyePosition());       // and to the middle of that opening: half its body under the rock beside it, its head bumps that lower roof and its eyes stay under
+		double dx = head.getX() + 0.5 - p.getX(), dz = head.getZ() + 0.5 - p.getZ();
 		var v = p.getDeltaMovement();
-		p.setDeltaMovement(v.x * 0.6, v.y, v.z * 0.6);
+		p.setDeltaMovement(v.x * 0.5 + Math.max(-0.06, Math.min(0.06, dx * 0.3)), v.y, v.z * 0.5 + Math.max(-0.06, Math.min(0.06, dz * 0.3)));
 		return "swimming up for air";
 	}
 

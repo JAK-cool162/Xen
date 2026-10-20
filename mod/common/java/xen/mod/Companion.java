@@ -877,9 +877,16 @@ public final class Companion {
 			return Action.FORWARD;
 		}
 		player.setSprinting(false);                                    // up: hold space
+		if (step.getX() == start.getX() && step.getZ() == start.getZ()) {   // straight up: no walking on (into the rock by the opening), the middle of it (Instinct, last)
+			airUp = player.tickCount + 5;
+			return Action.IDLE;
+		}
 		hands.face(Vec3.atCenterOf(step));
 		return Action.JUMP;
 	}
+
+	/** Till this tick it swims straight up, in the middle of the opening over it (done last, by Instinct; its next choice may say more). */
+	int airUp = -1;
 
 	/** No way to air near, under a roof, short of breath: a door put down beside it holds no water (an air pocket, a player's trick). */
 	private Action airPocket(ServerLevel level, BlockPos feet) {
@@ -1069,7 +1076,8 @@ public final class Companion {
 			goals.instant = "swimming up for air";
 			player.setSprinting(false);                               // (upright: swimming flat and looking down, it would sink)
 			player.setShiftKeyDown(false);
-			return Action.JUMP;                                       // hold space to swim up, like a player
+			airUp = player.tickCount + 5;                             // hold space to swim up, like a player (straight up: Instinct, last)
+			return Action.IDLE;
 		}
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
