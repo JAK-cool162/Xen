@@ -477,7 +477,7 @@ final class Goals {
 	private String curiousOf;
 	private final java.util.Set<String> seenUpClose = new java.util.HashSet<>();
 	private static final java.util.Set<String> OWN_PLACES = java.util.Set.of("home", "mine", "mine base", "bed", "diamonds", "spawn", "death", "chest", "base", "farm",
-			"pen", "portal");
+			"pen", "portal", "enchanting table", "mobfarm", "mob farm", "furnace", "crafting table", "sugar cane");   // (its own: nothing new to see there)
 
 	/** The nearest place it spotted (a village, a temple, ruins...) within 160 blocks, in this world, that it hasn't been to; null if none. */
 	private Places.Place curiousAbout() {
@@ -834,6 +834,7 @@ final class Goals {
 		c.rules.lean(b);                                                        // the rules it wrote itself; stuck: something it hasn't tried
 		c.intent.lean(b);                                                       // what it promised, what it agreed to do with someone
 		c.planner.lean(b);                                                      // what it's after next (a shield before night...), changed by what turns up
+		c.teamRole.lean(b);                                                     // its part on its team (the base, the mine, the monsters, scouting)
 		return b;
 	}
 
@@ -1247,6 +1248,19 @@ final class Goals {
 		}
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
+		if (tier >= 3 && can[Mind.ENCHANT] && !c.enchanter.on && now() > c.enchanter.retryAt) {   // the makings of an enchantment (lapis, levels, the table): a few seconds, before anything long
+			return why(Mind.ENCHANT, "enchant its gear (lapis, " + c.player.experienceLevel + " levels)");
+		}
+		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
+				&& (enchantedSomething() || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe, its gear enchanted (or two days on without): a first look at the Nether
+			netherTryAt = now() + 20 * 60 * 20;
+			String trip = c.nether.go("visit", 0);
+			c.journal("thinks", "the plan: a first look at the Nether (" + trip + ")");
+			if (trip.startsWith("You will")) {
+				c.chatter(c.pick3("Diamond pickaxe, enchanted gear. Time to see the Nether.", "Let's build a portal. The Nether's next.", "Nether time!"), true);
+				return why(Mind.REST, "off to see the Nether");
+			}
+		}
 		// The main goal: iron (tools, then armor), then diamonds, a home, and in the end the dragon. Its own plan (Xen 6.0)
 		// changes the order: a builder or a settler makes its home first, a speedrunner skips it, a settler farms.
 		boolean holeOnly = who.believes("hole_is_enough");
@@ -1397,6 +1411,21 @@ final class Goals {
 
 	private long now() {
 		return c.player.level().getGameTime();
+	}
+
+	/** When it first had a diamond pickaxe (game time; -1 not yet). */
+	private long diamondPickSince = -1;
+
+	private long diamondPickAt() {
+		if (diamondPickSince < 0) diamondPickSince = now();
+		return diamondPickSince;
+	}
+
+	/** Something it carries or wears is enchanted. */
+	private boolean enchantedSomething() {
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) if (inv.getItem(i).isEnchanted()) return true;
+		return false;
 	}
 
 	/** Diamond gear (a diamond pickaxe and sword or chestplate), and not yet netherite enough: the Nether is next. */

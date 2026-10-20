@@ -360,6 +360,7 @@ public final class Companion {
 		}
 		if (mode == Mode.FOLLOW && leader != null) nether.watchLeader(server.getPlayerList().getPlayer(leader));
 		if (player.tickCount % 20 == 5) farmer.look();                  // (farmland by water: that's how farms work)
+		teamRole.tick();                                                // (on a team: its part in it, now and then)
 		if (hurtNow && player.getLastHurtByMob() != null) learnFromHurt(player.getLastHurtByMob());
 		dontStareAtEndermen();
 		hurtNow = player.getHealth() < tickHealth;
@@ -822,6 +823,7 @@ public final class Companion {
 		String n = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
 		return switch (n) {
 			case "piglin", "spider", "cave_spider" -> false;           // calm until provoked (or in the dark: then they target it)
+			case "ghast" -> hands.hasBow() && hands.arrows() > 0;          // (up in the air: arrows, or its fireballs punched back; no chasing it)
 			case "creaking" -> !knowledge.knows("creaking");            // it can't be hurt (only its heart can): once it knows, it keeps away
 			default -> true;
 		};
@@ -1093,6 +1095,8 @@ public final class Companion {
 		if (shocked != null) return shocked;
 		Action told = goToStep();                                     // "go to 120 64 -40": to that very block
 		if (told != null) return told;
+		Action fireball = fireballComing();                           // the Nether: a ghast's fireball coming at it (punched back, or the shield)
+		if (fireball != null) return fireball;
 		Action creak = awayFromCreaking();                            // a creaking can't be hurt: it keeps away from it
 		if (creak != null) return creak;
 		Action end = dragon.next();                                    // in the End: the dragon fight
@@ -1235,6 +1239,8 @@ public final class Companion {
 		if (mode != Mode.FOLLOW || leaderWithin(NEARBY)) {
 			Action tend = farmer.tend();                                   // its crops: ripe ones harvested, planted again
 			if (tend != null) return tend;
+			Action cane = mode == Mode.FREE ? farmer.cane() : null;         // sugar cane by the water near home: planted, the tall ones cut
+			if (cane != null) return cane;
 		}
 		if (mode == Mode.FREE && mod.config.wants && !inArena && !minion) {
 			Action watch = tribe == null ? null : tribe.watchStep(this);   // on watch over the village tonight
@@ -2505,6 +2511,8 @@ public final class Companion {
 	final Taste taste = new Taste(this);
 	/** Its crop farm (see {@link Farmer}). */
 	final Farmer farmer = new Farmer(this);
+	/** On a team: what it does for the team (keeper, miner, fighter, explorer), its own pick. */
+	final TeamRole teamRole = new TeamRole(this);
 	/** Its shop in the village, if it keeps one (see {@link Market}). */
 	final Market.Keeper shop = new Market.Keeper(this);
 	/** The band of free Xens it joined (see {@link Tribe}), or null. */
@@ -2768,10 +2776,59 @@ public final class Companion {
 
 	private int creakingFight;
 
-	/** Hurt by something: some things you learn the hard way (a piglin, when you wear no gold). */
+	/** Hurt by something: some things you learn the hard way (a piglin, when you wear no gold; the Nether's others). */
 	private void learnFromHurt(LivingEntity by) {
 		String n = BuiltInRegistries.ENTITY_TYPE.getKey(by.getType()).getPath();
-		if (n.startsWith("piglin") && nether.inNether()) knowledge.learn("piglin_gold", Knowledge.How.TRIED);
+		if (n.startsWith("piglin") && nether.inNether()) knowledge.learn(n.equals("piglin") && wearsGold() ? "piglin_anger" : "piglin_gold", Knowledge.How.TRIED);
+		switch (n) {
+			case "ghast" -> knowledge.learn("ghast_fireball", Knowledge.How.TRIED);
+			case "zombified_piglin" -> knowledge.learn("zombified_piglins", Knowledge.How.TRIED);
+			case "wither_skeleton" -> knowledge.learn("wither_skeleton", Knowledge.How.TRIED);
+			case "hoglin" -> knowledge.learn("hoglin", Knowledge.How.TRIED);
+			case "blaze" -> knowledge.learn("blaze_cover", Knowledge.How.TRIED);
+			case "magma_cube" -> { if (by.getBbWidth() < 1.1f) knowledge.learn("magma_split", Knowledge.How.SEEN); }   // (a small one: it saw a big one split)
+			default -> { }
+		}
+	}
+
+	private boolean wearsGold() {
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
+			if (BuiltInRegistries.ITEM.getKey(player.getItemBySlot(slot).getItem()).getPath().startsWith("golden_")) return true;
+		return false;
+	}
+
+	/**
+	 * A ghast's fireball flying at it (it can't melee a ghast up in the air): close enough, and it knows the trick, a
+	 * punch sends it back; else the shield up toward it, else a step aside. Null: none coming.
+	 */
+	private Action fireballComing() {
+		if (!nether.inNether()) return null;
+		for (var f : player.level().getEntitiesOfClass(net.minecraft.world.entity.projectile.hurtingprojectile.LargeFireball.class,
+				player.getBoundingBox().inflate(7), e -> e.isAlive())) {
+			Vec3 v = f.getDeltaMovement(), to = player.getEyePosition().subtract(f.position());
+			if (v.lengthSqr() < 1e-4 || v.normalize().dot(to.normalize()) < 0.85) continue;   // (not coming at it)
+			double d = f.distanceTo(player);
+			if (knowledge.knows("ghast_fireball") && d < 3.2 && player.getAttackStrengthScale(0.5f) > 0.4f) {
+				hands.stop();
+				hands.face(f.position());
+				player.attack(f);                                             // a punch: it flies back the way it came
+				Compat.swing(player);
+				journal("does", "punches a ghast's fireball back at it");
+				acted = true;
+				return Action.IDLE;
+			}
+			if (hands.carries("shield") && hands.raiseShield()) {
+				hands.face(f.position());
+				goals.instant = "shield up: a ghast's fireball";
+				return Action.IDLE;
+			}
+			if (d < 6) {
+				goals.instant = "out of the way of a fireball";
+				return (player.tickCount / 10) % 2 == 0 ? Action.LEFT : Action.RIGHT;
+			}
+		}
+		return null;
 	}
 
 	private static String join(String... parts) {

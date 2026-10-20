@@ -50,6 +50,8 @@ final class Purpose {
 		Tribe t = c.tribe();
 		String job = t == null ? null : t.laws.jobOf(c);
 		if (job != null) return job + " of " + t.name;
+		if (c.teamRole.role != null && c.player != null && c.player.getTeam() != null)
+			return c.teamRole.role.name().toLowerCase(java.util.Locale.ROOT) + " of the " + c.player.getTeam().getDisplayName().getString();
 		int plan = c.personality.plan;
 		return plan < 0 ? "newcomer" : switch (plan) {
 			case Strategy.SPEEDRUN -> "speedrunner";

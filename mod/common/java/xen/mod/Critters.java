@@ -1,5 +1,6 @@
 package xen.mod;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -143,6 +144,7 @@ final class Critters {
 		if (p == null || c.inArena || c.fightingNow() || p.level().isDarkOutside() || now() < nextChore) return null;
 		Action a = shear();
 		if (a == null) a = breed();
+		if (a == null) a = lure();
 		if (a == null) a = tameCat();
 		if (a == null) nextChore = now() + 200;                                   // (nothing: look again in 10 seconds)
 		return a;
@@ -195,6 +197,70 @@ final class Critters {
 			});
 		}
 		return null;
+	}
+
+	/** The animal it's bringing home (wheat in its hand: it follows), what kind, and till when it tries. */
+	private Animal luring;
+	private String luringKind;
+	private long lureUntil, nextLure;
+	int lured;
+
+	/**
+	 * Fewer than two cows (or sheep) by its home and wheat in its bag: it fetches one the way a player does, wheat in its
+	 * hand so the animal follows, back to its pen (or its home), walking so it keeps up. Breeding does the rest.
+	 */
+	private Action lure() {
+		var p = c.player;
+		BlockPos home = c.goals.home;
+		if (home == null || !p.blockPosition().closerThan(home, 64)) {
+			luring = null;
+			return null;
+		}
+		BlockPos to = c.goals.pen != null ? c.goals.pen : home;
+		Vec3 there = Vec3.atBottomCenterOf(to);
+		if (luring == null) {
+			if (now() < nextLure || MindSense.count(c, n -> n.equals("wheat")) == 0) return null;
+			nextLure = now() + 20 * 60 * 2;
+			for (String kind : new String[] {"cow", "sheep"}) {
+				int near = p.level().getEntitiesOfClass(Animal.class, new net.minecraft.world.phys.AABB(to).inflate(10, 4, 10),
+						a -> a.isAlive() && !a.isBaby() && id(a).equals(kind)).size();
+				if (near >= 2) continue;
+				Animal far = nearest(Animal.class, 40, a -> id(a).equals(kind) && !a.isBaby() && a.position().distanceTo(there) > 12);
+				if (far == null) continue;
+				luring = far;
+				luringKind = kind;
+				lureUntil = now() + 20 * 90;
+				c.journal("thinks", "only " + near + " " + kind + (near == 1 ? "" : "s") + " by its " + (c.goals.pen != null ? "pen" : "home") + ": brings one over, wheat in hand");
+				break;
+			}
+			if (luring == null) return null;
+		}
+		if (!luring.isAlive() || now() > lureUntil) {
+			luring = null;
+			return null;
+		}
+		int wheat = c.hands.hotbar(s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("wheat"));
+		if (wheat < 0) {
+			luring = null;
+			return null;
+		}
+		if (luring.position().distanceTo(there) <= 6) {                             // home with it
+			lured++;
+			c.journal("does", "brought a " + luringKind + " home with wheat");
+			c.chatter(c.pick3("Come on, " + luringKind + ". Home.", "Got a " + luringKind + " home.", "One more " + luringKind + " for the farm."), false);
+			luring = null;
+			nextLure = now() + 20 * 20;                                                  // (the next one soon)
+			return null;
+		}
+		p.getInventory().setSelectedSlot(wheat);                                         // wheat in hand: it follows
+		c.goals.instant = "bringing a " + luringKind + " home (wheat in hand)";
+		c.acted = true;
+		if (p.distanceTo(luring) > 5) {
+			c.run(true);
+			return c.walkTo(luring.position());                                          // over to it first
+		}
+		c.run(false);                                                                    // (walking: it keeps up)
+		return c.walkTo(there);
 	}
 
 	private static boolean feeds(String kind, String n) {

@@ -454,7 +454,13 @@ final class Fighter {
 			return around >= 3 ? Action.BACK : idle();                        // (three or more round it: back off, so they're all in front of it)
 		}
 
-		h.ready(foe.isBlocking(), d);                                          // an axe for a raised shield, a spear out of a sword's reach, else its sword
+		boolean axeSooner = archer(foe) && axeKillsSooner(foe);                // a skeleton: the weapon that kills it in fewer crits (a stone axe: two)
+		if (axeSooner && now - axeSaidAt > 1200) {
+			axeSaidAt = now;
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "the %s has %.0f health: its axe kills it in %d crits, its sword in %d, so the axe",
+					kind(foe).replace('_', ' '), foe.getHealth(), critsToKill(foe, best("_axe")), critsToKill(foe, best("_sword"))));
+		}
+		h.ready(foe.isBlocking() || axeSooner, d);                             // an axe for a raised shield (or a skeleton), a spear out of a sword's reach, else its sword
 		float charge = p.getAttackStrengthScale(0.5f);
 		if (charge < lastCharge - 0.3f) newSwing();                            // it just swung: a new cycle
 		lastCharge = charge;
@@ -676,6 +682,44 @@ final class Fighter {
 		}
 		return best;
 	}
+
+	/** A weapon's hit at full charge (1.9+ combat): an axe hits harder, a sword swings faster. 1 for a bare hand. */
+	static float weaponHit(String id) {
+		boolean axe = id.endsWith("_axe");
+		if (!axe && !id.endsWith("_sword")) return 1;
+		return switch (id.substring(0, id.lastIndexOf('_'))) {
+			case "stone" -> axe ? 9 : 5;
+			case "iron" -> axe ? 9 : 6;
+			case "diamond" -> axe ? 9 : 7;
+			case "netherite" -> axe ? 10 : 8;
+			default -> axe ? 7 : 4;                                            // (wood, gold)
+		};
+	}
+
+	/** Its hardest-hitting weapon of a kind on its hotbar ("_axe", "_sword"); 0 if none. */
+	private float best(String kind) {
+		var inv = c.player.getInventory();
+		float best = 0;
+		for (int i = 0; i < 9; i++) {
+			String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if (id.endsWith(kind)) best = Math.max(best, weaponHit(id));
+		}
+		return best;
+	}
+
+	/** Critical hits (half again a full hit) that kill it from where its health is now. */
+	private static int critsToKill(LivingEntity foe, float hit) {
+		return hit <= 0 ? 99 : (int) Math.ceil((foe.getHealth() + foe.getAbsorptionAmount()) / (hit * 1.5f));
+	}
+
+	/** Its axe kills this one in fewer crits than its sword (a skeleton: a stone axe in two, a stone or iron sword in three)? */
+	private boolean axeKillsSooner(LivingEntity foe) {
+		float axe = best("_axe"), sword = best("_sword");
+		return axe > 0 && sword > 0 && critsToKill(foe, axe) < critsToKill(foe, sword);
+	}
+
+	/** When it last noted why the axe (once a minute at most). */
+	private long axeSaidAt = -10000;
 
 	private boolean archer(LivingEntity e) {
 		String k = kind(e);

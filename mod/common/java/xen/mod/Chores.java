@@ -2372,9 +2372,10 @@ final class Chores {
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-5, -3, -5), feet.offset(5, 5, 5))) {
 			var state = level.getBlockState(q);
 			int cat = WorldSenses.category(level, q, state);
-			if (cat != Blocks.COAL && cat != Blocks.IRON && cat != Blocks.GOLD && cat != Blocks.DIAMOND) continue;
+			boolean lapis = state.is(net.minecraft.world.level.block.Blocks.LAPIS_ORE) || state.is(net.minecraft.world.level.block.Blocks.DEEPSLATE_LAPIS_ORE);   // (for enchanting: a stone pickaxe takes it)
+			if (cat != Blocks.COAL && cat != Blocks.IRON && cat != Blocks.GOLD && cat != Blocks.DIAMOND && !lapis) continue;
 			if (cat == Blocks.GOLD && c.personality.believes("gold_for_fools")) continue;
-			if (Crafter.tierFor(cat) > tier || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;
+			if ((lapis ? 2 : Crafter.tierFor(cat)) > tier || skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ()))) continue;
 			boolean open = false;
 			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) if (level.getBlockState(q.relative(d)).isAir()) open = true;
 			if (!open) continue;

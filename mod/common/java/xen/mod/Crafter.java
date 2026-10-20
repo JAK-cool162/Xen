@@ -123,7 +123,9 @@ final class Crafter {
 		long day = Compat.timeOfDay(c.player.level()) % 24000;
 		if (tier == 2 && iron >= 1 && !hasShield() && wood() >= 6 && (day >= 6000 && day < 13000 || iron >= 4)) return "shield";   // (its first iron, the night coming: a shield first, the pickaxe after)
 		if (tier >= 3 && iron >= 2 && !has("iron_sword") && !has("diamond_sword") && sticksOrWood(1, 0)) return "iron_sword";
-		if (tier >= 3 && diamonds >= 2 && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
+		boolean tableWanted = c.enchanter.table() == null && !has("enchanting_table");   // (two diamonds go into an enchanting table: kept for it)
+		if (tableWanted && tier >= 4 && diamonds >= 2 && count(n -> n.equals("book")) >= 1 && count(n -> n.equals("obsidian")) >= 4) return "enchanting_table";
+		if (tier >= 3 && diamonds >= 2 + (tableWanted && tier >= 4 ? 2 : 0) && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
 		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
 		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
 		String bed = bedFromWool();                                                  // the wool's in: a bed now (the night's coming)
@@ -480,7 +482,7 @@ final class Crafter {
 		boolean wooden = goal.startsWith("wooden_"), tool = goal.matches(".*_(pickaxe|axe|shovel|hoe|sword)$");
 		int sticks = !tool ? 0 : goal.endsWith("_sword") ? 1 : 2;
 		int heads = goal.endsWith("_sword") ? 2 : 3;
-		int planksNeeded = (wooden ? heads : goal.endsWith("_bed") ? 3 : 0) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)   // (a bed: 3 planks, no sticks)
+		int planksNeeded = (wooden ? heads : goal.endsWith("_bed") ? 3 : planksIn(goal)) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)   // (a bed: 3 planks, no sticks)
 				+ (tableNearOrCarried() ? 0 : 4);
 		if (count(n -> n.endsWith("_planks")) < planksNeeded) {
 			if (count(Crafter::isLog) == 0) {                                          // (no log to make them from: later)
@@ -499,6 +501,16 @@ final class Crafter {
 			return step(() -> placeTable(), "a place for the table");
 		}
 		return step(() -> craftAt(at, goal), goal);
+	}
+
+	/** Planks that go into it (a shield 6, a boat 5, a chest 8): made from its logs first, or the table's recipe finds none. */
+	private static int planksIn(String goal) {
+		return switch (goal) {
+			case "shield", "barrel" -> 6;
+			case "chest" -> 8;
+			case "bowl" -> 3;
+			default -> goal.endsWith("_boat") || goal.endsWith("_raft") ? 5 : 0;
+		};
 	}
 
 	/** A table it put down out in the wild (not at home): done with it, it takes it along, like a player does. */

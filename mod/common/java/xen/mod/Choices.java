@@ -360,7 +360,7 @@ final class Choices {
 			case "iron" -> items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0) < 24 ? 0.8f : 0.3f;
 			case "coal" -> items.getOrDefault("coal", 0) + items.getOrDefault("torch", 0) / 4 < 16 ? 0.6f : 0.25f;
 			case "gold" -> c.personality.believes("gold_for_fools") ? 0f : 0.4f;
-			case "lapis" -> 0.3f;
+			case "lapis" -> tier >= 3 && items.getOrDefault("lapis_lazuli", 0) < 9 ? 0.6f : 0.3f;   // (iron pickaxe on: enchanting next, and that takes lapis)
 			case "redstone" -> 0.25f;
 			case "copper" -> 0.08f;
 			case "log" -> 0.5f;
@@ -408,6 +408,9 @@ final class Choices {
 		if ("built".equals(kind) || "chest".equals(kind) || "spawner".equals(kind) || "crop".equals(kind)) return choose(key, w.no("someone made that"), false);
 		String unsafe = unsafeToBreak(q);
 		if (unsafe != null) return choose(key, w.no(unsafe), false);
+		if ((name.contains("gold") || name.equals("chest")) && c.nether.inNether() && c.knowledge.knows("piglin_anger")
+				&& !level.getEntitiesOfClass(net.minecraft.world.entity.monster.piglin.Piglin.class, new net.minecraft.world.phys.AABB(q).inflate(16)).isEmpty())
+			return choose(key, w.no("piglins about: they'd turn on me for touching gold"), false);
 		float v = worth(kind, name, w);
 		float picky = c.personality.hidden(Personality.PICKINESS);                  // (a picky miner leaves the stone; one who mines anything takes it)
 		v *= kind != null && v >= 0.25f ? 0.85f + 0.3f * picky : 1.3f - 0.8f * picky;

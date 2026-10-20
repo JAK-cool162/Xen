@@ -20,6 +20,8 @@ final class Enchanter {
 	private BlockPos table;
 	private int step, tries;
 	boolean on;
+	/** Not again before this (game time): after a go (its levels come back slowly), or after it couldn't. */
+	long retryAt;
 
 	Enchanter(Companion c) {
 		this.c = c;
@@ -79,6 +81,7 @@ final class Enchanter {
 		if (!on) return null;
 		if (++tries > 2400) {                                                  // (two minutes: something's wrong, it gives up)
 			on = false;
+			retryAt = c.player.level().getGameTime() + 20 * 60 * 20;
 			return null;
 		}
 		BlockPos t = table();
@@ -137,6 +140,7 @@ final class Enchanter {
 		c.player.closeContainer();
 		c.acted = true;
 		on = false;
+		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
 		if (done) {
 			c.chatter(c.pick3("Enchanted! That glow...", "Ooh, shiny. Enchanted.", "The table liked that one."), false);
 			c.journal("does", "enchanted its gear (option " + (pick + 1) + ")");

@@ -342,6 +342,89 @@ final class Farmer {
 		return null;
 	}
 
+	// ------------------------------------------------------------------------------ sugar cane (paper, for books)
+	/** The ground it planted sugar cane on, by the water near its home. */
+	final Set<BlockPos> canes = new LinkedHashSet<>();
+	private BlockPos caneAt;
+	private boolean caneCut;
+	private long nextCane, caneUntil;
+	private static final Set<String> CANE_GROUND = Set.of("grass_block", "dirt", "sand", "red_sand", "podzol", "coarse_dirt", "mud", "moss_block", "rooted_dirt");
+
+	private static boolean isCane(ItemStack s) {
+		return BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("sugar_cane");
+	}
+
+	/** Ground sugar cane grows on: dirt, grass or sand with air over it and water right beside it. */
+	private static boolean caneGround(ServerLevel level, BlockPos q) {
+		if (!CANE_GROUND.contains(id(level.getBlockState(q))) || !level.getBlockState(q.above()).isAir()) return false;
+		for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) if (level.getFluidState(q.relative(d)).is(net.minecraft.tags.FluidTags.WATER)) return true;
+		return false;
+	}
+
+	/**
+	 * Sugar cane by the water near its home (paper for books, the enchanting table's): what it carries planted where it
+	 * grows, up to sixteen; the tall ones cut above the bottom (it grows back). Daytime, near home, nothing else on.
+	 * Null when there's nothing to do there.
+	 */
+	Action cane() {
+		BlockPos home = c.goals.home;
+		if (home == null || on || tending || c.player.isCreative() || c.chores.busy() || c.crafter.hasOrder()) return null;
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (!Places.dim(level).equals("overworld") || level.isDarkOutside() || c.player.blockPosition().distSqr(home) > 40 * 40) return null;
+		if (caneAt == null) {
+			if (now() < nextCane) return null;
+			nextCane = now() + 20 * 60 * 3;
+			int carried = 0;
+			var inv = c.player.getInventory();
+			for (int i = 0; i < inv.getContainerSize(); i++) if (isCane(inv.getItem(i))) carried += inv.getItem(i).getCount();
+			BlockPos cut = null, plant = null;
+			int planted = 0;
+			for (BlockPos q : BlockPos.betweenClosed(home.offset(-14, -4, -14), home.offset(14, 4, 14))) {
+				if (!id(level.getBlockState(q)).equals("sugar_cane") || id(level.getBlockState(q.below())).equals("sugar_cane")) continue;   // (the bottom of each)
+				planted++;
+				if (cut == null && id(level.getBlockState(q.above())).equals("sugar_cane")) cut = q.above().immutable();   // two high or more: cut above the bottom
+			}
+			if (cut == null && carried > 0 && planted < 16) {
+				for (BlockPos q : BlockPos.betweenClosed(home.offset(-14, -4, -14), home.offset(14, 4, 14))) {
+					if (!caneGround(level, q)) continue;
+					if (plant == null || q.distSqr(home) < plant.distSqr(home)) plant = q.immutable();
+				}
+			}
+			caneAt = cut != null ? cut : plant;
+			caneCut = cut != null;
+			caneUntil = now() + 20 * 30;
+			if (caneAt == null) return null;
+			c.journal("thinks", caneCut ? "its sugar cane has grown: cuts it (paper for books)" : "plants sugar cane by the water near its home (" + planted + " growing, " + carried + " to plant)");
+		}
+		if (now() > caneUntil) {                                                  // (half a minute and not done: later)
+			caneAt = null;
+			return null;
+		}
+		BlockPos at = caneAt;
+		if (caneCut) {
+			if (!id(level.getBlockState(at)).equals("sugar_cane")) {
+				caneAt = null;
+				nextCane = now() + 40;                                                // (the next one soon)
+				return null;
+			}
+			c.goals.instant = "cutting sugar cane";
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(at)) > c.player.blockInteractionRange() - 0.7) return c.walkTo(Vec3.atBottomCenterOf(at.below()));
+			if (c.hands.mine(at)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			caneAt = null;
+			return null;
+		}
+		if (!caneGround(level, at)) {                                               // (planted, or taken)
+			if (id(level.getBlockState(at.above())).equals("sugar_cane")) canes.add(at);
+			caneAt = null;
+			nextCane = now() + 40;
+			return null;
+		}
+		return act(at, "planting sugar cane by the water", Farmer::isCane);
+	}
+
 	/** Now and then: farmland it sees with water by it (a village's fields, a player's): it gets how farms work. */
 	void look() {
 		if (c.knowledge.knows("crops_water") || now() < nextLook) return;

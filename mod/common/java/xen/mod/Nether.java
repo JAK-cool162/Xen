@@ -324,7 +324,7 @@ final class Nether {
 			} else finishTrip("I'm not ready for the Nether yet.");
 			return null;
 		}
-		if (obsidian() < 10) return getObsidian();
+		if (obsidian() < obsidianWanted()) return getObsidian();
 		BlockPos near = c.goals.home != null && c.player.blockPosition().distSqr(c.goals.home) < 64 * 64 ? c.goals.home.offset(6, 0, 6) : null;
 		String plan = c.builder.startNear("nether portal", near);
 		if (!plan.startsWith("You will")) {
@@ -338,6 +338,14 @@ final class Nether {
 	private BlockPos lavaAt;
 	private long pouredAt = -1;
 
+	/** When it started looking around for obsidian it doesn't know how to make (0: not looking). */
+	private long lookingSince;
+
+	/** Ten for the portal, four more while it has no enchanting table yet (the table takes four). */
+	private int obsidianWanted() {
+		return 10 + (c.enchanter.table() == null && !has("enchanting_table") ? 4 : 0);
+	}
+
 	/** Ten obsidian: mined where it sees some (a diamond pickaxe), or made by pouring water onto a lava pool first. */
 	private Action getObsidian() {
 		if (c.crafter.pickTier() < 4) {
@@ -349,11 +357,14 @@ final class Nether {
 		}
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (visible("obsidian", 16) != null) {
-			c.chores.mineFor("obsidian", "obsidian", 10 - obsidian(), "obsidian");
+			c.chores.mineFor("obsidian", "obsidian", obsidianWanted() - obsidian(), "obsidian");
 			c.chores.own = true;
 			return null;
 		}
+		if (!c.knowledge.knows("obsidian") && lookingSince > 0 && now() - lookingSince > 20 * 60 * 3)   // three minutes of looking: it remembers how
+			c.knowledge.learn("obsidian", Knowledge.How.TRIED);
 		if (!c.knowledge.knows("obsidian")) {                               // it doesn't know you can make it: it looks for some
+			if (lookingSince <= 0) lookingSince = now();
 			say("I need obsidian. I'll look around for some.");
 			BlockPos seen = lookFor(level, "obsidian", 64);
 			if (seen != null) return c.walkTo(Vec3.atBottomCenterOf(seen.above()));
@@ -381,6 +392,14 @@ final class Nether {
 		}
 		if (lavaAt == null || !level.getFluidState(lavaAt).isSource()) lavaAt = visibleLava(20);
 		if (lavaAt == null) {
+			if (c.player.getY() > 10 && c.crafter.pickTier() >= 2 && !inNether()) {     // lava pools lie deep: down in the deepslate, where most are (diamonds too)
+				if (!c.chores.busy()) {
+					say("Lava pools are deep down. Going down to find one.");
+					c.chores.mine(-40, "diamonds", 3);
+					c.chores.own = true;
+				}
+				return c.chores.busy() ? c.chores.next() : null;
+			}
 			say("I'm looking for a lava pool to make obsidian.");
 			return c.goals.exploreStep();
 		}
