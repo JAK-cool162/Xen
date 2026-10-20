@@ -1,7 +1,13 @@
-XEN COMPANION 2.0.0-beta.40: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.41: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.41
+===========================
+
+Xen gets a massive upgrade.
 
 
 WHAT'S NEW IN 2.0.0-beta.40

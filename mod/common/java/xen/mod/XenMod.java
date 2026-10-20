@@ -76,6 +76,8 @@ public class XenMod implements ModInitializer {
 	Brain brain;
 	/** Xen Ex1, shared by every Xen (each one's hurts teach it, for all of them). */
 	xen.mod.core.Ex1 ex1;
+	/** Xen Glance: what its eyes' picture looks like at a glance (a monster close, a drop...), or null. */
+	xen.mod.core.Glance glance;
 	/** Xen 2.0's mind (what to do next: one for all main Xens, it keeps learning); null: the old way. */
 	xen.mod.core.Mind mind;
 	/** How many of its choices Xen 2.0 has seen turn out (in this world), and learned from. */
@@ -225,6 +227,7 @@ public class XenMod implements ModInitializer {
 		society.load(brainFile().resolveSibling("society.json"));
 		Rules.load(brainFile().resolveSibling("rules.tsv"));                  // the rules each Xen wrote itself
 		Focus.load(brainFile().resolveSibling("focus.tsv"));                  // what Focus learned of which goals are worth going back to
+		Planner.load(brainFile().resolveSibling("planner.tsv"));              // how often each kind of aim came to something
 		Vision.loadTuning(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("vision.txt"));   // (its shading, tuned from recordings)
 		// A world from an older version keeps what its Xens learned; anything it can't read (a brain of another shape, a
 		// damaged file) is kept aside (.old) and the one that ships with the mod takes its place: old worlds just upgrade.
@@ -252,6 +255,8 @@ public class XenMod implements ModInitializer {
 			}
 		}
 		ex1 = xen.mod.core.Ex1.bundled();                                       // Xen Ex1: trained on recorded play
+		glance = xen.mod.core.Glance.load();                                   // Xen Glance: the picture network
+		if (glance != null) LOG.info("Xen Glance loaded (trained on {} pictures)", glance.trainedOn);
 		if (ex1 != null) {
 			Path learned = brainFile().resolveSibling("ex1-learned.json");
 			try {
@@ -422,6 +427,7 @@ public class XenMod implements ModInitializer {
 		society.save();
 		Rules.save();
 		Focus.save();
+		Planner.save();
 		xen.mod.talk.Voice.save();                                            // (what its words network learned from people)
 		xen.mod.talk.Banter.save();
 	}
@@ -438,6 +444,7 @@ public class XenMod implements ModInitializer {
 		society.save();
 		Rules.save();
 		Focus.save();
+		Planner.save();
 		xen.mod.talk.Voice.save();
 		xen.mod.talk.Banter.save();
 		for (Companion c : new ArrayList<>(companions)) c.leave();
@@ -481,6 +488,9 @@ public class XenMod implements ModInitializer {
 		arena.tick();
 		runLater();
 		gameplayLog.quietly(() -> gameplayLog.tick(s));
+		long tLuck = Perf.now();
+		Hunch.tick(this, s);
+		Perf.add("luck (looking at the world)", tLuck);
 		List<Companion> order = new ArrayList<>(companions);
 		java.util.Collections.shuffle(order, random);                  // nobody always gets to act first
 		Perf.tick(s.getTickCount());
@@ -488,6 +498,7 @@ public class XenMod implements ModInitializer {
 			long t0 = Perf.now();
 			try {
 				c.tick();
+				c.director.tick();                                            // (a show's timing: after everything else has had its say this tick)
 			} catch (Throwable e) {
 				LOG.warn("{} stumbled: {}", c.name, e.toString(), e);
 			}
@@ -857,6 +868,7 @@ public class XenMod implements ModInitializer {
 
 	private void hear(ServerPlayer sender, String text) {
 		if (sender instanceof XenPlayer || !config.chat) return;
+		for (Companion c : companions) if (c.player() != null) c.director.heard(sender, text);   // (right after a show: a reaction)
 		for (Companion c : companions) if (c.player() != null && c.gut.answer(sender, text)) return;   // (the answer to what a Xen asked them)
 		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
@@ -1521,11 +1533,14 @@ public class XenMod implements ModInitializer {
 			if (o == c || o.player() == null || o.player().level() != c.player.level() || o.player().distanceTo(c.player) > 32) continue;
 			if (o.personality.loner || ownTeam(teamOf(o)) || o.diplomacy.wary(c.player.getUUID())) continue;
 			float t = o.trust(c.player.getUUID());
+			boolean kin = Personality.kindred(c.personality, o.personality);     // one of its own kind: in, before they know each other well
+			if (kin) t = Math.max(t, Math.min(0.8f, t + 0.35f));
 			if (t < 0.5f || o.personality.loyalty > 0.75f && teamOf(o) != null && t < 0.8f) continue;
 			board.addPlayerToTeam(o.name, team);
 			roster.remember(o, id);
 			var n = name;
-			o.mod.later(30 + 20 * joined, () -> o.say(o.pick3("Count me in! The " + n + "!", "I'm in.", "The " + n + "? Sure, I'll join.")));
+			o.mod.later(30 + 20 * joined, () -> o.say(kin ? o.pick3("We think alike. I'm in.", "Count me in! The " + n + "!", "People like us should stick together. I'm in.")
+					: o.pick3("Count me in! The " + n + "!", "I'm in.", "The " + n + "? Sure, I'll join.")));
 			joined++;
 		}
 		return c.pick3("I'm starting a team: the " + name + "!", "New team: the " + name + ". Who's in?", "From now on we're the " + name + "!")
@@ -1544,13 +1559,16 @@ public class XenMod implements ModInitializer {
 		for (Companion c : companions) {
 			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c))) continue;
 			var p = c.personality;
-			if (!(p.power > 0.6f || p.loyalty > 0.65f) || random.nextFloat() > 0.12f) continue;
-			int friends = 0;
+			int friends = 0, kin = 0;
 			for (Companion o : companions) {
-				if (o != c && o.player() != null && o.player().level() == c.player().level() && o.player().distanceTo(c.player()) < 32
-						&& o.trust(c.player().getUUID()) >= 0.5f && !ownTeam(teamOf(o))) friends++;
+				if (o == c || o.player() == null || o.player().level() != c.player().level() || o.player().distanceTo(c.player()) >= 32 || ownTeam(teamOf(o))
+						|| o.personality.loner) continue;
+				if (o.trust(c.player().getUUID()) >= 0.5f) friends++;
+				else if (Personality.kindred(p, o.personality)) kin++;               // (like-minded: they stick together from the start, before they know each other)
 			}
-			if (friends == 0) continue;
+			boolean leader = p.power > 0.6f || p.loyalty > 0.65f;
+			if (friends + kin == 0 || !(leader || kin >= 2) || random.nextFloat() > (kin > 0 ? 0.3f : 0.12f)) continue;
+			if (kin > 0) c.journal("thinks", "others about think like it: a team of its own kind");
 			c.say(foundTeam(c, null, null));
 			return;                                                               // (one new team at a time)
 		}

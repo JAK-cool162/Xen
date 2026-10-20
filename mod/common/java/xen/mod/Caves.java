@@ -201,6 +201,7 @@ final class Caves {
 		double bestScore = Double.MAX_VALUE;
 		for (BlockPos k : known) {
 			if (!k.closerThan(c.player.blockPosition(), far) || done.contains(k.asLong())) continue;
+			if (c.mod.config.luck > 0 && Hunch.claimedBy(c, k)) continue;      // (someone's mining that one: it happens to go for another)
 			double score = k.distSqr(c.player.blockPosition()) - (orePockets.contains(k.asLong()) ? 16 * 16 : 0);
 			if (score < bestScore) {
 				bestScore = score;

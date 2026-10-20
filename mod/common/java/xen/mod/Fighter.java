@@ -56,6 +56,7 @@ final class Fighter {
 	private float gene(int i) {
 		float g = c.personality.fightGenes[i];
 		if (c.inArena) return g;
+		g += Skills.nameKnack(c.name, i);                                      // (its name's knack: one times its crits better, another strafes)
 		return Math.max(0f, Math.min(1f, g * (0.6f + 0.8f * c.skills.get(Skills.FIGHT))));
 	}
 
@@ -129,7 +130,7 @@ final class Fighter {
 	/** How much health it wants left at the end of a fight: its nerve (brave, proud, wrathful: less), the dark (more). */
 	private float margin() {
 		var who = c.personality;
-		float m = 3 + 4 * (1 - who.bravery) - 2 * who.sin(xen.mod.core.Sins.PRIDE) - 1.5f * who.sin(xen.mod.core.Sins.WRATH);
+		float m = 2 + 3.5f * (1 - who.bravery) - 2 * who.sin(xen.mod.core.Sins.PRIDE) - 1.5f * who.sin(xen.mod.core.Sins.WRATH);   // (a player takes a gamble now and then: it cuts it a little closer)
 		if (who.believes("live_to_fight")) m += 3;
 		var p = c.player;
 		if (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7) m += 1.5f;
@@ -327,7 +328,7 @@ final class Fighter {
 			comboAt = now;
 			if (combo >= 3 && c.knowledge.knows("combo_shield")) shieldUntil = now + 20;
 		}
-		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && d < 5) {
+		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && d < 7.5) {   // (the fuse goes out past 7 blocks: it runs till then)
 			c.goals.instant = "getting away from the creeper";                 // it's hissing: run, like anyone would
 			if (!c.inArena) c.chatter("Creeper! Run!", false);
 			if (d < 3 && c.knowledge.knows("creeper_block")) {                  // right on it (a tunnel, no room to run): what players do
@@ -379,17 +380,30 @@ final class Fighter {
 			Action up = perch(foe, d);
 			if (up != null) return up;
 		}
+		boolean tall = kind(foe).equals("enderman") || kind(foe).equals("wither_skeleton");   // (nearly three blocks tall, and two and a half: neither fits under two)
+		if (tall && !c.inArena && (p.getHealth() < 16 || outmatched || expected(foe) > p.getHealth() - 6)) {
+			Action roof = underLowRoof(foe, d);                                // they can't get under a roof two blocks up: in there, and hit their legs
+			if (roof != null) return roof;
+		}
 		Action gear = c.kit.use(foe, d, fleeing || outmatched || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
 		if (gear != null) return gear;
-		if (outmatched || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
+		// About to die with nothing to fight with: anyone runs (its gut, not a choice), to a friend if one's about (and
+		// shouts for help), else behind something it can't be seen through (a tree, a wall), else just away.
+		boolean desperate = !c.inArena && !c.skills.sparringWith(foe.getUUID()) && p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal());
+		if (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f)) {
 			if (!fleeing && !c.inArena) c.chatter(c.personality.say("flee"), false);
 			fleeing = true;                                                    // back off until it has healed a bit
-			c.goals.instant = "backing off to heal";
+			c.goals.instant = desperate ? "running for its life" : "backing off to heal";
 			h.lowerShield();
-			if (d > (outmatched ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
+			if (d > (outmatched || desperate ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);
+			if (desperate || outmatched) {
+				Action friend = toFriend(foe, d, sprintable);
+				if (friend != null) return friend;
+			}
 			LivingEntity shooter = shooterInSight();                           // one shooting at it: out of its sight, not just away (it'd be shot in the back)
-			if (shooter != null && outmatched) {
+			if (shooter == null && desperate && foe instanceof Player) shooter = foe;   // (a player after it: out of their sight too, behind a tree)
+			if (shooter != null && (outmatched || desperate)) {
 				Action cover = takeCover(shooter);
 				if (cover != null) return cover;
 			}
@@ -432,7 +446,20 @@ final class Fighter {
 			return Action.JUMP;
 		}
 		boolean falling = !p.onGround() && p.getDeltaMovement().y < 0 && p.fallDistance > 0;
-		if (now < shieldUntil && !ready && h.raiseShield()) {                // a combo on it: shield up till it can hit back
+		String kindNow = kind(foe);
+		boolean shooter = kindNow.endsWith("skeleton") || kindNow.equals("stray") || kindNow.equals("bogged") || kindNow.equals("pillager") || kindNow.equals("witch") || kindNow.equals("blaze");
+		boolean melee = !(foe instanceof Player) && !shooter && !(foe instanceof net.minecraft.world.entity.monster.Creeper);
+		boolean opening = melee && now - foeSwungAt < 14;                       // (a zombie just swung: it can't hit again for a moment, that's the time to be close)
+		boolean axe = foe instanceof Player pl && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(pl.getMainHandItem().getItem()).getPath().endsWith("_axe");
+		boolean eating = foe instanceof Player && foe.isUsingItem() && !foe.isBlocking()
+				&& !net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(foe.getUseItem().getItem()).getPath().matches("bow|crossbow|trident");
+		if (axe) h.lowerShield();                                              // (an axe knocks a raised shield out for five seconds: it dodges instead)
+		if (eating && d > reach && !c.skills.sparringWith(foe.getUUID())) {     // eating or drinking: slow and can't swing, that's the time to close in
+			h.watching = foe;
+			p.setSprinting(sprintable);
+			return c.walkTo(foe.position());
+		}
+		if (now < shieldUntil && !ready && !axe && h.raiseShield()) {        // a combo on it: shield up till it can hit back
 			h.watching = foe;
 			return idle();
 		}
@@ -463,7 +490,8 @@ final class Fighter {
 				Action moved = h.lastMove();
 				if (sprintable && (moved == Action.FORWARD || moved == Action.JUMP)) p.setSprinting(true);   // a sprint hit
 				Action a = hit(foe);
-				if (random.nextFloat() < gene(3) || foe instanceof net.minecraft.world.entity.monster.Creeper) sTap = 3;   // S-tap (from a creeper: always)
+				if (random.nextFloat() < gene(3)) sTap = 3;                     // S-tap
+				if (foe instanceof net.minecraft.world.entity.monster.Creeper) sTap = 6;   // (a creeper: hit and run, back till it stops hissing, then in again)
 				return a;
 			}
 			h.watching = foe;                                                  // eyes on it while the swing charges
@@ -472,8 +500,9 @@ final class Fighter {
 				p.setSprinting(false);
 				return Action.BACK;
 			}
-			if (useShield && h.raiseShield()) return idle();
+			if (useShield && !axe && h.raiseShield()) return idle();
 			if (foeRising && d < 3.5 && random.nextFloat() < gene(6)) return Action.BACK;   // it jumps in for a crit: step out
+			if (opening) return idle();                                        // (its swing just went: no need to back off, it's ready first)
 			double spacing = spear && c.knowledge.knows("spear_reach") ? 3.6 : 2.2 + 0.8 * gene(2);   // (a spear: out of a sword's reach)
 			if (d < spacing - 0.2) return random.nextFloat() < gene(5) ? strafe() : Action.BACK;
 			return random.nextFloat() < gene(5) ? strafe() : idle();
@@ -484,13 +513,22 @@ final class Fighter {
 			h.watching = foe;
 			return Action.BACK;
 		}
-		if (!ready && d < 3.2 + 0.8 * gene(2)) {                              // keep its distance until its sword is ready
+		if (!ready && d < 3.2 + 0.8 * gene(2) && !opening) {                  // keep its distance until its sword is ready
 			h.watching = foe;
 			return idle();
 		}
 		p.setSprinting(sprintable && d > 2);
 		String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(foe.getType()).getPath();
 		boolean archer = kind.endsWith("skeleton") || kind.equals("stray") || kind.equals("bogged");
+		if (archer && d > 4 && !foe.isUsingItem()) {                          // its bow isn't drawn: no arrow coming, straight at it
+			h.lowerShield();
+			p.setSprinting(sprintable);
+			return c.walkTo(foe.position());
+		}
+		if (archer && d > 4 && foe.isUsingItem() && h.raiseShield()) {        // drawn: the shield up, eyes on it, a step in
+			h.watching = foe;
+			return Action.FORWARD;
+		}
 		if (archer && d > 4 && c.knowledge.knows("skeleton_dodge")) {        // side to side on the way in, eyes on it: its arrows miss
 			h.watching = foe;
 			int phase = (now / 8) % 4;                                          // (a strafe, a step in, the other strafe, a step in)
@@ -632,6 +670,43 @@ final class Fighter {
 		return c.walkTo(Vec3.atBottomCenterOf(cover));
 	}
 
+	/** When it last shouted for help. */
+	private int calledAt = -10000;
+
+	/**
+	 * To a friend close by (a Xen it trusts, or of its team), not past the foe; it shouts for help on the way, and each
+	 * one that hears decides for itself whether to come. Null: nobody to run to (or it's there).
+	 */
+	private Action toFriend(LivingEntity foe, double d, boolean sprintable) {
+		XenPlayer p = c.player;
+		int now = p.tickCount;
+		Companion best = null;
+		double bestD = 40;
+		Vec3 toFoe = foe.position().subtract(p.position()).multiply(1, 0, 1);
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.player == null || !o.player.isAlive() || o.player.level() != p.level() || o.player == foe || o.inArena) continue;
+			double od = o.player.distanceTo(p);
+			if (od >= bestD || o.trust(p.getUUID()) < 0.3f && !p.isAlliedTo(o.player) || c.trust(o.player.getUUID()) < 0.2f) continue;
+			Vec3 to = o.player.position().subtract(p.position()).multiply(1, 0, 1);
+			if (to.lengthSqr() > 1e-4 && toFoe.lengthSqr() > 1e-4 && to.normalize().dot(toFoe.normalize()) > 0.4 && od > d) continue;   // (not through the foe)
+			bestD = od;
+			best = o;
+		}
+		if (best == null) return null;
+		if (now - calledAt > 200) {                                          // "Help!": those near enough to hear decide whether to come
+			calledAt = now;
+			String what = foe instanceof Player ? foe.getName().getString() : kind(foe).replace('_', ' ');
+			c.say(c.pick3("Help! " + (foe instanceof Player ? what : "A " + what) + "'s on me!", "HELP! I'm nearly dead!", best.name + ", help me!"));
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "nearly dead, nothing to fight with: runs to %s (%.0f blocks), shouting for help", best.name, bestD));
+			for (Companion o : c.mod.companions) if (o != c && o.player != null && o.player.level() == p.level() && o.player.distanceTo(p) < 40) o.heardCall(c, foe);
+		}
+		if (bestD < 3) return null;                                          // there: it fights on beside them, or runs on
+		c.goals.instant = "running to " + best.name + " for help";
+		Vec3 to = best.player.position().subtract(p.position()).multiply(1, 0, 1);
+		if (clearRun(to.normalize())) return runAlong(to.normalize(), sprintable);
+		return c.walkTo(best.player.position());
+	}
+
 	/** The way it runs, turned 30 degrees one way, then the other, every third of a second: a zig-zag, like a player dodging arrows. */
 	private Vec3 weave(Vec3 dir) {
 		double a = (c.player.tickCount / 7 % 2 == 0 ? 1 : -1) * 0.52, cos = Math.cos(a), sin = Math.sin(a);
@@ -674,6 +749,56 @@ final class Fighter {
 		c.skills.practice(Skills.FIGHT, 0.004f);
 		c.acted = true;
 		return Action.ATTACK;
+	}
+
+	/** A spot close by with a roof two blocks up (an enderman, three tall, can't get in): it goes there and fights from it. Null: none. */
+	private net.minecraft.core.BlockPos lowRoof;
+	private int lowRoofAt = -1000;
+
+	private Action underLowRoof(LivingEntity foe, double d) {
+		XenPlayer p = c.player;
+		var level = p.level();
+		int now = p.tickCount;
+		if (lowRoof == null || now - lowRoofAt > 100) {
+			lowRoofAt = now;
+			lowRoof = null;
+			net.minecraft.core.BlockPos feet = p.blockPosition();
+			double best = Double.MAX_VALUE;
+			for (int dx = -8; dx <= 8; dx++)
+				for (int dz = -8; dz <= 8; dz++)
+					for (int dy = -2; dy <= 2; dy++) {
+						var q = feet.offset(dx, dy, dz);
+						if (!roofed(level, q)) continue;
+						int covered = 0;
+						for (var dir : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+							var n = q.relative(dir);
+							if (roofed(level, n) || !free(level, n)) covered++;
+						}
+						if (covered < 3) continue;                                   // (deep enough in: not right at the edge)
+						double score = q.distSqr(feet);
+						if (score < best) {
+							best = score;
+							lowRoof = q.immutable();
+						}
+					}
+		}
+		if (lowRoof == null) return null;
+		Hands h = c.hands;
+		if (!p.blockPosition().equals(lowRoof)) {
+			c.goals.instant = "under a low roof, away from the " + kind(foe).replace('_', ' ');
+			return c.walkTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(lowRoof));
+		}
+		c.goals.instant = "under a low roof: the " + kind(foe).replace('_', ' ') + " can't get in";
+		h.watching = foe;
+		h.ready(false, d);
+		if (d <= p.entityInteractionRange() && p.getAttackStrengthScale(0.5f) >= 0.9f) return hit(foe);
+		return idle();
+	}
+
+	/** Room to stand, and a solid block right over its head: two blocks of room, no more. */
+	private static boolean roofed(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos q) {
+		return free(level, q) && free(level, q.above()) && !free(level, q.above(2))
+				&& !level.getBlockState(q.below()).getCollisionShape(level, q.below()).isEmpty() && level.getFluidState(q).isEmpty();
 	}
 
 	private Action idle() {

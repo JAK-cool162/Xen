@@ -109,7 +109,7 @@ final class Focus {
 	private long heldAt = -1, backAt = -1;
 	/** The moments it weighed this goal (what it was like each time), to learn from when the goal ends. */
 	private final List<float[]> moments = new ArrayList<>();
-	/** Goals that came to nothing at once: how many times in a row, and until when it doesn't pick them again. */
+	/** Goals that came to nothing at once: how many times in a row, until when it doesn't pick them again, and how many times in a row it came to nothing at all. */
 	private final EnumMap<Goals.Short, long[]> nothing = new EnumMap<>(Goals.Short.class);
 	/** What it did with goals cut short (for /xen status and the tests). */
 	int held, backTo, letGo;
@@ -154,7 +154,7 @@ final class Focus {
 	/** What it's like now, for the model. */
 	float[] features() {
 		var p = c.player;
-		float danger = c.ex1Out == null ? 0f : c.ex1Out.danger;
+		float danger = c.danger();
 		return new float[] {1f, Math.min(1f, (now() - since) / 1200f / 10f), (float) Math.min(1.0, covered / 64), Math.min(1f, cuts / (float) MOST_CUTS),
 				p.level().isDarkOutside() ? 1f : 0f, danger, p.getHealth() / p.getMaxHealth(), 1f - p.getFoodData().getFoodLevel() / 20f,
 				p.level().canSeeSky(p.blockPosition().above()) ? 0f : 1f};
@@ -184,7 +184,7 @@ final class Focus {
 		if (!holding()) return false;
 		long now = now();
 		if (now < backAt || c.chores.busy() || c.fightingNow() || c.hands.busy()) return false;
-		return c.ex1Out == null || c.ex1Out.danger < 0.5f;
+		return c.danger() < 0.5f;
 	}
 
 	/** Not worth holding on to any more: held too long (its mind has other things to weigh), or night fell on work out in the open. */
@@ -215,9 +215,12 @@ final class Focus {
 	/** The goal is over: what it learned (did it come to something?), and a goal that came to nothing at once waits a while. */
 	void ended(Goals.Short g, boolean worked, long tookTicks) {
 		if (goal == g && !moments.isEmpty()) learn(g, new ArrayList<>(moments), worked);
-		long[] n = nothing.computeIfAbsent(g, k -> new long[2]);
-		if (worked) n[0] = 0;
-		else if (tookTicks < 60) {
+		long[] n = nothing.computeIfAbsent(g, k -> new long[3]);
+		if (worked) n[0] = n[2] = 0;
+		else if (++n[2] >= 3 && tookTicks >= 60) {                              // (the same thing, over and over, and nothing: a flooded staircase, a night with no way down)
+			n[1] = now() + (1200L << Math.min(3, n[2] - 3));                    // (a minute, two, four... up to eight: something else first)
+			c.journal("focus", String.format(Locale.ROOT, "%s came to nothing %d times in a row: something else for %.0f s", g.what, n[2], (n[1] - now()) / 20f));
+		} else if (tookTicks < 60) {
 			n[0]++;
 			n[1] = now() + (400L << Math.min(4, n[0] - 1));                     // (20 s, 40 s, ... up to 5 min: it keeps coming to nothing)
 			if (n[0] >= 2) c.journal("focus", String.format(Locale.ROOT, "%s came to nothing at once %d times in a row: not again for %.0f s", g.what, n[0], (n[1] - now()) / 20f));

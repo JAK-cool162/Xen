@@ -62,7 +62,11 @@ final class Places {
 		Place old = places.get(key(name, dim));
 		String biome = biomeAt(pos);
 		places.put(key(name, dim), new Place(name, dim, pos.immutable(), c.player.level().getGameTime() / 24000, biome));
-		if (old == null || old.pos().distSqr(pos) > 64) c.journal("remembers", name + " at " + pos.toShortString() + " (" + dim + (biome.isEmpty() ? "" : ", " + biome) + ")");
+		if (old == null || old.pos().distSqr(pos) > 64) {
+			c.journal("remembers", name + " at " + pos.toShortString() + " (" + dim + (biome.isEmpty() ? "" : ", " + biome) + ")");
+			Hunch.found(c, name, pos);
+			if (name.startsWith("village")) c.planner.sawVillage(pos);
+		}
 	}
 
 	/** Remember a place in a given world (the other end of a portal it just came through). */

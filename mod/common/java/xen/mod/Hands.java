@@ -822,7 +822,7 @@ public final class Hands {
 				limit = 1;
 				return;
 			}
-			slot = findHotbar(s -> s.has(DataComponents.FOOD));
+			slot = foodSlot(true);
 		}
 		if (slot < 0) {
 			limit = 1;
@@ -831,6 +831,41 @@ public final class Hands {
 		p.getInventory().setSelectedSlot(slot);
 		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
 		limit = 45;
+	}
+
+	/**
+	 * Which food: the one that fills what it's missing without much waste; a food with a catch (rotten flesh, a spider
+	 * eye, raw chicken: Survival) only when there's nothing else and it's starving; a golden apple not for hunger.
+	 */
+	/** Something it would eat now (see {@link #foodSlot}). */
+	boolean canEat() {
+		return foodSlot(false) >= 0;
+	}
+
+	private int foodSlot(boolean take) {
+		Inventory inv = p.getInventory();
+		int level = p.getFoodData().getFoodLevel(), missing = 20 - level, best = -1;
+		float bestScore = -1e9f;
+		for (int slot = 0; slot < 36; slot++) {
+			ItemStack s = inv.getItem(slot);
+			if (s.isEmpty() || !s.has(DataComponents.FOOD)) continue;
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			boolean risky = Survival.risky(n) != null, keep = Survival.keep(n);
+			if (risky && level > 6 || keep && level > 4) continue;
+			var food = s.get(DataComponents.FOOD);
+			int fills = food.nutrition();
+			float score = 2f * Math.min(fills, missing) - Math.max(0, fills - missing) + 0.15f * food.saturation()   // (saturation: how long till it's hungry again)
+					- (risky ? 40 : 0) - (keep ? 60 : 0) + (slot < 9 ? 0.5f : 0);
+			if (score > bestScore) {
+				bestScore = score;
+				best = slot;
+			}
+		}
+		if (best < 9 || !take) return best;
+		ItemStack held = inv.getItem(8);                                    // swap into the last hotbar slot
+		inv.setItem(8, inv.getItem(best));
+		inv.setItem(best, held);
+		return 8;
 	}
 
 	// ------------------------------------------------------------------- aimed actions (chores)
@@ -1214,7 +1249,7 @@ public final class Hands {
 
 	/** Can it heal by eating now: a golden apple (any time), or food when hungry? */
 	boolean canHeal() {
-		return findHotbar(Hands::goldenApple) >= 0 || p.getFoodData().needsFood() && findHotbar(s -> s.has(DataComponents.FOOD)) >= 0;
+		return findHotbar(Hands::goldenApple) >= 0 || p.getFoodData().needsFood() && foodSlot(false) >= 0;
 	}
 
 	private static boolean goldenApple(ItemStack s) {

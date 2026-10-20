@@ -325,7 +325,7 @@ public final class Vision {
 	void tick() {
 		var p = c.player;
 		if (p == null || !c.mod.config.vision || p.isSleeping() || c.minion && !c.awake()) return;
-		boolean near = c.watched;
+		boolean near = c.watched || DUMP != null;
 		int rows = near || p.tickCount % 4 == 0 ? 1 : 0;                        // (a row a tick near a player; out of sight, one every four)
 		if (rows == 0) return;
 		long t0 = System.nanoTime();
@@ -429,6 +429,75 @@ public final class Vision {
 		return r << 16 | g << 8 | bl;
 	}
 
+	// ------------------------------------------------------------------------------ Xen Glance
+	/** Pictures for training Xen Glance (-Dxen.visionDump=folder): each whole view, halved, with what was really there. */
+	static final String DUMP = System.getProperty("xen.visionDump");
+	/** What Xen Glance made of its last whole view (null: none yet, or no Glance), and how dangerous that looks (0 to 1). */
+	float[] glance;
+	float threat;
+
+	/** Its picture, halved (each 2x2 averaged): red, green, blue and distance (a line that met nothing: as far as can be), 0 to 1. */
+	float[][] glanceInput() {
+		int gw = xen.mod.core.Glance.W, gh = xen.mod.core.Glance.H;
+		float[][] x = new float[xen.mod.core.Glance.C][gw * gh];
+		for (int r = 0; r < gh; r++)
+			for (int q = 0; q < gw; q++) {
+				float red = 0, green = 0, blue = 0, far = 0;
+				for (int dr = 0; dr < 2; dr++)
+					for (int dq = 0; dq < 2; dq++) {
+						int px = (2 * r + dr) * W + 2 * q + dq, v = rgb[px];
+						red += (v >> 16) & 255;
+						green += (v >> 8) & 255;
+						blue += v & 255;
+						far += hit[px] == Long.MIN_VALUE ? 1f : Math.min(1f, dist[px] / 64f);
+					}
+				x[0][r * gw + q] = red / 1020f;
+				x[1][r * gw + q] = green / 1020f;
+				x[2][r * gw + q] = blue / 1020f;
+				x[3][r * gw + q] = far / 4f;
+			}
+		return x;
+	}
+
+	private java.io.DataOutputStream dumpOut;
+
+	/** Each whole view: what Glance makes of it (and, when collecting pictures, the picture with what was really there). */
+	private void glance(ServerLevel level) {
+		var model = c.mod.glance;
+		float[][] x = model != null || DUMP != null ? glanceInput() : null;
+		if (model != null) {
+			glance = model.run(x);
+			threat = Math.max(glance[xen.mod.core.Glance.CLOSE], 0.6f * glance[xen.mod.core.Glance.NEAR]);
+		}
+		if (DUMP == null) return;
+		Map<Integer, Entity> byId = new HashMap<>();
+		for (Entity e : inView) byId.put(e.getId(), e);
+		boolean close = false, nearBy = false;
+		for (int px = 0; px < W * H; px++) {
+			if (mob[px] < 0 || !(byId.get(mob[px]) instanceof Enemy)) continue;
+			if (dist[px] <= 6) close = true;
+			if (dist[px] <= 16) nearBy = true;
+		}
+		try {
+			if (dumpOut == null) {
+				Path dir = Path.of(DUMP);
+				Files.createDirectories(dir);
+				dumpOut = new java.io.DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(dir.resolve("glance_" + c.name.replaceAll("[^A-Za-z0-9_]", "_") + ".bin"),
+						java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND)));
+			}
+			dumpOut.writeLong(level.getGameTime());
+			dumpOut.writeFloat(c.player.getHealth());
+			dumpOut.writeByte(close ? 1 : 0);
+			dumpOut.writeByte(nearBy ? 1 : 0);
+			dumpOut.writeByte(drop ? 1 : 0);
+			dumpOut.writeByte(caveMouth ? 1 : 0);
+			for (float[] ch : x) for (float v : ch) dumpOut.writeByte(Math.round(v * 255));
+			if (frames % 20 == 0) dumpOut.flush();
+		} catch (IOException e) {
+			XenMod.LOG.warn("xen: couldn't write Glance pictures: {}", e.toString());
+		}
+	}
+
 	// ------------------------------------------------------------------------------ what it makes of it
 	private void understand(ServerLevel level) {
 		var p = c.player;
@@ -515,6 +584,7 @@ public final class Vision {
 		village = structure && villagers;
 		darkGround = darkTop >= 40;
 		mess = home != null && (messPx >= 3 || items >= 4 && p.blockPosition().closerThan(home, 24));
+		glance(level);
 		if (caveMouth && !wasCave && caveAt != null) {
 			c.caves.sawFromAfar(caveAt, "cave");                                    // (the way into it, seen from out here)
 			c.journal("sees", "a cave mouth, about " + Math.round(Math.sqrt(caveAt.distSqr(p.blockPosition()))) + " blocks off");

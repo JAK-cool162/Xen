@@ -371,6 +371,12 @@ public final class Companion {
 		}
 		if (player.tickCount % 20 == 13) confusion.second();
 		if (player.tickCount % 20 == 9) rage.second();                  // (anger cooling; bloodlust that picks someone)
+		if (player.tickCount % 20 == 11) {
+			hunch.second();
+			hunch.met();
+			planner.think();
+			director.think();
+		}
 		if (player.tickCount % 1200 == 17) aversions.fade();
 		if (player.tickCount % 40 == 21) diamondsWatch();
 		if (player.tickCount % 100 == 37) ideas.tick();
@@ -448,7 +454,7 @@ public final class Companion {
 	/** The category an item counts as (for rewards and requests). */
 	String itemKey(ItemStack s) {
 		String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
-		return s.has(DataComponents.FOOD) ? "food"
+		return s.has(DataComponents.FOOD) ? (Survival.risky(n) != null ? n : "food")   // (rotten flesh, spider eyes, raw chicken: not real food, only when starving)
 				: n.equals("cobbled_deepslate") ? "cobblestone"
 				: n.endsWith("_log") || WorldSenses.isNetherStem(n) ? "log"
 				: n.equals("iron_ore") ? "raw_iron" : n.equals("gold_ore") ? "raw_gold" : n;
@@ -726,7 +732,7 @@ public final class Companion {
 	 */
 	private Action humanIdle(Action brain) {
 		if (brain == Action.ATTACK && hostileInFront()) return brain;
-		if (brain == Action.EAT && player.getFoodData().getFoodLevel() < 17 && items().getOrDefault("food", 0) > 0) return brain;
+		if (brain == Action.EAT && player.getFoodData().getFoodLevel() < 17 && hands.canEat()) return brain;
 		if (brain == Action.MINE && sensible(Action.MINE) == null) return brain;
 		if (player.isInWater() || emotions.fear > 0.6f) {
 			Action s = sensible(brain);
@@ -1029,7 +1035,7 @@ public final class Companion {
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
 		boolean toHeal = player.getHealth() <= player.getMaxHealth() - 4 && player.getFoodData().getFoodLevel() < 18;   // (two hearts down: under 18 food it doesn't heal, so a player eats)
-		if ((player.getFoodData().getFoodLevel() <= personality.eatAt() || toHeal) && items().getOrDefault("food", 0) > 0 && player.getFoodData().needsFood()
+		if ((player.getFoodData().getFoodLevel() <= personality.eatAt() || toHeal) && hands.canEat() && player.getFoodData().needsFood()
 				&& choices.eat().yes()) {                                 // (a monster right on it: it fights first, eats after)
 			goals.instant = toHeal && player.getFoodData().getFoodLevel() > personality.eatAt() ? "eating to heal" : "eating";
 			return Action.EAT;
@@ -1165,6 +1171,8 @@ public final class Companion {
 		if (player.tickCount % 100 == 0 && mode == Mode.FREE) trials.spot();
 		Action deal = trader.next();
 		if (deal != null) return deal;
+		Action show = director.step();                                 // showing off for someone watching (a trick shot, a jump)
+		if (show != null) return show;
 		Action drill = skills.step();                                  // training (sparring, practising its swings, parkour)
 		if (drill != null) return drill;
 		Action need = needs();                                         // starving, or night coming with no bed: that first
@@ -2663,6 +2671,12 @@ public final class Companion {
 	final Fisher fisher = new Fisher(this);
 	/** Xen Ex1: what it made of the last moment (keys, turn, look, danger), the moments before (for learning), and what it perceived last. */
 	xen.mod.core.Ex1.Out ex1Out;
+
+	/** How dangerous right now feels: Ex1's sense of it (its senses), and what its eyes make of the picture (Xen Glance) on top. */
+	float danger() {
+		float ex = ex1Out == null ? 0f : ex1Out.danger;
+		return 1 - (1 - ex) * (1 - 0.5f * vision.threat);
+	}
 	private final java.util.ArrayDeque<xen.mod.core.Ex1.Out> ex1Recent = new java.util.ArrayDeque<>();
 	private int ex1Ticks;
 	private long ex1HurtAt = -1000;
@@ -2682,6 +2696,9 @@ public final class Companion {
 
 	/** Its anger and bloodlust (hidden; see {@link Rage}). */
 	final Rage rage = new Rage(this);
+	final Hunch hunch = new Hunch(this);
+	final Planner planner = new Planner(this);
+	final Director director = new Director(this);
 	/** What hurt it, remembered (once burnt, twice shy). */
 	final Aversions aversions = new Aversions(this);
 	/** Teaching (Xens and players), and the talk of a fight (a crouch after a hit: a sorry it may take or not). */
@@ -2706,6 +2723,123 @@ public final class Companion {
 			+ "(?:back )?(?:to|over to|into)\\s+(?:the |a |that |this |your |our |its )?(cave|village|house|home|base|mine|nether portal|portal|temple|desert temple|"
 			+ "jungle temple|monument|ocean monument|stronghold|shipwreck|ruins|ruined portal|outpost|pillager outpost|mansion|trial chamber|farm)\\b");
 
+	/**
+	 * Told where to go the way players say it: "go over there", "walk that way", "go about 50 blocks that way", "head
+	 * north", "go 30 blocks east". "There" is where the one asking is looking (the spot they point at, as far as it can
+	 * see); "that way", the way they face; a number is about that far (about: never to the block). No coordinates.
+	 */
+	private static final java.util.regex.Pattern GO_VAGUE = java.util.regex.Pattern.compile("\\b(?:go|walk|move|head|run|sprint|wander)\\s+"
+			+ "(?:(?:about|around|like|roughly|maybe|some|~)\\s*)?(?:(\\d{1,4})\\s*(?:blocks?|meters?|m)\\b\\s*)?(?:to(?:ward)?s?\\s+the\\s+)?"
+			+ "(over there|there|that way|this way|that direction|yonder|north|south|east|west|forward|ahead|straight)?\\b");
+	/** Where it was told to go was vague ("over there"): about there is there. */
+	private boolean commandedVague;
+	/** "Go to the hills", "head for the river", "let's go to the beach": the nearest one of those it can see. */
+	private static final java.util.regex.Pattern GO_FEATURE = java.util.regex.Pattern.compile("\\b(?:go|walk|move|head|run|sprint|let'?s go)\\s+(?:to|toward|towards|for|into|up|down to)?\\s*"
+			+ "(?:the |a |some |that |those |nearest |closest )*(hills?|mountains?|river|lake|water|beach|shore|forest|woods|trees|desert|plains|fields?|ocean|sea|snow|swamp|jungle)\\b");
+
+	/** "Go to the hills": the nearest of that kind it can see (high ground, water's edge, trees, a biome), and off it goes. Null: not that kind of ask. */
+	String goFeature(String words) {
+		var m = GO_FEATURE.matcher(words);
+		if (!m.find() || player == null) return null;
+		String kind = m.group(1);
+		ServerLevel level = (ServerLevel) player.level();
+		BlockPos feet = player.blockPosition();
+		BlockPos found = null;
+		int far = Math.min(sight(), 160);
+		outer:
+		for (int r = 12; r <= far; r += 8) {
+			int n = Math.max(16, (int) (2 * Math.PI * r / 5));                     // (a look every 5 blocks or so round each ring)
+			boolean byBiome = !kind.startsWith("hill") && !kind.startsWith("mountain") && !kind.equals("water") && !kind.equals("lake") && !kind.equals("forest")
+					&& !kind.equals("woods") && !kind.equals("trees");
+			for (int i = 0; i < n; i++) {
+				double a = 2 * Math.PI * i / n;
+				int x = feet.getX() + (int) Math.round(Math.cos(a) * r), z = feet.getZ() + (int) Math.round(Math.sin(a) * r);
+				if (!level.hasChunkAt(new BlockPos(x, feet.getY(), z))) continue;
+				int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), leafTop = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z);
+				BlockPos ground = new BlockPos(x, top, z);
+				boolean wet = !level.getFluidState(ground.below()).isEmpty();
+				String biome = byBiome || (i & 3) == 0 ? places.biomeAt(ground) : "";
+				boolean match = switch (kind) {
+					case "hill", "hills" -> !wet && top >= feet.getY() + 10;
+					case "mountain", "mountains" -> !wet && top >= feet.getY() + 25;
+					case "river", "lake", "water", "ocean", "sea" -> wet && (!kind.equals("river") || biome.contains("river")) && (!kind.equals("ocean") && !kind.equals("sea") || biome.contains("ocean"));
+					case "beach", "shore" -> !wet && (biome.contains("beach") || level.getBlockState(ground.below()).is(net.minecraft.world.level.block.Blocks.SAND) && nearWater(level, ground));
+					case "forest", "woods", "trees" -> !wet && leafTop > top + 2;
+					case "field", "fields" -> !wet && biome.contains("plains");
+					case "snow" -> !wet && biome.contains("snow");
+					default -> !wet && biome.contains(kind);
+				};
+				if (!match) continue;
+				if (wet) {                                                        // (water: the dry ground at its edge, not in it)
+					for (double d = r; d > 4; d -= 2) {
+						int sx = feet.getX() + (int) Math.round(Math.cos(a) * d), sz = feet.getZ() + (int) Math.round(Math.sin(a) * d);
+						Vec3 dry = XenMod.surface(level, sx, sz);
+						if (dry != null) {
+							found = BlockPos.containing(dry);
+							break outer;
+						}
+					}
+					continue;
+				}
+				found = new BlockPos(x, top, z);
+				break outer;
+			}
+		}
+		if (found == null) return pick3("I don't see any " + kind + " around here.", "No " + kind + " that I can see.", "Where? I can't see any " + kind + ".");
+		commandedTo = found;
+		commandedVague = true;
+		commandedAt = player.level().getGameTime();
+		chores.cancel();
+		goals.drop();
+		journal("does", "heads for the " + kind + " it can see, about " + Math.round(Math.sqrt(found.distSqr(feet))) + " blocks off, as it was told");
+		return pick3("Okay, to the " + kind + ".", "Sure, heading for the " + kind + ".", "On my way to the " + kind + ".");
+	}
+
+	private static boolean nearWater(ServerLevel level, BlockPos p) {
+		for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) for (int k = 1; k <= 4; k++) if (!level.getFluidState(p.below().relative(d, k)).isEmpty()) return true;
+		return false;
+	}
+
+	/** "Go over there", "50 blocks that way": where that is (the one asking points), and off it goes. Null: not that kind of ask. */
+	String goVague(ServerPlayer from, String words) {
+		var m = GO_VAGUE.matcher(words);
+		if (!m.find() || player == null || m.group(1) == null && m.group(2) == null) return null;
+		String way = m.group(2) == null ? "that way" : m.group(2);
+		if (way.equals("this way")) return null;                                 // ("come this way": follow)
+		int far = m.group(1) == null ? -1 : Math.min(400, Integer.parseInt(m.group(1)));
+		ServerLevel level = (ServerLevel) player.level();
+		boolean near = from != null && from.level() == player.level() && from.distanceTo(player) < 48;
+		double yaw = switch (way) {                                              // (Minecraft: south is +z, yaw 0)
+			case "north" -> 180;
+			case "south" -> 0;
+			case "east" -> -90;
+			case "west" -> 90;
+			default -> near ? from.getYRot() : player.getYRot();
+		};
+		BlockPos target = null;
+		if (far < 0 && near && (way.contains("there") || way.equals("yonder"))) {   // "over there": the spot they're looking at
+			Vec3 eye = from.getEyePosition(), to = eye.add(from.getLookAngle().scale(160));
+			var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.ANY, from));
+			if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) target = hit.getBlockPos().above();
+		}
+		if (target == null) {
+			double d = far > 0 ? far : 30;
+			d *= 0.92 + 0.16 * random().nextDouble();                           // (about that far)
+			double a = Math.toRadians(yaw) + (random().nextDouble() - 0.5) * 0.12;
+			int x = (int) Math.round(player.getX() - Math.sin(a) * d), z = (int) Math.round(player.getZ() + Math.cos(a) * d);
+			int y = level.isLoaded(new BlockPos(x, 0, z)) ? level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) : player.getBlockY();
+			target = new BlockPos(x, y, z);
+		}
+		commandedTo = target;
+		commandedVague = true;
+		commandedAt = player.level().getGameTime();
+		chores.cancel();
+		goals.drop();
+		journal("does", "goes " + (far > 0 ? "about " + far + " blocks " : "") + way + ", as it was told");
+		return far > 0 ? pick3("Okay, about " + far + " that way.", "On it, " + far + " blocks or so.", "Sure, heading " + (way.contains("th") && !way.contains("there") ? way : "that way") + ".")
+				: way.contains("there") || way.equals("yonder") ? pick3("Over there? On my way.", "Okay, going there.", "Sure, over there.") : pick3("Okay, that way.", "Heading " + way + ".", "Sure.");
+	}
+
 	/** Off to a place it knows ("the cave", "home"): where, how far; or that it doesn't know one. */
 	String goToPlace(String kind) {
 		BlockPos at = switch (kind) {
@@ -2724,6 +2858,7 @@ public final class Companion {
 				"No idea where " + (a.isEmpty() ? "home is" : "one is") + ", sorry.");
 		commandedTo = at;
 		commandedAt = player.level().getGameTime();
+		commandedVague = false;
 		chores.cancel();
 		goals.drop();
 		return String.format(java.util.Locale.ROOT, "Okay, to %s%s at %d %d %d (%.0f blocks from here). Follow me!", a, kind, at.getX(), at.getY(), at.getZ(),
@@ -2745,6 +2880,7 @@ public final class Companion {
 		}
 		commandedTo = new BlockPos(x, y, z);
 		commandedAt = player.level().getGameTime();
+		commandedVague = false;
 		chores.cancel();
 		goals.drop();
 		return String.format(java.util.Locale.ROOT, "Okay, going to %d %d %d (%.0f blocks from here).", x, y, z,
@@ -2759,6 +2895,7 @@ public final class Companion {
 		visiting = friend;
 		commandedTo = friend.goals.home;
 		commandedAt = player.level().getGameTime();
+		commandedVague = false;
 		chatter(pick3("I'm going to visit " + friend.name + ".", "Let's see what " + friend.name + " has built.", "Time to drop by " + friend.name + "'s place."), true);
 		journal("does", "goes to visit " + friend.name);
 	}
@@ -2775,6 +2912,22 @@ public final class Companion {
 			say(pick3("Hey " + f.name + "! Nice place.", "Knock knock, " + f.name + "!", "Just passing by, " + f.name + ". Love the base."));
 			trust(f.player() != null ? f.player().getUUID() : null, 0.05f);
 			return Action.IDLE;
+		}
+		if (commandedVague && Math.hypot(at.getX() - commandedTo.getX(), at.getZ() - commandedTo.getZ()) <= 3 && Math.abs(at.getY() - commandedTo.getY()) <= 4) {
+			walker.stop();                                                      // (about there: there)
+			mode = Mode.STAY;
+			anchor = at;
+			say(pick3("Here?", "Okay, here.", "Made it."));
+			commandedTo = null;
+			commandedVague = false;
+			return Action.IDLE;
+		}
+		if (commandedVague && player.level().getGameTime() % 40 == 0) {          // (the ground there, now it can see it)
+			ServerLevel level = (ServerLevel) player.level();
+			if (level.isLoaded(commandedTo)) {
+				int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, commandedTo.getX(), commandedTo.getZ());
+				if (Math.abs(y - commandedTo.getY()) > 2 && level.getBlockState(commandedTo.below()).isAir()) commandedTo = new BlockPos(commandedTo.getX(), y, commandedTo.getZ());
+			}
 		}
 		if (at.getX() == commandedTo.getX() && at.getZ() == commandedTo.getZ() && Math.abs(at.getY() - commandedTo.getY()) <= 1) {
 			walker.stop();
@@ -2796,7 +2949,8 @@ public final class Companion {
 			commandedTo = null;
 			return null;
 		}
-		goals.instant = "going to " + commandedTo.toShortString();
+		goals.instant = commandedVague ? "going where it was told" : "going to " + commandedTo.toShortString();
+		if (commandedVague) run(player.blockPosition().distSqr(commandedTo) > 8 * 8);   // (a way off: it sprints, like a player)
 		Action a = walkTo(Vec3.atBottomCenterOf(commandedTo));
 		return a != null ? a : Action.IDLE;
 	}
@@ -3031,6 +3185,32 @@ public final class Companion {
 		return pick3("Okay, I'm on the " + color + " team now!", "Sure. Team " + color + "!", "Alright, " + from.getName().getString() + ", count me in.");
 	}
 
+	/** A friend in trouble called to it for help: what's at them, till when, and whether it goes (its own call). */
+	private LivingEntity helpAgainst;
+	private long helpUntil;
+	private boolean helpGoing;
+
+	/**
+	 * A friend, about to die and with nothing to fight with, called for help: does it go? Its kindness, loyalty and nerve,
+	 * how much it trusts them, whether they're its own kind or team, and whether it's in a state to help, decide.
+	 */
+	void heardCall(Companion from, LivingEntity against) {
+		if (player == null || from == this || from.player == null || inArena || against == null || against == player || helpGoing) return;
+		if (against instanceof ServerPlayer sp && (sp.getUUID().equals(owner) || trust(sp.getUUID()) >= 0.6f)) return;   // (not against its own friend)
+		var p = personality;
+		float t = trust(from.player.getUUID());
+		float chance = 0.1f + 0.3f * p.kindness + 0.25f * p.loyalty + 0.2f * p.bravery + 0.4f * Math.max(0f, t)
+				+ (Personality.kindred(p, from.personality) ? 0.25f : 0f) + (player.isAlliedTo(from.player) ? 0.2f : 0f)
+				- (hands.hasWeapon() ? 0f : 0.35f) - (player.getHealth() < 10 ? 0.3f : 0f) - (t < 0 ? 0.5f : 0f);
+		helpGoing = random.nextFloat() < chance;
+		helpAgainst = against;
+		helpUntil = player.level().getGameTime() + 20 * 25;
+		String what = against instanceof ServerPlayer ? against.getName().getString() : BuiltInRegistries.ENTITY_TYPE.getKey(against.getType()).getPath().replace('_', ' ');
+		journal("thinks", from.name + " called for help (" + what + " at them): " + (helpGoing ? "goes" : "doesn't go"));
+		if (helpGoing) mod.later(10 + random.nextInt(20), () -> say(pick3("Coming!", "Hang on, " + from.name + ", I'm coming!", "On my way!")));
+		else if (random.nextFloat() < 0.4f) mod.later(10 + random.nextInt(20), () -> say(pick3("Sorry, I can't!", "Run!", "I can't help, get out of there!")));
+	}
+
 	/** Who Xen 2.0 chose to fight (its own call: a monster, or a player it's against, even one of its team). */
 	LivingEntity chosenFoe;
 	private int saidComingAt = -10000;
@@ -3044,8 +3224,8 @@ public final class Companion {
 		if (chosenFoe != null && chosenFoe.isAlive() && chosenFoe.level() == player.level() && player.distanceTo(chosenFoe) < 6
 				&& player.hasLineOfSight(chosenFoe) && !(chosenFoe instanceof ServerPlayer sp && (sp.isCreative() || sp.isSpectator()))) return chosenFoe;
 		for (var creeper : player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class,
-				player.getBoundingBox().inflate(5), x -> x.isAlive() && x.getSwellDir() > 0)) {
-			if (player.distanceTo(creeper) < 5) return creeper;           // hissing close by: it hears that (and runs)
+				player.getBoundingBox().inflate(8), x -> x.isAlive() && x.getSwellDir() > 0)) {
+			if (player.distanceTo(creeper) < 7.5) return creeper;         // hissing close by: it hears that, and runs till it stops (past 7 blocks the fuse goes out)
 		}
 		long tick = player.level().getGameTime();
 		if (lastFoe != null && lastFoe.isAlive() && lastFoe.level() == player.level() && player.distanceTo(lastFoe) < 10 && tick - lastFoeAt < 60
@@ -3072,7 +3252,14 @@ public final class Companion {
 				best = e;
 			}
 		}
-		if (best != null || mod.config.pvp.equals("off")) return best;
+		if (best != null) return best;
+		if (helpGoing && helpAgainst != null) {                                     // a friend called for help, and it chose to go
+			LivingEntity a = helpAgainst;
+			if (player.level().getGameTime() > helpUntil || !a.isAlive() || a.level() != player.level() || a == player || player.distanceTo(a) > 32
+					|| diplomacy.atPeace(a) || a instanceof ServerPlayer && mod.config.pvp.equals("off")) helpGoing = false;
+			else return a;
+		}
+		if (mod.config.pvp.equals("off")) return null;
 		ServerPlayer o = owner == null ? null : server.getPlayerList().getPlayer(owner);
 		long now = player.level().getGameTime();
 		boolean own = mod.config.pvp.equals("own");
@@ -3606,7 +3793,8 @@ public final class Companion {
 				+ String.format(java.util.Locale.ROOT, " Xen 2.0: %s, reactions %d ms on average; choices %d (%d yes, %d no, %d later)%s%s",
 						confusion.says(), reflexes.averageMs(), choices.made, choices.yes, choices.no, choices.later,
 						choices.thinking().isEmpty() ? "" : "; last: " + choices.thinking(), gut.doing.isEmpty() ? "" : "; gut: " + gut.doing)
-				+ (focus.describe().isEmpty() ? "" : "; " + focus.describe());
+				+ (focus.describe().isEmpty() ? "" : "; " + focus.describe()) + (hunch.describe().isEmpty() ? "" : "; " + hunch.describe()) + (planner.describe().isEmpty() ? "" : "; " + planner.describe())
+				+ (director.describe().isEmpty() ? "" : "; " + director.describe());
 	}
 
 	/** How far along it is, in one line (for a long run's log): where, health, its pickaxe, the things that mark progress, its adventure. */
@@ -3852,6 +4040,14 @@ public final class Companion {
 			say(goToPlace(place.group(1)));
 			return null;
 		}
+		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && !COORDS.matcher(words).find()) {   // "go over there", "50 blocks that way"
+			String vague = goFeature(words.toLowerCase(java.util.Locale.ROOT));
+			if (vague == null) vague = goVague(from, words.toLowerCase(java.util.Locale.ROOT));
+			if (vague != null) {
+				say(vague);
+				return null;
+			}
+		}
 		if ((owner == null || owner.equals(u) || trust(u) >= 0.5f) && GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).find()) {
 			say(goTo(words.substring(GO_TO.matcher(words.toLowerCase(java.util.Locale.ROOT)).results().findFirst().get().start())));
 			return null;                                               // "go to 120 64 -40"
@@ -4094,6 +4290,14 @@ public final class Companion {
 				}
 				case "attack" -> plan = attack(r.thing(), from);
 				default -> {}
+			}
+		}
+		if (plan == null && r.intent().equals("chat")) {                     // a survival question it knows the answer to (the wiki's facts)
+			String fact = Survival.answer(words);
+			if (fact != null) {
+				journal("thinks", "knows this one: " + fact);
+				say(fact);
+				return null;
 			}
 		}
 		if (plan == null && r.intent().equals("chat") && said != null && !(grammar != null && aboutAThing(grammar))) {   // its talk model: a player's answer to a player

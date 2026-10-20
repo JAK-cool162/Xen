@@ -1,0 +1,446 @@
+{
+ "source": "Facts from the Minecraft Wiki (minecraft.wiki: the mob, item and Tutorial pages), Java Edition, normal difficulty, written in our own words.",
+ "risky_food": {
+  "rotten_flesh": "80% chance of Hunger for 30 seconds",
+  "spider_eye": "poisons you",
+  "poisonous_potato": "60% chance of poison",
+  "pufferfish": "poison, nausea and hunger",
+  "chicken": "raw chicken: 30% chance of Hunger, cook it first",
+  "chorus_fruit": "teleports you up to 8 blocks away"
+ },
+ "keep_food": [
+  "golden_apple",
+  "enchanted_golden_apple"
+ ],
+ "facts": [
+  {
+   "about": [
+    "zombie",
+    "zombies"
+   ],
+   "fact": "A zombie has 20 health and hits for about 3. It burns in daylight unless it's in water or shade or wears a helmet, and it has to wait between swings: step in right after it swings."
+  },
+  {
+   "about": [
+    "husk",
+    "husks"
+   ],
+   "fact": "A husk is a desert zombie: it doesn't burn in the sun, and its hit makes you hungry."
+  },
+  {
+   "about": [
+    "drowned"
+   ],
+   "fact": "Drowned live in water. One with a trident throws it from range, so don't swim at it in the open."
+  },
+  {
+   "about": [
+    "skeleton",
+    "skeletons",
+    "arrow",
+    "arrows"
+   ],
+   "fact": "A skeleton has to draw its bow before it shoots: when the bow isn't drawn, no arrow is coming, so rush it then. A shield stops its arrows, and it burns in daylight. Skeletons run from wolves."
+  },
+  {
+   "about": [
+    "creeper",
+    "creepers",
+    "explosion"
+   ],
+   "fact": "A creeper starts hissing when you're within 3 blocks and blows up a second and a half later. Get more than 7 blocks away and the fuse goes out. Hit it and back off, wait for the hiss to stop, then go in again. Creepers are scared of cats and ocelots."
+  },
+  {
+   "about": [
+    "enderman",
+    "endermen",
+    "ender"
+   ],
+   "fact": "An enderman is nearly 3 blocks tall: get under a roof 2 blocks high and it can't come in after you, while you hit its legs. Don't look at its face, and water hurts it. A carved pumpkin on your head lets you look at it safely."
+  },
+  {
+   "about": [
+    "spider",
+    "spiders"
+   ],
+   "fact": "A spider climbs walls and leaves you alone in bright light unless you hit it first. It fits through gaps one block high but not one block wide."
+  },
+  {
+   "about": [
+    "cave spider",
+    "cave spiders",
+    "poison"
+   ],
+   "fact": "A cave spider is small enough to fit through one block, and its bite poisons. They come from spawners in mineshafts: break the spawner or put torches on it."
+  },
+  {
+   "about": [
+    "witch",
+    "witches",
+    "potion",
+    "potions"
+   ],
+   "fact": "A witch throws potions of harming, poison, slowness and weakness, and drinks healing when hurt. Close in fast and hit while it's drinking."
+  },
+  {
+   "about": [
+    "phantom",
+    "phantoms",
+    "insomnia"
+   ],
+   "fact": "Phantoms come at night once you haven't slept for three days. Sleeping in a bed stops them, and they burn in daylight."
+  },
+  {
+   "about": [
+    "bed",
+    "beds",
+    "sleep",
+    "sleeping"
+   ],
+   "fact": "A bed sets where you come back when you die. You can only sleep at night or in a thunderstorm, and not with monsters close by. A bed explodes in the Nether and the End."
+  },
+  {
+   "about": [
+    "hunger",
+    "hungry",
+    "food",
+    "starving",
+    "starve"
+   ],
+   "fact": "Your health only comes back on its own when your hunger bar is nearly full. At 6 hunger or less you can't sprint, and at 0 you start taking damage."
+  },
+  {
+   "about": [
+    "steak",
+    "porkchop",
+    "meat",
+    "beef",
+    "cook",
+    "cooked"
+   ],
+   "fact": "Steak and cooked porkchop fill 8 hunger, the best common food. Cooked mutton, cooked chicken and cooked salmon fill 6, bread and baked potatoes 5. Raw meat is only 2 or 3."
+  },
+  {
+   "about": [
+    "rotten flesh",
+    "rotten"
+   ],
+   "fact": "Rotten flesh fills 4 hunger but usually makes you hungry: only eat it when there's nothing else."
+  },
+  {
+   "about": [
+    "golden apple",
+    "golden apples",
+    "gapple",
+    "gapples"
+   ],
+   "fact": "A golden apple gives Regeneration II and Absorption: save it for a fight."
+  },
+  {
+   "about": [
+    "sword",
+    "swords"
+   ],
+   "fact": "Swords hit for 4 (wood), 5 (stone), 6 (iron), 7 (diamond) and 8 (netherite), and swing fast."
+  },
+  {
+   "about": [
+    "axe",
+    "axes"
+   ],
+   "fact": "An axe hits harder than a sword but swings slower: a stone axe hits for 9, a stone sword for 5. An axe also knocks a raised shield out for 5 seconds."
+  },
+  {
+   "about": [
+    "shield",
+    "shields",
+    "block",
+    "blocking"
+   ],
+   "fact": "A shield takes 6 planks and 1 iron ingot. It blocks hits and arrows from the front, but an axe knocks it out for 5 seconds."
+  },
+  {
+   "about": [
+    "armor",
+    "armour",
+    "chestplate",
+    "helmet"
+   ],
+   "fact": "Each point of armor takes about 4% off a hit. A full set of iron gives 15 points, diamond 20."
+  },
+  {
+   "about": [
+    "crit",
+    "crits",
+    "critical"
+   ],
+   "fact": "A hit while falling (after a jump) is a critical hit, half as strong again. It doesn't work while sprinting."
+  },
+  {
+   "about": [
+    "fall",
+    "falling",
+    "fall damage"
+   ],
+   "fact": "Falling hurts 1 for every block past 3. Landing in water, or a water bucket placed just before you land, saves you."
+  },
+  {
+   "about": [
+    "lava"
+   ],
+   "fact": "Lava sets you on fire and hurts fast. Never dig straight down, and keep a bucket of water for lava."
+  },
+  {
+   "about": [
+    "drown",
+    "drowning",
+    "underwater",
+    "air"
+   ],
+   "fact": "You have about 15 seconds of air underwater, then you take 2 damage a second."
+  },
+  {
+   "about": [
+    "night",
+    "dark",
+    "darkness"
+   ],
+   "fact": "Monsters spawn in the dark (light level 0). A torch, a roof, a bed or just a good sword gets you through the night."
+  },
+  {
+   "about": [
+    "first day",
+    "first night",
+    "new world",
+    "just started"
+   ],
+   "fact": "First day: about 10 logs, a crafting table, a wooden pickaxe, then around 19 cobblestone for a stone pickaxe, axe and sword. If dusk comes with no house, dig into a hill and block the hole behind you."
+  },
+  {
+   "about": [
+    "shelter",
+    "hut",
+    "hide at night",
+    "first house"
+   ],
+   "fact": "No house by night? Dig into a hillside and seal the way in, or use a village house: they often have a bed. Don't build with sand or gravel, they fall."
+  },
+  {
+   "about": [
+    "torch",
+    "torches",
+    "lost in a cave",
+    "way back",
+    "caving"
+   ],
+   "fact": "In a cave, put torches on your right going in: on the way out they're on your left. If you're really lost, dig a staircase up to the surface."
+  },
+  {
+   "about": [
+    "exhaustion",
+    "sprint",
+    "sprinting",
+    "saturation"
+   ],
+   "fact": "Sprinting burns hunger (0.1 a block, a sprint jump 0.2), walking burns none. Healing one health costs a lot, so eat food with high saturation: golden carrots 14.4, steak and porkchop 12.8."
+  },
+  {
+   "about": [
+    "rabbit stew",
+    "stew",
+    "best food"
+   ],
+   "fact": "Rabbit stew fills the most (10), then steak, cooked porkchop and pumpkin pie (8). For lasting full, golden carrots."
+  },
+  {
+   "about": [
+    "diamond",
+    "diamonds",
+    "y level",
+    "deepslate"
+   ],
+   "fact": "Diamonds are most common at the bottom of the world: mine at y -59, just over the bedrock, in a tunnel two high and one wide. Carry a water bucket: there's a lot of lava down there."
+  },
+  {
+   "about": [
+    "mining",
+    "branch mining",
+    "strip mining"
+   ],
+   "fact": "Mining in caves is quicker but riskier; a long tunnel two high and one wide is slower but safe. Never dig straight down or straight up."
+  },
+  {
+   "about": [
+    "pillar",
+    "pillaring",
+    "tower"
+   ],
+   "fact": "Two blocks up and a zombie can't reach you while you hit it. Three or four up and you can hit a creeper before it blows."
+  },
+  {
+   "about": [
+    "creeper",
+    "creepers",
+    "bow"
+   ],
+   "fact": "A creeper is safest with a bow: about three shots. A shield blocks the whole blast, but it costs the shield a lot."
+  },
+  {
+   "about": [
+    "skeleton",
+    "skeletons"
+   ],
+   "fact": "Don't sprint-hit a skeleton: the knockback just gives it room for a free shot."
+  },
+  {
+   "about": [
+    "enderman",
+    "endermen"
+   ],
+   "fact": "Standing in water stops an enderman's attacks: it can't stand the water."
+  },
+  {
+   "about": [
+    "piglin",
+    "piglins",
+    "gold armor"
+   ],
+   "fact": "In the Nether, piglins leave you alone if you wear at least one piece of gold armor. Babies never attack."
+  },
+  {
+   "about": [
+    "ghast",
+    "ghasts",
+    "fireball",
+    "fireballs"
+   ],
+   "fact": "Ghasts shoot from up to 100 blocks. Cobblestone stops their fireballs, and you can hit a fireball back at them."
+  },
+  {
+   "about": [
+    "zombified piglin",
+    "zombie piglin",
+    "pigman",
+    "pigmen"
+   ],
+   "fact": "Zombified piglins are calm, but hit one and the whole group comes for you."
+  },
+  {
+   "about": [
+    "wither skeleton",
+    "wither skeletons",
+    "wither"
+   ],
+   "fact": "Wither skeletons can't fit through a gap two blocks high, and their hit gives you Wither."
+  },
+  {
+   "about": [
+    "blaze",
+    "blazes",
+    "fortress"
+   ],
+   "fact": "Blazes live in Nether fortresses. A fire resistance potion makes their fireballs harmless, and snowballs hurt them."
+  },
+  {
+   "about": [
+    "nether trip",
+    "go to the nether",
+    "going to the nether",
+    "nether portal",
+    "portal"
+   ],
+   "fact": "For the Nether bring iron armor and tools, a bow, plenty of food, cobblestone, flint and steel, and 10 obsidian for a way home. Water doesn't work there, and neither do compasses or beds."
+  },
+  {
+   "about": [
+    "gravel",
+    "sand",
+    "suffocate"
+   ],
+   "fact": "Don't mine under sand or gravel: it falls on you and you can suffocate."
+  },
+  {
+   "about": [
+    "pyramid",
+    "desert temple",
+    "temple",
+    "tnt"
+   ],
+   "fact": "In a desert pyramid, don't dig down in the middle: there's a TNT trap under the pressure plate."
+  },
+  {
+   "about": [
+    "water bucket",
+    "clutch"
+   ],
+   "fact": "Never leave home without a water bucket: it puts out fire, turns lava to obsidian and breaks a fall."
+  },
+  {
+   "about": [
+    "spiders climb",
+    "wall height",
+    "how high a wall"
+   ],
+   "fact": "Build walls high: spiders climb short ones, and players jump them."
+  },
+  {
+   "about": [
+    "village",
+    "villages",
+    "siege",
+    "zombie siege"
+   ],
+   "fact": "Near a village at night, sleep: a zombie siege can start at midnight."
+  },
+  {
+   "about": [
+    "pvp",
+    "duel",
+    "fight a player",
+    "player fight"
+   ],
+   "fact": "In PvP your reach is 3 blocks: hit from the edge of it. Swing when the bar is about 85% full, jump as you're hit to take less knockback, and let go of sprint before a jump-hit for a crit."
+  },
+  {
+   "about": [
+    "dps",
+    "which weapon",
+    "better weapon",
+    "sword or axe",
+    "axe or sword"
+   ],
+   "fact": "A sword does more damage over time (6.4 to 12.8 a second) than an axe (5.6 to 10); an axe hits harder once and breaks shields."
+  },
+  {
+   "about": [
+    "bow",
+    "arrows",
+    "charge"
+   ],
+   "fact": "A bow is fully drawn in about a second and hits for 6. Punch knocks them back too."
+  },
+  {
+   "about": [
+    "cobweb",
+    "cobwebs",
+    "web"
+   ],
+   "fact": "Cobwebs slow whoever is in them: jump into one with a foe for crits, or stand in two to heal while they can't hit you."
+  },
+  {
+   "about": [
+    "milk",
+    "poisoned",
+    "cure"
+   ],
+   "fact": "Milk takes away every effect: poison from a cave spider, a witch's potions."
+  },
+  {
+   "about": [
+    "phantom",
+    "phantoms"
+   ],
+   "fact": "Phantoms come after three nights without sleep: sleep and they don't come."
+  }
+ ]
+}

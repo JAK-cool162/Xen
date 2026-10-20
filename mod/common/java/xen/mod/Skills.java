@@ -54,10 +54,39 @@ final class Skills {
 		level[MOVE] += 0.2f * p.curiosity;
 		level[random.nextInt(level.length)] += 0.3f;                          // its talent
 		for (int i = 0; i < level.length; i++) level[i] = Math.max(0.05f, Math.min(0.9f, level[i]));
+		c.journal("is", String.format(Locale.ROOT, "its name gives it a PvP knack of %.2f", nameGrade(c.name)));
 	}
 
+	/** Its fighting, with its name's knack for PvP (see {@link #nameGrade}): the same name always fights about as well. */
 	float get(int skill) {
-		return level[skill];
+		if (skill != FIGHT) return level[skill];
+		return Math.max(0f, Math.min(1f, level[FIGHT] + 0.3f * (nameGrade(c.name) - 0.5f)));
+	}
+
+	/**
+	 * A knack for PvP from its name: the letters as their ASCII numbers, added up, the total mixed with each letter in
+	 * turn, 0 to 1. "Steve" is S 83, t 116, e 101, v 118, e 101. Not from anything it learned: born with it, like a
+	 * name, and a Xen named the same fights about as well.
+	 */
+	static float nameGrade(String name) {
+		if (name == null || name.isEmpty()) return 0.5f;
+		int sum = 0;
+		long mix = 0;
+		for (int i = 0; i < name.length(); i++) {
+			int code = name.charAt(i) & 0x7f;
+			sum += code;
+			mix = mix * 131 + code;
+		}
+		return (Math.floorMod(sum, 101) + Math.floorMod(mix, 101)) / 200f;
+	}
+
+	/** Its name's knack for one fight gene (the letter at that place, against the total): -0.15 to 0.15. */
+	static float nameKnack(String name, int gene) {
+		if (name == null || name.isEmpty()) return 0f;
+		int sum = 0;
+		for (int i = 0; i < name.length(); i++) sum += name.charAt(i) & 0x7f;
+		int code = name.charAt(gene % name.length()) & 0x7f;
+		return (Math.floorMod(code * (gene + 3) + sum, 31) - 15) / 100f;
 	}
 
 	/** Doing it teaches a little, training much more (the more it knows, the slower it gets better). */
@@ -207,6 +236,23 @@ final class Skills {
 	boolean sparringWith(java.util.UUID who) {
 		if (partner != null && partner.player != null && partner.player.getUUID().equals(who)) return true;
 		return who != null && who.equals(lastPartner) && c.player != null && now() - sparEnded < 100;
+	}
+
+	/** A quick duel with a friend, someone watching (first to half health, two minutes at most): did they agree? */
+	boolean duel(Companion o) {
+		if (c.player == null || o.player == null || partner != null || o.skills.partner != null || !o.skills.agreesToSpar(c)) return false;
+		training = FIGHT;
+		trainingUntil = now() + 20 * 60 * 2;
+		partner = o;
+		o.skills.partner = c;
+		o.skills.training = FIGHT;
+		o.skills.trainingUntil = trainingUntil;
+		c.say(c.pick3(o.name + ", 1v1? First to half health.", "Yo " + o.name + ", duel me.", o.name + ", quick fight? Just for fun."));
+		o.say(o.pick3("Bet.", "You're on.", "Okay, don't cry when you lose."));
+		c.chosenFoe = o.player;
+		o.chosenFoe = c.player;
+		c.journal("does", "duels " + o.name + " (for fun, someone watching)");
+		return true;
 	}
 
 	boolean agreesToSpar(Companion asker) {

@@ -133,7 +133,7 @@ final class Gut {
 			last = null;
 			return null;
 		}
-		float danger = c.ex1Out == null ? 0f : c.ex1Out.danger;
+		float danger = c.danger();
 		Action refuge = refuge(danger);                                          // it knows what's coming, out in the dark: it digs in
 		if (refuge != null) return refuge;
 		float[] all = c.mod.brain.fears(c.perceived);

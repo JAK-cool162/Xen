@@ -55,6 +55,11 @@ final class Visits {
 		return at != null;
 	}
 
+	/** Something it just saw is worth a visit: it thinks about one at once, not in a few seconds. */
+	void soon() {
+		nextThink = 0;
+	}
+
 	/** Has it been to that place (or is it there now)? */
 	boolean wasThere(BlockPos p) {
 		return visited.contains(p) || at != null && at.equals(p);

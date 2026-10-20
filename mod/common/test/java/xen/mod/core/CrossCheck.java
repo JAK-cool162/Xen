@@ -224,6 +224,30 @@ public final class CrossCheck {
 
 		swearing();
 
+		// Xen Glance: the picture network gives what Python gives for the same pictures
+		if (Files.exists(dir.resolve("glance.json"))) {
+			JsonObject gf = gson.fromJson(Files.readString(dir.resolve("glance.json")), JsonObject.class);
+			Glance g = Glance.load();
+			check(g != null, "Xen Glance doesn't load");
+			if (g != null) {
+				double worstG = 0;
+				for (var e : gf.getAsJsonArray("cases")) {
+					JsonObject cs = e.getAsJsonObject();
+					var xs = cs.getAsJsonArray("x");
+					float[][] x = new float[Glance.C][Glance.W * Glance.H];
+					for (int ch = 0; ch < Glance.C; ch++) for (int i = 0; i < x[ch].length; i++) x[ch][i] = xs.get(ch).getAsJsonArray().get(i).getAsFloat();
+					float[] out = g.run(x);
+					for (int i = 0; i < out.length; i++) worstG = Math.max(worstG, Math.abs(out[i] - cs.getAsJsonArray("out").get(i).getAsFloat()));
+				}
+				check(worstG < 2e-3, "Xen Glance differs from Python by " + worstG);
+				long t0 = System.nanoTime();
+				float[][] blank = new float[Glance.C][Glance.W * Glance.H];
+				for (int i = 0; i < 200; i++) g.run(blank);
+				System.out.printf(java.util.Locale.ROOT, "xen glance: %d pictures like Python (max difference %.1e), %.2f ms a picture, trained on %d%n",
+						gf.getAsJsonArray("cases").size(), worstG, (System.nanoTime() - t0) / 1e6 / 200, g.trainedOn);
+			}
+		}
+
 		// Learning works in Java too: fear conditioning in a tiny lava room.
 		check(learnsToFearLava(), "Java brain did not learn to fear lava");
 

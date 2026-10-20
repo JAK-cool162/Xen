@@ -33,6 +33,7 @@ def load(paths, with_xen=False):
         if F.source(records) == "xen" and not with_xen:
             print(f"(left out {path}: a Xen's own play; --with-xen to use it)", file=sys.stderr)
             continue
+        records = [r for r in records if not r.get("assisted")]   # (a Xen's moments its luck steered: not what it saw, not to learn from)
         fr = F.frames(records)
         cut = int(len(fr) * 0.8)
         train += fr[:cut]

@@ -7,6 +7,8 @@ import java.util.Random;
 public final class TwoCheck {
 	private TwoCheck() {}
 
+	private static float kindredShare;
+
 	private static int failures;
 
 	private static void check(boolean ok, String what) {
@@ -35,6 +37,23 @@ public final class TwoCheck {
 		float dry = Facts.catchesIn(5, false), wet = Facts.catchesIn(5, true);
 		check(dry > 12 && dry < 17 && wet > dry, "catches in 5 minutes: " + dry + " / rain " + wet);
 		check(!Facts.about("sheep").isEmpty() && !Facts.about("fish").isEmpty() && !Facts.about("lava").isEmpty(), "tips");
+		String ender = Survival.answer("how do i beat an enderman?"), creeper = Survival.answer("any tips for creepers"), hungry = Survival.answer("do you have food?");
+		check(Survival.size() >= 40 && ender != null && ender.contains("roof") && creeper != null && creeper.contains("7 blocks") && hungry == null
+				&& Survival.answer("what are you doing") == null && Survival.risky("rotten_flesh") != null && Survival.risky("cooked_beef") == null && Survival.keep("golden_apple"),
+				"wiki facts: " + Survival.size() + ", enderman: " + ender + ", creeper: " + creeper + ", 'do you have food?': " + hungry);
+		check(Skills.nameGrade("Steve") == Skills.nameGrade("Steve") && Skills.nameGrade("Steve") != Skills.nameGrade("Alex") && Skills.nameGrade("Alex") > 0.8f
+				&& Math.abs(Skills.nameKnack("Steve", 0)) <= 0.15f, "pvp knack from the name: Steve " + Skills.nameGrade("Steve") + ", Alex " + Skills.nameGrade("Alex"));
+		java.util.Random kr = new java.util.Random(5);
+		Personality[] folk = new Personality[60];
+		for (int i = 0; i < folk.length; i++) folk[i] = Personality.random(kr);
+		int pairs = 0, kin = 0;
+		for (int i = 0; i < folk.length; i++) for (int j = i + 1; j < folk.length; j++) {
+			pairs++;
+			if (Personality.kindred(folk[i], folk[j])) kin++;
+			if (Personality.kinship(folk[i], folk[j]) != Personality.kinship(folk[j], folk[i])) check(false, "kinship both ways");
+		}
+		kindredShare = kin / (float) pairs;
+		check(Personality.kindred(folk[0], folk[0]) && kindredShare > 0.1f && kindredShare < 0.35f, "kindred pairs " + kindredShare);
 		// the weighing of a choice
 		long now = 1000;
 		Choices.Weigh w = new Choices.Weigh();
@@ -163,8 +182,8 @@ public final class TwoCheck {
 		copy.load(mem.toJson());
 		check(copy.size() == mem.size(), "facts are saved");
 		xen.mod.talk.Words.reset();
-		System.out.printf(java.util.Locale.ROOT, "xen 2.0: pig %.0f hunger (%s), sheep %.0f, %.1f catches in 5 min; reactions %.0f ms (unseen %.0f, confused %.0f); %s%n",
-				Facts.hunger(pig), pig.says(), Facts.hunger(sheep), dry, ms, median(unseen), median(confused), failures == 0 ? "all good" : failures + " failed");
+		System.out.printf(java.util.Locale.ROOT, "xen 2.0: pig %.0f hunger (%s), sheep %.0f, %.1f catches in 5 min; reactions %.0f ms (unseen %.0f, confused %.0f); %d wiki facts, %.0f%% of pairs kindred; %s%n",
+				Facts.hunger(pig), pig.says(), Facts.hunger(sheep), dry, ms, median(unseen), median(confused), Survival.size(), 100 * kindredShare, failures == 0 ? "all good" : failures + " failed");
 		return failures == 0;
 	}
 }

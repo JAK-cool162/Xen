@@ -196,6 +196,35 @@ public final class Personality {
 		return plan < 0 ? "no plan yet" : Strategy.NAMES[plan] + ": " + Strategy.WORDS[plan];
 	}
 
+	/**
+	 * How alike two Xens are inside, 0 to 1: the same beliefs, the same temper, the same plan, the same sins, the same
+	 * way of fighting. Like-minded ones stick together from the start (a team of their own kind); nothing about how
+	 * they look counts.
+	 */
+	static float kinship(Personality a, Personality b) {
+		if (a == null || b == null) return 0f;
+		float k = 0f;
+		int both = 0;
+		if (a.beliefs != null && b.beliefs != null) for (String x : a.beliefs) if (b.beliefs.contains(x)) both++;
+		k += Math.min(0.36f, 0.12f * both);                                  // what they believe
+		if (a.temper.equals(b.temper)) k += 0.2f;                            // friendly with friendly, hotheads with hotheads
+		if (a.plan >= 0 && a.plan == b.plan) k += 0.15f;                     // after the same thing
+		if (a.sins != null && b.sins != null && topSin(a.sins) == topSin(b.sins)) k += 0.2f;   // the same failing
+		if (a.fight.equals(b.fight)) k += 0.09f;
+		return Math.min(1f, k);
+	}
+
+	/** Kindred: alike enough to stick together (the same temper and a belief in common, say: about one pair in five). */
+	static boolean kindred(Personality a, Personality b) {
+		return kinship(a, b) >= 0.31f;
+	}
+
+	private static int topSin(float[] s) {
+		int t = 0;
+		for (int i = 1; i < s.length; i++) if (s[i] > s[t]) t = i;
+		return t;
+	}
+
 	boolean aggressive() {
 		return temper.equals("aggressive");
 	}

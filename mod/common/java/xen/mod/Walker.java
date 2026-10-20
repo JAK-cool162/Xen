@@ -1299,6 +1299,8 @@ final class Walker {
 		p.zza = (float) (flat > 0.15 ? Math.min(1, flat * (last ? 1.5 : 3)) : 0);
 		boolean sprint = (m.kind() == Kind.WALK || m.kind() == Kind.DIAGONAL || m.kind() == Kind.PARKOUR || m.kind() == Kind.ASCEND)
 				&& (straight || smooth() || m.kind() == Kind.PARKOUR) && (!stroll || m.kind() == Kind.PARKOUR) && p.getFoodData().getFoodLevel() > 6 && !p.isInWater() && remaining() > 2;
+		if (sprint && m.kind() != Kind.PARKOUR && p.getFoodData().getFoodLevel() <= 14 && !c.hands.canEat() && c.danger() < 0.3f && !c.fighter.escapingNow())
+			sprint = false;                                                         // hungry, nothing to eat: it walks (sprinting burns hunger, walking doesn't)
 		var ex = c.mod.config.ex1 ? c.ex1Out : null;                              // Xen Ex1: how the player it learned from moved
 		if (ex != null && sprint && m.kind() != Kind.PARKOUR && ex.keys[xen.mod.core.Ex1.SPRINT] < 0.25f) sprint = false;   // (they walked here)
 		p.setSprinting(sprint);

@@ -271,6 +271,7 @@ final class Facts {
 		List<String> out = new ArrayList<>();
 		if (t.length() < 3) return out;
 		for (String tip : TIPS) if (tip.toLowerCase(Locale.ROOT).contains(t)) out.add(tip);
+		for (String tip : Survival.about(topic)) if (!out.contains(tip)) out.add(tip);   // (and what the wiki says)
 		return out;
 	}
 }

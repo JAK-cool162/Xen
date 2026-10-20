@@ -99,6 +99,11 @@ final class Crafter {
 		return false;
 	}
 
+	/** A shield, in its bag or its other hand. */
+	boolean hasShield() {
+		return has("shield") || path(c.player.getOffhandItem()).equals("shield");
+	}
+
 	boolean canMake(int tier) {
 		int sticks = Math.max(0, 2 - count(n -> n.equals("stick")));
 		int woodForSticks = sticks > 0 ? 2 : 0, woodForTable = tableNearOrCarried() ? 0 : 4;
@@ -114,7 +119,9 @@ final class Crafter {
 		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
 		if (tier == 3 && diamonds >= 3 && canMake(4)) return "diamond_pickaxe";      // the next tier, like any player
 		if (tier == 2 && iron >= 3 && canMake(3)) return "iron_pickaxe";
-		if (tier >= 3 && iron >= 1 && !has("shield") && !path(c.player.getOffhandItem()).equals("shield") && wood() >= 6) return "shield";   // (the first ingot after the pickaxe: a shield, before a sword or armor: it stops nearly everything early on)
+		if (tier >= 3 && iron >= 1 && !hasShield() && wood() >= 6) return "shield";   // (the first ingot after the pickaxe: a shield, before a sword or armor: it stops nearly everything early on)
+		long day = Compat.timeOfDay(c.player.level()) % 24000;
+		if (tier == 2 && iron >= 1 && !hasShield() && wood() >= 6 && (day >= 6000 && day < 13000 || iron >= 4)) return "shield";   // (its first iron, the night coming: a shield first, the pickaxe after)
 		if (tier >= 3 && iron >= 2 && !has("iron_sword") && !has("diamond_sword") && sticksOrWood(1, 0)) return "iron_sword";
 		if (tier >= 3 && diamonds >= 2 && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
 		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
@@ -126,7 +133,8 @@ final class Crafter {
 		int stone = count(Crafter::isStoneMaterial);
 		if (tier == 0 && (canMake(1) || canMake(2))) return stone >= 3 && canMake(2) ? "stone_pickaxe" : "wooden_pickaxe";   // (cobblestone and sticks: stone at once)
 		if (tier == 1 && canMake(2)) return "stone_pickaxe";
-		if (tier >= 1 && !has("_sword")) {
+		if (tier >= 1 && !has("_sword") && !has("_axe")) {                     // a weapon: a stone axe does (it hits harder than a stone sword, and chops too)
+			if (stone >= 3 && sticksOrWood(2, 0)) return "stone_axe";
 			if (stone >= 2 && sticksOrWood(1, 0)) return "stone_sword";
 			if (stone == 0 && sticksOrWood(1, 2 + 4)) return "wooden_sword";         // with wood to spare only
 		}

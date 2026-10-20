@@ -566,6 +566,8 @@ final class Goals {
 		}
 		if (exploreTo == null) {
 			if (Double.isNaN(heading)) heading = random.nextDouble() * Math.PI * 2;
+			double lucky = c.hunch.exploreWay();                                // (its feet just go the lucky way, now and then)
+			if (!Double.isNaN(lucky)) heading = lucky;
 			for (int tries = 0; tries < 8 && exploreTo == null; tries++) {
 				double a = heading + (random.nextDouble() - 0.5) * (tries < 4 ? 0.7 : Math.PI * 2);   // (it keeps going one way: far, not round in circles)
 				double r = 40 + random.nextInt(40) + 60 * c.personality.curiosity;
@@ -807,11 +809,14 @@ final class Goals {
 		c.habits.bias(b);                                                       // its routine, what it's sick of, how stung it is
 		c.rules.lean(b);                                                        // the rules it wrote itself; stuck: something it hasn't tried
 		c.intent.lean(b);                                                       // what it promised, what it agreed to do with someone
+		c.planner.lean(b);                                                      // what it's after next (a shield before night...), changed by what turns up
 		return b;
 	}
 
 	/** Until when each choice is off (one that ended the moment it began isn't picked again right away: no spinning on the spot). */
 	private final long[] quickUntil = new long[Mind.N];
+	/** How many times in a row each choice came to nothing. */
+	private final int[] failsInRow = new int[Mind.N];
 
 	private boolean thinkMind(boolean nearby, long now) {
 		if (option >= 0 && current == null) {                              // one of its own kind of choices (rest, follow, eat, help...)
@@ -1097,7 +1102,8 @@ final class Goals {
 		var p = c.player;                                                     // out in the dark: a tip comes to mind, and it's its call
 		int near = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(16), m -> m.isAlive()).size();
 		float dark = p.level().getMaxLocalRawBrightness(p.blockPosition()) < 5 ? 0.1f : 0;
-		float pull = hurt ? (12 - p.getHealth()) / 12f + 0.1f * Math.min(3, near) + dark : 0.55f + 0.1f * Math.min(3, near) + dark;
+		boolean ready = c.hands.hasWeapon() && p.getHealth() >= 14 && p.getFoodData().getFoodLevel() >= 10;   // (armed and well: night's just night)
+		float pull = hurt ? (12 - p.getHealth()) / 12f + 0.1f * Math.min(3, near) + dark : (ready ? 0.2f : 0.55f) + 0.1f * Math.min(3, near) + dark;
 		if (!c.tips.take(hurt ? Tips.Tip.HURT_IN_DARK : Tips.Tip.NIGHTFALL, pull, String.format(java.util.Locale.ROOT, "%s, %.0f health, %s",
 				Mind.SAYS[option], p.getHealth(), near == 0 ? "nothing about" : near + " monster" + (near > 1 ? "s" : "") + " about"), 600)) return false;
 		c.journal("does", (outdoorWork ? "night fell" : String.format(java.util.Locale.ROOT, "hurt (%.0f health) out in the dark", c.player.getHealth()))
@@ -1147,11 +1153,12 @@ final class Goals {
 		boolean below = f[Mind.UNDERGROUND] > 0.5f;
 		Personality who = c.personality;
 		int plan = who.plan;
+		boolean nightReady = c.hands.hasWeapon() && c.player.getHealth() >= 14 && hunger >= 10 && !who.believes("night_belongs_to_monsters");   // (armed, healthy, fed: the night's no reason to stop, players play on)
 		if (can[Mind.EAT] && hunger < Math.min(18, who.eatAt() + 4)) return why(Mind.EAT, "hungry");   // (a glutton sooner)
 		if (dark && f[Mind.NIGHT] < 0.5f && !sunDown() && f[Mind.DANGER] < 0.2f) {   // late afternoon: ready for the night, not in for it yet (a player keeps at it till the sun goes down)
 			if (home != null && can[Mind.SHELTER] && !c.player.blockPosition().closerThan(home, 48) && c.player.blockPosition().closerThan(home, 400))
 				return why(Mind.SHELTER, "dusk: heading home before dark");
-			if (blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below && (home == null || !c.player.blockPosition().closerThan(home, 96)))
+			if (blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below && !nightReady && (home == null || !c.player.blockPosition().closerThan(home, 96)))
 				return why(Mind.STONE, "dusk: blocks for a hut tonight");
 			dark = false;                                                       // (else its afternoon goes on)
 		}
@@ -1176,6 +1183,7 @@ final class Goals {
 				if (can[Mind.STORE]) return why(Mind.STORE, "night: sorting its things");
 				return why(Mind.REST, "night: staying in");
 			}
+			if (nightReady) return -1;                                          // (a roof is one way through the night, not the only one: its mind's call)
 			if (f[Mind.NIGHT] < 0.5f && blocks() < NIGHT_BLOCKS && can[Mind.STONE] && !below
 					&& (home == null || !c.player.blockPosition().closerThan(home, 96))) return why(Mind.STONE, "dusk: dirt for a hut");   // (before dark, like a player)
 			if (can[Mind.SHELTER]) return why(Mind.SHELTER, "night: a roof first");
@@ -1742,6 +1750,13 @@ final class Goals {
 		float[] after = MindSense.features(c);
 		if (died) after[Mind.HEALTH] = 0;
 		float r = Mind.reward(before, after, o, minutes), h = Mind.harm(before, after, died);
+		if (r > 0.05f) failsInRow[o] = 0;
+		else if (++failsInRow[o] >= 3 && o != Mind.EAT && o != Mind.FLEE && o != Mind.FIGHT && o != Mind.FOLLOW && o != Mind.HELP && o != Mind.GUARD
+				&& o != Mind.REST && o != Mind.SLEEP) {                                    // (the same choice, again and again, and nothing: a flooded staircase, a night by the sea)
+			quickUntil[o] = now + (2400L << Math.min(3, failsInRow[o] - 3));
+			c.journal("thinks", String.format(Locale.ROOT, "%s came to nothing %d times in a row: something else for %d min", Mind.SAYS[o], failsInRow[o], (2400 << Math.min(3, failsInRow[o] - 3)) / 1200));
+		}
+		if (r > 0 && c.hunch.assistedSince(optionAt)) r *= 0.5f;             // (luck helped: its mind learns less from that than from what it did itself)
 		c.mod.mind.remember(before, o, r, h, after, died, minutes, Mind.bits(MindSense.allowed(c, after, false)));
 		if (!notItsDoing) {                                                   // (its outcome memory: how that went, here, like that, against what it expected; not a /kill)
 			String thought = c.experience.record(optionSituation, o, r, h, died, minutes, optionWhere != null ? optionWhere : c.player.blockPosition(), optionFollowed,

@@ -457,6 +457,7 @@ public final class GameplayLog {
 		if (inventory) log.lastInventory = log.ticks;
 		if (view) log.lastVision = log.ticks;
 		state(p, p.level(), o, input(p), inventory, view);
+		if (p instanceof XenPlayer x && x.companion != null && x.companion.hunch.assisted()) o.addProperty("assisted", x.companion.hunch.steered);   // (luck steered it: not what it saw)
 		log.health = p.getHealth();
 		write(log, o);
 	}

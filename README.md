@@ -12,7 +12,8 @@ It **plays fair**. It isn't handed the world like most game AIs. It knows
 everything within 6 blocks of itself, and beyond that only what it *sees* in
 its 90° field of view, up to 8 chunks away. Things behind walls, under the
 ground or behind its back stay unknown, and what it saw before is a belief
-whose confidence fades.
+whose confidence fades. (The one exception is its *luck*, a setting: how often
+it happens to wander the right way. Its mind is never told anything by it.)
 
 On top of survival it has skills: it **builds** from templates (roofs, arches,
 houses, towers, bridges), **rates** builds and learns your taste in buildings,
@@ -221,8 +222,8 @@ settings:
 
 | jar | Minecraft | Java |
 |---|---|---|
-| `dist/xen-companion-2.0.0-beta.40+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
-| `dist/xen-companion-2.0.0-beta.40+mc26.x.jar` | 26.1 - 26.3 | 25+ |
+| `dist/xen-companion-2.0.0-beta.41+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.41+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
 Everything Xen needs is inside the jar: nothing to download, nothing online.
 
@@ -821,6 +822,8 @@ tests/                python -m unittest discover -s tests -t .
   and [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen,
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Only the fitted numbers are in the code.
 * Village houses: Minecraft's own structure files, read from the player's game at run time (nothing of Mojang's is included).
+* Survival know-how (2.0.0-beta.41): facts from the [Minecraft Wiki](https://minecraft.wiki/) (mob, item and Tutorial pages),
+  written in our own words in `assets/xen/survival.json`; no wiki text is copied.
 
 ## Tests
 

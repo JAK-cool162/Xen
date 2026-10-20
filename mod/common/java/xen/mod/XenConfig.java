@@ -115,6 +115,11 @@ public final class XenConfig {
 	 * distance). Further costs the server more.
 	 */
 	public int sight = 128;
+	/**
+	 * Luck: how often a Xen happens to wander the right way (0 to 1; 0: never lucky). It still has to see things for
+	 * itself, get there and live through it.
+	 */
+	public double luck = 0.5;
 	/** XenTalk: Xen's own small talk model words its chats (from what's true for it; the classic voice when it has nothing that sticks to the facts). */
 	public boolean xentalk = true;
 	/**

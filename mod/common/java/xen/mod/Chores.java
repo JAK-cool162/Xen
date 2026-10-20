@@ -425,6 +425,7 @@ final class Chores {
 			if (hole != null) {
 				begin(Kind.SHELTER);
 				pit = hole;
+				nookTried = false;
 				walls = List.of();
 				shape = "hole";
 				waited = 0;
@@ -466,6 +467,7 @@ final class Chores {
 			if (hole != null) {
 				begin(Kind.SHELTER);
 				pit = hole;
+				nookTried = false;
 				walls = List.of();
 				shape = "hole";
 				waited = 0;
@@ -593,6 +595,8 @@ final class Chores {
 					if (hole == null) continue;
 					begin(Kind.SHELTER);
 					pit = hole;
+					nookTried = false;
+				nookTried = false;
 					walls = List.of();
 					shape = "hole";
 					waited = 0;
@@ -637,8 +641,25 @@ final class Chores {
 	private List<BlockPos> inside;
 	private int walked;
 
-	/** The hole it's digging for the night (the two blocks under it), or null. */
+	/** The hole it's digging for the night (the two blocks under it), or null; and whether it tried a pocket in its side already. */
 	private List<BlockPos> pit;
+	private boolean nookTried;
+
+	/** Beside the bottom of its hole: two blocks of earth or stone it can dig out, solid over them (a roof) and under them. Null: none. */
+	private BlockPos sidePocket(ServerLevel level, BlockPos bottom) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos side = bottom.relative(d);
+			var feet = level.getBlockState(side);
+			var head = level.getBlockState(side.above());
+			if (!feet.getFluidState().isEmpty() || !head.getFluidState().isEmpty() || feet.getCollisionShape(level, side).isEmpty() || head.getCollisionShape(level, side.above()).isEmpty()) continue;
+			if (feet.getDestroySpeed(level, side) < 0 || head.getDestroySpeed(level, side.above()) < 0 || feet.getDestroySpeed(level, side) > 3) continue;   // (dirt, stone: not bedrock, not obsidian)
+			BlockPos roof = side.above(2);
+			if (level.getBlockState(roof).getCollisionShape(level, roof).isEmpty() || !level.getBlockState(roof).getFluidState().isEmpty()) continue;
+			if (level.getBlockState(side.below()).getCollisionShape(level, side.below()).isEmpty()) continue;
+			return side.immutable();
+		}
+		return null;
+	}
 
 	private Action pitNext() {
 		ServerLevel level = (ServerLevel) c.player.level();
@@ -669,6 +690,14 @@ final class Chores {
 				return Action.PLACE;
 			}
 			if (++waited < 100) return Action.IDLE;
+			BlockPos nook = nookTried ? null : sidePocket(level, bottom);       // nothing to cover it with: into its side, under a roof of earth (an arrow can't get in there, nor an enderman)
+			if (nook != null) {
+				nookTried = true;
+				pit = List.of(nook.above(), nook);
+				waited = 0;
+				c.journal("thinks", "nothing to cover its hole with: digs into the side of it, under the ground's own roof");
+				return Action.IDLE;
+			}
 		}
 		pit = null;
 		stop();
@@ -1095,6 +1124,7 @@ final class Chores {
 		if (cave != null) {
 			caveMode = true;
 			toMine = cave;
+			Hunch.claim(c, cave);
 			XenMod.LOG.info("{} mines in the cave at {}", c.name, cave.toShortString());
 			return "You will go mining in the cave at " + cave.getX() + " " + cave.getY() + " " + cave.getZ()
 					+ " (the walls show the ore; you'll light it with torches as you go).";
@@ -1492,6 +1522,11 @@ final class Chores {
 				mineBase = feet;
 				mineLeg = 0;
 				legStarted = now();
+				net.minecraft.core.Direction lucky = c.hunch.tunnelWay(feet, what);   // (its tunnels just happen to go the good way, now and then)
+				if (lucky != null && !wet(feet, lucky, 4)) {
+					mineDir = lucky;
+					mineRecordDir = lucky;
+				}
 				c.places.remember("mine base", feet);
 				if (c.places.get("mine") == null) c.places.remember("mine", mineStart);
 				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
@@ -1523,6 +1558,11 @@ final class Chores {
 		return a;
 	}
 
+	/** Out looking round for a cave (for its mining), not in one yet. */
+	boolean lookingForCave() {
+		return kind == Kind.MINE && caveLook > 0 && !caveMode && now() < caveLook;
+	}
+
 	/** Looking round for a cave before it digs: one found (it saw it), in it goes; none in a while, its own mine. Null: done looking. */
 	private Action lookForCave() {
 		BlockPos cave = c.caves.nearest(64);
@@ -1531,6 +1571,7 @@ final class Chores {
 			caveMode = true;
 			caveTarget = null;
 			toMine = cave;
+			Hunch.claim(c, cave);
 			intoHill = false;
 			tunnelIn = null;
 			c.journal("does", "found a cave to mine in at " + cave.toShortString() + ": in there, not its own staircase");
@@ -2436,7 +2477,8 @@ final class Chores {
 		}
 		Vec3 here = c.player.position();
 		if (wander == null || now() > wanderUntil || here.distanceTo(wander) < 2) {
-			double a = random.nextDouble() * Math.PI * 2;
+			double lucky = kind == Kind.HUNT && !forWool ? c.hunch.animalWay() : Double.NaN;   // (hungry: its feet happen to go the way the animals are, now and then)
+			double a = Double.isNaN(lucky) ? random.nextDouble() * Math.PI * 2 : lucky;
 			wander = here.add(Math.cos(a) * 24, 0, Math.sin(a) * 24);
 			wanderUntil = now() + 400;
 			if (scans++ > 4) scans = 0;                                  // and look around again when it gets there
@@ -2725,6 +2767,7 @@ final class Chores {
 				walls = List.of();
 				inside = null;
 				pit = hole;
+				nookTried = false;
 				shape = "hole";
 				waited = 0;
 				return Action.IDLE;
