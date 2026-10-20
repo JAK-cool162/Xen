@@ -1562,8 +1562,7 @@ final class Chores {
 					doing = c.guide.doing(got, want);
 					Action a = reach(t);
 					if (a != null) return a;
-				} else if (mineBase == null && tunnelIn == null) {             // far: its staircase goes that way, down to it
-					mineY = t.getY();
+				} else if (mineBase == null && tunnelIn == null && t.getY() < here.getY() - 3) {   // far and below: its staircase goes that way (as deep as it was going: it takes the ore as it passes)
 					net.minecraft.core.Direction d = c.guide.way();
 					if (!wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
 				}
@@ -2205,6 +2204,19 @@ final class Chores {
 	}
 
 	/** Drops it came for (what it's gathering), close and on about its level; it walks over them to pick them up. */
+	private static final Set<String> JUNK = Set.of("dirt", "granite", "andesite", "diorite", "tuff", "gravel", "calcite", "netherrack", "sand", "red_sand", "cobbled_deepslate");
+	private long enoughAt;
+	private boolean enough;
+
+	/** Blocks enough for a night's hut and a pillar (cobblestone and dirt, 32): the rest of the dirt can lie. */
+	private boolean enoughBlocks() {
+		if (now() - enoughAt > 40) {
+			enoughAt = now();
+			enough = count("cobblestone") + countItem("dirt") >= 32;
+		}
+		return enough;
+	}
+
 	private ItemEntity dropToPickUp() {
 		double feet = c.player.getY();
 		ItemEntity best = null;
@@ -2216,6 +2228,7 @@ final class Chores {
 			// what it just mined is its too (a player picks up what they dig, cobblestone and all): close by, if there's room
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
+			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;
