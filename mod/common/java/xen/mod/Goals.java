@@ -1234,7 +1234,7 @@ final class Goals {
 			}
 			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood to smelt its iron");   // (no coal last time: a tree burns too)
 		}
-		if (meals < 2 && hunger < 18 && can[Mind.FOOD]) {
+		if ((meals < 2 || meals < 3 && hunger < 14) && hunger < 18 && can[Mind.FOOD]) {   // (food in the bag before it's needed: hunger is a slow enemy)
 			c.chores.forWool = false;
 			return why(Mind.FOOD, "low on food");
 		}

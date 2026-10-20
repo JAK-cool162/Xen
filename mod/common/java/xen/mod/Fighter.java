@@ -352,6 +352,8 @@ final class Fighter {
 		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
 		if (c.personality.believes("warrior_never_runs")) retreat = Math.min(retreat, 0.12f);   // (it stands its ground till the very end)
 		if (c.personality.believes("live_to_fight")) retreat = Math.max(retreat, 0.45f);        // (it backs off early and lives)
+		if (!(foe instanceof Player) && !c.inArena)                             // the first rule: never below five hearts against monsters (back off, heal, then again)
+			retreat = Math.max(retreat, c.personality.believes("warrior_never_runs") ? 0.4f : 0.5f);
 		if (!(foe instanceof Player) && !c.inArena) {                          // mobs: outnumbered, or in the dark, anyone backs off sooner (most of its deaths were two or three mobs, at night)
 			int mobs = p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(10), m -> m.isAlive()).size();
 			float more = Math.min(0.3f, 0.12f * Math.max(0, mobs - 1)) + (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7 ? 0.08f : 0);
@@ -538,6 +540,13 @@ final class Fighter {
 			h.watching = foe;
 			return idle();
 		}
+		boolean walker = !(foe instanceof Player) && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && !archer(foe)
+				&& foe instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == p;
+		if (walker && unsure() && d < 7 && h.carries("shield") && h.raiseShield()) {   // defense first: a monster on its way to it, shield up, let it come
+			h.watching = foe;
+			c.goals.instant = "shield up, letting the " + kind(foe).replace('_', ' ') + " come to it";
+			return idle();
+		}
 		p.setSprinting(sprintable && d > 2);
 		String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(foe.getType()).getPath();
 		boolean archer = kind.endsWith("skeleton") || kind.equals("stray") || kind.equals("bogged");
@@ -561,6 +570,16 @@ final class Fighter {
 			return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
+	}
+
+	/**
+	 * Not sure how this goes: more than one at it, hurt (under seven hearts), or dark round it. Then, like a player who
+	 * can't see it all, it plays defense first: the shield up, they come to it, it hits back when they're in reach.
+	 */
+	private boolean unsure() {
+		XenPlayer p = c.player;
+		if (p == null) return false;
+		return around >= 2 || p.getHealth() < 14 || p.level().getMaxLocalRawBrightness(p.blockPosition()) < 5;
 	}
 
 	/** When it last ate a golden apple in a fight (one at a time: they're precious). */
@@ -883,7 +902,7 @@ final class Fighter {
 	/** The start of a swing: decide how to play this one. */
 	private void newSwing() {
 		goCrit = random.nextFloat() < gene(0);
-		useShield = random.nextFloat() < gene(9);
+		useShield = random.nextFloat() < gene(9) || unsure();                   // (not sure what's coming: defense first, the shield up between hits)
 		selecting = random.nextFloat() < gene(7);
 		waited = 0;
 	}

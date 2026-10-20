@@ -353,7 +353,7 @@ public final class Personality {
 
 	/** When it eats: at this food level or below (10 for most; a glutton or "food is life" sooner, "hunger keeps you sharp" later). */
 	int eatAt() {
-		return Math.max(6, Math.min(18, Math.round(10 + 6 * sin(Sins.GLUTTONY) + 8 * knobs().hunger + 4 * (hidden(APPETITE) - 0.5f))));   // (always hungry: eats sooner)
+		return Math.max(14, Math.min(18, Math.round(10 + 6 * sin(Sins.GLUTTONY) + 8 * knobs().hunger + 4 * (hidden(APPETITE) - 0.5f))));   // (always hungry: eats sooner; never lets it fall below 14: hunger is a slow enemy, no healing, no sprinting)
 	}
 
 	/**
