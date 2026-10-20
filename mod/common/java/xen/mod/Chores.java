@@ -1144,6 +1144,32 @@ final class Chores {
 	private int luckyTries;
 	private long luckyAt, luckyNext;
 
+	/** Getting closer to the ore it has a feeling about (else, ten seconds of that: not this one). */
+	private boolean luckyProgress(BlockPos here) {
+		double d = Math.sqrt(luckyOre.distSqr(here));
+		if (d < luckyClosest - 0.5) {
+			luckyClosest = d;
+			luckyCloserAt = now();
+			return true;
+		}
+		if (now() - luckyCloserAt <= 200) return true;
+		c.hunch.taken(luckyOre);
+		luckyOre = null;
+		luckyTries++;
+		return false;
+	}
+
+	private double luckyClosest = Double.MAX_VALUE;
+	private long luckyCloserAt;
+
+	/** Water within r blocks round (a beach, a river bank): no place to start a staircase. */
+	private boolean wetAround(BlockPos at, int r) {
+		var level = c.player.level();
+		for (BlockPos q : BlockPos.betweenClosed(at.offset(-r, -3, -r), at.offset(r, 1, r)))
+			if (!level.getFluidState(q).isEmpty()) return true;
+		return false;
+	}
+
 	/** The way (of the four) from a toward b. */
 	private static net.minecraft.core.Direction toward(BlockPos a, BlockPos b) {
 		int dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
@@ -1252,8 +1278,10 @@ final class Chores {
 		}
 		// None: a new one. Luck: ore it "has a feeling" about close by (the server knows the world): its new staircase
 		// goes straight toward it, down to its depth, no wandering for a cave first. (Luck off: none.)
-		luckyOre = !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
-				? c.hunch.oreNear(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : "coal", c.player.blockPosition(), 40, what.equals("diamonds") ? 140 : 72) : null;
+		BlockPos at = c.player.blockPosition();
+		luckyOre = !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && !wetAround(at, 6)
+				? c.hunch.oreNear(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : "coal", at, 40, what.equals("diamonds") ? 140 : 72) : null;
+		if (luckyOre != null && (luckyOre.getY() > at.getY() - 20 || luckyOre.getY() > y + 24)) luckyOre = null;   // (just under the grass: not where a mine goes; it digs down to the ore's depth)
 		if (luckyOre != null) {
 			luckyAt = now();
 			caveLook = 0;
@@ -1590,19 +1618,21 @@ final class Chores {
 					luckyTries++;
 				}
 			}
-			if ((luckyOre == null || !luckyOre.closerThan(here, 12)) && now() >= luckyNext && (mineBase != null || here.getY() <= mineStart.getY() - 4)) {
+			boolean deepDown = here.getY() < c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, here.getX(), here.getZ()) - 8;
+			if ((luckyOre == null || !luckyOre.closerThan(here, 12)) && now() >= luckyNext && deepDown && (mineBase != null || here.getY() <= mineStart.getY() - 8)) {
 				luckyNext = now() + 60;                                            // (now and then, down here: a feeling there's some right by it)
 				BlockPos near = c.hunch.oreNear(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : what.equals("coal") ? "coal" : what, here, 8, 8);
 				if (near != null && !near.equals(luckyOre)) {
 					luckyOre = near;
 					luckyAt = now();
+					luckyClosest = Double.MAX_VALUE;
 				}
 			}
 			if (luckyOre != null && luckyOre.closerThan(here, 12)) {
 				var st = c.player.level().getBlockState(luckyOre);
 				if (WorldSenses.category((ServerLevel) c.player.level(), luckyOre, st) == Blocks.STONE || st.isAir()) {   // (mined: gone)
 					luckyOre = null;
-				} else {
+				} else if (luckyProgress(here)) {
 					doing = String.format(java.util.Locale.ROOT, "digging to the %s it has a feeling is right here (%d of %d so far)", what, got, want);
 					Action a = c.walkTo(Goal.nextTo(luckyOre));
 					if (a != null) return a;
