@@ -419,6 +419,13 @@ final class Fighter {
 		Action surprise = c.antics.surprise(foe, d);                          // not in the script
 		if (surprise != null) return surprise;
 
+		LivingEntity urgent = mostUrgent(foe);                                 // more than one at it: the shield (and its eyes) to whichever hits first
+		if (urgent != foe && urgent != null && !p.isUsingItem() && h.carries("shield") && (archer(urgent) ? urgent.getTicksUsingItem() >= 12 : urgent.distanceTo(p) < 3) && h.raiseShield()) {
+			h.watching = urgent;
+			c.goals.instant = "shield up to the " + kind(urgent) + " first";
+			return around >= 3 ? Action.BACK : idle();                        // (three or more round it: back off, so they're all in front of it)
+		}
+
 		h.ready(foe.isBlocking(), d);                                          // an axe for a raised shield, a spear out of a sword's reach, else its sword
 		float charge = p.getAttackStrengthScale(0.5f);
 		if (charge < lastCharge - 0.3f) newSwing();                            // it just swung: a new cycle
@@ -522,14 +529,19 @@ final class Fighter {
 		p.setSprinting(sprintable && d > 2);
 		String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(foe.getType()).getPath();
 		boolean archer = kind.endsWith("skeleton") || kind.equals("stray") || kind.equals("bogged");
-		if (archer && d > 4 && !foe.isUsingItem()) {                          // its bow isn't drawn: no arrow coming, straight at it
+		int drawn = foe.isUsingItem() ? foe.getTicksUsingItem() : 0;             // a bow lets go at a full draw (20 ticks); a shield takes 5 to come up
+		if (archer && d > 4 && drawn < 12) {                                 // no arrow for a moment yet: straight at it, sprinting (the shield slows it)
 			h.lowerShield();
 			p.setSprinting(sprintable);
 			return c.walkTo(foe.position());
 		}
-		if (archer && d > 4 && foe.isUsingItem() && h.raiseShield()) {        // drawn: the shield up, eyes on it, a step in
+		if (archer && d > 4 && h.raiseShield()) {                            // the arrow's coming: the shield up in time, eyes on it, a step in
 			h.watching = foe;
 			return Action.FORWARD;
+		}
+		if (archer && d > 4 && drawn >= 15) {                                // no shield: a step sideways just as it lets go (it shoots where it was)
+			h.watching = foe;
+			return (now / 30) % 2 == 0 ? Action.LEFT : Action.RIGHT;
 		}
 		if (archer && d > 4 && c.knowledge.knows("skeleton_dodge")) {        // side to side on the way in, eyes on it: its arrows miss
 			h.watching = foe;
@@ -537,6 +549,45 @@ final class Fighter {
 			return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
+	}
+
+	/** How many monsters were round it (within 6) at the last look. */
+	private int around;
+
+	/**
+	 * Surrounded: which one hits it first? A skeleton at a full draw with a clear shot, a zombie right on it, before the
+	 * one it's fighting, if those are coming sooner (a player in a crowd guards the side the hit comes from).
+	 */
+	private LivingEntity mostUrgent(LivingEntity foe) {
+		XenPlayer p = c.player;
+		LivingEntity best = foe;
+		double bestT = soonest(foe);
+		around = 0;
+		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(10),
+				x -> x.isAlive() && x != foe && x.getTarget() == p)) {
+			if (m.distanceTo(p) < 6) around++;
+			double t = soonest(m);
+			if (t < bestT - 4) {
+				bestT = t;
+				best = m;
+			}
+		}
+		return best;
+	}
+
+	private boolean archer(LivingEntity e) {
+		String k = kind(e);
+		return k.endsWith("skeleton") && !k.equals("wither_skeleton") || k.equals("stray") || k.equals("bogged");
+	}
+
+	/** Ticks till this one could hurt it (about). */
+	private double soonest(LivingEntity e) {
+		XenPlayer p = c.player;
+		double d = e.distanceTo(p);
+		if (archer(e))
+			return p.hasLineOfSight(e) ? (e.isUsingItem() ? Math.max(0, 20 - e.getTicksUsingItem()) : 25) + d / 3 : 999;   // (an arrow flies about 3 blocks a tick)
+		if (e instanceof net.minecraft.world.entity.monster.Creeper cr) return cr.getSwellDir() > 0 ? 0 : d * 5;
+		return Math.max(0, d - 2.5) * 5;                                    // (on foot: about a block every 5 ticks)
 	}
 
 	/** That way, the next few blocks: ground to run on, no drop, no lava or water, no wall it can't jump (else it works out a way). */
