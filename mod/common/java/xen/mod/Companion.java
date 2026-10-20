@@ -1066,6 +1066,8 @@ public final class Companion {
 		if (shore != null) return shore;
 		Action come = comeOver();                                     // "come here": right over to them, then waits to see what they want
 		if (come != null) return come;
+		Action escort = escortNext();                                 // a friend died: with them back to their things, picking them up, handing them back
+		if (escort != null) return escort;
 		boolean toHeal = player.getHealth() <= player.getMaxHealth() - 4 && player.getFoodData().getFoodLevel() < 18;   // (two hearts down: under 18 food it doesn't heal, so a player eats)
 		if ((player.getFoodData().getFoodLevel() <= personality.eatAt() || toHeal) && hands.canEat() && player.getFoodData().needsFood()
 				&& choices.eat().yes()) {                                 // (a monster right on it: it fights first, eats after)
@@ -2167,8 +2169,11 @@ public final class Companion {
 			lostBest = Double.MAX_VALUE;
 			lostProgressAt = now;
 			chatter("My stuff! I'm going back for it.", true);
+			askFriendAlong(far);                                          // (back there with nothing on it: better with a friend)
 		}
-		if (far > 8 && crafter.pickTier() == 0 && !crafter.canMake(1) && 5800 - lostAged > 2400 && !player.level().canSeeSky(lostAt.above())
+		Action ready = readyAlone(far, now);                                  // nobody came: a few blocks and stone tools first
+		if (ready != null) return ready;
+		if (aloneUntil == 0 && far > 8 && crafter.pickTier() == 0 && !crafter.canMake(1) && 5800 - lostAged > 2400 && !player.level().canSeeSky(lostAt.above())
 				&& lostAt.getY() < player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, lostAt.getX(), lostAt.getZ()) - 4) {
 			if (lostToolUntil == 0) {                                            // its things are down in the ground, no pickaxe: a basic one first
 				lostToolUntil = now + 2400;
@@ -2210,6 +2215,12 @@ public final class Companion {
 			}
 			if (target != null && lostItemNext != null) lostItem = lostItemNext;
 			lostItemNext = null;
+			if (target == null && helper != null && helper.escortFor == this && !helper.escortGot.isEmpty()) {   // its friend picked them up: they'll hand them over
+				lostAt = null;
+				saidGoingBack = false;
+				chatter(pick3("Thanks " + helper.name + ", you got my stuff!", helper.name + " has my things. Legend.", "Nice, " + helper.name + " grabbed it all."), true);
+				return null;
+			}
 			if (target == null) {
 				lostAt = null;
 				saidGoingBack = false;
@@ -2232,6 +2243,193 @@ public final class Companion {
 			return null;
 		}
 		return walkTo(target);
+	}
+
+	/** Going back alone: till when it gets ready first (0: not yet weighed, -1: ready, or no time for it: it goes). */
+	private long aloneUntil;
+
+	/**
+	 * Nobody came along: before going back alone, blocks (sixteen if there's time, never none) and basic stone gear (a
+	 * stone pickaxe, a stone axe or sword), with the time its things have left and the way back there in mind.
+	 */
+	private Action readyAlone(double far, long now) {
+		if (helper != null || aloneUntil < 0 || far < 16) return null;
+		int blocks = walker.blocks();
+		boolean pick = crafter.pickTier() >= 2, weapon = stoneWeapon();
+		long left = 5800 - lostAged - (long) (far * 5);                       // (its things' time, less the way there at a run)
+		if (blocks >= 16 && pick && weapon || left < 200) {
+			if (aloneUntil > 0) journal("thinks", blocks >= 16 && pick && weapon ? "ready: " + blocks + " blocks and stone tools, back for its things"
+					: "no more time to get ready: back for its things as it is (" + blocks + " blocks)");
+			aloneUntil = -1;
+			return null;
+		}
+		if (aloneUntil == 0) {
+			aloneUntil = now + Math.min(2400, Math.max(300, left - 600));     // (two minutes at most, a margin left over)
+			java.util.List<String> needs = new java.util.ArrayList<>();
+			if (blocks < 16) needs.add(blocks == 0 ? "some blocks (it has none)" : "blocks (" + blocks + " of 16)");
+			if (!pick) needs.add("a stone pickaxe");
+			if (!weapon) needs.add("a stone weapon");
+			journal("thinks", String.format(java.util.Locale.ROOT, "nobody came along: %s first, then back alone (%.0f blocks off, about %d s before its things go)",
+					String.join(", ", needs), far, (5800 - lostAged) / 20));
+			chatter(pick3("Fine, I'll go alone. Getting some blocks and stone tools first.", "Nobody? OK. Tools first, then my stuff.",
+					"Going alone then. Let me grab some stone first."), true);
+		}
+		if (now >= aloneUntil && (blocks > 0 || now >= aloneUntil + 300)) {   // time's up (one block at least, if it can get one quickly)
+			journal("thinks", "out of time getting ready: back for its things with " + blocks + " blocks" + (pick ? "" : ", no stone pickaxe") + (weapon ? "" : ", no stone weapon"));
+			aloneUntil = -1;
+			if (chores.own) chores.cancel();
+			return null;
+		}
+		goals.instant = "getting blocks and stone tools, then back for its things alone";
+		if (!chores.busy()) {
+			var have = items();
+			int stone = have.getOrDefault("cobblestone", 0), wood = 4 * have.getOrDefault("log", 0) + have.getOrDefault("stick", 0);
+			for (var e : have.entrySet()) if (e.getKey().endsWith("_planks")) wood += e.getValue();
+			boolean under = !player.level().canSeeSky(player.blockPosition());
+			int toolStone = (pick ? 0 : 3) + (weapon ? 0 : 3);
+			if (now >= aloneUntil) chores.gather(under && crafter.pickTier() >= 1 ? "stone" : "dirt", 1);   // (the one block it won't go without)
+			else if (toolStone > 0 && wood < 4 && crafter.pickTier() >= 1) chores.gather("wood", 2);         // (sticks for the handles)
+			else if (toolStone > stone) chores.gather("stone", toolStone - stone + (under ? Math.max(0, 16 - blocks) : 0));   // (no pickaxe: wood for one first, by itself)
+			else chores.gather(under && crafter.pickTier() >= 1 ? "stone" : "dirt", 16 - blocks);
+			chores.own = true;
+		}
+		return chores.next();
+	}
+
+	/** A stone weapon or better (a sword or an axe, not wood or gold). */
+	private boolean stoneWeapon() {
+		var inv = player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			String n = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+			if ((n.endsWith("_sword") || n.endsWith("_axe")) && !n.startsWith("wooden") && !n.startsWith("golden")) return true;
+		}
+		return false;
+	}
+
+	/** Going back for its things with a friend: who came along (null: nobody). */
+	private Companion helper;
+	/** Helping a friend get their things back: whose, where they are, till when, and what of theirs it picked up (to hand back). */
+	private Companion escortFor;
+	private BlockPos escortSpot;
+	private long escortUntil;
+	final Map<String, Integer> escortGot = new HashMap<>();
+	private Map<String, Integer> escortHad = new HashMap<>();
+
+	/**
+	 * Back for its things with nothing on it: it asks a friend close by (its team, or one it trusts) to come along. The
+	 * friend decides (kindness, loyalty, trust, alike or not, armed or not, busy or not), like answering a call for help.
+	 */
+	private void askFriendAlong(double far) {
+		if (inArena || minion || lostAt == null || far < 6) return;
+		for (Companion o : mod.companions) {
+			if (o == this || o.player == null || !o.player.isAlive() || o.player.level() != player.level() || o.player.distanceTo(player) > 64) continue;
+			if (o.inArena || o.minion || o.lostAt != null || o.escortFor != null || o.fightingNow()) continue;
+			float t = o.trust(player.getUUID());
+			if (!o.player.isAlliedTo(player) && t < 0.4f) continue;
+			var p = o.personality;
+			float chance = 0.15f + 0.35f * p.kindness + 0.25f * p.loyalty + 0.3f * Math.max(0f, t) + (Personality.kindred(p, personality) ? 0.2f : 0f)
+					+ (o.player.isAlliedTo(player) ? 0.2f : 0f) + (o.fighter.style() == Fighter.Style.TEAM ? 0.25f : 0f)
+					- (o.hands.hasWeapon() ? 0f : 0.3f) - (o.chores.busy() ? 0.15f : 0f) - (o.player.getHealth() < 12 ? 0.3f : 0f);
+			String spot = lostAt.getX() + " " + lostAt.getY() + " " + lostAt.getZ();
+			say(pick3("Hey " + o.name + ", help me get my stuff back? It's at " + spot + ".", o.name + ", come with me? I died at " + spot + ".",
+					o.name + "! My things are at " + spot + ", cover me?"));
+			boolean goes = o.random.nextFloat() < chance;
+			journal("thinks", "asks " + o.name + " to come along for its things: " + (goes ? "they come" : "they don't"));
+			if (goes) {
+				helper = o;
+				o.escortFor = this;
+				o.escortSpot = lostAt;
+				o.escortUntil = player.level().getGameTime() + 20 * 180;
+				o.escortGot.clear();
+				o.escortHad = o.rawItems();
+				o.chores.cancel();
+				o.journal("thinks", "goes with " + name + " to get their things back (at " + spot + ")");
+				mod.later(15 + o.random.nextInt(20), () -> o.say(o.pick3("Sure, I've got you.", "On my way, stay close.", "Yeah, let's go get it.")));
+			} else {
+				mod.later(15 + o.random.nextInt(20), () -> o.say(o.pick3("Can't right now, sorry.", "Busy, good luck!", "Nah, I'll pass.")));
+			}
+			return;                                                       // (one ask: then it goes, with them or alone)
+		}
+	}
+
+	/** What it carries by item id (not merged like items(): to hand back exactly what it picked up). */
+	private Map<String, Integer> rawItems() {
+		Map<String, Integer> out = new HashMap<>();
+		var inv = player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			ItemStack st = inv.getItem(i);
+			if (!st.isEmpty()) out.merge(BuiltInRegistries.ITEM.getKey(st.getItem()).getPath(), st.getCount(), Integer::sum);
+		}
+		return out;
+	}
+
+	/** With a friend back to their things: guard them, pick up what's lying there, then hand it over. Null: not on it (or a fight first). */
+	private Action escortNext() {
+		if (escortFor == null) return null;
+		Companion o = escortFor;
+		long now = player.level().getGameTime();
+		if (o.player == null || !o.player.isAlive() || o.player.level() != player.level() || now > escortUntil && escortGot.isEmpty() || now > escortUntil + 20 * 120) {
+			escortFor = null;                                              // (they're gone, or it's been too long: its own things again)
+			if (o.helper == this) o.helper = null;
+			return null;
+		}
+		if (fighting) return null;                                         // (a monster first: that's half of why it came)
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, o.player.getBoundingBox().inflate(12),
+				m -> m.isAlive() && m.getTarget() == o.player && hostile(m))) {
+			if (!helpGoing && hands.hasWeapon()) {                         // one after them: its fight
+				helpAgainst = m;
+				helpGoing = true;
+				helpUntil = now + 20 * 20;
+			}
+			break;
+		}
+		Map<String, Integer> has = rawItems();                             // what it picked up since it came: theirs
+		for (var e : has.entrySet()) {
+			int more = e.getValue() - escortHad.getOrDefault(e.getKey(), 0);
+			if (more > 0) escortGot.merge(e.getKey(), more, Integer::sum);
+		}
+		escortHad = has;
+		var lying = escortSpot == null ? java.util.List.<net.minecraft.world.entity.item.ItemEntity>of()
+				: player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(escortSpot).inflate(8, 4, 8), it -> it.isAlive());
+		boolean there = escortSpot != null && player.blockPosition().closerThan(escortSpot, 8);
+		if (!lying.isEmpty() && (there || player.blockPosition().closerThan(escortSpot, 40))) {   // their things on the ground: it picks them up
+			var it = lying.stream().min(java.util.Comparator.comparingDouble(x -> x.distanceToSqr(player))).get();
+			goals.instant = "picking up " + o.name + "'s things";
+			return stepTo(it.position());
+		}
+		if (!there && lying.isEmpty() && escortGot.isEmpty() && escortSpot != null && now < escortUntil) {   // not there yet: on the way, with them
+			goals.instant = "going with " + o.name + " to their things";
+			return walkTo(Vec3.atBottomCenterOf(escortSpot));
+		}
+		if (escortGot.isEmpty()) {                                         // nothing left there, nothing of theirs on it: done
+			escortFor = null;
+			if (o.helper == this) o.helper = null;
+			return null;
+		}
+		if (player.distanceTo(o.player) > 2.5) {                           // theirs on it: over to them
+			goals.instant = "bringing " + o.name + " their things";
+			return walkTo(o.player.position());
+		}
+		var inv = player.getInventory();
+		hands.face(o.player.position().add(0, 0.2, 0));
+		for (var e : new java.util.ArrayList<>(escortGot.entrySet())) {     // at their feet, all of it, the way players hand things over
+			int left = e.getValue();
+			for (int i = 0; i < 36 && left > 0; i++) {
+				ItemStack st = inv.getItem(i);
+				if (st.isEmpty() || !BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals(e.getKey())) continue;
+				ItemStack out = st.split(Math.min(left, st.getCount()));
+				left -= out.getCount();
+				if (!Compat.tossTo(player, out, o.player.getUUID())) inv.add(out);
+			}
+		}
+		journal("does", "handed " + o.name + " back their things: " + escortGot);
+		say(pick3("Here, " + o.name + ", all your stuff.", "There you go, everything I found.", "Got it all back for you."));
+		escortGot.clear();
+		escortHad = rawItems();
+		escortFor = null;
+		if (o.helper == this) o.helper = null;
+		acted = true;
+		return Action.IDLE;
 	}
 
 	/** When it last ran back for its things (no stopping for ore meanwhile), and till when it gets a pickaxe first. */
@@ -3492,6 +3690,39 @@ public final class Companion {
 	private static final java.util.regex.Pattern TEAM_JOIN = java.util.regex.Pattern.compile(
 			"\\b(join|be on|come to|switch to|be in)\\s+(my|our|the)?\\s*(team|side)\\b|\\bjoin\\s+(the\\s+)?(red|blue|green|yellow|purple|aqua)(\\s+team)?\\b|\\bjoin us\\b");
 
+	private static final java.util.regex.Pattern TEAM_MAKE = java.util.regex.Pattern.compile(
+			"\\b(make|create|start|form|found)\\s+(a|our|my|an)?\\s*(new\\s+)?team\\b(?:\\s+(?:called|named))?\\s*([a-z0-9 ]{0,24})");
+
+	/**
+	 * A player starts a team in chat ("let's make a team called Night Owls", "make a team with me"): it's made for them,
+	 * and this Xen decides whether it joins (trust, loyalty to the team it has; a loner never). Null if not asked.
+	 */
+	private String teamMade(ServerPlayer from, String words) {
+		var m = TEAM_MAKE.matcher(words.toLowerCase(java.util.Locale.ROOT));
+		if (!m.find()) return null;
+		String wanted = m.group(4) == null ? "" : m.group(4).replaceAll("\\b(with|me|us|and|you|please|now|together)\\b", " ").trim();
+		var team = mod.playerTeam(from, wanted);
+		if (team == null) team = server.getScoreboard().getPlayersTeam(from.getScoreboardName());   // (they have one: that one)
+		if (team == null) return "Couldn't make a team, sorry.";
+		String name = team.getDisplayName().getString();
+		journal("thinks", from.getName().getString() + " made the team " + name);
+		String join = joinOrNot(from, team);
+		return pick3("The " + name + "? ", "A team, the " + name + ". ", "Team " + name + ", huh. ") + join;
+	}
+
+	/** Join this player's team? Its call (trust in them, loyalty to its own team; a loner never): what it says. */
+	private String joinOrNot(ServerPlayer from, net.minecraft.world.scores.PlayerTeam team) {
+		if (personality.loner) return pick3("I don't do teams. I work alone.", "Thanks, but I'm better on my own.", "No teams for me. Nothing personal.");
+		var mine = server.getScoreboard().getPlayersTeam(name);
+		if (mine == team) return "I'm already on it!";
+		float trust = trust(from.getUUID());
+		boolean onOne = mine != null && (mod.ownTeam(mine.getName()) || mod.onPlayersTeam(this));
+		boolean agree = trust >= 0.45f && (!onOne || personality.loyalty < 0.7f || trust >= 0.8f);
+		if (!agree) return trust < 0.2f ? "Why would I join you? I don't even know you." : "No thanks, I'm staying with my team.";
+		mod.joinPlayersTeam(this, team);
+		return pick3("I'm in!", "Count me in, " + from.getName().getString() + ".", "Sure, I'll join.");
+	}
+
 	/** Asked to join a team: it decides, by how much it trusts whoever asks and how loyal it is to its own. Null if not asked. */
 	private String teamAsked(ServerPlayer from, String words) {
 		var m = TEAM_JOIN.matcher(words.toLowerCase(java.util.Locale.ROOT));
@@ -3499,7 +3730,8 @@ public final class Companion {
 		String color = m.group(5);
 		if (color == null) {
 			var t = server.getScoreboard().getPlayersTeam(from.getScoreboardName());
-			if (t == null || !t.getName().startsWith("xen_")) return "You don't have a team for me to join. Make one first (/team), or tell me a color.";
+			if (t == null) return "You don't have a team for me to join. Make one first (say \"let's make a team\"), or tell me a color.";
+			if (!t.getName().startsWith("xen_") || mod.ownTeam(t.getName())) return joinOrNot(from, t);   // (a team they made, in chat or with /team)
 			color = t.getName().substring(4);
 		}
 		if (personality.loner) return pick3("I don't do teams. I work alone.", "Thanks, but I'm better on my own.", "No teams for me. Nothing personal.");
@@ -4022,6 +4254,8 @@ public final class Companion {
 		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
 		lostAged = 0;
 		lostToolUntil = 0;
+		aloneUntil = 0;
+		helper = null;
 		lostAgedAt = player.level().getGameTime();
 		lostFoundAny = false;
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
@@ -4441,7 +4675,8 @@ public final class Companion {
 			say(train);
 			return null;
 		}
-		String teamAnswer = teamAsked(from, words);                    // "join my team", "join the red team": its call
+		String teamAnswer = teamMade(from, words);                     // "let's make a team called ...": made for them, and it decides whether to join
+		if (teamAnswer == null) teamAnswer = teamAsked(from, words);   // "join my team", "join the red team": its call
 		if (teamAnswer != null) {
 			say(teamAnswer);
 			return null;

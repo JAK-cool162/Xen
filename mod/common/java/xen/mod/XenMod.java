@@ -1521,6 +1521,51 @@ public class XenMod implements ModInitializer {
 	}
 
 	/**
+	 * A player starts a team by asking in chat ("let's make a team called Night Owls"), no commands or cheats needed: a
+	 * name they chose (or one made up) and a color; they're in. Xens join it if they want to (see Companion). The team,
+	 * or null if they're already on one they made.
+	 */
+	net.minecraft.world.scores.PlayerTeam playerTeam(ServerPlayer p, String wanted) {
+		var board = server.getScoreboard();
+		var had = board.getPlayersTeam(p.getScoreboardName());
+		if (had != null && ownTeam(had.getName())) return null;
+		String name = wanted != null && !wanted.isBlank() ? titled(wanted.trim()) : TEAM_A[random.nextInt(TEAM_A.length)] + " " + TEAM_B[random.nextInt(TEAM_B.length)];
+		if (name.length() > 24) name = name.substring(0, 24);
+		String id = "xen_" + name.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+		if (id.length() > 16) id = id.substring(0, 16);
+		if (java.util.Arrays.asList(TEAM_COLORS).contains(id.substring(4))) id = id + "s";   // (not mixed up with a color team)
+		var team = board.getPlayerTeam(id);
+		if (team == null) {
+			team = board.addPlayerTeam(id);
+			team.setDisplayName(Component.literal(name));
+			Compat.teamColor(team, TEAM_PAINT[random.nextInt(TEAM_PAINT.length)]);
+		}
+		team.setAllowFriendlyFire(config.friendlyFire);
+		board.addPlayerToTeam(p.getScoreboardName(), team);
+		LOG.info("{} made the team {}", p.getName().getString(), name);
+		return team;
+	}
+
+	/** A Xen joins a player's team, whoever made it (asked in chat, or /team): it stays on it (no team of its own, no color team). */
+	void joinPlayersTeam(Companion c, net.minecraft.world.scores.PlayerTeam team) {
+		server.getScoreboard().addPlayerToTeam(c.name, team);
+		roster.remember(c, team.getName());
+		c.journal("does", "joins the team " + team.getDisplayName().getString() + " (its own choice)");
+	}
+
+	/** Is the Xen on a team a person is on too (a player's team: it keeps to it)? */
+	boolean onPlayersTeam(Companion c) {
+		var team = server.getScoreboard().getPlayersTeam(c.name);
+		if (team == null) return false;
+		for (String member : team.getPlayers()) {
+			ServerPlayer p = server.getPlayerList().getPlayerByName(member);
+			boolean xen = companions.stream().anyMatch(o -> o.name.equals(member));
+			if (!xen && (p == null || !(p instanceof XenPlayer))) return true;   // (someone not a Xen: a person, online or not)
+		}
+		return false;
+	}
+
+	/**
 	 * A Xen starts a team of its own (a name it makes up, or the one asked for, and a color), like players on an SMP,
 	 * and asks the friends around it to join; each decides (trust, loyalty; loners never). A player who asked is in too.
 	 */
@@ -1574,7 +1619,7 @@ public class XenMod implements ModInitializer {
 	private void maybeFoundTeams() {
 		if (config.teams == 0 || companions.size() < 2) return;
 		for (Companion c : companions) {
-			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c))) continue;
+			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c)) || onPlayersTeam(c)) continue;
 			var p = c.personality;
 			int friends = 0, kin = 0;
 			for (Companion o : companions) {
@@ -1599,6 +1644,10 @@ public class XenMod implements ModInitializer {
 		if (c.arenaTeam == null && ownTeam(kept) && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a team it started or joined itself
 			board.addPlayerToTeam(c.name, board.getPlayerTeam(kept));
 			return;
+		}
+		if (c.arenaTeam == null && kept != null && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a player's team it joined (made with /team): it stays
+			board.addPlayerToTeam(c.name, board.getPlayerTeam(kept));
+			if (onPlayersTeam(c)) return;
 		}
 		if (c.arenaTeam != null) {                                     // the arena's red and blue teams
 			String name = "xen_" + c.arenaTeam;
