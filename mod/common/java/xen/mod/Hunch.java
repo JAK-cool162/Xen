@@ -452,9 +452,9 @@ final class Hunch {
 		String kind = what.equals("diamonds") ? "diamond" : what;
 		boolean straight = kind.equals("diamond") && c.crafter.pickTier() >= 3 && c.caves.nearest(160) == null   // (an iron pickaxe, diamonds wanted, no cave to look in: its sense of them leads it straight there, through the rock)
 				|| c.mod.config.luck >= 2;                                         // (knowing everything: every ore it needs, wherever it is, and further round)
-		if (c.mod.config.luck >= 2) {
-			flat = Math.max(flat, 128);
-			deep = Math.max(deep, 160);
+		if (c.mod.config.luck >= 2) {                                          // (diamonds: further round, they're rare; iron and coal there's some close by)
+			flat = Math.max(flat, kind.equals("diamond") ? 128 : 48);
+			deep = Math.max(deep, kind.equals("diamond") ? 160 : 72);
 		}
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())

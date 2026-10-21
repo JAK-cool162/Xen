@@ -750,8 +750,9 @@ final class Goals {
 		int food = p.getFoodData().getFoodLevel();
 		boolean danger = f[Mind.DANGER] > 0.3f, night = p.level().isDarkOutside() && p.level().canSeeSky(p.blockPosition().above());
 		if (o == Mind.REST) return 0;
+		if (night && o == planned && agendaGoal && o != Mind.SHELTER) return 1;   // (the goal waits for the morning, or till it's under the ground)
 		if (o == Mind.FLEE) return danger ? 4 : 1;
-		if (o == Mind.SHELTER) return danger ? 4 : night && c.crafter.pickTier() <= 1 ? 3 : 1;
+		if (o == Mind.SHELTER) return danger ? 4 : night ? 3 : 1;                   // (night out in the open: cover first; dug in, the goal again)
 		if (o == Mind.EAT) return food < 8 || p.getHealth() < 8 ? 4 : food < 14 ? 3 : 0;
 		if (o == Mind.CRAFT) return 3;
 		if (o == Mind.SMELT && c.items().getOrDefault("raw_iron", 0) >= 1) return 3;
