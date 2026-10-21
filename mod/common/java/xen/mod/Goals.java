@@ -1503,13 +1503,6 @@ final class Goals {
 			int next = afterStone(can, items, iron, meals, hunger, bed, holeOnly);
 			if (next >= 0) return next;
 		} else stoneGoal = -1;
-		if (homeFirst && tier >= 3 && home == null) {
-			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home first (its plan)");
-			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for its home (its plan)");
-		}
-		boolean farmed = c.places.get("farm") != null;
-		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
-		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "iron");   // (nothing else open)
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (tier >= 4 && !tabled && diamonds() >= 2 && f[Mind.DANGER] < 0.2f) {   // the diamond pickaxe and two diamonds: the enchanting table next (a book, four obsidian), the armor after
 			int step = planStep(can, "enchanting_table", 1, "the enchanting table");
@@ -1519,6 +1512,13 @@ final class Goals {
 			int step = planStep(can, "lapis_lazuli", 3, "lapis to enchant with");
 			if (step >= 0) return step;
 		}
+		if (homeFirst && tier >= 3 && home == null) {
+			if (can[Mind.HOUSE]) return why(Mind.HOUSE, "a home first (its plan)");
+			if (can[Mind.WOOD]) return why(Mind.WOOD, "wood for its home (its plan)");
+		}
+		boolean farmed = c.places.get("farm") != null;
+		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
+		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "iron");   // (nothing else open)
 		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
 		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) {
 			boolean diamonds = readyForDiamonds() || !(f[Mind.ARMOR] < 0.6f && iron < 24);   // (its own call: a chestplate, or a shield and an axe it can use, or nerve)

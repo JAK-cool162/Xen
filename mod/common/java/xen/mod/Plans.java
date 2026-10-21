@@ -294,7 +294,7 @@ final class Plans {
 		}
 		int option = switch (src.kind) {
 			case GATHER -> src.arg.equals("wood") ? Mind.WOOD : src.arg.equals("stone") || src.arg.equals("dirt") ? Mind.STONE : Mind.MINE;
-			case FETCH -> src.arg.endsWith("_ore") ? Mind.MINE : Mind.EXPLORE;
+			case FETCH -> src.arg.endsWith("_ore") || src.arg.equals("obsidian") ? Mind.MINE : Mind.EXPLORE;   // (obsidian's under the ground by the lava: a mining trip, day or night)
 			case HUNT -> Mind.FOOD;
 			default -> Mind.EXPLORE;
 		};

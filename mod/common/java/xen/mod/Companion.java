@@ -870,7 +870,18 @@ public final class Companion {
 		}
 		if (player.tickCount - airLast > 20) airSince = player.tickCount;      // (a new swim for air)
 		airLast = player.tickCount;
-		if (player.tickCount - airSince > 50 && player.getAirSupply() < player.getMaxAirSupply() / 3) {   // swimming for air a while and still under (bobbing between two blocks counts): it digs its way (over its head, or the way on), or towers up through the water
+		if (pillaring && player.tickCount - airPillarAt < 30) {                 // towering up already: it keeps at it (a block a jump), no changing its mind each tick
+			goals.instant = "towering up out of the water";
+			return Action.JUMP;
+		}
+		if (player.tickCount - airSince > 50 && player.getAirSupply() < player.getMaxAirSupply() / 3) {   // swimming for air a while and still under (bobbing between two blocks counts): it towers up through the water over it, or digs its way (over its head, or the way on)
+			if (level.getBlockState(head.above()).canBeReplaced() && player.tickCount - airPillarAt > 30 && hands.startPillar()) {
+				airPillarAt = player.tickCount;
+				pillaring = true;
+				goals.instant = "towering up out of the water";
+				journal("water", "out of air: towers up through the water");
+				return Action.JUMP;
+			}
 			for (BlockPos b : new BlockPos[] {head.above(), step != null ? step.above() : null, step}) {
 				if (b == null) continue;
 				var st = level.getBlockState(b);
@@ -882,13 +893,6 @@ public final class Companion {
 					acted = true;
 					return Action.MINE;
 				}
-			}
-			if (level.getBlockState(head.above()).canBeReplaced() && player.tickCount - airPillarAt > 30 && hands.startPillar()) {   // water over its head: a block under its feet each jump
-				airPillarAt = player.tickCount;
-				pillaring = true;
-				goals.instant = "towering up out of the water";
-				journal("water", "out of air: towers up through the water");
-				return Action.JUMP;
 			}
 		}
 		if (step == null) return airPocket(level, start);
