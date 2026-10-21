@@ -203,9 +203,16 @@ final class Walker {
 
 	/** Is the move it's on a way down it chose (a drop, a leap, digging or climbing down)? */
 	boolean meansToDrop() {
-		if (path == null || index >= path.size()) return false;
-		Kind k = path.get(index).kind();
-		return k == Kind.FALL || k == Kind.PARKOUR || k == Kind.DIG_DOWN || k == Kind.CLIMB_DOWN;
+		return plannedDrop() >= 0;
+	}
+
+	/** How far down the move it's on means to go (-1: it doesn't mean to drop at all). */
+	int plannedDrop() {
+		if (path == null || index >= path.size()) return -1;
+		Move m = path.get(index);
+		Kind k = m.kind();
+		if (k == Kind.FALL) return m.from().getY() - m.to().getY();
+		return k == Kind.PARKOUR || k == Kind.DIG_DOWN || k == Kind.CLIMB_DOWN ? 2 : -1;
 	}
 
 	void stop() {
@@ -488,12 +495,11 @@ final class Walker {
 		fear = c.emotions.fear;
 		float brave = c.personality.bravery;
 		float h = p.getHealth();
-		maxFall = (h >= 16 ? 5 : h >= 12 ? 4 : 3) + (brave > 0.7f && h >= 18 && fear < 0.4f ? 1 : 0);
+		maxFall = h >= 16 ? 4 : 3;                                             // (three blocks hurt nothing, four a half heart: a player doesn't jump off more than that on purpose)
 		maxGap = h < 10 || fear > 0.6f ? 0 : brave > 0.7f ? 3 : brave > 0.35f ? 2 : 1;
 		float risk = c.personality.risk();                                 // its beliefs: "fortune favors the bold", "look before you leap"
 		if (risk > 0.25f && h >= 14) {
 			maxGap = Math.min(3, maxGap + 1);
-			maxFall += 1;
 		} else if (risk < -0.25f) {
 			maxGap = Math.min(maxGap, 1);
 			maxFall = Math.min(maxFall, 3);
@@ -501,9 +507,9 @@ final class Walker {
 		blocks = throwaway();
 		worth = placeWorth();
 		dig = true;
-		if (h >= 16 && c.mimic.skill(Mimic.CLUTCH) >= 0.6f && c.hands.carries("water_bucket") && !c.nether.inNether()) maxFall = Math.max(maxFall, 12);   // (good at the water clutch, a bucket on it: a drop is the quick way down, like a player; not in the Nether, water boils away)
+		if (h >= 18 && c.mimic.skill(Mimic.CLUTCH) >= 0.85f && c.hands.carries("water_bucket") && !c.nether.inNether()) maxFall = Math.max(maxFall, 10);   // (good at the water clutch, a bucket on it: a drop is the quick way down, like a player; not in the Nether, water boils away)
 		if (now() < daringUntil) {                                           // (the solver said: be bolder)
-			maxFall += h >= 16 ? 4 : 2;
+			maxFall += h >= 16 ? 2 : 1;
 			maxGap = 3;
 		}
 		for (int g = 3; g >= 1; g--) {                                       // what it knows of its own jumps: a gap it keeps missing, it doesn't try; the longest it always makes, one more

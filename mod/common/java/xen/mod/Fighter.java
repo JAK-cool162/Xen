@@ -565,7 +565,7 @@ final class Fighter {
 					p.setSprinting(false);
 					return idle();
 				}
-				boolean edge = melee && dropBehind(foe);
+				boolean edge = !(foe instanceof Player) && dropBehind(foe);   // (any of them with a drop or lava behind it, a creeper too: a sprint hit and the fall does the rest, no fight)
 				int bunched = melee ? bunchedBy(foe) : 0;
 				if (bunched >= 1 && p.onGround() && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath().endsWith("_sword")) {
 					h.watching = foe;                                          // a sweep: on the ground, not sprinting, a full swing: every one bunched by it is hit and knocked back too (Sweeping Edge: hard)
@@ -578,7 +578,7 @@ final class Fighter {
 					}
 					return a;
 				}
-				if (melee && (around >= 2 || edge) && p.onGround() && p.getFoodData().getFoodLevel() > 6 && !foe.isBlocking()) {   // knockback: a sprint hit sends it flying (over the edge, into lava, or out of the crowd), then back while the sword recharges
+				if ((melee && around >= 2 || edge) && p.onGround() && p.getFoodData().getFoodLevel() > 6 && !foe.isBlocking()) {   // knockback: a sprint hit sends it flying (over the edge, into lava, or out of the crowd), then back while the sword recharges
 					h.watching = foe;
 					p.setSprinting(true);
 					Action a = hit(foe);
@@ -949,6 +949,8 @@ final class Fighter {
 			if (p.getHealth() < p.getMaxHealth() && c.hands.canHeal()) return Action.EAT;
 			return idle();
 		}
+		Action wall = wallOff(shooter, what);                                  // a wall of blocks between them, two high: no fight at all
+		if (wall != null) return wall;
 		if (now - coverAt > 20) {
 			coverAt = now;
 			var was = cover;
@@ -983,6 +985,43 @@ final class Fighter {
 		if (cover == null) return null;
 		c.goals.instant = "taking cover from the " + what;
 		return c.walkTo(Vec3.atBottomCenterOf(cover));
+	}
+
+	/** Blocks it put up against shooters lately, and when. */
+	private int wallBlocks, wallAt = -10000;
+
+	/**
+	 * A shooter on it: two blocks (feet and head) between them, on the side it's shooting from, the way a player walls
+	 * a skeleton off rather than fight it; more as it walks round (up to eight a fight). Null: no blocks, too close
+	 * (that one's a fight), or nowhere to put them.
+	 */
+	private Action wallOff(LivingEntity shooter, String what) {
+		XenPlayer p = c.player;
+		int now = p.tickCount;
+		if (now - wallAt > 600) wallBlocks = 0;
+		if (wallBlocks >= 8 || now - wallAt < 5 || shooter.distanceTo(p) < 3.5) return null;
+		var level = p.level();
+		Vec3 to = shooter.position().subtract(p.position());
+		net.minecraft.core.Direction d = Math.abs(to.x) > Math.abs(to.z) ? (to.x > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
+				: (to.z > 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH);
+		var feet = p.blockPosition();
+		var w = feet.relative(d);
+		for (var b : new net.minecraft.core.BlockPos[] {w, w.above()}) {
+			if (!level.getBlockState(b).canBeReplaced()) continue;
+			for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
+				var n = b.relative(side);
+				if (n.equals(feet) || n.equals(feet.above()) || level.getBlockState(n).getCollisionShape(level, n).isEmpty()) continue;
+				if (c.hands.placeItem(b, st -> Hands.PLACEABLE.contains(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath()), n, side.getOpposite(), -1)) {
+					wallAt = now;
+					if (wallBlocks++ == 0) c.journal("fight", "the " + what + " is shooting at it: walls itself off with blocks instead of fighting it");
+					c.goals.instant = "walling itself off from the " + what;
+					c.acted = true;
+					return Action.IDLE;
+				}
+			}
+			return null;                                                         // (nothing to put it against: cover then)
+		}
+		return null;
 	}
 
 	/** When it last shouted for help. */

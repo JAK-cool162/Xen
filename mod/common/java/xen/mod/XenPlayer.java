@@ -62,7 +62,8 @@ public class XenPlayer extends ServerPlayer {
 	 */
 	private void edgeGuard() {
 		int drop = 0;
-		if (companion != null && onGround() && !isInWater() && !isInLava() && !getAbilities().flying && !isPassenger() && !companion.walker.meansToDrop()) {
+		int planned = companion == null ? -1 : companion.walker.plannedDrop();
+		if (companion != null && onGround() && !isInWater() && !isInLava() && !getAbilities().flying && !isPassenger()) {
 			var v = getDeltaMovement();
 			double sx = v.x, sz = v.z;
 			if (sx * sx + sz * sz < 0.0009 && zza != 0) {                         // (only just setting off: the way it faces)
@@ -75,7 +76,7 @@ public class XenPlayer extends ServerPlayer {
 				drop = Math.max(drop, dropAt(net.minecraft.core.BlockPos.containing(getX() + sx / len * k, getY() + 0.01, getZ() + sz / len * k)));
 			}
 		}
-		boolean deep = drop >= 6 || drop >= 4 && drop - 3 >= getHealth() - 2;  // (more than a few hearts, or what it has left)
+		boolean deep = (drop >= 6 || drop >= 4 && drop - 3 >= getHealth() - 2) && drop > planned + 1;   // (more than a few hearts, or what it has left; a drop its way-finder planned passes, not a deeper one)
 		if (deep) {
 			setShiftKeyDown(true);
 			setJumping(false);
