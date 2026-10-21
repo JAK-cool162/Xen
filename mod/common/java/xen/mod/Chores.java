@@ -1580,6 +1580,10 @@ final class Chores {
 			doing = "mining the " + Blocks.NAMES[WorldSenses.category((ServerLevel) c.player.level(), bonus, c.player.level().getBlockState(bonus))] + " it spotted";
 			return reach(bonus);
 		}
+		if (c.mod.config.luck >= 2 && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {   // knowing everything: straight to the ore it knows of
+			Action a = knownOre(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : "coal", got, want);
+			if (a != null) return a;
+		}
 		int[] seek = mineCats();
 		List<BlockPos> ores = oreCandidates(seek, 12);                       // every ore it knows (showing, or seen): the cheapest to get to
 		if (ores.size() > 1 && c.mod.config.pathAssist) {
@@ -2672,6 +2676,49 @@ final class Chores {
 		stairDugAt = now;
 		BlockPos feet = c.player.blockPosition();
 		return digDown(feet.relative(stairDir, 2).below(2));
+	}
+
+	/** The ore of this kind it knows of (knowing everything), and when it last looked them up. */
+	private List<BlockPos> known = new ArrayList<>();
+	private long knownAt = -1000;
+	private String knownKind = "";
+
+	/**
+	 * Knowing everything, the way Baritone mines: every ore of the kind it's after that it knows of close by (a dozen,
+	 * looked up again every few seconds, the mined ones dropped) is one goal for its way-finder, standing by any of
+	 * them, digging the way there (the cheapest it can work out, through the rock as needed); one in arm's reach it
+	 * mines at once. No way to any: the nearest is let go, the rest stay. Null: none known.
+	 */
+	private Action knownOre(String kind, int got, int want) {
+		var p = c.player;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockPos feet = p.blockPosition();
+		if (!kind.equals(knownKind) || now() - knownAt > 100 || known.isEmpty()) {
+			knownKind = kind;
+			knownAt = now();
+			known = new ArrayList<>(c.hunch.oresNear(kind, feet, 128, 160, 12));
+		}
+		known.removeIf(o -> !level.getBlockState(o).getBlock().getDescriptionId().contains(kind) || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ())));
+		if (known.isEmpty()) return null;
+		for (BlockPos o : known) {
+			if (p.getEyePosition().distanceTo(Vec3.atCenterOf(o)) <= p.blockInteractionRange() - 0.3) {   // right here: mine it
+				target = o;
+				doing = String.format(java.util.Locale.ROOT, "mining the %s it knew was here (%d of %d)", kind, got, want);
+				Action a = reach(o);
+				if (a != null) return a;
+			}
+		}
+		List<Goal> goals = new ArrayList<>();
+		for (BlockPos o : known) goals.add(Goal.nextTo(o));
+		doing = String.format(java.util.Locale.ROOT, "digging to the %s it knows of (%d known, %d of %d so far)", kind, known.size(), got, want);
+		Action a = c.walkTo(Goal.anyOf(goals));
+		if (a == null) {                                                       // no way to any of them: the nearest let go, on with the rest
+			BlockPos near = known.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(feet))).get();
+			c.hunch.taken(near);
+			skip.add(Perception.Beliefs.key(near.getX(), near.getY(), near.getZ()));
+			known.remove(near);
+		}
+		return a;
 	}
 
 	/**
