@@ -707,8 +707,7 @@ final class Goals {
 
 	/**
 	 * The diamonds it still needs for diamond everything: a pickaxe (3), an enchanting table (2), a sword (2), and each
-	 * piece of armor it isn't wearing in diamond yet (chestplate 8, leggings 7, helmet 5, boots 4), the crafter keeping
-	 * 3 in hand for the next piece. What it has in diamond already doesn't count.
+	 * piece of armor it isn't wearing in diamond yet (chestplate 8, leggings 7, helmet 5, boots 4). What it has in diamond already doesn't count.
 	 */
 	int diamondsWanted() {
 		var p = c.player;
@@ -723,7 +722,7 @@ final class Goals {
 			String worn = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getItemBySlot(slots[i]).getItem()).getPath();
 			if (!worn.startsWith("diamond") && !worn.startsWith("netherite") && !c.crafter.has("diamond_" + pieces[i])) n += cost[i];
 		}
-		return n == 0 ? 0 : n + 3;
+		return n;
 	}
 
 	/** Its mining is for diamonds now (an iron pickaxe, fewer than it needs, and ready for them or on the run). */
@@ -1505,6 +1504,15 @@ final class Goals {
 		boolean farmed = c.places.get("farm") != null;
 		if ((plan == Strategy.SETTLER || who.believes("farming_way")) && home != null && !farmed && can[Mind.FARM]) return why(Mind.FARM, "a farm (its plan)");
 		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "iron");   // (nothing else open)
+		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
+		if (tier >= 4 && !tabled && diamonds() >= 2 && f[Mind.DANGER] < 0.2f) {   // the diamond pickaxe and two diamonds: the enchanting table next (a book, four obsidian), the armor after
+			int step = planStep(can, "enchanting_table", 1, "the enchanting table");
+			if (step >= 0) return step;
+		}
+		if (tier >= 4 && tabled && items.getOrDefault("lapis_lazuli", 0) < 3 && f[Mind.DANGER] < 0.2f) {   // lapis for it
+			int step = planStep(can, "lapis_lazuli", 3, "lapis to enchant with");
+			if (step >= 0) return step;
+		}
 		boolean rushing = plan == Strategy.SPEEDRUN && f[Mind.ARMOR] >= 0.6f && f[Mind.SWORD] >= 0.75f;   // (geared enough: on to the End)
 		if (tier >= 3 && !rushing && wantsOre(tier, iron) && can[Mind.MINE]) {
 			boolean diamonds = readyForDiamonds() || !(f[Mind.ARMOR] < 0.6f && iron < 24);   // (its own call: a chestplate, or a shield and an axe it can use, or nerve)
@@ -1857,6 +1865,24 @@ final class Goals {
 		}
 		return -1;
 	}
+
+	/**
+	 * The next step of its plan for this (worked out now if it had no plan, or only one of its own ideas; not again for
+	 * two minutes if that came to nothing), as the agenda's step: -1 if there's no step it can take now.
+	 */
+	private int planStep(boolean[] can, String item, int n, String why) {
+		if (!item.equals(c.plans.goal)) {
+			if (c.plans.goal != null && c.plans.askedBy != null || now() - planStepAt < 20 * 60 * 2) return -1;   // (someone asked it for something: that first)
+			planStepAt = now();
+			c.plans.setGoal(item, n, null);
+		}
+		Plans.Step s = c.plans.advice();
+		if (s == null || s.option < 0 || s.option >= can.length || !can[s.option]) return -1;
+		agendaGoal = true;
+		return why(s.option, why + ": " + s.how);
+	}
+
+	private long planStepAt = -1_000_000;
 
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
 		agendaGoal = option == Mind.MINE;

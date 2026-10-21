@@ -268,7 +268,9 @@ final class Gut {
 		boolean open = level.canSeeSky(p.blockPosition().above());
 		boolean mining = c.chores.busy() && c.chores.kind == Chores.Kind.MINE;      // (on its way down its mine: under the ground in a moment anyway)
 		boolean dusk = open && !mining;                                         // (night out in the open: a player is under the ground or under a roof by now)
-		boolean coming = danger >= 0.6f || near > 0 && (p.getHealth() <= 10 || bare) || near >= 3 || fresh && bare || dusk;
+		boolean deep = !open && p.getY() < 50;                                   // (under the ground already: night up there changes nothing down here)
+		boolean coming = deep ? near >= 3 || near > 0 && (p.getHealth() <= 10 || bare || danger >= 0.6f)
+				: danger >= 0.6f || near > 0 && (p.getHealth() <= 10 || bare) || near >= 3 || fresh && bare || dusk;
 		if (!coming || closest < (fresh && bare ? 2.2 : 3.5)) return null;          // (just respawned with nothing: a hole now, even with them close; running with nothing gets it killed again)
 		String plan = c.chores.digIn();
 		if (plan == null) return null;

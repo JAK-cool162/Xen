@@ -1982,6 +1982,13 @@ final class Chores {
 			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
 		}
 		if (best == null) best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
+		if (best == null && c.mod.config.luck >= 2 && java.util.Set.of("obsidian", "diamond", "iron", "coal", "lapis", "gold", "redstone", "copper", "emerald").contains(kind)) {   // knowing everything: the nearest it knows of, seen or not
+			for (BlockPos q : c.hunch.oresNear(kind, feet, 128, 160, 12)) {
+				if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)) continue;
+				best = q;
+				break;
+			}
+		}
 		return best;
 	}
 
@@ -2367,7 +2374,7 @@ final class Chores {
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
 			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
-			if (!wanted && c.guide.leading() && (JUNK.contains(k) || k.equals("cobblestone")) && count("cobblestone") + countItem("dirt") >= 8) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls)
+			if (!wanted && (c.guide.leading() || onOreWay()) && (JUNK.contains(k) || k.equals("cobblestone") || k.equals("cobbled_deepslate")) && count("cobblestone") + countItem("cobbled_deepslate") + countItem("dirt") >= 8) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;
@@ -2689,6 +2696,13 @@ final class Chores {
 	 * them, digging the way there (the cheapest it can work out, through the rock as needed); one in arm's reach it
 	 * mines at once. No way to any: the nearest is let go, the rest stay. Null: none known.
 	 */
+	private long oreWalkAt = -1000;
+
+	/** On its way to ore it knows of just now: what lies about (the stone it dug, its pillars) can stay where it is. */
+	boolean onOreWay() {
+		return busy() && now() - oreWalkAt < 100;
+	}
+
 	private Action knownOre(String kind, int got, int want) {
 		var p = c.player;
 		ServerLevel level = (ServerLevel) p.level();
@@ -2712,6 +2726,7 @@ final class Chores {
 		for (BlockPos o : known) goals.add(Goal.nextTo(o));
 		doing = String.format(java.util.Locale.ROOT, "digging to the %s it knows of (%d known, %d of %d so far)", kind, known.size(), got, want);
 		Action a = c.walkTo(Goal.anyOf(goals));
+		if (a != null) oreWalkAt = now();
 		if (a == null) {                                                       // no way to any of them: the nearest let go, on with the rest
 			BlockPos near = known.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(feet))).get();
 			c.hunch.taken(near);

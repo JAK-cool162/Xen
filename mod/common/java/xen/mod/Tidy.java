@@ -92,7 +92,7 @@ final class Tidy {
 
 	/** This moment's tidying (null: nothing to tidy, or not now). */
 	Action next() {
-		if (placed.isEmpty() || c.player == null || c.fightingNow() || c.fighter.perched() || c.pillaring || c.builder.busy()) return null;
+		if (placed.isEmpty() || c.player == null || c.fightingNow() || c.fighter.perched() || c.pillaring || c.builder.busy() || c.chores.onOreWay()) return null;
 		XenPlayer p = c.player;
 		ServerLevel level = (ServerLevel) p.level();
 		long now = level.getGameTime();

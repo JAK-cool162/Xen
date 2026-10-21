@@ -609,6 +609,8 @@ final class Walker {
 	private List<Move> search(ServerLevel level, BlockPos start, Vec3 to, Goal want) {
 		this.level = level;
 		this.eyes = start;
+		nightSky = want != null && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside()
+				&& c.chores.busy() && c.chores.kind == Chores.Kind.MINE;            // (on its way to ore at night: under the ground, not over it)
 		BlockPos target = BlockPos.containing(to);
 		Goal aim = want != null ? want : Goal.block(target);
 		partial = false;
@@ -1121,9 +1123,12 @@ final class Walker {
 	/** Till when it plans no way with its head under water (it ran short of air there). */
 	long noDiveUntil;
 
+	/** Mining at night: the open sky costs more (monsters spawn up there), so its way goes down into the rock early. */
+	private boolean nightSky;
+
 	/** Lava next to the way, a drop into the void: it keeps well clear. */
 	private double danger(BlockPos p) {
-		double d = 0;
+		double d = nightSky && level.canSeeSky(p.above()) ? 6 : 0;
 		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 40;
 		if ((cell(p.below()) & K_SICK) != 0) d += 30;                       // sulfur gas makes you sick
 		return d;

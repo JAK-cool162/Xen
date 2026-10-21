@@ -69,6 +69,25 @@ final class Crafter {
 		return best;
 	}
 
+	/** What's left of its best pickaxe (1 new, 0 gone). */
+	double pickWorn() {
+		double left = 0;
+		int best = -1;
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			var st = inv.getItem(i);
+			String n = st.isEmpty() ? "" : path(st);
+			if (!n.endsWith("_pickaxe")) continue;
+			int t = n.startsWith("netherite") || n.startsWith("diamond") ? 4 : n.startsWith("iron") ? 3 : n.startsWith("stone") ? 2 : 1;
+			double l = st.getMaxDamage() <= 0 ? 1 : 1 - (double) st.getDamageValue() / st.getMaxDamage();
+			if (t > best || t == best && l > left) {
+				best = t;
+				left = l;
+			}
+		}
+		return best < 0 ? 0 : left;
+	}
+
 	boolean has(String suffix) {
 		return count(n -> n.endsWith(suffix)) > 0;
 	}
@@ -118,14 +137,15 @@ final class Crafter {
 		int tier = pickTier();
 		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
 		if (tier < 4 && diamonds >= 3 && canMake(4)) return "diamond_pickaxe";       // the next tier, like any player (its iron one broke: straight to diamond)
-		if (tier == 2 && iron >= 3 && canMake(3)) return "iron_pickaxe";
+		if (tier < 3 && iron >= 3 && canMake(3)) return "iron_pickaxe";            // (its iron one broke, ingots in its bag: iron again, not wood)
+		if (tier == 3 && iron >= 3 && canMake(3) && count(n -> n.equals("iron_pickaxe")) == 1 && pickWorn() < 0.12) return "iron_pickaxe";   // (nearly worn out: a spare before it breaks down there)
 		if (tier >= 3 && iron >= 1 && !hasShield() && wood() >= 6) return "shield";   // (the first ingot after the pickaxe: a shield, before a sword or armor: it stops nearly everything early on)
 		long day = Compat.timeOfDay(c.player.level()) % 24000;
 		if (tier == 2 && iron >= 1 && !hasShield() && wood() >= 6 && (day >= 6000 && day < 13000 || iron >= 4)) return "shield";   // (its first iron, the night coming: a shield first, the pickaxe after)
 		if (tier >= 3 && iron >= 2 && !has("iron_sword") && !has("diamond_sword") && sticksOrWood(1, 0)) return "iron_sword";
 		boolean tableWanted = c.enchanter.table() == null && !has("enchanting_table");   // (two diamonds go into an enchanting table: kept for it)
 		if (tableWanted && tier >= 4 && diamonds >= 2 && count(n -> n.equals("book")) >= 1 && count(n -> n.equals("obsidian")) >= 4) return "enchanting_table";
-		if (tier >= 3 && diamonds >= 2 + (tableWanted && tier >= 4 ? 2 : 0) && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";
+		if (tier >= 4 && diamonds >= 2 + (tableWanted ? 2 : 0) && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";   // (the pickaxe first: obsidian and the deep ore need it)
 		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
 		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
 		String bed = bedFromWool();                                                  // the wool's in: a bed now (the night's coming)
@@ -164,10 +184,11 @@ final class Crafter {
 			boolean hasIt = has("_" + pieces[i]) || !c.player.getItemBySlot(slotOf(pieces[i])).isEmpty();
 			if (!hasIt && iron >= cost[i]) return "iron_" + pieces[i];
 		}
+		int keep = c.enchanter.table() == null && !has("enchanting_table") && pickTier() >= 4 ? 2 : 0;   // (two for the enchanting table, the rest into armor)
 		for (int i = 0; i < pieces.length; i++) {
 			var worn = c.player.getItemBySlot(slotOf(pieces[i]));
 			String n = worn.isEmpty() ? "" : path(worn);
-			if (!n.startsWith("diamond") && !n.startsWith("netherite") && !has("diamond_" + pieces[i]) && diamonds >= cost[i] + 3) return "diamond_" + pieces[i];
+			if (!n.startsWith("diamond") && !n.startsWith("netherite") && !has("diamond_" + pieces[i]) && diamonds >= cost[i] + keep) return "diamond_" + pieces[i];
 		}
 		if (!has("shield") && c.player.getOffhandItem().isEmpty() && iron >= 1 && wood() >= 6) return "shield";
 		if (!has("bucket") && iron >= 3 && pickTier() >= 2) return "bucket";
