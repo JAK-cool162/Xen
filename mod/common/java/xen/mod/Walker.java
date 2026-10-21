@@ -60,6 +60,8 @@ final class Walker {
 	private long badSince;
 	/** For /xen status and the journal: what it's doing on its way, and what went wrong last. */
 	String doing = "", lastProblem = "";
+	/** When it last turned a way down because it was too long under water. */
+	long diveRefusedAt = -1000;
 	private String journaled = "";
 
 	/** The blocks it walked on lately, and when: a new plan doesn't go back over them unless it has to (no back and forth). */
@@ -328,6 +330,7 @@ final class Walker {
 				c.journal("way", "won't go: a long way under water to " + BlockPos.containing(to).toShortString());
 				lastProblem = "it's too far under water";
 				badSince = now();
+				diveRefusedAt = now();
 				path = null;
 				release();
 				return null;

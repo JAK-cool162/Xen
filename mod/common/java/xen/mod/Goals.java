@@ -1890,12 +1890,19 @@ final class Goals {
 			c.plans.setGoal(item, n, null);
 		}
 		Plans.Step s = c.plans.advice();
-		if (s == null || s.option < 0 || s.option >= can.length || !can[s.option]) return -1;
+		if (s == null || s.option < 0 || s.option >= can.length) return -1;
+		if (!can[s.option]) {                                                  // (nothing of it about here, a cow for the leather: a look round for it, a few minutes at most)
+			if (planLookSince < 0 || now() - planLookSince > 20 * 60 * 8) planLookSince = now();
+			if (now() - planLookSince > 20 * 60 * 3 || !can[Mind.EXPLORE]) return -1;
+			agendaGoal = true;
+			return why(Mind.EXPLORE, why + ": looking about for what it needs (" + s.how + ")");
+		}
+		planLookSince = -1;
 		agendaGoal = true;
 		return why(s.option, why + ": " + s.how);
 	}
 
-	private long planStepAt = -1_000_000;
+	private long planStepAt = -1_000_000, planLookSince = -1;
 
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
 		agendaGoal = option == Mind.MINE;

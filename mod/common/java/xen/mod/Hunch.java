@@ -59,7 +59,8 @@ final class Hunch {
 		for (Block b : BuiltInRegistries.BLOCK) {
 			String n = BuiltInRegistries.BLOCK.getKey(b).getPath();
 			if (n.equals("ancient_debris")) ORES.put(b, "debris");
-			else if (n.equals("obsidian")) ORES.put(b, "obsidian");                 // (an enchanting table's four, a portal's ten: by lava down deep, in ruined portals)
+			else if (n.equals("obsidian")) ORES.put(b, "obsidian");
+			else if (n.equals("sugar_cane")) ORES.put(b, "sugar_cane");             // (paper for the enchanting table's book: by the water, up on the land)                 // (an enchanting table's four, a portal's ten: by lava down deep, in ruined portals)
 			else if (n.endsWith("_ore")) ORES.put(b, n.replace("deepslate_", "").replace("nether_", "").replace("_ore", ""));
 		}
 	}
@@ -463,10 +464,10 @@ final class Hunch {
 				if (!f.kind().equals(kind) || !straight && !f.open() && (!f.shallow() || c.mod.config.runner)) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of; a runner, only ore in the open)
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
-				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
+				if (dx > flat || dz > flat || dy > deep || dy < (kind.equals("sugar_cane") ? -120 : -6) || taken.contains(at.asLong())) continue;
 				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy);
 				if (kind.equals("diamond")) cost -= 6 * f.amount() + (at.getY() < 0 ? 24 : 0);   // (deepslate diamonds: the big clumps are down there, more for the same dig)
-				if (level.hasChunkAt(at) && level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ())
+				if (!kind.equals("sugar_cane") && level.hasChunkAt(at) && level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ())
 						- level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, at.getX(), at.getZ()) > 2) cost += 120;   // (under the sea: a swim and a flooded dig; the ones under land first)
 				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
 			}

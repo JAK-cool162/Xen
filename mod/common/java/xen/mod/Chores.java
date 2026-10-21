@@ -1982,7 +1982,7 @@ final class Chores {
 			if (open && (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
 		}
 		if (best == null) best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
-		if (best == null && c.mod.config.luck >= 2 && java.util.Set.of("obsidian", "diamond", "iron", "coal", "lapis", "gold", "redstone", "copper", "emerald").contains(kind)) {   // knowing everything: the nearest it knows of, seen or not
+		if (best == null && c.mod.config.luck >= 2 && java.util.Set.of("obsidian", "diamond", "iron", "coal", "lapis", "gold", "redstone", "copper", "emerald", "sugar_cane").contains(kind)) {   // knowing everything: the nearest it knows of, seen or not
 			for (BlockPos q : c.hunch.oresNear(kind, feet, 128, 160, 12)) {
 				if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)) continue;
 				best = q;
@@ -2730,7 +2730,7 @@ final class Chores {
 			oreBest = gap;
 			oreBestAt = now();
 			oreBestKind = kind;
-		} else if (now() - oreBestAt > 300) {                                // fifteen seconds and no closer (under water all the way, walled off): the next one
+		} else if (now() - oreBestAt > 300 || now() - c.walker.diveRefusedAt < 2 && now() - oreBestAt > 20) {   // fifteen seconds and no closer (walled off), or the way there is too long under water: the next one
 			c.journal("way", "lets the " + kind + " at " + nearest.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
 			c.hunch.taken(nearest);
 			skip.add(Perception.Beliefs.key(nearest.getX(), nearest.getY(), nearest.getZ()));
