@@ -116,10 +116,12 @@ public final class XenConfig {
 	 */
 	public int sight = 128;
 	/**
-	 * Luck: how often a Xen happens to wander the right way (0 to 1; 0: never lucky). It still has to see things for
-	 * itself, get there and live through it.
+	 * Knowing the world (any value above 0: on; 0: off; the key is still "luck" so older configs load): a Xen knows
+	 * where the caves, villages, herds, everyone, and ore showing to the air or one block behind a wall are, and goes
+	 * for them as if it just wandered that way. It still has to see things for itself when it gets there, mine them and
+	 * live through it; what it does about anyone (a fight, a talk) is its own call.
 	 */
-	public double luck = 0.5;
+	public double luck = 1.0;
 	/** XenTalk: Xen's own small talk model words its chats (from what's true for it; the classic voice when it has nothing that sticks to the facts). */
 	public boolean xentalk = true;
 	/**

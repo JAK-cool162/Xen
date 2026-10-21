@@ -1783,7 +1783,7 @@ final class Chores {
 					c.journal("thinks", "a big cave should be over there: quicker iron than strip mining, so it goes for that first");
 				}
 				doing = "going to have a look for the cave it has a feeling about";
-				Action a = c.walkTo(Vec3.atBottomCenterOf(felt));
+				Action a = c.wanderTo(Vec3.atBottomCenterOf(felt));
 				if (a != null) return a;
 			}
 			BlockPos best = null;
@@ -1808,8 +1808,8 @@ final class Chores {
 				return null;
 			}
 		}
-		doing = "looking round for a cave (the walls show the ore)";
-		Action a = c.walkTo(Vec3.atBottomCenterOf(caveLookTo));
+		doing = caveLookTo.equals(feltAt) ? "going to have a look for the cave it has a feeling about" : "looking round for a cave (the walls show the ore)";
+		Action a = caveLookTo.equals(feltAt) ? c.wanderTo(Vec3.atBottomCenterOf(caveLookTo)) : c.walkTo(Vec3.atBottomCenterOf(caveLookTo));
 		if (a == null) caveLookTo = null;
 		return a != null ? a : Action.TURN_LEFT;                         // (no way there: a look round from here, another way next)
 	}
@@ -2697,7 +2697,7 @@ final class Chores {
 
 	/** Knows of nothing to go for: look all around (its view is only 90 degrees), then walk somewhere new. */
 	private Action lookAround() {
-		if (kind == Kind.HUNT && (wander == null || now() > wanderUntil || c.player.position().distanceTo(wander) < 3)) {   // luck: it knows where the animals are, and goes straight there
+		if (kind == Kind.HUNT && (wander == null || now() > wanderUntil || c.player.position().distanceTo(wander) < 3)) {   // it knows where the animals are, and wanders that way
 			BlockPos herd = c.hunch.animalsAt(forWool);
 			if (herd != null && !herd.closerThan(c.player.blockPosition(), 6)) {
 				if (wander == null || wander.distanceTo(Vec3.atBottomCenterOf(herd)) > 8)
@@ -2712,7 +2712,7 @@ final class Chores {
 		if (kind == Kind.HUNT && herdHunch && wander != null && now() <= wanderUntil) {
 			doing = forWool ? "going to the sheep it has a feeling about" : "going to the animals it has a feeling about";
 			c.run(c.player.position().distanceTo(wander) > 20);
-			return c.walkTo(wander);
+			return c.wanderTo(wander);                                     // (the way a hungry player happens on them: roughly that way, not a beeline)
 		}
 		if (scans < 4) {
 			scans++;

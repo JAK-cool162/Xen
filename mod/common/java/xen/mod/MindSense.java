@@ -72,13 +72,17 @@ final class MindSense {
 		return false;
 	}
 
-	/** The closest thing that means it harm (a monster after it, one that attacks on sight), within 16 blocks. */
+	/**
+	 * The closest thing that means it harm (a monster after it, one that attacks on sight), within 16 blocks: in sight,
+	 * or (it knows where everyone is) round the corner within 12 at about its level.
+	 */
 	static LivingEntity threat(Companion c) {
 		LivingEntity best = null;
 		double bestD = 16;
+		boolean knows = c.knowsWorld();
 		for (LivingEntity e : c.player.level().getEntitiesOfClass(LivingEntity.class, c.player.getBoundingBox().inflate(16), c::hostile)) {
 			double d = c.player.distanceTo(e);
-			if (d < bestD && c.player.hasLineOfSight(e)) {
+			if (d < bestD && (c.player.hasLineOfSight(e) || knows && d < 12 && Math.abs(e.getY() - c.player.getY()) < 4)) {
 				bestD = d;
 				best = e;
 			}
@@ -89,7 +93,8 @@ final class MindSense {
 	/**
 	 * Someone it would fight: a player (or Xen) it distrusts or its tribe is fighting, and, if it's aggressive and
 	 * power drives it, a stranger it doesn't trust much (it picks fights); with its bloodlust up, a smaller grudge, or
-	 * someone it picked for no reason (see {@link Rage}). Within 24 blocks, in sight.
+	 * someone it picked for no reason (see {@link Rage}). Within 24 blocks, in sight; it knowing where everyone is, within
+	 * 48, seen or not (it goes and finds them; the fight is its own call).
 	 */
 	static ServerPlayer enemy(Companion c) {
 		Tribe t = c.tribe();
@@ -103,7 +108,8 @@ final class MindSense {
 		boolean duelist = smp && armed && c.player.getHealth() >= 16 && c.skills.get(Skills.FIGHT) >= 0.55f && c.personality.bravery > 0.45f;
 		var myTeam = c.server.getScoreboard().getPlayersTeam(c.name);
 		ServerPlayer best = null;
-		double bestD = 24;
+		boolean knows = c.knowsWorld();
+		double bestD = knows ? 48 : 24;
 		for (ServerPlayer p : c.server.getPlayerList().getPlayers()) {
 			if (p == c.player || p.level() != c.player.level() || !p.isAlive() || p.isCreative() || p.isSpectator()) continue;
 			if (p.getUUID().equals(c.owner) || c.diplomacy.atPeace(p)) continue;
@@ -123,7 +129,7 @@ final class MindSense {
 			}
 			if (!foe) continue;
 			double d = p.distanceTo(c.player);
-			if (d < bestD && c.player.hasLineOfSight(p)) {
+			if (d < bestD && (knows || c.player.hasLineOfSight(p))) {
 				bestD = d;
 				best = p;
 			}

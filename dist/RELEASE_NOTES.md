@@ -1074,7 +1074,7 @@ From 50 minutes of play with a friend and 15 Xens:
 
 ### 2.0.0-beta.4: corrected notes
 
-* The x-ray talked about in the recorded chat was the friend's, not the recording player's. The recordings are from
+* The cheating talked about in the recorded chat was the friend's, not the recording player's. The recordings are from
   the recording player's own view, so every ore in them was found fairly. Ex1 is the same as in beta.3.
 
 ### 2.0.0-beta.3: Xen Ex1 v2, trained on an hour more play

@@ -2968,6 +2968,40 @@ public final class Companion {
 		return walkTo(null, goal);
 	}
 
+	/** It knows the world without seeing it (the "knows the world" setting): where the caves, villages, ore by the air and everyone are. */
+	boolean knowsWorld() {
+		return mod.config.luck > 0 && !minion;
+	}
+
+	/**
+	 * To a place it knows of without having seen it, the way someone wandering would happen to get there: legs of 12
+	 * to 22 blocks, each bent up to about 34 degrees off the line, never a beeline; within 20 blocks, straight there.
+	 */
+	Action wanderTo(Vec3 goal) {
+		Vec3 here = player.position();
+		double d = Math.hypot(goal.x - here.x, goal.z - here.z);
+		if (d <= 20) {
+			wanderLeg = null;
+			return walkTo(goal);
+		}
+		long now = player.level().getGameTime();
+		if (wanderLeg == null || wanderGoal == null || wanderGoal.distanceTo(goal) > 4 || Math.hypot(wanderLeg.x - here.x, wanderLeg.z - here.z) < 3 || now > wanderLegUntil) {
+			double a = Math.atan2(goal.z - here.z, goal.x - here.x) + (random.nextDouble() - 0.5) * 1.2;
+			double len = Math.min(d - 8, 12 + random.nextDouble() * 10);
+			int x = (int) Math.floor(here.x + Math.cos(a) * len), z = (int) Math.floor(here.z + Math.sin(a) * len);
+			int y = player.level().isLoaded(new BlockPos(x, 0, z))
+					? player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) : (int) here.y;
+			if (Math.abs(y - here.y) > 24) y = (int) here.y;                  // (under the ground, or up a cliff: the level it's on)
+			wanderLeg = new Vec3(x + 0.5, y, z + 0.5);
+			wanderGoal = goal;
+			wanderLegUntil = now + 20 * 20;
+		}
+		return walkTo(wanderLeg);
+	}
+
+	private Vec3 wanderLeg, wanderGoal;
+	private long wanderLegUntil;
+
 	/** Walk toward a goal (next to an ore, down to a height, the nearest of several...): see {@link Goal}. */
 	Action walkTo(Goal g) {
 		return walkTo(g, g.center());

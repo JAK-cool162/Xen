@@ -215,8 +215,8 @@ public class XenSettingsScreen extends Screen {
 			case 8 -> {
 				choice("Sight", "sight", List.of(128, 64, 96, 160, 192, 256), n -> n + " blocks (" + n / 16 + " chunks)",
 						"How far Xens see: their render distance (8 chunks is how most players play): what they notice and remember (trees, water, lava, houses) and the picture of their view (half of it while no player is near). Never past what the server has loaded (its view distance). Further costs the server more.");
-				choice("Luck", "luck", List.of(0.5, 0.0, 0.25, 0.75, 1.0), n -> n == 0 ? "never lucky" : Math.round(n * 100) + "%",
-						"How often a Xen happens to wander the right way. It still has to see things for itself, get there and live through it.");
+				choice("Knows the world", "luck", List.of(1.0, 0.0), n -> n == 0 ? "off (only what it sees)" : "on (a sense for where things are)",
+						"On: a Xen knows where caves, villages, herds, everyone, and ore showing to the air or one block behind a wall are, and wanders that way as if by chance (never a beeline). Ore deep in solid rock it doesn't know of. It still has to see things when it gets there; fights and everything else are its own call. Off: only what it sees.");
 				onOff("Xen Ex1", "ex1", "The first Xen brain trained on recorded play: how a player sprints, sprint-jumps and looks while walking, and a feeling of danger (will I get hurt in the next two seconds?) that keeps learning from every Xen's own hurts.");
 				choice("Says on its own", "talkAmount", List.of("normal", "quiet", "chatty"), s -> s.equals("normal") ? "normal (45 s apart)" : s.equals("quiet") ? "quiet (2 min apart)" : "chatty (20 s apart)",
 						"How often a Xen says something nobody asked for (answers always come). It doesn't narrate: in a conversation it talks, otherwise at most one line this often, and notes on signs when nobody's around.");

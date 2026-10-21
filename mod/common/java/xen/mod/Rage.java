@@ -88,7 +88,8 @@ final class Rage {
 
 	private void pick(long now) {
 		ServerPlayer best = null;
-		double bestD = 24;
+		boolean knows = c.knowsWorld();                                              // (it knows where everyone is: 48 blocks, seen or not)
+		double bestD = knows ? 48 : 24;
 		Tribe t = c.tribe();
 		for (ServerPlayer p : c.server.getPlayerList().getPlayers()) {
 			if (p == c.player || p.level() != c.player.level() || !p.isAlive() || p.isCreative() || p.isSpectator()) continue;
@@ -96,7 +97,7 @@ final class Rage {
 			if (p.getUUID().equals(c.owner) || trust >= 0.6f || trust < 0f || c.diplomacy.atPeace(p) || c.skills.sparringWith(p.getUUID())) continue;   // (one it holds something against: that's with a reason)
 			if (t != null && p instanceof XenPlayer x && x.companion != null && t.members.contains(x.companion) && bloodlust < 85) continue;   // (its own village: only at its worst)
 			double d = p.distanceTo(c.player);
-			if (d < bestD && c.player.hasLineOfSight(p)) {
+			if (d < bestD && (knows || c.player.hasLineOfSight(p))) {
 				bestD = d;
 				best = p;
 			}

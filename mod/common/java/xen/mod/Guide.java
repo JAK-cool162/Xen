@@ -9,13 +9,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Xen's guide: another soul beside it, the way Baritone's x-ray mining works, but it only knows ore that shows to
- * the air somewhere (a cave wall, a ravine, a tunnel): ore inside solid rock it acts as if nobody could know of, like
- * a player. It knows where the nearest such ore really is (luck: the server knows the world) and works out a way there, a staircase
- * down toward it and then straight in, dry all the way (no water, no lava on it or by it). It only offers: the Xen
- * decides whether to follow it, by how much it trusts it, which it learns (following it paid off, or didn't) and its
- * nature gives it to start with (a curious one trusts it more, a proud one would rather find its own way).
- * <p>Its mind isn't told any of this: it only knows that it had a feeling and followed it, or didn't.
+ * Xen's guide: a miner's eye for where the ore is. It knows ore that a player could have spotted: ore
+ * showing to the air (a cave wall, a ravine, a tunnel) or one block behind it; ore deep in solid rock it acts as if
+ * nobody could know of. It knows where the nearest such ore really is (the server knows the world) and works out a
+ * way there, a staircase down toward it and then straight in, dry all the way (no water, no lava on it or by it), and
+ * the Xen goes, every time (no dice), as if it had just noticed it.
+ * <p>Its mind isn't told any of this: it only knows that it had a feeling and followed it.
  */
 final class Guide {
 	private final Companion c;
@@ -63,13 +62,6 @@ final class Guide {
 				continue;
 			}
 			offered++;
-			if (c.random().nextFloat() >= faith()) {
-				ignored++;
-				c.hunch.taken(ore);
-				c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d, but goes its own way (trusts its feelings %.0f%%)",
-						what, ore.getX(), ore.getY(), ore.getZ(), 100 * faith()));
-				return false;
-			}
 			target = ore;
 			kind = what;
 			closest = Double.MAX_VALUE;
@@ -78,26 +70,19 @@ final class Guide {
 			c.hunch.steered = what + " (its guide)";
 			c.hunch.steeredAt = now();
 			c.hunch.times++;
-			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and follows it: %d blocks of digging (trusts its feelings %.0f%%)",
-					what, ore.getX(), ore.getY(), ore.getZ(), way.size(), 100 * faith()));
+			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and follows it: %d blocks of digging",
+					what, ore.getX(), ore.getY(), ore.getZ(), way.size()));
 			XenMod.LOG.info("{} follows its guide to {} at {} ({} steps)", c.name, what, ore.toShortString(), way.size());
 			return true;
 		}
 		return false;
 	}
 
-	/** A feeling there's a cave over there (a big one: quicker iron than any mine): does it follow it? Its trust decides, as with ore. */
+	/** A feeling there's a cave over there (a big one: quicker iron than any mine): it goes and has a look, every time. */
 	boolean follows(String what, BlockPos at) {
 		offered++;
-		if (c.random().nextFloat() >= faith()) {
-			ignored++;
-			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d, but goes its own way (trusts its feelings %.0f%%)",
-					what, at.getX(), at.getY(), at.getZ(), 100 * faith()));
-			return false;
-		}
 		followed++;
-		c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and goes to look (trusts its feelings %.0f%%)",
-				what, at.getX(), at.getY(), at.getZ(), 100 * faith()));
+		c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and wanders that way to look", what, at.getX(), at.getY(), at.getZ()));
 		return true;
 	}
 

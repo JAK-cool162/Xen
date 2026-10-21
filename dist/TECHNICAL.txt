@@ -13,6 +13,16 @@ Water: Walker SWIM moves swim for real (sprint-swim facing the next spot, up for
 no path with 12+ moves under water, 24+ swim moves: its boat (Rider.sail). Respawns on dry land (Companion.dryNear).
 Blocks to dig are never ones with water on top (Chores.findVisible: a river bed, the sea floor).
 
+Knowing the world (the "luck" setting, now on or off, on by default): no more dice. A Xen knows where the caves,
+villages, herds and everyone are, and ore showing to the air or one block behind a wall (Hunch.Find.shallow:
+Hunch.oneBlockIn); ore deeper in solid rock it doesn't know of. It goes for them as if it wandered that way:
+Hunch.exploreWay and animalWay headings keep their wobble, Companion.wanderTo walks far targets in legs of 12 to 22
+blocks bent up to about 34 degrees off the line (straight within 20), its tunnels turn toward ore at their depth, and
+the guide (Guide.offer, Guide.follows) always follows, no trust roll. Monsters round a corner within 12 blocks at
+about its level count as a threat (MindSense.threat); players it's against, or picked in a rage, within 48 blocks,
+seen or not (MindSense.enemy, Rage.pick). The fight, a greeting, anything it does about them is still its own call
+and still needs sight to land (a hit, an arrow).
+
 Caves and ore: Hunch.caveNear weighs a cave by its size within 24 blocks and the iron that shows; the guide leads only to
 ore with a face showing. Chores.readyForCave: a weapon, health 12+, and below y 0 food and armor or a shield; not ready:
 a strip mine at y -58/-59, branches every 3. Ore on the way (Chores.oreInReach) takes lapis too (stone pickaxe).
@@ -1627,7 +1637,7 @@ Gameplay logs (GameplayLog.java; setting gameplayLog: off, xens, players, both; 
 WHAT'S NEW IN 2.0.0-beta.4
 ==========================
 
-- The notes on the recordings are corrected: the x-ray in the chat was the other player's, not the recording
+- The notes on the recordings are corrected: the cheating the chat mentions was the other player's, not the recording
   player's (see beta.3 below). Ex1 is the same as in beta.3.
 
 
@@ -1657,7 +1667,7 @@ From the recordings:
   hitting back took a median 1.2 s (n 7).
 - Not copied: against players, the player mostly spam-clicked (charge at a hit: median .08, 5% at .9 or more). Xens keep
   charged hits; their fight genes decide.
-- No x-ray in the data: the x-ray the chat talks about was the other player's. The recordings are from the recording
+- No cheats in the data: the one the chat talks about was the other player's. The recordings are from the recording
   player's own view, so every ore in them was found fairly.
 
 

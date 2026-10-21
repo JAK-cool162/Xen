@@ -19,12 +19,12 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * Luck: the way a good player always seems to wander the right way. The server knows the world (the ore in the rock,
- * the caves under the hills, the villages over the next rise, where the other Xens are); a Xen never gets told any of
- * it. Now and then, when it picks which way to explore or which way to run its tunnels, its feet go the lucky way:
- * toward what it needs, roughly, never straight to it. It still has to see the thing with its own eyes, get there,
- * mine it and live through it; it's never given a place or a number, its mind never hears of it, and it can walk
- * right past.
+ * What a Xen knows of the world without seeing it, its sense for where things are: the server knows the world (the caves under the
+ * hills, the villages over the next rise, the ore in a cave wall, where the herds and the other Xens are), and a Xen
+ * goes for what it needs as if it just happened to wander that way: roughly that way, a bend now and then, never a
+ * beeline. Ore only where a player could have spotted it: showing to the air, or one block behind a wall (a cave's,
+ * a tunnel's); ore deep in solid rock it acts as if nobody could know of. It still has to see the thing with its own
+ * eyes when it gets there, mine it and live through it; its mind is never given a place or a number.
  * <p>And Xens on good terms pass things on between them, unseen and unsaid: one that finds a village or a cave, its
  * friends happen to wander that way; one mining a cave, the others happen to find their own; two friends out
  * exploring now and then happen to run into each other. Every Xen still decides for itself what it does.
@@ -33,7 +33,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
  */
 final class Hunch {
 	/** One thing in the world: ore (a clump of it in an 8-block cell; out in the open air or not), a cave, a structure. */
-	record Find(String kind, BlockPos at, int amount, boolean open) {}
+	record Find(String kind, BlockPos at, int amount, boolean open, boolean shallow) {}
 
 	private record Chunk(long at, List<Find> finds) {}
 
@@ -129,17 +129,18 @@ final class Hunch {
 						String kind = ores ? ORES.get(st.getBlock()) : null;
 						if (kind == null) continue;
 						long oc = cell ^ ((long) kind.hashCode() << 44);
-						int[] o = ore.computeIfAbsent(oc, q -> new int[] {0, 0, fx, wy, fz});
+						int[] o = ore.computeIfAbsent(oc, q -> new int[] {0, 0, fx, wy, fz, 0});
 						oreKind.put(oc, kind);
 						o[0]++;
 						if (o[1] == 0 && openAir(chunk, x0 + x, wy, z0 + z)) o[1] = 1;
+						else if (o[1] == 0 && o[5] == 0 && oneBlockIn(chunk, x0 + x, wy, z0 + z)) o[5] = 1;
 					}
 		}
 		for (var e : ore.entrySet()) {
 			int[] o = e.getValue();
-			out.add(new Find(oreKind.get(e.getKey()), new BlockPos(x0 + o[2], o[3], z0 + o[4]), o[0], o[1] == 1));
+			out.add(new Find(oreKind.get(e.getKey()), new BlockPos(x0 + o[2], o[3], z0 + o[4]), o[0], o[1] == 1, o[5] == 1));
 		}
-		for (int[] a : air.values()) if (a[0] >= 24) out.add(new Find("cave", new BlockPos(x0 + a[1], a[2], z0 + a[3]), a[0] * 8, true));
+		for (int[] a : air.values()) if (a[0] >= 24) out.add(new Find("cave", new BlockPos(x0 + a[1], a[2], z0 + a[3]), a[0] * 8, true, false));
 		try {
 			var structures = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
 			for (var e : chunk.getAllStarts().entrySet()) {
@@ -148,7 +149,7 @@ final class Hunch {
 				if (id == null) continue;
 				String n = id.getPath();
 				String kind = n.startsWith("village") ? "village" : n;
-				out.add(new Find(kind, e.getValue().getBoundingBox().getCenter(), 1, true));
+				out.add(new Find(kind, e.getValue().getBoundingBox().getCenter(), 1, true, false));
 			}
 		} catch (RuntimeException ignored) {                                     // (no structures to read: ore and caves are enough)
 		}
@@ -165,7 +166,22 @@ final class Hunch {
 		return false;
 	}
 
-	// ------------------------------------------------------------------------- one Xen's luck
+	/** One block of rock between it and the air (a cave wall, a tunnel's): as close as a player could have spotted it. */
+	private static boolean oneBlockIn(LevelChunk chunk, int x, int y, int z) {
+		BlockPos at = new BlockPos(x, y, z);
+		for (var d : net.minecraft.core.Direction.values()) {
+			BlockPos q = at.relative(d);
+			if ((q.getX() >> 4) != (x >> 4) || (q.getZ() >> 4) != (z >> 4) || chunk.getBlockState(q).isAir()) continue;
+			for (var e : net.minecraft.core.Direction.values()) {
+				BlockPos r = q.relative(e);
+				if (r.equals(at) || (r.getX() >> 4) != (x >> 4) || (r.getZ() >> 4) != (z >> 4)) continue;
+				if (chunk.getBlockState(r).isAir()) return true;
+			}
+		}
+		return false;
+	}
+
+	// ------------------------------------------------------------------------- one Xen's knowing
 	private final Companion c;
 	/** What luck steered it toward last, and when (for its gameplay log and its mind). */
 	String steered;
@@ -190,8 +206,9 @@ final class Hunch {
 		return steeredAt >= t && steeredAt >= 0;
 	}
 
+	/** It knows the world (the setting's on; not a minion). No dice: it always knows, and acts as if it wandered there. */
 	private boolean lucky() {
-		return c.mod.config.luck > 0 && !c.minion && c.random().nextFloat() < (float) c.mod.config.luck;
+		return c.mod.config.luck > 0 && !c.minion;
 	}
 
 	/** What it needs now and how much: what its feet would take it toward. */
@@ -433,7 +450,7 @@ final class Hunch {
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
-				if (!f.kind().equals(kind) || !f.open()) continue;               // (only ore showing to the air, a cave wall or a tunnel's: ore in solid rock it acts as if it can't know of)
+				if (!f.kind().equals(kind) || !f.open() && !f.shallow()) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of)
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
