@@ -1589,6 +1589,8 @@ final class Chores {
 					return reach(o);                                           // (one right here: that one)
 				}
 			}
+		}
+		if (ores.size() > 1 && c.mod.config.pathAssist && !c.guide.leading()) {   // (its guide leading it to ore it needs more: that way, not round the ones it happens to have seen)
 			// The same set for a while (a new set is a new goal: the walker would plan afresh every step), less the ones gone.
 			ServerLevel level = (ServerLevel) c.player.level();
 			if (oreWay != null) oreWay.removeIf(o -> !java.util.Arrays.stream(seek).anyMatch(k -> k == WorldSenses.category(level, o, level.getBlockState(o)))
