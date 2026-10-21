@@ -1325,6 +1325,57 @@ final class Chores {
 	}
 
 	/** Water on or over the first steps of a staircase down that way? */
+	/** When it may next put a block in water or lava, how many it put lately and since when, and what it last blocked. */
+	private long plugNext, plugSince;
+	private int plugs;
+	private String plugged = "water";
+
+	/**
+	 * Water or lava in or right by its tunnel or staircase, under the ground: a cobblestone (or dirt...) in it, a source
+	 * first, lava before water, the way a player blocks it off and mines on. Not a sea: more than a dozen blocks a minute
+	 * and it gives up on that (it digs somewhere drier). True if it put one this time.
+	 */
+	private boolean plugFluid() {
+		var p = c.player;
+		long now = now();
+		if (now < plugNext || p.isInLava()) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockPos feet = p.blockPosition();
+		if (level.canSeeSky(feet.above()) && mineBase == null && tunnelIn == null) return false;   // (out in the open: a river is no flood)
+		if (now - plugSince > 1200) {
+			plugSince = now;
+			plugs = 0;
+		}
+		if (plugs >= 12) return false;
+		BlockPos best = null;
+		int bestScore = Integer.MAX_VALUE;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -2, -3), feet.offset(3, 3, 3))) {
+			var fl = level.getFluidState(q);
+			if (fl.isEmpty()) continue;
+			boolean lava = fl.is(net.minecraft.tags.FluidTags.LAVA);
+			int score = (int) q.distSqr(feet) + (fl.isSource() ? 0 : 40) + (lava ? 0 : 20);
+			if (score < bestScore && p.getEyePosition().distanceTo(Vec3.atCenterOf(q)) <= p.blockInteractionRange() - 0.3) {
+				bestScore = score;
+				best = q.immutable();
+			}
+		}
+		if (best == null) return false;
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			BlockPos n = best.relative(d);
+			if (n.equals(feet) || n.equals(feet.above()) || !level.getFluidState(n).isEmpty() || level.getBlockState(n).getCollisionShape(level, n).isEmpty()) continue;
+			boolean lava = level.getFluidState(best).is(net.minecraft.tags.FluidTags.LAVA);
+			if (c.hands.placeItem(best, st -> Hands.PLACEABLE.contains(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath()), n, d.getOpposite(), -1)) {
+				plugNext = now + 6;
+				plugs++;
+				plugged = lava ? "lava" : "water";
+				if (plugs == 1) c.journal("does", "blocks the " + plugged + " off at " + best.toShortString() + " and mines on");
+				return true;
+			}
+		}
+		plugNext = now + 10;
+		return false;
+	}
+
 	private boolean wet(BlockPos from, net.minecraft.core.Direction d, int down) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		for (int i = 0; i <= Math.min(Math.max(down, 4), 20); i++) {
@@ -1622,6 +1673,10 @@ final class Chores {
 			if (feet.getY() <= mineY + 6) mineBase = feet;
 			legStarted = now();
 			return null;
+		}
+		if (plugFluid()) {                                                   // water or lava coming in: a block in it, as a player does, and on
+			doing = "blocking the " + plugged + " off";
+			return Action.IDLE;
 		}
 		net.minecraft.core.Direction right = mineDir.getClockWise();
 		BlockPos goal;
