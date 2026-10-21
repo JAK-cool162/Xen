@@ -697,7 +697,8 @@ final class Goals {
 		float fight = c.skills.get(Skills.FIGHT);
 		boolean shieldAndAxe = shield && c.crafter.has("_axe") && fight >= 0.5f;
 		boolean confident = shield && c.personality.bravery > 0.7f, ego = c.personality.sin(Sins.PRIDE) > 0.7f;
-		return armored || shieldAndAxe || confident || ego || c.items().getOrDefault("iron_ingot", 0) + c.items().getOrDefault("raw_iron", 0) >= 24;
+		boolean caveReady = shield && c.crafter.has("_sword");                  // (enough to live through a cave: iron pickaxe, a shield and a sword; then straight for diamonds, the armor after)
+		return armored || caveReady || shieldAndAxe || confident || ego || c.items().getOrDefault("iron_ingot", 0) + c.items().getOrDefault("raw_iron", 0) >= 24;
 	}
 
 	private int diamonds() {

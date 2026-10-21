@@ -464,6 +464,7 @@ final class Hunch {
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
 				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy);
+				if (kind.equals("diamond")) cost -= 6 * f.amount() + (at.getY() < 0 ? 24 : 0);   // (deepslate diamonds: the big clumps are down there, more for the same dig)
 				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
 			}
 		found.sort((a, b) -> Double.compare(a[0], b[0]));
