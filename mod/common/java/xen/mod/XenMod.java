@@ -799,6 +799,12 @@ public class XenMod implements ModInitializer {
 	}
 
 	/** Something said out loud by a player or a Xen: the Xens close by overhear it (rumors, plots: spies). */
+	/** The Xen this player is (null: a real player). */
+	Companion companionOf(ServerPlayer p) {
+		for (Companion o : companions) if (o.player() == p) return o;
+		return null;
+	}
+
 	void overheardBy(ServerPlayer speaker, String name, String text) {
 		if (speaker == null) return;
 		for (Companion o : companions) {
@@ -884,6 +890,14 @@ public class XenMod implements ModInitializer {
 		if (sender instanceof XenPlayer || !config.chat) return;
 		for (Companion c : companions) if (c.player() != null) c.director.heard(sender, text);   // (right after a show: a reaction)
 		for (Companion c : companions) if (c.player() != null && c.gut.answer(sender, text)) return;   // (the answer to what a Xen asked them)
+		for (Companion c : companions) {                                       // "lol ur geeked" to one that's embarrassed: it snaps
+			if (c.player() == null || !hears(c, sender)) continue;
+			String snap = c.jokes.geeked(sender, text);
+			if (snap != null) {
+				if (!snap.isEmpty()) c.say(snap);
+				return;
+			}
+		}
 		overheardBy(sender, sender.getName().getString(), text);             // who's listening close by?
 		if (config.journal && journal != null) journal.add(sender.getName().getString(), "says", text);
 		Companion named = null;                                               // the one named first ("Bex, help Aria build": Bex)

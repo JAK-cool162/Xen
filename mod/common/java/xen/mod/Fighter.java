@@ -382,6 +382,13 @@ final class Fighter {
 						p.getHealth(), kind(foe).replace('_', ' '), expected(foe), now < gutUntil ? ", its gut says get out" : ""), 60);
 			}
 		}
+		if (!rush && !outmatched && !(foe instanceof Player) && !c.inArena && kind(foe).equals("piglin_brute") && c.knowledge.knows("piglin_brute") && !c.bruteReady()) {
+			outmatched = true;                                                 // a brute, short of diamond: no fight to take, away (and out of reach of that axe)
+			if (now - bruteSaidAt > 600) {
+				bruteSaidAt = now;
+				c.journal("fight", "a piglin brute: its axe takes half my hearts and I'm not in diamond, so away");
+			}
+		}
 		if (outmatched && !escaping) {
 			escaping = true;
 			escapedAt = now;
@@ -730,8 +737,8 @@ final class Fighter {
 	/** When it last noted why the axe (once a minute at most). */
 	private long axeSaidAt = -10000;
 
-	/** When it last noted rushing a skeleton. */
-	private long rushSaidAt = -10000;
+	/** When it last noted rushing a skeleton; getting away from a piglin brute. */
+	private long rushSaidAt = -10000, bruteSaidAt = -10000;
 
 	private boolean archer(LivingEntity e) {
 		String k = kind(e);

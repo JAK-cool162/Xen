@@ -841,6 +841,7 @@ public final class Companion {
 		String n = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
 		return switch (n) {
 			case "piglin", "spider", "cave_spider" -> false;           // calm until provoked (or in the dark: then they target it)
+			case "piglin_brute" -> !knowledge.knows("piglin_brute") || bruteReady();   // (knowing what one is: not one it picks a fight with, short of diamond)
 			case "ghast" -> hands.hasBow() && hands.arrows() > 0;          // (up in the air: arrows, or its fireballs punched back; no chasing it)
 			case "creaking" -> !knowledge.knows("creaking");            // it can't be hurt (only its heart can): once it knows, it keeps away
 			default -> true;
@@ -2614,6 +2615,7 @@ public final class Companion {
 			"emerald", "iron_ingot", "gold_ingot", "raw_iron", "raw_gold", "totem_of_undying", "golden_apple", "enchanted_golden_apple", "string",
 			"feather", "gunpowder", "flint", "heavy_core", "breeze_rod", "wind_charge", "obsidian", "name_tag", "saddle", "book", "enchanted_book",
 			"music_disc_bounce", "bread", "cooked_beef", "cooked_porkchop", "nether_wart", "gold_nugget", "iron_nugget", "coal", "wheat", "wheat_seeds",
+			"potion", "splash_potion", "crying_obsidian",
 			"carrot", "potato", "beetroot", "beetroot_seeds", "bone_meal", "elytra", "firework_rocket", "lapis_lazuli", "sugar_cane", "leather",
 			"paper", "experience_bottle", "shulker_shell", "netherite_scrap", "ancient_debris",
 			// (what animals and monsters drop: food for later, bone meal, beds, slime for pistons)
@@ -2812,13 +2814,19 @@ public final class Companion {
 			case "zombified_piglin" -> knowledge.learn("zombified_piglins", Knowledge.How.TRIED);
 			case "wither_skeleton" -> knowledge.learn("wither_skeleton", Knowledge.How.TRIED);
 			case "hoglin" -> knowledge.learn("hoglin", Knowledge.How.TRIED);
+			case "piglin_brute" -> knowledge.learn("piglin_brute", Knowledge.How.TRIED);
 			case "blaze" -> knowledge.learn("blaze_cover", Knowledge.How.TRIED);
 			case "magma_cube" -> { if (by.getBbWidth() < 1.1f) knowledge.learn("magma_split", Knowledge.How.SEEN); }   // (a small one: it saw a big one split)
 			default -> { }
 		}
 	}
 
-	private boolean wearsGold() {
+	/** Ready for a piglin brute (50 health, an axe that takes half its hearts): diamond-like armor, a weapon, health. */
+	boolean bruteReady() {
+		return player.getArmorValue() >= 16 && hands.hasWeapon() && player.getHealth() >= 16;
+	}
+
+	boolean wearsGold() {
 		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
 				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
 			if (BuiltInRegistries.ITEM.getKey(player.getItemBySlot(slot).getItem()).getPath().startsWith("golden_")) return true;
@@ -4383,6 +4391,7 @@ public final class Companion {
 				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant);   // (for the test runs: what it was doing)
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
+		if (!inArena && (how.contains("fall") || how.contains("drown") || how.contains("cactus") || how.contains("sweetBerry"))) jokes.embarrass(1800, "it died to " + how.replace("sweetBerryBush", "a berry bush"));   // (a silly death: embarrassing)
 		if (!inArena && !source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) && random.nextFloat() < 0.4f + 0.4f * personality.chattiness) {
 			String said = banter.event("died", java.util.Map.of("mob", new BanterSelf().death().isEmpty() ? "that" : new BanterSelf().death()));   // ("bruh", "i died to a skeleton lol")
 			if (said != null) chatter(said, false);
@@ -4686,6 +4695,11 @@ public final class Companion {
 		Talk talk = talks.computeIfAbsent(u, k -> new Talk());         // what was said before: "what about cows?", "and you?", "is it good?"
 		long saidAt = player.level().getGameTime();
 		if (said != null) said = xen.mod.talk.Chat.fromThai(said);             // (Thai: in the words it reads; what it asks for was read in Thai already)
+		String joked = said == null ? null : jokes.heard(from, said);   // its joke's answer ("what?", "No", "lol"): it goes on with the bit, or it's embarrassed
+		if (joked != null) {
+			if (!joked.isEmpty()) say(joked);
+			return null;
+		}
 		if (said != null && r.intent().equals("chat") && comeAnswered(from, said)) return null;   // (called over: "nothing, thanks": back to its own things)
 		if (!r.intent().equals("chat") && !r.intent().equals("follow") && comeFor != null) {   // called over and now asked for something: that's what it was for
 			comeFor = null;
@@ -5238,6 +5252,7 @@ public final class Companion {
 			if (player == null) return "ok";
 			if (player.getHealth() < 8) return "kinda hurt tbh";
 			if (player.getFoodData().getFoodLevel() < 7) return "hungry lol";
+			if (jokes.embarrassed()) return "kinda embarrassed ngl";
 			return switch (emotions.mood()) {
 				case "terrified" -> "scared ngl";
 				case "afraid" -> "kinda scared";
@@ -5618,6 +5633,7 @@ public final class Companion {
 	final Mimic mimic = new Mimic(this);
 	/** The unpredictable side: dancing, showing off, surprises. */
 	final Antics antics = new Antics(this);
+	final Jokes jokes = new Jokes(this);
 	final Rider rider = new Rider(this);
 	final Uses uses = new Uses(this);
 	final Habits habits = new Habits(this);

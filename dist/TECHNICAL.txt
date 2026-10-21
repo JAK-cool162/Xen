@@ -44,7 +44,11 @@ The Nether: Knowledge ghast_fireball, zombified_piglins, piglin_anger, wither_sk
 magma_split, nether_water, nether_lava_sea (60% of Xens start knowing each; the rest are told, or learn when hurt).
 Companion.fireballComing: a ghast's fireball coming at it is punched back (in reach, knowing how), else the shield,
 else a side step; a ghast is only a foe with a bow and arrows. No water clutch there; no gold mined with piglins about
-once it knows.
+once it knows. Knowledge piglin_barter: in gold armor with gold ingots and under 16 ender pearls, it walks up to a
+grown piglin with nothing to fight (Nether.barter: in sight, within 12, 30 s apart), tosses it one ingot, waits 8 s
+and picks up what it gives (20 s at most). Knowledge piglin_brute: a brute is a foe whatever it wears, and one it stays
+clear of (Fighter outmatched) unless Companion.bruteReady (armor 16+, a weapon, 16+ health); a bastion is only a
+place to go then. Hit by one, it learns.
 
 Fights: Fighter.weaponHit / critsToKill: against a skeleton, the axe when it kills in fewer crits than the sword
 (stone axe 9, crit 13.5: two crits for 20 health; a stone sword three). Styles (tactician, opportunist, controller,
@@ -61,6 +65,15 @@ time its things have left. Teams: "let's make a team called ...", "I made a team
 player's team, and each Xen decides (no team: trust, kindness, how social, wanting its own; a no stands 2 minutes).
 TeamRole: on a team each picks keeper (farms, chests, walls), miner, fighter or explorer from its nature and what the
 team is short of, and says so; it leans its choices (Goals.bias), its mind still decides.
+
+Jokes (Jokes, the antics setting): now and then, the jokers (hidden humor) most, a Xen tries a bit on someone close by
+it knows or can see, player or Xen: "Hey, guess what?", "wanna hear a joke?", "knock knock". A "what?" gets the punchline (a silly
+one, or something true: its diamonds), a laugh makes its day. A "No", a "bruh", "not funny" or no answer: the joke
+flopped and it's embarrassed (2 minutes: "oh. ok 😿"); sometimes (low composure, grumpy or bold, already angry: more
+often) that turns to mad ("😿😾"): a little angrier, a little less trust, no jokes or warm hellos for them for five
+minutes. A Xen it jokes with answers for itself (a grumpy, busy or wary one says "No"). Embarrassing too: a trick that
+went wrong, dying to a fall, water, a cactus or a berry bush. Called geeked by someone close by while it's embarrassed,
+it snaps (Rage.snap): anger and bloodlust 100%, and it wants them dead (two minutes, the pvp setting still applies).
 
 Farms: Farmer.cane: sugar cane it carries planted on dirt, grass or sand by water near home (up to 16), the tall ones
 cut above the bottom. Critters.lure: fewer than 2 cows (or sheep) by its pen or home and wheat in its bag: it brings one,

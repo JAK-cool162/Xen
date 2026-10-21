@@ -258,6 +258,7 @@ final class Antics {
 		} else {
 			c.player.setShiftKeyDown(true);                                 // stumbles
 			c.talker.sayNear(c.words(Say.LAUGH, "I meant to do that"));
+			c.jokes.embarrass(1200, "it flubbed a trick");
 			doing = "stumble";
 			until = now() + 20;
 		}

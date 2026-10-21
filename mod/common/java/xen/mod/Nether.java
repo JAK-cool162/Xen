@@ -249,6 +249,80 @@ final class Nether {
 		return count(id) > 0;
 	}
 
+	// ------------------------------------------------------------------------------ trading with piglins
+	/**
+	 * Bartering, the way players do it: knowing how, gold on, a gold ingot in its bag and a grown piglin close by that
+	 * isn't after it, it goes up to it and tosses it the ingot; the piglin looks it over (six seconds) and throws
+	 * something back (an ender pearl, obsidian, string, a fire resistance potion...), which it picks up. Half a minute
+	 * between trades; enough ender pearls (16), and it keeps its gold.
+	 */
+	private Action barter(ServerLevel level) {
+		long now = now();
+		if (barterWith == null) {
+			if (!c.knowledge.knows("piglin_barter") || !c.wearsGold() || count("gold_ingot") < 1 || count("ender_pearl") >= 16 || now - barterAt < 20 * 30
+					|| c.fightingNow()) return null;
+			net.minecraft.world.entity.monster.piglin.Piglin best = null;
+			double bestD = 12;
+			for (var p : level.getEntitiesOfClass(net.minecraft.world.entity.monster.piglin.Piglin.class, c.player.getBoundingBox().inflate(12),
+					p -> p.isAlive() && !p.isBaby() && p.getTarget() == null)) {
+				double d = p.distanceTo(c.player);
+				if (d < bestD && c.player.hasLineOfSight(p)) {
+					bestD = d;
+					best = p;
+				}
+			}
+			if (best == null || !level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, c.player.getBoundingBox().inflate(10),
+					m -> m.isAlive() && m.getTarget() == c.player).isEmpty()) return null;   // (nothing after it while it trades)
+			barterWith = best.getUUID();
+			barterSince = now;
+			gaveAt = -1;
+			c.journal("does", String.format(Locale.ROOT, "trades with a piglin %.0f blocks off: a gold ingot for whatever it gives (%d gold left)", bestD, count("gold_ingot")));
+		}
+		var e = level.getEntity(barterWith);
+		if (!(e instanceof net.minecraft.world.entity.monster.piglin.Piglin p) || !p.isAlive() || p.getTarget() == c.player || now - barterSince > 20 * 30) {
+			if (e instanceof net.minecraft.world.entity.monster.piglin.Piglin p2 && p2.getTarget() == c.player) c.knowledge.learn("piglin_anger", Knowledge.How.TRIED);
+			barterWith = null;
+			barterAt = now;
+			return null;
+		}
+		if (gaveAt < 0) {
+			if (c.player.distanceTo(p) > 3) {
+				c.goals.instant = "going to trade with a piglin";
+				return c.walkTo(p.position());
+			}
+			var inv = c.player.getInventory();
+			for (int i = 0; i < inv.getContainerSize(); i++) {
+				ItemStack s = inv.getItem(i);
+				if (!BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("gold_ingot")) continue;
+				c.hands.face(p.position().add(0, 0.5, 0));                       // (tossed at its feet, the way the Q key throws it)
+				Compat.drop(c.player, s.split(1));
+				gaveAt = now;
+				c.chatter(c.pick3("Here, some gold. What've you got?", "Gold for you. Trade?", "Go on, take it."), false);
+				return Action.IDLE;
+			}
+			barterWith = null;
+			return null;
+		}
+		if (now - gaveAt < 20 * 8) {                                             // it looks the gold over, then throws something back
+			c.goals.instant = "waiting for the piglin's trade";
+			c.hands.watching = p;
+			return Action.IDLE;
+		}
+		for (var item : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, p.getBoundingBox().inflate(6),
+				x -> x.isAlive() && x.getOwner() != c.player && !BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath().equals("gold_ingot"))) {
+			if (now - gaveAt > 20 * 20) break;                                    // (picked up what it could)
+			c.goals.instant = "picking up what the piglin traded";
+			return c.walkTo(item.position());
+		}
+		c.journal("does", "traded with a piglin (" + count("ender_pearl") + " ender pearls now)");
+		barterWith = null;
+		barterAt = now;
+		return null;
+	}
+
+	private java.util.UUID barterWith;
+	private long barterAt = -100000, barterSince, gaveAt = -1;
+
 	private int count(String id) {
 		int n = 0;
 		var inv = c.player.getInventory();
@@ -581,6 +655,8 @@ final class Nether {
 			c.chatter("Got " + count("blaze_rod") + " blaze rods! Time to go home.", true);
 			purpose = "home";
 		}
+		Action trade = barter(level);                                           // a piglin about, gold in its bag: a trade first (pearls for the eyes, obsidian)
+		if (trade != null) return trade;
 		if (purpose.equals("debris")) {                                          // netherite: ancient debris, deep in the netherrack
 			if (count("ancient_debris") + count("netherite_scrap") + 4 * count("netherite_ingot") >= 4 || now() - tripSince > 20 * 60 * 15) {
 				c.chatter(count("ancient_debris") >= 4 ? "Four ancient debris! Home to smelt it into netherite." : "That's enough of the Nether for now.", true);

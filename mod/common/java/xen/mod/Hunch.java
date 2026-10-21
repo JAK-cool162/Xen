@@ -221,7 +221,7 @@ final class Hunch {
 		if (nether) {
 			if (tier >= 3) w.put("debris", 0.8f);
 			w.put("fortress", 1f);
-			w.put("bastion_remnant", 0.4f);
+			if (!c.knowledge.knows("piglin_brute") || c.bruteReady()) w.put("bastion_remnant", 0.4f);   // (brutes guard them: not short of diamond)
 			return w;
 		}
 		int meals = items.getOrDefault("food", 0), hunger = c.player.getFoodData().getFoodLevel();

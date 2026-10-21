@@ -105,6 +105,7 @@ final class Talker {
 			nextXenTalk = now + (FAST ? 100 : 600);
 		}
 		playLines(now);
+		c.jokes.tick(now, fighting);
 		if (!c.mod.config.talk || fighting) return;
 		if (asked != null && now > askedUntil) asked = null;          // nobody answered: never mind
 		if (now - lastGreetCheck >= 20 && !c.known.isEmpty()) {       // once a second is enough to notice someone
@@ -114,6 +115,11 @@ final class Talker {
 		if (c.mod.config.talkToXens && now >= nextXenTalk && lines.isEmpty()) chatWithXen(now);
 		if (now >= nextRemark && (now - anyoneSpoke > 200 || FAST) && lines.isEmpty() && !listeners(48).isEmpty()) {
 			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.talkative()) * (0.7f + 0.6f * random.nextFloat())));
+			if (c.jokes.start(now)) {                                          // a bit: "Hey, guess what?"
+				c.mod.lastRemarkAt = System.currentTimeMillis();
+				anyoneSpoke = now;
+				return;
+			}
 			String r = random.nextFloat() < (FAST ? 0.7f : 0.35f) ? question() : null;
 			boolean asking = r != null;
 			if (r == null && c.mod.config.xentalk && xen.mod.talk.XenTalk.get() != null && random.nextFloat() < 0.5f) {   // its own talk model, a moment later
@@ -157,6 +163,10 @@ final class Talker {
 			String n = p.getName().getString();
 			if (c.trust(u) >= 0.3f) c.antics.wave(p);
 			boolean friend = c.trust(u) >= 0.5f;
+			if (c.jokes.sulkingAt(u)) {                                         // (still sore about its joke)
+				sayNear(pick("hmph", "...", "oh. it's you", "...", "hmph \uD83D\uDE3E", "hmph."));
+				continue;
+			}
 			sayNear(c.trust(u) < -0.2f ? pick("Oh. It's you.", "Hello, " + n + ".", "You again.", "...", "Stay back, " + n + ".", "Oh no, it's " + n + "!")
 					: friend ? pick(metBefore ? "Hi " + n + "! I missed you!" : "Hi " + n + "!", "Hello, " + n + ". Good to see you.", "Oh, it's you, " + n + ".",
 							"H-hi " + n + "...", "There you are, " + n + "!", "Hiii " + n + "!")
@@ -323,7 +333,7 @@ final class Talker {
 
 	/** Waiting for an answer from this player? (Then a plain "yes" in chat is for it.) */
 	boolean waitingFor(UUID who) {
-		return asked != null && c.player != null && now() <= askedUntil && who.equals(askedWho);
+		return asked != null && c.player != null && now() <= askedUntil && who.equals(askedWho) || c.jokes.waitingFor(who);
 	}
 
 	// --------------------------------------------------------------------------- Xen with Xen
@@ -471,6 +481,11 @@ final class Talker {
 			o.trust(me, 0.1f);
 		});
 		conversing = true;
+	}
+
+	/** A line said out loud a moment from now (by it or a Xen it's talking with), then this. */
+	void later(Companion who, String text, long at, Runnable then) {
+		line(who, text, at, then);
 	}
 
 	private void line(Companion who, String text, long at, Runnable then) {

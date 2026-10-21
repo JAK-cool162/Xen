@@ -79,6 +79,11 @@ final class SmallTalk {
 			"I told a joke to a chicken. It laid an egg.",
 			"Why do villagers never win arguments? They only say hmm."};
 
+	/** One of its jokes. */
+	static String joke(java.util.Random r) {
+		return JOKES[r.nextInt(JOKES.length)];
+	}
+
 	/** The last thing it explained (for a "why?" after it). */
 	private String because = "";
 
@@ -253,7 +258,10 @@ final class SmallTalk {
 		}
 		String state = aboutItself(from, w);                                  // what it's doing, why, what it has, found, its team...
 		if (state != null) return state;
-		if (JOKE.matcher(w).find()) return JOKES[random.nextInt(JOKES.length)];
+		if (JOKE.matcher(w).find()) {
+			c.jokes.told(from);                                               // (and it'll see how it goes down)
+			return JOKES[random.nextInt(JOKES.length)];
+		}
 		if (LAUGH.matcher(w).find() && w.split("\\s+").length <= 2) return c.pick3("Haha.", "Right?", "Hehe.");
 		if (LORE_Q.matcher(w).find()) return loreAnswer();
 		var mq = MINING_Q.matcher(w);

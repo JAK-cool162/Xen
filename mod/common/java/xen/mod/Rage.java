@@ -52,6 +52,19 @@ final class Rage {
 		}
 	}
 
+	/** Pushed over the edge by someone (called geeked while embarrassed): anger and bloodlust all the way up, and it wants them dead. */
+	void snap(ServerPlayer at, String why) {
+		if (c.inArena || c.minion || at == null) return;
+		anger = 100f;
+		bloodlust = 100f;
+		noted = 4;
+		mark = at.getUUID();
+		markUntil = c.player.level().getGameTime() + 20 * 60 * 2;
+		if (!c.mod.config.pvp.equals("off") && !c.diplomacy.atPeace(at) && !at.isCreative() && !at.isSpectator()) c.goals.duel(at);   // (no thinking it over: it goes for them)
+		c.journal("feels", "snaps: " + why + " (anger 100%, bloodlust 100%): wants " + at.getName().getString() + " dead");
+		XenMod.LOG.info("{} snaps at {}: {} (anger 100%, bloodlust 100%)", c.name, at.getName().getString(), why);
+	}
+
 	/** It killed someone: that takes the edge off. */
 	void killed(LivingEntity who) {
 		if (!(who instanceof ServerPlayer p)) return;
