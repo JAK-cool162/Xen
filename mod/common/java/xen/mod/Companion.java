@@ -255,6 +255,18 @@ public final class Companion {
 		if (hands.digging(head)) return;                                // (already at it)
 		walker.stop();
 		hands.stop();
+		BlockPos feet = player.blockPosition();
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {   // room beside it, head and feet: a step out is quicker than digging (gravel keeps coming down)
+			BlockPos f = feet.relative(d), h = f.above();
+			if (!level.getBlockState(f).getCollisionShape(level, f).isEmpty() || !level.getBlockState(h).getCollisionShape(level, h).isEmpty()
+					|| !level.getFluidState(f).isEmpty() && level.getFluidState(f).is(net.minecraft.tags.FluidTags.LAVA)
+					|| level.getBlockState(f.below()).getCollisionShape(level, f.below()).isEmpty() && level.getFluidState(f.below()).isEmpty()) continue;
+			hands.face(Vec3.atBottomCenterOf(f).add(0, 1, 0));
+			hands.steer = Vec3.atBottomCenterOf(f);
+			hands.start(Action.FORWARD);
+			goals.instant = "stepping out of the block its head is in";
+			return;
+		}
 		if (hands.mine(head)) {
 			goals.instant = "digging out of a wall";
 			if (DEBUG) XenMod.LOG.info("[xen debug] {} digs out of {} at {}", name, level.getBlockState(head), head);
