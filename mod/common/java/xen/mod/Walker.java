@@ -613,7 +613,7 @@ final class Walker {
 		this.level = level;
 		this.eyes = start;
 		nightSky = want != null && level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside()
-				&& c.chores.busy() && c.chores.kind == Chores.Kind.MINE;            // (on its way to ore at night: under the ground, not over it)
+				&& c.chores.busy() && (c.chores.kind == Chores.Kind.MINE || c.chores.kind == Chores.Kind.PICKUP);   // (on its way to ore, obsidian or the like at night: under the ground, not over it)
 		BlockPos target = BlockPos.containing(to);
 		Goal aim = want != null ? want : Goal.block(target);
 		partial = false;

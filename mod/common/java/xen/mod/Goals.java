@@ -1402,6 +1402,13 @@ final class Goals {
 			boolean atHome = home != null && c.player.blockPosition().closerThan(home, 24);
 			boolean monstersNight = who.believes("night_belongs_to_monsters") && !below;   // (its belief: it stays in, unless it's down a mine already)
 			if (c.player.getHealth() <= 12 && !sheltered && !below && can[Mind.SHELTER]) return why(Mind.SHELTER, "night, and hurt: dig in and heal");   // (not a long walk to a mine like this)
+			if (tier >= 4 && !monstersNight && f[Mind.DANGER] < 0.2f) {            // the night's for what the enchanting table needs from under the ground: obsidian, then lapis
+				boolean tabledNight = c.enchanter.table() != null || c.crafter.has("enchanting_table");
+				int obsidian = items.getOrDefault("obsidian", 0);
+				int next = !tabledNight && obsidian < 4 ? planStep(can, "obsidian", 4, "night: obsidian for the enchanting table (under the ground)")
+						: items.getOrDefault("lapis_lazuli", 0) < 3 ? planStep(can, "lapis_lazuli", 3, "night: lapis to enchant with (under the ground)") : -1;
+				if (next >= 0) return next;
+			}
 			if (tier >= 1 && can[Mind.MINE] && !monstersNight) {               // a pickaxe: the night's for mining, as players do (stone, coal, more iron: all worth having)
 				boolean mineNear = mine != null && mine.closerThan(c.player.blockPosition(), mineRange);
 				return why(Mind.MINE, below || mineNear ? "night: mining (safe under the ground)"
@@ -1885,8 +1892,8 @@ final class Goals {
 	 */
 	private int planStep(boolean[] can, String item, int n, String why) {
 		if (!item.equals(c.plans.goal)) {
-			if (c.plans.goal != null && c.plans.askedBy != null || now() - planStepAt < 20 * 60 * 2) return -1;   // (someone asked it for something: that first)
-			planStepAt = now();
+			if (c.plans.goal != null && c.plans.askedBy != null || now() - planStepAt.getOrDefault(item, -1_000_000L) < 20 * 60 * 2) return -1;   // (someone asked it for something: that first)
+			planStepAt.put(item, now());
 			c.plans.setGoal(item, n, null);
 		}
 		Plans.Step s = c.plans.advice();
@@ -1902,7 +1909,8 @@ final class Goals {
 		return why(s.option, why + ": " + s.how);
 	}
 
-	private long planStepAt = -1_000_000, planLookSince = -1;
+	private final java.util.HashMap<String, java.lang.Long> planStepAt = new java.util.HashMap<>();
+	private long planLookSince = -1;
 
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
 		agendaGoal = option == Mind.MINE;
