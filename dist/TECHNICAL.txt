@@ -1,7 +1,33 @@
-XEN COMPANION 2.0.0-beta.45: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.46: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.46
+
+Crafter: diamond armor is in wanted() (made at once, mid-chore) via diamondPiece(diamonds, keep): the first piece not
+worn in diamond that it can afford, keeping 2 for the enchanting table while it has none (was: upgrade() only, with 3
+kept). Diamond sword only with a diamond pickaxe. Iron pickaxe again when the iron one broke (tier < 3, 3 ingots);
+a spare when pickWorn() < 0.12. Goals.diamondsWanted() no longer adds 3.
+
+Mining, knowing everything: Chores.onOreWay() (knownOre walked in the last 5 s): junk stone and cobbled deepslate
+drops are left (with 8 blocks in hand) and Tidy doesn't take pillars down. knownOre lets the nearest known ore go if
+the nearest gap hasn't shrunk by a block in 300 ticks (journal "lets the X at ... go"). Hunch.oresNear: +120 cost
+where the surface over the ore is water (WORLD_SURFACE vs OCEAN_FLOOR heightmaps differ by more than 2).
+Chores.findBlock (fetch, for plans): with luck 2, obsidian, lapis and ores come from Hunch.oresNear too.
+
+Enchanting: Goals agenda step planStep("enchanting_table") once pickaxe tier 4 and 2 diamonds, then
+planStep("lapis_lazuli", 3) once the table is there; a plan of its own is replaced, an asked one isn't; retried
+every 2 minutes at most.
+
+Safety: Walker.danger() adds 6 per cell under the open sky at night on a mining trip (overworld), so the way goes
+into the rock early. Gut.refuge(): deep (no sky, y < 50) it digs in only with 3 monsters near, or one and low health,
+no weapon or Ex1 danger. Companion.toAir(): 50 ticks into a swim for air with under a third of its air left it mines
+the block over its head or on its way, else towers up through the water.
+
+Test (gear_test, 3 Xens, iron gear, luck 2, 20 min): deaths 0; 2 of 3 made a diamond pickaxe, sword and all four
+diamond armor pieces; enchants 0. beta.45 in the same test: 4 deaths, 0 diamonds.
 
 
 WHAT'S NEW IN 2.0.0-beta.45

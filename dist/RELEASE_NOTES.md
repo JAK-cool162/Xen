@@ -1,9 +1,31 @@
-**Xen Companion 2.0.0-beta.45**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.46**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.45: Xen gets a massive upgrade
+### 2.0.0-beta.46: Xen gets a massive upgrade
+
+* **Full diamond armor in under 25 minutes**: in a 20-minute test (3 Xens given an iron pickaxe, sword, shield and
+  chestplate, "Knows the world" on everything), **2 of the 3 made a diamond pickaxe, a diamond sword and all four
+  diamond armor pieces**. Counted from when each Xen joined: first diamonds at about 7 minutes, diamond pickaxe at
+  about 9, the last armor piece at about 23 and 24. The third Xen found none (it started by the sea). **0 deaths** (beta.45 in the same test: 4 deaths,
+  0 diamonds).
+* **Diamond armor straight away**: each piece is made the moment it has the diamonds, even mid-mine (before, armor
+  waited for a quiet moment that never came on a diamond trip), with two diamonds kept back for the enchanting table.
+  The diamond pickaxe comes before the sword.
+* **Mines like it means it**: on its way to diamonds it knows of it leaves the stone it digs lying and its pillars
+  standing (that back-and-forth wore out pickaxes), lets a diamond go if it gets no closer in 15 seconds (under water
+  all the way, walled off) and takes the next, and leaves diamonds under the sea for last.
+* **No more broken-pickaxe dead ends**: a spare iron pickaxe before the old one wears out; a broken iron one is
+  replaced with iron, not wood.
+* **Safer**: at night its way to ore goes under the rock, not over open ground; deep under the ground it doesn't stop
+  for the night (night up there changes nothing down there); out of air too long under water it digs its way up or
+  towers up through the water.
+* **Enchanting**: the enchanting table is now a step of its own once it has a diamond pickaxe and two diamonds (a book,
+  four obsidian, then lapis), with obsidian and lapis found through what it knows of the world. Not seen working in a
+  test yet: 0 enchants so far.
+
+### 2.0.0-beta.45
 
 * **Diamonds the way Baritone mines** (with "Knows the world" on its new top setting, **everything**): every
   diamond it knows of close by is one goal for its own way-finder, which digs the cheapest way there; diamonds in
