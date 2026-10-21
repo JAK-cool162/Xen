@@ -331,11 +331,17 @@ final class Fighter {
 		if (foe instanceof net.minecraft.world.entity.monster.Creeper creeper && (creeper.getSwellDir() > 0 || creeper.isIgnited()) && d < 7.5) {   // (the fuse goes out past 7 blocks: it runs till then)
 			c.goals.instant = "getting away from the creeper";                 // it's hissing: run, like anyone would
 			if (!c.inArena) c.chatter("Creeper! Run!", false);
+			if (d < 5 && h.carries("shield") && h.raiseShield()) {             // a shield up and facing it takes the whole blast: up, and backing off
+				h.watching = foe;
+				c.goals.instant = "shield up to the hissing creeper";
+				p.setSprinting(false);
+				return Action.BACK;
+			}
+			if (d < 3 && p.getAttackStrengthScale(0.5f) > 0.9f && d <= p.entityInteractionRange()) {
+				sTap = 6;                                                      // a hit knocks it back (then away: back, till it stops hissing)
+				return hit(foe);
+			}
 			if (d < 3 && c.knowledge.knows("creeper_block")) {                  // right on it (a tunnel, no room to run): what players do
-				if (p.getAttackStrengthScale(0.5f) > 0.9f && d <= p.entityInteractionRange()) {
-					sTap = 3;                                                  // a hit knocks it back...
-					return hit(foe);
-				}
 				net.minecraft.core.BlockPos between = p.blockPosition().relative(net.minecraft.core.Direction.getApproximateNearest(
 						foe.getX() - p.getX(), 0, foe.getZ() - p.getZ()));
 				if (h.placeAt(between, "any")) {                                // ...then a block between
@@ -348,6 +354,9 @@ final class Fighter {
 			}
 			return runFrom(foe, sprintable);
 		}
+
+		Action screen = creeperScreen();                                       // a skeleton and a creeper: the creeper between it and the arrows
+		if (screen != null) return screen;
 
 		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
 		if (c.personality.believes("warrior_never_runs")) retreat = Math.min(retreat, 0.12f);   // (it stands its ground till the very end)
@@ -812,6 +821,44 @@ final class Fighter {
 			case "skeleton", "stray", "bogged", "pillager", "witch", "blaze", "piglin" -> true;
 			default -> false;
 		};
+	}
+
+	private long screenSaidAt = -100_000;
+
+	/**
+	 * A skeleton shooting at it and a creeper coming (not hissing yet): it stands so the creeper is between it and the
+	 * skeleton, the way players do, and the arrows meant for it go into the creeper. Null: not that.
+	 */
+	private Action creeperScreen() {
+		XenPlayer p = c.player;
+		if (c.inArena || p.getHealth() < 10) return null;
+		LivingEntity shooter = shooterInSight();
+		if (shooter == null || !Companion.archer(shooter)) return null;
+		net.minecraft.world.entity.monster.Creeper cr = null;
+		double best = 10;
+		for (var x : p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class, p.getBoundingBox().inflate(10),
+				x -> x.isAlive() && x.getSwellDir() <= 0 && !x.isIgnited())) {
+			double dd = x.distanceTo(p);
+			if (dd > 3.5 && dd < best) {
+				best = dd;
+				cr = x;
+			}
+		}
+		if (cr == null) return null;
+		Vec3 away = cr.position().subtract(shooter.position()).multiply(1, 0, 1);
+		if (away.lengthSqr() < 1) return null;
+		Vec3 spot = cr.position().add(away.normalize().scale(4.5));
+		long now = p.level().getGameTime();
+		if (now - screenSaidAt > 600) {
+			screenSaidAt = now;
+			c.journal("fight", "a skeleton and a creeper: keeps the creeper between it and the arrows");
+		}
+		c.goals.instant = "keeping the creeper between it and the skeleton";
+		if (p.position().distanceTo(spot) < 1.5) {
+			c.hands.watching = cr;
+			return idle();
+		}
+		return c.walkTo(spot);
 	}
 
 	/** The nearest one about that shoots and can see it (16 blocks), or null. */

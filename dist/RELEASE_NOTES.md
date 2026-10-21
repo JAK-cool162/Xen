@@ -21,7 +21,9 @@ player's controls.
   in diamond.
 * **Fights**: the axe when it kills a skeleton in fewer crits than the sword, a rush at a skeleton close by, five
   fighting styles, crouching at cliff edges, and a skeleton shooting from up to 16 blocks is a fight it's in (no
-  turning its back on it for a chore).
+  turning its back on it for a chore). Creepers: the shield up to a hissing one (it takes the whole blast), a hit to
+  knock it back and away till the hissing stops, and with a skeleton about, the creeper kept between them so the
+  arrows hit it.
 * **Staying alive**: no hunting in the dark bare-handed, no hunting for animals deep in the caves (where one walked into
   lava), a build that's stuck for 4 minutes is given up (one Xen with an iron pickaxe had stood 35 minutes at one
   block), and the urge to dig in for the night no longer fires with a skeleton shooting at it.

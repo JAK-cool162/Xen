@@ -53,6 +53,11 @@ place to go then. Hit by one, it learns.
 Fights: Fighter.weaponHit / critsToKill: against a skeleton, the axe when it kills in fewer crits than the sword
 (stone axe 9, crit 13.5: two crits for 20 health; a stone sword three). Styles (tactician, opportunist, controller,
 explorer, team) from a player's notes: the health each keeps in hand, healing early, a finishing blow, the high ground.
+Creepers: hissing within 5 blocks and a shield in its bag, the shield goes up facing it (a raised shield takes the whole
+blast) and it backs off; within 3 with its swing charged, a hit knocks it back and it backs off till the hissing stops
+(anyone, not only those who know to put a block between); else it runs. A skeleton shooting at it and a creeper 3.5 to
+10 blocks off, not hissing yet: it stands 4.5 blocks behind the creeper from the skeleton (Fighter.creeperScreen), so
+the arrows go into the creeper.
 
 Staying alive: night falling while it hunts bare-handed (or under 14 health) drops
 the hunt for a shelter (Goals.nightfall); a skeleton, stray, bogged or pillager shooting at it from up to 16 blocks is
