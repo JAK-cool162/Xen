@@ -102,8 +102,27 @@ final class Guide {
 		return at < 0 ? path.get(0) : path.get(Math.min(path.size() - 1, at + 5));
 	}
 
-	/** The very next place along its way from where it stands (on it, or the step back onto it), or null. */
+	/** Where on its way it is (within a step and a half), or -1. */
+	private int nearest(BlockPos feet) {
+		if (path == null) return -1;
+		for (int i = 0; i < path.size(); i++) if (path.get(i).distSqr(feet) <= 2.1) return i;
+		return feet.distSqr(path.get(0)) <= 3 ? 0 : -1;
+	}
+
+	/** When it last worked its way out again (off its way: from where it stands now). */
+	private long reroutedAt = -1000;
+
+	/** The very next place along its way from where it stands (on it, or the step back onto it), or null. Off its way: a new way from here. */
 	BlockPos nextCell(BlockPos feet) {
+		if (target != null && c.player != null && (path == null || path.isEmpty() || nearest(feet) < 0) && now() - reroutedAt > 40) {
+			reroutedAt = now();
+			List<BlockPos> way = route((ServerLevel) c.player.level(), feet, target);
+			if (way == null) {
+				done(false, "no dry way from where it is");
+				return null;
+			}
+			path = way;
+		}
 		if (path == null || path.isEmpty()) return null;
 		int at = -1;
 		double best = 2.1;
