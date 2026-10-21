@@ -58,7 +58,11 @@ blast) and it backs off; within 3 with its swing charged, a hit knocks it back a
 (anyone, not only those who know to put a block between); else it runs. A skeleton shooting at it and a creeper 3.5 to
 10 blocks off, not hissing yet: it stands 4.5 blocks behind the creeper from the skeleton (Fighter.creeperScreen), so
 the arrows go into the creeper. Backing off (outmatched, low) with a skeleton shooting at it and a shield, the shield stays
-up facing it while it backs away, instead of turning its back to run for cover.
+up facing it while it backs away, instead of turning its back to run for cover. Tested (night, iron sword, shield and
+chestplate, hurt to 8 health, two skeletons 10 and 12 blocks off, 40 s, 6 tries each): before, 2 of 6 died and the rest
+had 9.1 health on average; with it, none died, 13.5 health on average. Creepers (4 tries each, none died either way):
+a creeper alone with shield and sword 20.0 health both; bare-handed 18.1 before, 19.6 with the hit and back-off; a
+skeleton and a creeper together 17.9 before, 18.2 with the creeper kept in between.
 
 Staying alive: night falling while it hunts bare-handed (or under 14 health) drops
 the hunt for a shelter (Goals.nightfall); a skeleton, stray, bogged or pillager shooting at it from up to 16 blocks is
