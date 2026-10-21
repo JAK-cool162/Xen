@@ -3068,16 +3068,15 @@ public final class Companion {
 	private long heldSince, heldCalled;
 
 	/**
-	 * Where it's headed: once it sets out somewhere it keeps to it for two seconds, whatever else comes to mind (a new
-	 * spot a few blocks over is the same way, and counts). Danger, a fight, a hit, short of air, or getting there lets it
-	 * change at once; so does a second of not walking (it was doing something else).
+	 * Where it's headed: once it sets out somewhere it keeps to it for two seconds, whatever else comes to mind (another
+	 * spot a block or two over too: each new spot is a new way worked out). Danger, a fight, a hit, short of air, or
+	 * getting there lets it change at once; so does a second of not walking (it was doing something else).
 	 */
 	private Vec3 headingFor(Vec3 goal) {
 		long now = player.level().getGameTime();
 		boolean urgent = fightingNow() || player.hurtTime > 0 || danger() > 0.4f || player.isInWater() && player.getAirSupply() < player.getMaxAirSupply() / 2;
-		boolean same = heldGoal != null && goal.distanceTo(heldGoal) < 3;
-		if (heldGoal == null || same || urgent || now - heldCalled > 20 || now - heldSince >= 40 || player.position().distanceTo(heldGoal) < 2) {
-			if (!same) heldSince = now;
+		if (heldGoal == null || urgent || now - heldCalled > 20 || now - heldSince >= 40 || player.position().distanceTo(heldGoal) < 2) {
+			if (heldGoal == null || goal.distanceTo(heldGoal) > 0.5) heldSince = now;   // (a new spot: two seconds of it, even a block or two over; the same spot, on it goes)
 			heldGoal = goal;
 		}
 		heldCalled = now;
