@@ -868,6 +868,29 @@ public final class Companion {
 			step = stepToAir(level, start, false, far);                // ...or through gaps one block high, swimming flat
 			tall = false;
 		}
+		if (player.tickCount - airLast > 20) airSince = player.tickCount;      // (a new swim for air)
+		airLast = player.tickCount;
+		if (player.tickCount - airSince > 50 && player.getAirSupply() < player.getMaxAirSupply() / 3) {   // swimming for air a while and still under (bobbing between two blocks counts): it digs its way (over its head, or the way on), or towers up through the water
+			for (BlockPos b : new BlockPos[] {head.above(), step != null ? step.above() : null, step}) {
+				if (b == null) continue;
+				var st = level.getBlockState(b);
+				if (st.canBeReplaced() || st.getCollisionShape(level, b).isEmpty()) continue;
+				float hard = st.getDestroySpeed(level, b);
+				if (hard < 0 || hard > 10) continue;
+				if (hands.mine(b)) {
+					goals.instant = "digging its way to air";
+					acted = true;
+					return Action.MINE;
+				}
+			}
+			if (level.getBlockState(head.above()).canBeReplaced() && player.tickCount - airPillarAt > 30 && hands.startPillar()) {   // water over its head: a block under its feet each jump
+				airPillarAt = player.tickCount;
+				pillaring = true;
+				goals.instant = "towering up out of the water";
+				journal("water", "out of air: towers up through the water");
+				return Action.JUMP;
+			}
+		}
 		if (step == null) return airPocket(level, start);
 		goals.instant = "swimming to air";
 		hands.steer = Vec3.atBottomCenterOf(step);
@@ -900,6 +923,7 @@ public final class Companion {
 
 	/** Till this tick it swims straight up, in the middle of the opening over it (done last, by Instinct; its next choice may say more). */
 	int airUp = -1;
+	private int airSince, airLast = -100, airPillarAt = -100;
 
 	/** No way to air near, under a roof, short of breath: a door put down beside it holds no water (an air pocket, a player's trick). */
 	private Action airPocket(ServerLevel level, BlockPos feet) {

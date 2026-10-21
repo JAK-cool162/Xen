@@ -2696,7 +2696,9 @@ final class Chores {
 	 * them, digging the way there (the cheapest it can work out, through the rock as needed); one in arm's reach it
 	 * mines at once. No way to any: the nearest is let go, the rest stay. Null: none known.
 	 */
-	private long oreWalkAt = -1000;
+	private long oreWalkAt = -1000, oreBestAt;
+	private double oreBest = Double.MAX_VALUE;
+	private String oreBestKind = "";
 
 	/** On its way to ore it knows of just now: what lies about (the stone it dug, its pillars) can stay where it is. */
 	boolean onOreWay() {
@@ -2721,6 +2723,21 @@ final class Chores {
 				Action a = reach(o);
 				if (a != null) return a;
 			}
+		}
+		BlockPos nearest = known.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(feet))).get();
+		double gap = Math.sqrt(nearest.distSqr(feet));
+		if (gap < oreBest - 1 || !kind.equals(oreBestKind)) {
+			oreBest = gap;
+			oreBestAt = now();
+			oreBestKind = kind;
+		} else if (now() - oreBestAt > 300) {                                // fifteen seconds and no closer (under water all the way, walled off): the next one
+			c.journal("way", "lets the " + kind + " at " + nearest.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
+			c.hunch.taken(nearest);
+			skip.add(Perception.Beliefs.key(nearest.getX(), nearest.getY(), nearest.getZ()));
+			known.remove(nearest);
+			oreBest = Double.MAX_VALUE;
+			oreBestAt = now();
+			if (known.isEmpty()) return null;
 		}
 		List<Goal> goals = new ArrayList<>();
 		for (BlockPos o : known) goals.add(Goal.nextTo(o));

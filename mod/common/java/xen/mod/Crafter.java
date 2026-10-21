@@ -69,6 +69,18 @@ final class Crafter {
 		return best;
 	}
 
+	/** The next diamond armor piece it isn't wearing yet that it has the diamonds for (keeping some back), or null. */
+	private String diamondPiece(int diamonds, int keep) {
+		String[] pieces = {"chestplate", "leggings", "helmet", "boots"};
+		int[] cost = {8, 7, 5, 4};
+		for (int i = 0; i < pieces.length; i++) {
+			var worn = c.player.getItemBySlot(slotOf(pieces[i]));
+			String n = worn.isEmpty() ? "" : path(worn);
+			if (!n.startsWith("diamond") && !n.startsWith("netherite") && !has("diamond_" + pieces[i]) && diamonds >= cost[i] + keep) return "diamond_" + pieces[i];
+		}
+		return null;
+	}
+
 	/** What's left of its best pickaxe (1 new, 0 gone). */
 	double pickWorn() {
 		double left = 0;
@@ -146,6 +158,10 @@ final class Crafter {
 		boolean tableWanted = c.enchanter.table() == null && !has("enchanting_table");   // (two diamonds go into an enchanting table: kept for it)
 		if (tableWanted && tier >= 4 && diamonds >= 2 && count(n -> n.equals("book")) >= 1 && count(n -> n.equals("obsidian")) >= 4) return "enchanting_table";
 		if (tier >= 4 && diamonds >= 2 + (tableWanted ? 2 : 0) && !has("diamond_sword") && sticksOrWood(1, 0)) return "diamond_sword";   // (the pickaxe first: obsidian and the deep ore need it)
+		if (tier >= 4) {                                                             // diamond armor as soon as it has the diamonds (two kept for the enchanting table)
+			String piece = diamondPiece(diamonds, tableWanted ? 2 : 0);
+			if (piece != null) return piece;
+		}
 		if (tier >= 3 && iron >= 8 && !has("_chestplate")) return "iron_chestplate";
 		if (tier >= 3 && iron >= 5 && !has("_helmet")) return "iron_helmet";
 		String bed = bedFromWool();                                                  // the wool's in: a bed now (the night's coming)
@@ -184,12 +200,8 @@ final class Crafter {
 			boolean hasIt = has("_" + pieces[i]) || !c.player.getItemBySlot(slotOf(pieces[i])).isEmpty();
 			if (!hasIt && iron >= cost[i]) return "iron_" + pieces[i];
 		}
-		int keep = c.enchanter.table() == null && !has("enchanting_table") && pickTier() >= 4 ? 2 : 0;   // (two for the enchanting table, the rest into armor)
-		for (int i = 0; i < pieces.length; i++) {
-			var worn = c.player.getItemBySlot(slotOf(pieces[i]));
-			String n = worn.isEmpty() ? "" : path(worn);
-			if (!n.startsWith("diamond") && !n.startsWith("netherite") && !has("diamond_" + pieces[i]) && diamonds >= cost[i] + keep) return "diamond_" + pieces[i];
-		}
+		String piece = diamondPiece(diamonds, c.enchanter.table() == null && !has("enchanting_table") && pickTier() >= 4 ? 2 : 0);   // (two for the enchanting table, the rest into armor)
+		if (piece != null) return piece;
 		if (!has("shield") && c.player.getOffhandItem().isEmpty() && iron >= 1 && wood() >= 6) return "shield";
 		if (!has("bucket") && iron >= 3 && pickTier() >= 2) return "bucket";
 		if (!has("shears") && iron >= 4 && pickTier() >= 3) return "shears";   // wool without killing the sheep
