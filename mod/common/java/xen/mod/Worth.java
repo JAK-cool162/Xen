@@ -30,7 +30,7 @@ final class Worth {
 			Map.entry("paper", new Use("books for enchanting", 9, 1)),
 			Map.entry("leather", new Use("books (paper and leather) and armor", 3, 1)),
 			Map.entry("book", new Use("an enchanting table, bookshelves", 3, 1)),
-			Map.entry("diamond", new Use("a diamond pickaxe (for obsidian), an enchanting table", 5, 2)),
+			Map.entry("diamond", new Use("a diamond pickaxe (for obsidian), an enchanting table, diamond armor and a sword", 34, 2)),
 			Map.entry("obsidian", new Use("an enchanting table (4) and a Nether portal (10)", 14, 2)),
 			Map.entry("lapis_lazuli", new Use("enchanting", 9, 2)),
 			Map.entry("flint_and_steel", new Use("lighting the Nether portal", 1, 2)),

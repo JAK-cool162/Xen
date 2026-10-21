@@ -396,6 +396,17 @@ final class Fighter {
 						p.getHealth(), kind(foe).replace('_', ' '), expected(foe), now < gutUntil ? ", its gut says get out" : ""), 60);
 			}
 		}
+		if (!rush && !outmatched && !(foe instanceof Player) && !c.inArena) {   // what's coming, not only what's on it: all of them about, the dark, its armor, before it's low
+			float group = threatAround();
+			if (group > p.getHealth() - margin() && group > expected(foe) + 1) {
+				outmatched = true;
+				if (now - threatSaidAt > 400) {
+					threatSaidAt = now;
+					c.journal("fight", String.format(java.util.Locale.ROOT, "sees trouble coming (%.0f health, all of them about would cost about %.0f%s): gets out before it's hurt",
+							p.getHealth(), group, p.level().isDarkOutside() ? ", in the dark" : ""));
+				}
+			}
+		}
 		if (!rush && !outmatched && !(foe instanceof Player) && !c.inArena && kind(foe).equals("piglin_brute") && c.knowledge.knows("piglin_brute") && !c.bruteReady()) {
 			outmatched = true;                                                 // a brute, short of diamond: no fight to take, away (and out of reach of that axe)
 			if (now - bruteSaidAt > 600) {
@@ -436,13 +447,14 @@ final class Fighter {
 			saidWhyAt = now;
 			c.journal("fight", String.format(java.util.Locale.ROOT, "takes a hit to finish the %s (%.0f health left on it, %.0f on itself)", kind(foe).replace('_', ' '), foe.getHealth(), p.getHealth()));
 		}
-		if (!finishing && !rush && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f))) {
+		if (!finishing && !rush && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f) || fleeing && !c.inArena && !safe() && (p.getHealth() < 16 || threatAround() > p.getHealth() - margin()))) {   // (once it's getting out, it keeps at it till it's safe, or healed with nothing it can't handle)
 			if (!fleeing && !c.inArena) {
 				c.chatter(c.personality.say("flee"), false);
 				c.journal("fight", String.format(java.util.Locale.ROOT, "backs off at %.0f health (%s: keeps %.0f in hand)%s", p.getHealth(), style().words, retreat * p.getMaxHealth(),
 						outmatched ? ", the fight would cost more than it has" : desperate ? ", nothing to fight with" : ""));
 			}
 			fleeing = true;                                                    // back off until it has healed a bit
+			fledAt = now;
 			c.goals.instant = desperate ? "running for its life" : "backing off to heal";
 			LivingEntity archerOnIt = shooterInSight();
 			if (archerOnIt != null && h.carries("shield") && h.raiseShield()) {   // one shooting at it, and a shield: up and facing it, backing off (turning its back to run, it's shot in the back)
@@ -474,6 +486,10 @@ final class Fighter {
 			Vec3 dir = escapeDir(foe);
 			if (shooter != null) dir = weave(dir);                              // zig-zag: an arrow aimed where it was going misses
 			if (outmatched && clearRun(dir)) return runAlong(dir, sprintable);   // a clear way: just sprint off (no time to work out a way)
+			if (!clearRun(dir) && d < 4.5 && !archer(foe)) {                    // nowhere to run and one on it: blocks between them, not wandering about
+				Action box = wallOff(foe, kind(foe).replace('_', ' '), 1.2);
+				if (box != null) return box;
+			}
 			return c.walkTo(p.position().add(dir.scale(8)));
 		}
 		fleeing = false;
@@ -1000,10 +1016,14 @@ final class Fighter {
 	 * (that one's a fight), or nowhere to put them.
 	 */
 	private Action wallOff(LivingEntity shooter, String what) {
+		return wallOff(shooter, what, 3.5);
+	}
+
+	private Action wallOff(LivingEntity shooter, String what, double nearest) {
 		XenPlayer p = c.player;
 		int now = p.tickCount;
 		if (now - wallAt > 600) wallBlocks = 0;
-		if (wallBlocks >= 8 || now - wallAt < 5 || shooter.distanceTo(p) < 3.5) return null;
+		if (wallBlocks >= 8 || now - wallAt < 5 || shooter.distanceTo(p) < nearest) return null;
 		var level = p.level();
 		Vec3 to = shooter.position().subtract(p.position());
 		net.minecraft.core.Direction d = Math.abs(to.x) > Math.abs(to.z) ? (to.x > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
@@ -1023,9 +1043,57 @@ final class Fighter {
 					return Action.IDLE;
 				}
 			}
+			if (now - wallFailSaidAt > 400) {
+				wallFailSaidAt = now;
+				c.journal("fight", "can't wall off the " + what + ": " + c.hands.cantPlace);
+			}
 			return null;                                                         // (nothing to put it against: cover then)
 		}
 		return null;
+	}
+
+	private int wallFailSaidAt = -10000, threatSaidAt = -10000, fledAt = -10000, recoverSaidAt = -10000;
+
+	/**
+	 * What all the monsters about it (within 12) would cost it together: those after it in full, the others less, the
+	 * far ones less again; more in the dark, more with little armor. Its threat before anything has hit it.
+	 */
+	private float threatAround() {
+		XenPlayer p = c.player;
+		float t = 0;
+		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(12),
+				x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy && !(x instanceof net.minecraft.world.entity.monster.EnderMan))) {
+			float e = expected(m) * (m.getTarget() == p ? 1f : m.hasLineOfSight(p) ? 0.5f : 0.2f) * (m.distanceTo(p) < 6 ? 1f : 0.6f);
+			t += e;
+		}
+		if (p.level().isDarkOutside() && p.level().canSeeSky(p.blockPosition().above())) t *= 1.25f;
+		return t * (1.3f - 0.5f * Math.min(1f, p.getArmorValue() / 20f));
+	}
+
+	/** Safe again: nothing after it within 12 that can see it, and over half its health. */
+	private boolean safe() {
+		XenPlayer p = c.player;
+		return p.getHealth() >= 12 && p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(12),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && m.hasLineOfSight(p) && (m.getTarget() == p || m.distanceTo(p) < 8)).isEmpty();
+	}
+
+	/**
+	 * Got away (nothing on it now): it heals before it goes back to anything, a bite and a moment to see what's about,
+	 * up to half a minute, the way a player gets their health back before the next thing. Null: healed, or long enough.
+	 */
+	Action recover() {
+		XenPlayer p = c.player;
+		int now = p.tickCount;
+		if (now - fledAt > 600 || p.getHealth() >= 16 || c.inArena) return null;
+		if (now - recoverSaidAt > 600) {
+			recoverSaidAt = now;
+			c.journal("fight", String.format(java.util.Locale.ROOT, "got away (%.0f health): heals and looks about before going on", p.getHealth()));
+		}
+		c.goals.instant = "getting its health back";
+		c.hands.watching = null;
+		if (c.hands.canHeal() && p.getFoodData().getFoodLevel() < 20) return Action.EAT;
+		if (p.getFoodData().getFoodLevel() < 18) return null;                 // (no food to heal on: on with things, carefully)
+		return idle();
 	}
 
 	/** When it last shouted for help. */

@@ -59,6 +59,7 @@ final class Hunch {
 		for (Block b : BuiltInRegistries.BLOCK) {
 			String n = BuiltInRegistries.BLOCK.getKey(b).getPath();
 			if (n.equals("ancient_debris")) ORES.put(b, "debris");
+			else if (n.equals("obsidian")) ORES.put(b, "obsidian");                 // (an enchanting table's four, a portal's ten: by lava down deep, in ruined portals)
 			else if (n.endsWith("_ore")) ORES.put(b, n.replace("deepslate_", "").replace("nether_", "").replace("_ore", ""));
 		}
 	}

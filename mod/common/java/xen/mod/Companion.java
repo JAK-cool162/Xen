@@ -3291,7 +3291,8 @@ public final class Companion {
 			hands.lowerShield();
 			player.setSprinting(false);
 			fighter.reset();
-			return fighter.stayUp();                                     // (up on its pillar, healing: it stays up a while)
+			Action up = fighter.stayUp();                                // (up on its pillar, healing: it stays up a while)
+			return up != null ? up : fighter.recover();                  // (got away: it heals before going on)
 		}
 		if (!hurtNow && !reflexes.ready(foe.getUUID(), !WorldSenses.sees(player, hands.yaw, hands.pitch, foe))) {   // Xen 2.0: it notices a reaction time later
 			fighting = false;

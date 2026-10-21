@@ -342,7 +342,7 @@ final class Goals {
 			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
-			case MINE -> fuelRun && (c.chores.fuel() == 0 || c.mod.config.runner) ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < 3 && (readyForDiamonds() || diamondRun) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+			case MINE -> fuelRun && (c.chores.fuel() == 0 || c.mod.config.runner) ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < diamondsWanted() && (readyForDiamonds() || diamondRun) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, diamondsWanted() - diamonds()) + (c.personality.believes("diamonds_forever") ? 2 : 0))
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (an iron pickaxe: down for diamonds, the iron on the way comes too; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> {                                                       // (a real farm: tilled, planted, looked after; then a pen for the animals about)
@@ -400,7 +400,7 @@ final class Goals {
 					: home != null && !busyBuilding && !evening() && !c.player.isCreative() && c.taste.wantsBigger(items.getOrDefault("log", 0))
 					? 0.35f * (0.5f + p.diligence) : 0;                                // a better house once it has the wood
 			case MINE -> tools >= 2 && iron < 6 && c.crafter.pickTier() < 3 ? 0.55f * (0.6f + p.bravery)
-					: c.crafter.pickTier() >= 3 && diamonds() < 3 ? (readyForDiamonds() ? 0.5f : 0.4f) * (0.5f + p.bravery)
+					: c.crafter.pickTier() >= 3 && diamonds() < diamondsWanted() ? (readyForDiamonds() ? 0.5f : 0.4f) * (0.5f + p.bravery)
 					: tools >= 1 && items.getOrDefault("coal", 0) < 4 && home != null ? 0.3f : 0;
 			case FARM -> home != null && (c.farmer.middle == null || pen == null && animalsByHome() >= 2) && !busyBuilding && !evening() && tools >= 1 ? 0.55f * (0.5f + p.diligence) : 0;
 			case MOBFARM -> home != null && farm != null && mobFarm == null && !busyBuilding && !evening()
@@ -705,9 +705,30 @@ final class Goals {
 		return c.items().getOrDefault("diamond", 0);
 	}
 
-	/** Its mining is for diamonds now (an iron pickaxe, fewer than 3, and ready for them or on the run). */
+	/**
+	 * The diamonds it still needs for diamond everything: a pickaxe (3), an enchanting table (2), a sword (2), and each
+	 * piece of armor it isn't wearing in diamond yet (chestplate 8, leggings 7, helmet 5, boots 4), the crafter keeping
+	 * 3 in hand for the next piece. What it has in diamond already doesn't count.
+	 */
+	int diamondsWanted() {
+		var p = c.player;
+		int n = c.crafter.pickTier() >= 4 ? 0 : 3;
+		if (c.enchanter.table() == null && !c.crafter.has("enchanting_table")) n += 2;
+		if (!c.crafter.has("diamond_sword")) n += 2;
+		String[] pieces = {"chestplate", "leggings", "helmet", "boots"};
+		int[] cost = {8, 7, 5, 4};
+		var slots = new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.entity.EquipmentSlot.LEGS,
+				net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.FEET};
+		for (int i = 0; i < 4; i++) {
+			String worn = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getItemBySlot(slots[i]).getItem()).getPath();
+			if (!worn.startsWith("diamond") && !worn.startsWith("netherite") && !c.crafter.has("diamond_" + pieces[i])) n += cost[i];
+		}
+		return n == 0 ? 0 : n + 3;
+	}
+
+	/** Its mining is for diamonds now (an iron pickaxe, fewer than it needs, and ready for them or on the run). */
 	private boolean diamondsNext() {
-		return c.crafter.pickTier() >= 3 && diamonds() < 3 && (readyForDiamonds() || diamondRun);
+		return c.crafter.pickTier() >= 3 && diamonds() < diamondsWanted() && (readyForDiamonds() || diamondRun);
 	}
 
 	/** Nothing pressing (no danger, health and food fine): it can stay set on its goal. */
@@ -1853,7 +1874,7 @@ final class Goals {
 		boolean armor = true;
 		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
 				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) armor &= !c.player.getItemBySlot(slot).isEmpty();
-		return tier == 2 ? iron < 3 : !armor && iron < 24 || diamonds() < 3;
+		return tier == 2 ? iron < 3 : !armor && iron < 24 || diamonds() < diamondsWanted();
 	}
 
 	private int wool() {

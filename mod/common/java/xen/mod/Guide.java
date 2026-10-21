@@ -117,7 +117,7 @@ final class Guide {
 		if (at < 0) return feet.distSqr(path.get(0)) <= 3 ? path.get(0) : null;
 		return path.get(Math.min(path.size() - 1, path.get(at).equals(feet) ? at + 1 : at));
 	}
-	private static final String[] KINDS = {"coal", "iron", "lapis", "diamond"};
+	private static final String[] KINDS = {"coal", "iron", "lapis", "diamond", "obsidian"};
 
 	/**
 	 * How much it needs this ore now: 3 it can't go on without it (coal for the raw iron it has, iron for its first iron
@@ -132,8 +132,9 @@ final class Guide {
 		return switch (k) {
 			case "coal" -> coal < 3 && items.getOrDefault("raw_iron", 0) > 0 ? 3 : coal < 3 && items.getOrDefault("torch", 0) < 8 ? 2 : coal < 8 ? 1 : 0;
 			case "iron" -> tier < 3 ? 3 : iron < 24 && !c.crafter.has("_chestplate") ? 1 : 0;
-			case "diamond" -> tier >= 3 && items.getOrDefault("diamond", 0) < 5 ? 2 : 0;
-			case "lapis" -> tier >= 3 && items.getOrDefault("lapis_lazuli", 0) < 3 ? 1 : 0;
+			case "diamond" -> tier >= 3 && items.getOrDefault("diamond", 0) < c.goals.diamondsWanted() ? 2 : 0;
+			case "lapis" -> tier >= 3 && items.getOrDefault("lapis_lazuli", 0) < 3 ? (tier >= 4 ? 2 : 1) : 0;   // (enchanting: with a diamond pickaxe, as needed as the diamonds)
+			case "obsidian" -> tier >= 4 && items.getOrDefault("obsidian", 0) < 4 && c.enchanter.table() == null && !c.crafter.has("enchanting_table") ? 2 : 0;   // (four for the table, with a diamond pickaxe to mine it)
 			default -> 0;
 		};
 	}
