@@ -435,6 +435,13 @@ final class Fighter {
 			}
 			fleeing = true;                                                    // back off until it has healed a bit
 			c.goals.instant = desperate ? "running for its life" : "backing off to heal";
+			LivingEntity archerOnIt = shooterInSight();
+			if (archerOnIt != null && h.carries("shield") && h.raiseShield()) {   // one shooting at it, and a shield: up and facing it, backing off (turning its back to run, it's shot in the back)
+				h.watching = archerOnIt;
+				c.goals.instant = "backing off behind its shield from the " + kind(archerOnIt).replace('_', ' ');
+				p.setSprinting(false);
+				return Action.BACK;
+			}
 			h.lowerShield();
 			if (d > (outmatched || desperate ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);

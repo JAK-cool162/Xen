@@ -57,7 +57,8 @@ Creepers: hissing within 5 blocks and a shield in its bag, the shield goes up fa
 blast) and it backs off; within 3 with its swing charged, a hit knocks it back and it backs off till the hissing stops
 (anyone, not only those who know to put a block between); else it runs. A skeleton shooting at it and a creeper 3.5 to
 10 blocks off, not hissing yet: it stands 4.5 blocks behind the creeper from the skeleton (Fighter.creeperScreen), so
-the arrows go into the creeper.
+the arrows go into the creeper. Backing off (outmatched, low) with a skeleton shooting at it and a shield, the shield stays
+up facing it while it backs away, instead of turning its back to run for cover.
 
 Staying alive: night falling while it hunts bare-handed (or under 14 health) drops
 the hunt for a shelter (Goals.nightfall); a skeleton, stray, bogged or pillager shooting at it from up to 16 blocks is
