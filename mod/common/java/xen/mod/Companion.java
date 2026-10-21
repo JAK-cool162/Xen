@@ -886,6 +886,7 @@ public final class Companion {
 				if (b == null) continue;
 				var st = level.getBlockState(b);
 				if (st.canBeReplaced() || st.getCollisionShape(level, b).isEmpty()) continue;
+				if (!level.getBlockState(b.above()).isAir()) continue;          // (only a block with air over it: one with water over it lets more in)
 				float hard = st.getDestroySpeed(level, b);
 				if (hard < 0 || hard > 10) continue;
 				if (hands.mine(b)) {

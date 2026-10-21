@@ -1986,7 +1986,8 @@ final class Chores {
 		if (best == null && c.mod.config.luck >= 2 && java.util.Set.of("obsidian", "diamond", "iron", "coal", "lapis", "gold", "redstone", "copper", "emerald", "sugar_cane").contains(kind)) {   // knowing everything: the nearest it knows of, seen or not
 			for (BlockPos q : c.hunch.oresNear(kind, feet, 128, 160, 12)) {
 				if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)
-						|| level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER) && level.getFluidState(q.above(2)).is(net.minecraft.tags.FluidTags.WATER)) continue;   // (at the bottom of a lake: a dive, not a dig)
+						|| level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER) && level.getFluidState(q.above(2)).is(net.minecraft.tags.FluidTags.WATER)   // (at the bottom of a lake: a dive, not a dig)
+						|| !kind.equals("sugar_cane") && waterNear(level, q, 2)) continue;   // (by an aquifer, down deep: where it drowns; a dry one)
 				best = q;
 				break;
 			}
@@ -2602,6 +2603,13 @@ final class Chores {
 	private BlockPos lastLog;
 
 	/** Only water around it (a river bed, the bottom of a lake): it would have to dive for it. */
+	/** Water within r blocks of it (a cube), in loaded chunks only. */
+	private static boolean waterNear(ServerLevel level, BlockPos b, int r) {
+		for (BlockPos q : BlockPos.betweenClosed(b.offset(-r, -r, -r), b.offset(r, r, r)))
+			if (level.isLoaded(q) && level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
+		return false;
+	}
+
 	private boolean underwater(BlockPos b) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (!level.isLoaded(b)) return false;                                  // (never loads a chunk just to look)

@@ -208,6 +208,11 @@ final class Nether {
 			return why.equals("blaze") ? "You will look for a Nether fortress and fight blazes for " + rods + " blaze rods."
 					: why.equals("debris") ? "You will mine for ancient debris down at y 15." : "You will look around the Nether.";
 		}
+		if (why.equals("table")) {                                              // the enchanting table's obsidian, no portal
+			if (c.crafter.pickTier() < 4 && !has("water_bucket") && !has("bucket") && iron() < 3) return "You can't get obsidian yet: you need a diamond pickaxe and a bucket of water.";
+			start(why);
+			return "You will get four obsidian (mined, or made by pouring water on lava), make an enchanting table and enchant your gear.";
+		}
 		BlockPos portal = c.places.nearest("portal");
 		boolean canBuild = obsidian() >= 10 && has("flint_and_steel");
 		boolean canGet = c.crafter.pickTier() >= 4 || has("water_bucket") || has("bucket") || iron() >= 3;
@@ -364,6 +369,7 @@ final class Nether {
 
 	/** In the overworld: to a portal (building it first, and getting what that takes). */
 	private Action toPortal() {
+		if (purpose.equals("table")) return tableTrip();
 		if (purpose.equals("home")) {
 			finishTrip("I'm home.");
 			return null;
@@ -425,7 +431,7 @@ final class Nether {
 	}
 
 	private BlockPos lavaAt;
-	private long pouredAt = -1;
+	private long pouredAt = -1, fetchTriedAt;
 
 	/** The chore it started to go down for lava (its serial number), so another of its own errands doesn't hold it up. */
 	private int lavaChore = -1;
@@ -438,9 +444,34 @@ final class Nether {
 	/** When it started looking around for obsidian it doesn't know how to make (0: not looking). */
 	private long lookingSince;
 
-	/** Ten for the portal, four more while it has no enchanting table yet (the table takes four). */
+	/** Ten for the portal, four more while it has no enchanting table yet (the table takes four); four only, for the table alone. */
 	private int obsidianWanted() {
-		return 10 + (c.enchanter.table() == null && !has("enchanting_table") ? 4 : 0);
+		int table = c.enchanter.table() == null && !has("enchanting_table") ? 4 : 0;
+		return "table".equals(purpose) ? table : 10 + table;
+	}
+
+	/** Its enchanting table: four obsidian, the table (the crafter makes it: a book, two diamonds), then its gear enchanted. */
+	private Action tableTrip() {
+		boolean tabled = c.enchanter.table() != null || has("enchanting_table");
+		if (!tabled && obsidian() < 4) return getObsidian();
+		if (!tabled && !has("book")) {
+			finishTrip("I've got the obsidian. A book next, for the table.");
+			return null;
+		}
+		if (c.enchanter.on || c.enchanter.possible() && now() > c.enchanter.retryAt) {
+			if (!c.enchanter.on) {
+				c.enchanter.start();
+				c.journal("thinks", "has the obsidian: makes its enchanting table and enchants its gear");
+			}
+			c.goals.instant = "enchanting";
+			return c.enchanter.next();
+		}
+		if (!tabled && !c.crafter.hasOrder()) {
+			c.crafter.orderRecipe("enchanting_table", 1);
+			return null;
+		}
+		finishTrip(c.items().getOrDefault("lapis_lazuli", 0) < 1 ? "The enchanting table's ready. Lapis next." : "Enchanting table done.");
+		return null;
 	}
 
 	/** Ten obsidian: mined where it sees some (a diamond pickaxe), or made by pouring water onto a lava pool first. */
@@ -458,9 +489,16 @@ final class Nether {
 			c.chores.own = true;
 			return null;
 		}
+		if (c.mod.config.luck >= 2 && now() > fetchTriedAt) {                  // knowing everything: obsidian it knows of further off (by the lava, in a ruined portal)
+			fetchTriedAt = now() + 20 * 60;
+			if (c.chores.fetch("obsidian", n -> n.equals("obsidian"), "obsidian", obsidianWanted() - obsidian()).startsWith("You will")) {
+				c.chores.own = true;
+				return null;
+			}
+		}
 		if (!c.knowledge.knows("obsidian") && lookingSince > 0 && now() - lookingSince > 20 * 60 * 3)   // three minutes of looking: it remembers how
 			c.knowledge.learn("obsidian", Knowledge.How.TRIED);
-		if (!c.knowledge.knows("obsidian")) {                               // it doesn't know you can make it: it looks for some
+		if (!c.knowledge.knows("obsidian") && c.mod.config.luck < 2) {      // it doesn't know you can make it: it looks for some (knowing everything, it knows that too)
 			if (lookingSince <= 0) lookingSince = now();
 			say("I need obsidian. I'll look around for some.");
 			BlockPos seen = lookFor(level, "obsidian", 64);

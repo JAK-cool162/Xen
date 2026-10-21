@@ -1405,6 +1405,8 @@ final class Goals {
 			if (tier >= 4 && !monstersNight && f[Mind.DANGER] < 0.2f) {            // the night's for what the enchanting table needs from under the ground: obsidian, then lapis
 				boolean tabledNight = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 				int obsidian = items.getOrDefault("obsidian", 0);
+				int trip = !tabledNight && obsidian < 4 ? tableTrip(items) : -1;
+				if (trip >= 0) return trip;
 				int next = !tabledNight && obsidian < 4 ? planStep(can, "obsidian", 4, "night: obsidian for the enchanting table (under the ground)")
 						: items.getOrDefault("lapis_lazuli", 0) < 3 ? planStep(can, "lapis_lazuli", 3, "night: lapis to enchant with (under the ground)") : -1;
 				if (next >= 0) return next;
@@ -1505,6 +1507,8 @@ final class Goals {
 		} else stoneGoal = -1;
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (tier >= 4 && !tabled && diamonds() >= 2 && f[Mind.DANGER] < 0.2f) {   // the diamond pickaxe and two diamonds: the enchanting table next (a book, four obsidian), the armor after
+			int trip = tableTrip(items);
+			if (trip >= 0) return trip;
 			int step = planStep(can, "enchanting_table", 1, "the enchanting table");
 			if (step >= 0) return step;
 		}
@@ -1910,6 +1914,22 @@ final class Goals {
 
 	private final java.util.HashMap<String, java.lang.Long> planStepAt = new java.util.HashMap<>();
 	private long planLookSince = -1;
+
+	/**
+	 * The book in its bag (or the paper for it), no obsidian yet: off for the table's four obsidian (mined where it knows
+	 * of some, or made by pouring water on lava), the table and its gear enchanted, as one trip. -1: not now.
+	 */
+	private int tableTrip(Map<String, Integer> items) {
+		if (items.getOrDefault("book", 0) < 1 || items.getOrDefault("obsidian", 0) >= 4 || c.nether.busy() || now() < tableTripAt) return -1;
+		tableTripAt = now() + 20 * 60 * 4;
+		String trip = c.nether.go("table", 0);
+		c.journal("thinks", "the enchanting table: " + trip);
+		if (!trip.startsWith("You will")) return -1;
+		agendaGoal = true;
+		return why(Mind.REST, "the enchanting table: obsidian, the table, then its gear enchanted");
+	}
+
+	private long tableTripAt;
 
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
 		agendaGoal = option == Mind.MINE;
