@@ -445,6 +445,21 @@ final class Hunch {
 	 * Ore of this kind close by (luck: the server knows the world), for the guide: the few cheapest to dig to (within
 	 * flat blocks round, deep down or a few up) that are still there and dry, cheapest first. Empty with luck off.
 	 */
+	/** Open water on the straight line from here to there (every 3 blocks, the last few left out): 8 for each, a swim. */
+	private static double waterBetween(ServerLevel level, BlockPos from, BlockPos to) {
+		double dx = to.getX() - from.getX(), dz = to.getZ() - from.getZ(), len = Math.sqrt(dx * dx + dz * dz), cost = 0;
+		var surface = net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE;
+		var floor = net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR;
+		for (double t = 3; t < len - 3; t += 3) {
+			int x = from.getX() + (int) Math.round(dx * t / len), z = from.getZ() + (int) Math.round(dz * t / len);
+			BlockPos q = new BlockPos(x, from.getY(), z);
+			if (!level.hasChunkAt(q)) continue;
+			int top = level.getHeight(surface, x, z);
+			if (top - level.getHeight(floor, x, z) >= 1 && level.getFluidState(new BlockPos(x, top - 1, z)).is(net.minecraft.tags.FluidTags.WATER)) cost += 8;
+		}
+		return cost;
+	}
+
 	List<BlockPos> oresNear(String what, BlockPos from, int flat, int deep, int max) {
 		List<BlockPos> out = new ArrayList<>();
 		if (c.player == null || c.mod.config.luck <= 0 || c.minion) return out;
@@ -467,6 +482,7 @@ final class Hunch {
 				if (dx > flat || dz > flat || dy > deep || dy < (kind.equals("sugar_cane") ? -120 : -6) || taken.contains(at.asLong())) continue;
 				double cost = Math.sqrt((double) dx * dx + (double) dz * dz) + 1.2 * Math.max(0, dy);
 				if (kind.equals("diamond")) cost -= 6 * f.amount() + (at.getY() < 0 ? 24 : 0);   // (deepslate diamonds: the big clumps are down there, more for the same dig)
+				if (kind.equals("sugar_cane")) cost += waterBetween(level, from, at);   // (cane by the water on its own shore, not across the lake)
 				if (!kind.equals("sugar_cane") && level.hasChunkAt(at) && level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ())
 						- level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, at.getX(), at.getZ()) > 2) cost += 120;   // (under the sea: a swim and a flooded dig; the ones under land first)
 				found.add(new double[] {cost, at.getX(), at.getY(), at.getZ()});
