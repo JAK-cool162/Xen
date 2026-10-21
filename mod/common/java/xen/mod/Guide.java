@@ -70,7 +70,7 @@ final class Guide {
 					c.hunch.taken(ore);                                              // (through water or lava: not that one)
 					continue;
 				}
-				leads.add(new Lead(k, ore, n, way.size()));
+				leads.add(new Lead(k, ore, n, way.size(), way));
 				break;
 			}
 		}
@@ -80,7 +80,27 @@ final class Guide {
 
 	/** The ore it can go for, one of each kind, the most necessary first (the top one is the one it follows). */
 	private final List<Lead> leads = new ArrayList<>();
-	private record Lead(String kind, BlockPos at, int need, int steps) {}
+	private record Lead(String kind, BlockPos at, int need, int steps, List<BlockPos> way) {}
+	/** The way it worked out to the ore it's following (where to stand, step by step), or null. */
+	private List<BlockPos> path;
+
+	/**
+	 * The next place along its way (a few steps on from where it is on it, or back onto it): it digs there and stands
+	 * in it, and on, a step at a time, like a player who knows where they're going. Null: no way known.
+	 */
+	BlockPos waypoint(BlockPos feet) {
+		if (path == null || path.isEmpty()) return null;
+		int at = -1;
+		double best = 9;
+		for (int i = 0; i < path.size(); i++) {
+			double d = path.get(i).distSqr(feet);
+			if (d <= best) {
+				best = d;
+				at = i;
+			}
+		}
+		return at < 0 ? path.get(0) : path.get(Math.min(path.size() - 1, at + 5));
+	}
 	private static final String[] KINDS = {"coal", "iron", "lapis", "diamond"};
 
 	/**
@@ -114,6 +134,7 @@ final class Guide {
 			followed++;
 			target = l.at();
 			kind = l.kind();
+			path = l.way();
 			closest = Double.MAX_VALUE;
 			closerAt = since = now();
 			c.hunch.steered = kind + " (its guide)";
@@ -228,12 +249,14 @@ final class Guide {
 		c.journal("learns", String.format(Locale.ROOT, "following its feeling to the %s: %s (%s, %.1f min); trusts its feelings %.0f%%", kind, worked ? "paid off" : "didn't",
 				why, (now() - since) / 1200f, 100 * faith()));
 		target = null;
+		path = null;
 		next();                                                                  // (the next one on its stack, if any)
 	}
 
 	/** Not this time (the trip ended, a fight, the night...). */
 	void drop() {
 		target = null;
+		path = null;
 		leads.clear();
 	}
 

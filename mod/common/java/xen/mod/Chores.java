@@ -1562,10 +1562,17 @@ final class Chores {
 			}
 			if (c.guide.check()) {
 				BlockPos t = c.guide.target, here = c.player.blockPosition();
+				BlockPos w = t.closerThan(here, 11) ? null : c.guide.waypoint(here);
 				if (t.closerThan(here, 11)) {                                   // close: straight to it
 					doing = c.guide.doing(got, want);
 					Action a = reach(t);
 					if (a != null) return a;
+				} else if (w != null && (c.mod.config.luck >= 2 || c.guide.leadingTo("diamond"))) {   // far: along the way it worked out, dry all the way, a few steps at a time
+					Action a = c.walkTo(Goal.block(w));
+					if (a != null) {
+						doing = c.guide.doing(got, want);
+						return a;
+					}
 				} else if (!caveMode && mineBase == null && tunnelIn == null && t.getY() < here.getY() - 3) {   // far and below: its staircase goes that way (as deep as it was going: it takes the ore as it passes)
 					net.minecraft.core.Direction d = c.guide.way();
 					if (!wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
