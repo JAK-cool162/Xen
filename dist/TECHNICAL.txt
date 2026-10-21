@@ -54,10 +54,10 @@ Fights: Fighter.weaponHit / critsToKill: against a skeleton, the axe when it kil
 (stone axe 9, crit 13.5: two crits for 20 health; a stone sword three). Styles (tactician, opportunist, controller,
 explorer, team) from a player's notes: the health each keeps in hand, healing early, a finishing blow, the high ground.
 
-Staying alive: running for its life with nothing to fight with, it sprints off along a clear line (Fighter.escapeDir,
-runAlong) instead of waiting on a way worked out; night falling while it hunts bare-handed (or under 14 health) drops
+Staying alive: night falling while it hunts bare-handed (or under 14 health) drops
 the hunt for a shelter (Goals.nightfall); a skeleton, stray, bogged or pillager shooting at it from up to 16 blocks is
-the fight it's in (Companion.foe), not something to turn its back on for a chore. A build that gets nowhere for four
+the fight it's in (Companion.foe), not something to turn its back on for a chore, and its gut doesn't make it dig in
+with one shooting at it (Gut.refuge). Below y 40 with no sky, a hunt with no animals in sight ends (Chores.huntNext). A build that gets nowhere for four
 minutes of working on it (Builder: no block placed or dug, no wood fetched, nothing crafted) is given up: finished as it
 stands with 20+ blocks placed, else dropped and not come back to.
 

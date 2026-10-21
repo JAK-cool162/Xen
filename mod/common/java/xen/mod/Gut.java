@@ -253,11 +253,11 @@ final class Gut {
 				|| c.commandedTo != null || c.mode == Companion.Mode.FOLLOW) return null;
 		int near = 0;
 		double closest = 99;
-		boolean onIt = false;                                                    // one coming at it now, or shooting at it: that first (digging, it's hit from behind)
+		boolean onIt = false;                                                    // one shooting at it: that first (digging, it's shot in the back)
 		for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
 				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
 			double d = m.distanceTo(p);
-			if (m.getTarget() == p && (d < 6 || Companion.archer(m) && m.hasLineOfSight(p))) onIt = true;
+			if (m.getTarget() == p && Companion.archer(m) && m.hasLineOfSight(p)) onIt = true;   // (a zombie a few blocks off: digging in still beats running)
 			if (d > 12) continue;
 			near++;
 			closest = Math.min(closest, d);

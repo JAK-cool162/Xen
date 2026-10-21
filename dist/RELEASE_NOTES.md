@@ -3,9 +3,37 @@ own houses, farm, trade, form villages with their own rules, make friends and en
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.41
+### 2.0.0-beta.41: Xen gets a massive upgrade
 
-* Xen gets a massive upgrade.
+* **Xens know the world** (the "knows the world" setting, on by default, off any time): where the caves, villages,
+  herds and other players are, and ore that shows to the air or sits one block behind a wall (not ore deep in solid
+  rock). They don't beeline: they wander that way, in legs that bend off the line, as if they found it by chance. A
+  fight, a greeting, anything they do about it is still their own call and still needs sight to land.
+* **Water**: real swimming (sprint-swim, up for air at 70%, a door as an air pocket), a boat for long crossings, no
+  long ways under water, respawning on dry land, out from under an overhang (3 of 3 got out in the test; the old jar
+  stayed pinned), and a step sideways out of gravel instead of suffocating in it.
+* **The road to the Nether**: a shield, then armor; 2 diamonds kept for the enchanting table; enchanting comes before
+  crafting more gear; obsidian (14, looking for lava deep down, water on lava), flint from gravel, the portal built,
+  its frame cleared, lit and walked into. Tested with the gear given: it enchants, builds and lights the portal and
+  goes through.
+* **The Nether**: ghast fireballs punched back (or blocked, or dodged), blazes, hoglins, wither skeletons, magma
+  cubes, piglin anger, the lava seas; gold traded with piglins for ender pearls; piglin brutes kept clear of until it's
+  in diamond.
+* **Fights**: the axe when it kills a skeleton in fewer crits than the sword, a rush at a skeleton close by, five
+  fighting styles, crouching at cliff edges, and a skeleton shooting from up to 16 blocks is a fight it's in (no
+  turning its back on it for a chore).
+* **Staying alive**: no hunting in the dark bare-handed, no hunting for animals deep in the caves (where one walked into
+  lava), a build that's stuck for 4 minutes is given up (one Xen with an iron pickaxe had stood 35 minutes at one
+  block), and the urge to dig in for the night no longer fires with a skeleton shooting at it.
+* **Jokes**: "Hey, guess what?", "wanna hear a joke?", knock knock, with players and with each other. A "No" or a
+  "bruh" and it's embarrassed ("oh. ok 😿"), sometimes mad ("😿😾"); called geeked while it's embarrassed, it snaps:
+  anger and bloodlust 100%, and it comes for you.
+* **Together**: "let's make a team called ..." (each Xen decides), roles on a team (keeper, miner, fighter, explorer),
+  "come here" that really comes, back for its things after dying (a friend along, if they want), sugar cane, animals
+  led into its pen.
+* **Benchmark** (6 Xens, normal difficulty, the test worlds): beta.40 over 2.1 days: 1.05 deaths a Xen a day, 1 Xen
+  with iron. beta.41's runs over 4 days: 0.5 to 1.2 deaths a Xen a day, 3 Xens with iron in each world, 2 with an
+  iron pickaxe, up to 2 in full iron armor. No Xen has got to diamonds on its own yet: that's next.
 
 ### 2.0.0-beta.40: Xen Ex1 v5, learned from a player building a house
 
