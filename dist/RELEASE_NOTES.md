@@ -1,9 +1,30 @@
-**Xen Companion 2.0.0-beta.44**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.45**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.44: Xen gets a massive upgrade
+### 2.0.0-beta.45: Xen gets a massive upgrade
+
+* **Diamonds the way Baritone mines** (with "Knows the world" on its new top setting, **everything**): every
+  diamond it knows of close by is one goal for its own way-finder, which digs the cheapest way there; diamonds in
+  reach it mines at once. Deepslate diamonds and big clumps first. Test (3 Xens given iron gear): one got **7 diamonds
+  in about 8 game minutes**, the first after about 9; the other two found none in the 20 game minutes, so it isn't
+  reliable yet.
+* **It wants diamond everything**: about 31 diamonds (pickaxe, enchanting table, sword, all four armor pieces), not
+  3; its world knowledge now includes obsidian and lapis for the enchanting table. Diamond armor and enchanting
+  haven't been seen in a test yet.
+* **Stays on its goal**: choices stack up by how necessary they are (its life, then what can't wait, then the main
+  goal, then the rest); a house, a farm or a mine entrance is dropped for the main goal; it doesn't wander off a
+  diamond trip; boredom takes 15 to 35 minutes, not a few.
+* **Fewer deaths**: it sees trouble coming before it's hurt (every monster about, the dark, its armor), keeps to a
+  retreat until it's safe, puts blocks between itself and them when cornered, heals before going on, gets under the
+  ground by dusk, digs in after dark, crouches at drops it didn't plan (no more long falls), blocks water and lava
+  off when mining, knocks mobs off ledges. 10-day test runs: 10 and 5 deaths by game day 6 (the build before: 20 and 29
+  by day 7 to 9), no falls.
+* Knows what things are for: from village chests only what it needs; sugar cane early for books; some look for a cave
+  before their first tree.
+
+### 2.0.0-beta.44
 
 * **Runs to eat**: hurt and hungry in a fight with monsters close, it sprints away first (monsters walk at about 2
   to 2.5 blocks a second, a sprinting player does about 5.6), opens a gap, then eats. It used to stand and take hits.

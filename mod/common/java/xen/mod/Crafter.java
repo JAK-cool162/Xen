@@ -117,7 +117,7 @@ final class Crafter {
 	private String wanted() {
 		int tier = pickTier();
 		int iron = count(n -> n.equals("iron_ingot")), diamonds = count(n -> n.equals("diamond"));
-		if (tier == 3 && diamonds >= 3 && canMake(4)) return "diamond_pickaxe";      // the next tier, like any player
+		if (tier < 4 && diamonds >= 3 && canMake(4)) return "diamond_pickaxe";       // the next tier, like any player (its iron one broke: straight to diamond)
 		if (tier == 2 && iron >= 3 && canMake(3)) return "iron_pickaxe";
 		if (tier >= 3 && iron >= 1 && !hasShield() && wood() >= 6) return "shield";   // (the first ingot after the pickaxe: a shield, before a sword or armor: it stops nearly everything early on)
 		long day = Compat.timeOfDay(c.player.level()) % 24000;

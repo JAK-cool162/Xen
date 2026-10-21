@@ -1,8 +1,27 @@
-XEN COMPANION 2.0.0-beta.44: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.45: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.45
+
+Mining, knowing everything (luck 2, the new default): Chores.knownOre(): every ore of the kind it's after within 128
+blocks round and 160 down (Hunch.oresNear, a dozen, looked up again every 5 s, mined ones dropped) becomes one
+Goal.anyOf(nextTo each) for the walker, digging allowed (the way Baritone's mine process does it); one in reach is
+mined at once; no way to any: the nearest is let go. Diamond cost: minus 6 per block in the clump, minus 24 below y 0.
+Goals.diamondsWanted(): 3 pickaxe + 2 table + 2 sword + 8/7/5/4 per armor piece not diamond yet, +3 in hand.
+Goals.necessity(): 4 life (danger, food or health under 8), 3 can't wait (eat under 14, a craft, iron to smelt, no
+food, cover at dusk or night in the open), 2 the main goal's step, 1 the rest, 0 rest; only higher cuts in.
+Optional jobs (its own house, farms, mob farm, trial chambers) are dropped after a minute while the main goal is open.
+Fighter.threatAround(): every monster within 12 (full if after it, half if it sees it, less far off), x1.25 in the
+dark in the open, x(1.3 - 0.5 armor/20); over its health less its margin: it gets out early. Retreat kept till safe()
+(none after it in sight within 12, 12+ health); recover(): eats and waits till 16 health (30 s at most).
+Gut: in the open after dark it digs in (unless on its way down its mine). XenPlayer.edgeGuard(): crouches at drops of
+6+ (or 4+ that would leave it under 2 health) deeper than the walker planned; planned drops at most 4 (10 with a sure
+water clutch). Chores.plugFluid(): water or lava by its tunnel under the ground, a block in it (a dozen a minute at most).
+Whims: boredom fills in 15 to 35 minutes of the same (x0.3 on a job, x1.5 with nothing to do); standing about moves on
+after a minute of nothing, three on a stuck job. Worth: what each thing is for and how many it wants by when.
 
 WHAT'S NEW IN 2.0.0-beta.44
 

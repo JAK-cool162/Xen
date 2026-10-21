@@ -71,8 +71,9 @@ final class Whims {
 		}
 		int option = c.goals.option;
 		float patience = c.personality.patience();
-		float rise = 1f / (20 * 60 * (6 + 8 * patience)) * c.mod.config.decisionTicks;   // full in 6 to 14 minutes of the same
-		if (option < 0 || "looking around".equals(c.goals.instant) || c.goals.instant.isEmpty()) rise *= 2;   // (nothing to do: faster)
+		float rise = 1f / (20 * 60 * (15 + 20 * patience)) * c.mod.config.decisionTicks;   // full in 15 to 35 minutes of the same (a player's patience, not a goldfish's)
+		if (option < 0 || "looking around".equals(c.goals.instant) || c.goals.instant.isEmpty()) rise *= 1.5f;   // (nothing to do: a bit faster)
+		else if (c.chores.busy() || c.fightingNow()) rise *= 0.3f;              // (in Minecraft something's always happening on a job: ore, mobs, the way there; it hardly gets bored)
 		if (p.tickCount % 20 == 0) {                                              // something it never had before: that's fun, not boring
 			int before = had.size();
 			had.addAll(c.items().keySet());
