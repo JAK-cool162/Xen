@@ -60,24 +60,68 @@ final class Guide {
 		if (c.player == null || c.mod.config.luck <= 0 || c.minion || target != null) return false;
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos from = c.player.blockPosition();
-		for (BlockPos ore : c.hunch.oresNear(what, from, flat, deep, 6)) {
-			List<BlockPos> way = route(level, from, ore);
-			if (way == null) {
-				c.hunch.taken(ore);                                                  // (through water or lava: not that one)
-				continue;
+		leads.clear();
+		for (String k : KINDS) {                                                 // every ore it needs, how much it needs it (what it came for: a little more)
+			int n = need(k) + (k.equals(what) ? 1 : 0);
+			if (n <= 0) continue;
+			for (BlockPos ore : c.hunch.oresNear(k, from, flat, deep, 6)) {
+				List<BlockPos> way = route(level, from, ore);
+				if (way == null) {
+					c.hunch.taken(ore);                                              // (through water or lava: not that one)
+					continue;
+				}
+				leads.add(new Lead(k, ore, n, way.size()));
+				break;
 			}
+		}
+		leads.sort((a, b) -> a.need() != b.need() ? b.need() - a.need() : a.steps() - b.steps());   // the most necessary on top, the nearest of those
+		return next();
+	}
+
+	/** The ore it can go for, one of each kind, the most necessary first (the top one is the one it follows). */
+	private final List<Lead> leads = new ArrayList<>();
+	private record Lead(String kind, BlockPos at, int need, int steps) {}
+	private static final String[] KINDS = {"coal", "iron", "lapis", "diamond"};
+
+	/**
+	 * How much it needs this ore now: 3 it can't go on without it (coal for the raw iron it has, iron for its first iron
+	 * pickaxe), 2 the main goal (diamonds for a pickaxe and an enchanting table, coal for torches), 1 good to have
+	 * (iron for armor, lapis for enchanting, coal to spare), 0 not at all.
+	 */
+	private int need(String k) {
+		var items = c.items();
+		int tier = c.crafter.pickTier();
+		int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0);
+		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
+		return switch (k) {
+			case "coal" -> coal < 3 && items.getOrDefault("raw_iron", 0) > 0 ? 3 : coal < 3 && items.getOrDefault("torch", 0) < 8 ? 2 : coal < 8 ? 1 : 0;
+			case "iron" -> tier < 3 ? 3 : iron < 24 && !c.crafter.has("_chestplate") ? 1 : 0;
+			case "diamond" -> tier >= 3 && items.getOrDefault("diamond", 0) < 5 ? 2 : 0;
+			case "lapis" -> tier >= 3 && items.getOrDefault("lapis_lazuli", 0) < 3 ? 1 : 0;
+			default -> 0;
+		};
+	}
+
+	/** On to the next lead on its stack that's still there (true), or none left. */
+	private boolean next() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		while (!leads.isEmpty()) {
+			Lead l = leads.remove(0);
+			var st = level.getBlockState(l.at());
+			int cat = WorldSenses.category(level, l.at(), st);
+			if (st.isAir() || cat == Blocks.AIR || cat == Blocks.STONE) continue;  // (mined meanwhile)
 			offered++;
-			target = ore;
-			kind = what;
+			followed++;
+			target = l.at();
+			kind = l.kind();
 			closest = Double.MAX_VALUE;
 			closerAt = since = now();
-			followed++;
-			c.hunch.steered = what + " (its guide)";
+			c.hunch.steered = kind + " (its guide)";
 			c.hunch.steeredAt = now();
 			c.hunch.times++;
-			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and follows it: %d blocks of digging",
-					what, ore.getX(), ore.getY(), ore.getZ(), way.size()));
-			XenMod.LOG.info("{} follows its guide to {} at {} ({} steps)", c.name, what, ore.toShortString(), way.size());
+			c.journal("thinks", String.format(Locale.ROOT, "has a feeling there's %s at about %d %d %d and follows it: %d blocks of digging (%d more in mind)",
+					kind, target.getX(), target.getY(), target.getZ(), l.steps(), leads.size()));
+			XenMod.LOG.info("{} follows its guide to {} at {} ({} steps, need {}, {} more on its stack)", c.name, kind, target.toShortString(), l.steps(), l.need(), leads.size());
 			return true;
 		}
 		return false;
@@ -106,7 +150,7 @@ final class Guide {
 		List<BlockPos> way = new ArrayList<>();
 		int x = from.getX(), y = from.getY(), z = from.getZ(), turn = 0;
 		int[][] ring = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-		for (int guard = 0; guard < 240; guard++) {
+		for (int guard = 0; guard < 480; guard++) {
 			int dx = ore.getX() - x, dz = ore.getZ() - z, dy = ore.getY() - y;
 			int flat = Math.abs(dx) + Math.abs(dz);
 			if (flat <= 1 && dy >= -1 && dy <= 1) return way;                        // right by it: it mines it from here
@@ -184,11 +228,13 @@ final class Guide {
 		c.journal("learns", String.format(Locale.ROOT, "following its feeling to the %s: %s (%s, %.1f min); trusts its feelings %.0f%%", kind, worked ? "paid off" : "didn't",
 				why, (now() - since) / 1200f, 100 * faith()));
 		target = null;
+		next();                                                                  // (the next one on its stack, if any)
 	}
 
 	/** Not this time (the trip ended, a fight, the night...). */
 	void drop() {
 		target = null;
+		leads.clear();
 	}
 
 	String describe() {

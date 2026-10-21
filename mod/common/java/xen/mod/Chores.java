@@ -1200,7 +1200,7 @@ final class Chores {
 		mineLeg = 0;
 		legStarted = now();
 		using = null;
-		if (!what.equals("diamonds") || !c.guide.leadingTo("diamond")) c.guide.drop();   // (back to the same diamond dig: its guide still knows the way, no new one each time)
+		if (!c.guide.leading()) c.guide.drop();                                // (a new trip: its guide keeps what it's leading to, no new one each time)
 		guideNext = 0;
 		boolean dark = c.player.level().isDarkOutside();                      // at night: no long walks in the dark to get there
 		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)

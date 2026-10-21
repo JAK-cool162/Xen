@@ -39,7 +39,9 @@ final class Hunch {
 
 	/** What's in each chunk near a Xen, for each world: looked at a chunk at a time, again every five minutes. */
 	private static final Map<String, Map<Long, Chunk>> WORLD = new HashMap<>();
-	private static final int AROUND = 5, AGAIN = 20 * 60 * 5, EVERY = 3, MOST = 6000;
+	private static final int AGAIN = 20 * 60 * 5, EVERY = 3, MOST = 12000;
+	/** How many chunks round each Xen the server's knowledge reaches: 5 (80 blocks), knowing everything 8 (128). */
+	private static int AROUND = 5;
 	/** Ore blocks, by what they are ("iron", "diamond", ...). */
 	private static final Map<Block, String> ORES = new HashMap<>();
 	/** The grapevine: what Xens found and pass on to their friends; caves being mined (and by whom); meetings. */
@@ -66,6 +68,7 @@ final class Hunch {
 	static void tick(XenMod mod, MinecraftServer s) {
 		double luck = mod.config.luck;
 		if (luck <= 0 || s.getTickCount() % EVERY != 0 || mod.companions.isEmpty()) return;
+		AROUND = luck >= 2 ? 8 : 5;
 		ores();
 		List<Companion> who = new ArrayList<>();
 		for (Companion c : mod.companions) if (c.player != null && c.player.isAlive() && !c.minion) who.add(c);
@@ -447,7 +450,12 @@ final class Hunch {
 		Map<Long, Chunk> known = WORLD.get(dim(level));
 		if (known == null) return out;
 		String kind = what.equals("diamonds") ? "diamond" : what;
-		boolean straight = kind.equals("diamond") && c.crafter.pickTier() >= 3 && c.caves.nearest(160) == null;   // (an iron pickaxe, diamonds wanted, no cave to look in: its sense of them leads it straight there, through the rock)
+		boolean straight = kind.equals("diamond") && c.crafter.pickTier() >= 3 && c.caves.nearest(160) == null   // (an iron pickaxe, diamonds wanted, no cave to look in: its sense of them leads it straight there, through the rock)
+				|| c.mod.config.luck >= 2;                                         // (knowing everything: every ore it needs, wherever it is, and further round)
+		if (c.mod.config.luck >= 2) {
+			flat = Math.max(flat, 128);
+			deep = Math.max(deep, 160);
+		}
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
