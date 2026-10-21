@@ -541,6 +541,7 @@ final class Plans {
 				yield input != null && c.chores.smelt(input).startsWith("You will");
 			}
 			case HUNT -> {
+				if (s.item.equals("leather")) yield c.chores.slay("cow", "leather", s.count, "leather").startsWith("You will");   // (a cow for it, whatever food it has)
 				if (s.item.equals("wool")) c.chores.forWool = true;
 				yield false;                                                   // (the usual hunt does it)
 			}

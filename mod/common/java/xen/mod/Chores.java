@@ -1962,6 +1962,7 @@ final class Chores {
 		pickupAt = at;
 		pickupGoneAt = -1;
 		fetchDrop = drop;
+		fetchAt = now();
 		fetchWant = Math.max(1, n);
 		items = new String[] {drop};
 		what = name;
@@ -1984,7 +1985,8 @@ final class Chores {
 		if (best == null) best = c.eyes.nearest(kind, Eyes.RANGE, k -> skip.contains(Perception.Beliefs.key(BlockPos.of(k).getX(), BlockPos.of(k).getY(), BlockPos.of(k).getZ())));
 		if (best == null && c.mod.config.luck >= 2 && java.util.Set.of("obsidian", "diamond", "iron", "coal", "lapis", "gold", "redstone", "copper", "emerald", "sugar_cane").contains(kind)) {   // knowing everything: the nearest it knows of, seen or not
 			for (BlockPos q : c.hunch.oresNear(kind, feet, 128, 160, 12)) {
-				if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)) continue;
+				if (skip.contains(Perception.Beliefs.key(q.getX(), q.getY(), q.getZ())) || underwater(q) || lavaBehind(level, q)
+						|| level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER) && level.getFluidState(q.above(2)).is(net.minecraft.tags.FluidTags.WATER)) continue;   // (at the bottom of a lake: a dive, not a dig)
 				best = q;
 				break;
 			}
@@ -2005,10 +2007,13 @@ final class Chores {
 				doing = "picking up " + fetchDrop.replace('_', ' ');
 				return c.stepTo(drop.position());
 			}
-			if (fetchMatch.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath())) {
+			boolean noWay = now() - c.walker.diveRefusedAt < 2 && now() - fetchAt > 40 || now() - fetchAt > 20 * 180;   // (too long under water to get there, or three minutes on this one: the next)
+			if (noWay) c.journal("way", "lets the " + fetchKind.replace('_', ' ') + " at " + pickupAt.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
+			if (!noWay && fetchMatch.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath())) {
 				doing = String.format(java.util.Locale.ROOT, "getting %s (%d of %d)", fetchDrop.replace('_', ' '), countItem(fetchDrop) - had, fetchWant);
 				return reach(pickupAt);
 			}
+			if (noWay) pickupGoneAt = now() - 20;
 			if (pickupGoneAt < 0) pickupGoneAt = now();
 			if (now() - pickupGoneAt < 20) return Action.IDLE;                // (a moment for the drop to land)
 			skip.add(Perception.Beliefs.key(pickupAt.getX(), pickupAt.getY(), pickupAt.getZ()));
@@ -2021,6 +2026,7 @@ final class Chores {
 			}
 			pickupAt = next;
 			pickupGoneAt = -1;
+			fetchAt = now();
 			return Action.IDLE;
 		}
 		if (countItem(pickupId) > had || pickupId.equals("torch") && countItem("torch") > had) {
@@ -2137,6 +2143,17 @@ final class Chores {
 			return c.stepTo(drop.position());
 		}
 		if (prey == null || !prey.isAlive() || c.player.distanceTo(prey) > 48) prey = nearestOf(slayType);
+		if (prey == null && c.mod.config.luck >= 2) {                         // knowing everything: the nearest one about, seen or not
+			LivingEntity far = null;
+			for (LivingEntity e : c.player.level().getEntitiesOfClass(LivingEntity.class, c.player.getBoundingBox().inflate(128, 48, 128), x -> x.isAlive()
+					&& net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(x.getType()).getPath().equals(slayType)))
+				if (far == null || c.player.distanceTo(e) < c.player.distanceTo(far)) far = e;
+			if (far != null) {
+				doing = "going to the " + slayType.replace('_', ' ') + " it knows of";
+				if (c.player.distanceTo(far) < 16) prey = far;
+				return c.walkTo(far.position());
+			}
+		}
 		if (prey == null) {
 			doing = "looking for a " + slayType.replace('_', ' ');
 			return lookAround();
@@ -2696,7 +2713,7 @@ final class Chores {
 	 * them, digging the way there (the cheapest it can work out, through the rock as needed); one in arm's reach it
 	 * mines at once. No way to any: the nearest is let go, the rest stay. Null: none known.
 	 */
-	private long oreWalkAt = -1000, oreBestAt;
+	private long oreWalkAt = -1000, oreBestAt, fetchAt;
 	private double oreBest = Double.MAX_VALUE;
 	private String oreBestKind = "";
 

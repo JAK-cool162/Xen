@@ -1486,8 +1486,7 @@ final class Goals {
 			}
 		}
 		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
-				&& (enchantedSomething() || c.enchanter.table() == null && MindSense.count(c, n -> n.equals("obsidian") || n.equals("enchanting_table")) < 4
-						&& MindSense.count(c, n -> n.equals("book")) > 0 || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted, or the book and no obsidian for the table yet (the trip gets it, and it enchants before the portal), or two days on: a first look at the Nether
+				&& (enchantedSomething() || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted (the enchanting table its own step first), or two days on: a first look at the Nether
 			netherTryAt = now() + 20 * 60 * 20;
 			String trip = c.nether.go("visit", 0);
 			c.journal("thinks", "the plan: a first look at the Nether (" + trip + ")");
