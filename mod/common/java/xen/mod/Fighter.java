@@ -1002,6 +1002,7 @@ final class Fighter {
 			if (o == c || o.player == null || !o.player.isAlive() || o.player.level() != p.level() || o.player == foe || o.inArena) continue;
 			double od = o.player.distanceTo(p);
 			if (od >= bestD || o.trust(p.getUUID()) < 0.3f && !p.isAlliedTo(o.player) || c.trust(o.player.getUUID()) < 0.2f) continue;
+			if (o.player.getHealth() < 10 || !o.hands.hasWeapon() || o.fightingNow() && o.player.hurtTime > 0) continue;   // (in trouble too, or nothing to fight with: running to it is running into two fights)
 			Vec3 to = o.player.position().subtract(p.position()).multiply(1, 0, 1);
 			if (to.lengthSqr() > 1e-4 && toFoe.lengthSqr() > 1e-4 && to.normalize().dot(toFoe.normalize()) > 0.4 && od > d) continue;   // (not through the foe)
 			bestD = od;

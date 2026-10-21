@@ -266,7 +266,7 @@ final class Gut {
 		boolean bare = !c.hands.hasWeapon();
 		boolean fresh = level.getGameTime() - c.respawnedAt < 600;                 // (just back from dying, at the spawn, with nothing)
 		boolean coming = danger >= 0.6f || near > 0 && (p.getHealth() <= 10 || bare) || near >= 3 || fresh && bare;
-		if (!coming || closest < 3.5) return null;
+		if (!coming || closest < (fresh && bare ? 2.2 : 3.5)) return null;          // (just respawned with nothing: a hole now, even with them close; running with nothing gets it killed again)
 		String plan = c.chores.digIn();
 		if (plan == null) return null;
 		c.chores.own = true;
