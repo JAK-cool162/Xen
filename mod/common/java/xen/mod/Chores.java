@@ -214,8 +214,8 @@ final class Chores {
 				return false;
 			}
 		}
-		int minutes = "diamonds".equals(what) ? 8 : 3;                          // (diamonds are rare: a player strip-mines a while for them)
-		float patience = Math.max(kind == Kind.MINE ? 0.7f : 0.3f, c.personality.patience());   // (a trip down takes a while, even for a lazy one)
+		int minutes = "diamonds".equals(what) ? 8 : 4;                          // (diamonds are rare: a player strip-mines a while for them)
+		float patience = Math.max(kind == Kind.MINE ? 0.7f : 0.6f, c.personality.patience());   // (a trip down takes a while, even for a lazy one; and nobody gives up in under two and a half minutes)
 		if (now() - lastGain < (long) (20 * 60 * minutes * patience)) return false;   // (a lazy one gives up sooner, a hard worker later)
 		if (kind == Kind.MINE) {
 			if (!caveMode && mineBase != null) {                                // a mine that got down: these tunnels gave nothing, the next ones further out may (a player keeps their mine)
@@ -1068,10 +1068,9 @@ final class Chores {
 		}
 		boolean forStone = cats.length > 0 && cats[0] == Blocks.STONE && c.crafter.pickTier() >= 1;
 		if (forStone && !c.player.isInWater() && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD
-				&& (known == null || Math.hypot(known[0] - c.player.getX(), known[2] - c.player.getZ()) > 12)) {
+				&& (known == null || Math.hypot(known[0] - c.player.getX(), known[2] - c.player.getZ()) > 24)) {   // (stone it saw on a hillside close by: it walks over, it doesn't dig)
 			doing = "digging down for stone";                             // (none close: like a player, it digs down where it stands, stone is a few blocks under)
-			BlockPos feet = c.player.blockPosition();
-			return digDown(feet.relative(c.player.getDirection(), 2).below(2));
+			return stairsDown();
 		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
@@ -2203,8 +2202,7 @@ final class Chores {
 				doing = "getting stone for a furnace (" + stone + " of 8)";
 				int[] s = glance(new int[] {Blocks.STONE});
 				if (s != null) return reach(new BlockPos(s[0], s[1], s[2]));
-				BlockPos feet = c.player.blockPosition();
-				return digDown(feet.relative(c.player.getDirection(), 2).below(2));   // (none in sight: the stone under its feet, the staircase way)
+				return stairsDown();                                         // (none in sight: the stone under its feet, the staircase way)
 			}
 			if (countItem("furnace") == 0) {                                  // make one (8 cobblestone, in its crafting table)
 				doing = "making a furnace";
@@ -2595,6 +2593,19 @@ final class Chores {
 	 * Down to a block below it: a staircase, never straight down (a hole under your feet can drop you into lava or a
 	 * cave). The block itself, once it's within reach and it can see a side of it, it just mines.
 	 */
+	/** The way its staircase down goes, and when it last dug at it: one way, kept, not wherever it happens to face. */
+	private net.minecraft.core.Direction stairDir;
+	private long stairDugAt = -1000;
+
+	/** Down for stone the way a player does: a straight staircase one way (it doesn't turn as it looks about and wander off digging). */
+	private Action stairsDown() {
+		long now = now();
+		if (stairDir == null || now - stairDugAt > 200) stairDir = c.player.getDirection();   // (a new staircase: the way it faces now)
+		stairDugAt = now;
+		BlockPos feet = c.player.blockPosition();
+		return digDown(feet.relative(stairDir, 2).below(2));
+	}
+
 	private Action digDown(BlockPos t) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();

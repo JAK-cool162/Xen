@@ -3063,7 +3063,29 @@ public final class Companion {
 	/** When it last looked for ore to take on its way. */
 	private int lookedOnTheWay;
 
+	/** Where it set out for, since when, and when it last walked (a player doesn't change where they're headed five times a second). */
+	private Vec3 heldGoal;
+	private long heldSince, heldCalled;
+
+	/**
+	 * Where it's headed: once it sets out somewhere it keeps to it for two seconds, whatever else comes to mind (a new
+	 * spot a few blocks over is the same way, and counts). Danger, a fight, a hit, short of air, or getting there lets it
+	 * change at once; so does a second of not walking (it was doing something else).
+	 */
+	private Vec3 headingFor(Vec3 goal) {
+		long now = player.level().getGameTime();
+		boolean urgent = fightingNow() || player.hurtTime > 0 || danger() > 0.4f || player.isInWater() && player.getAirSupply() < player.getMaxAirSupply() / 2;
+		boolean same = heldGoal != null && goal.distanceTo(heldGoal) < 3;
+		if (heldGoal == null || same || urgent || now - heldCalled > 20 || now - heldSince >= 40 || player.position().distanceTo(heldGoal) < 2) {
+			if (!same) heldSince = now;
+			heldGoal = goal;
+		}
+		heldCalled = now;
+		return heldGoal;
+	}
+
 	private Action walkTo(Goal g, Vec3 goal) {
+		if (g == null) goal = headingFor(goal);                         // (no changing its mind about where it's going every tick)
 		Action ore = oreOnTheWay();                                     // on its way: ore right there, it takes it (like a player would)
 		if (ore != null) return ore;
 		if (g == null && (voyager.flying() || voyager.shouldFly(goal))) {   // far, under the sky, with an elytra: it flies there

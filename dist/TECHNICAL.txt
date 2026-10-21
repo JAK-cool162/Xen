@@ -63,7 +63,14 @@ up facing it while it backs away, instead of turning its back to run for cover.
 Staying alive: night falling while it hunts bare-handed (or under 14 health) drops
 the hunt for a shelter (Goals.nightfall); a skeleton, stray, bogged or pillager shooting at it from up to 16 blocks is
 the fight it's in (Companion.foe), not something to turn its back on for a chore, and its gut doesn't make it dig in
-with one shooting at it (Gut.refuge). Below y 40 with no sky, a hunt with no animals in sight ends (Chores.huntNext). A build that gets nowhere for four
+with one shooting at it (Gut.refuge). Below y 40 with no sky, a hunt with no animals in sight ends (Chores.huntNext).
+
+Attention: once it sets out somewhere it keeps to it for 2 seconds (Companion.headingFor; a spot within 3 blocks of it
+is the same way), unless it's in a fight, just hit, in danger or short of air, or got there (the runs before: about 25
+new routes a Xen a minute, 60% of them somewhere else within 2 seconds). Down for stone, its staircase goes one way,
+the way it faced when it started (Chores.stairsDown), not wherever it looks while digging (it wandered about digging
+dirt for minutes); stone it saw within 24 blocks it walks to instead. A chore with nothing to show gives up after 4
+minutes times its patience (at least 0.6: 2.4 minutes), not 0.9. A build that gets nowhere for four
 minutes of working on it (Builder: no block placed or dug, no wood fetched, nothing crafted) is given up: finished as it
 stands with 20+ blocks placed, else dropped and not come back to.
 
