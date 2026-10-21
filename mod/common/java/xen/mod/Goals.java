@@ -709,6 +709,30 @@ final class Goals {
 		return current == Short.MINE && diamondsNext() || option == Mind.ENCHANT || c.nether.busy();
 	}
 
+	/** The main goal's step it put on hold for something more necessary (null: none): it comes back on top after. */
+	private String heldGoal;
+
+	/**
+	 * How necessary a choice is now; its goals stack up by it. 4: its life (danger, food or health running out). 3: what
+	 * can't wait (a bite before it's starving, a craft or iron to smelt waiting, no food in the bag, cover at night with
+	 * nothing to fight with). 2: the main goal's next step (wood and stone tools, iron, diamonds, enchanting, and what a
+	 * trip needs first). 1: anything else it could do (a house, a bed, a farm, a look round). 0: a breather. Something
+	 * cuts in only if it's more necessary than what it's set on.
+	 */
+	private int necessity(int o, float[] f, int planned) {
+		var p = c.player;
+		int food = p.getFoodData().getFoodLevel();
+		boolean danger = f[Mind.DANGER] > 0.3f, night = p.level().isDarkOutside() && p.level().canSeeSky(p.blockPosition().above());
+		if (o == Mind.REST) return 0;
+		if (o == Mind.FLEE) return danger ? 4 : 1;
+		if (o == Mind.SHELTER) return danger ? 4 : night && c.crafter.pickTier() <= 1 ? 3 : 1;
+		if (o == Mind.EAT) return food < 8 || p.getHealth() < 8 ? 4 : food < 14 ? 3 : 0;
+		if (o == Mind.CRAFT) return 3;
+		if (o == Mind.SMELT && c.items().getOrDefault("raw_iron", 0) >= 1) return 3;
+		if (o == Mind.FOOD && c.items().getOrDefault("food", 0) < 2) return 3;
+		return o == planned && agendaGoal ? 2 : 1;
+	}
+
 	/** Times it went straight back to a diamond dig without a new diamond, and how many it had then. */
 	private int keptAt, keptDiamonds;
 	/** The agenda's step this time is part of the main goal (iron, diamonds, enchanting, or what they need first). */
@@ -940,15 +964,27 @@ final class Goals {
 			d.how[need] = "no standing about: " + Mind.SAYS[need] + " first";
 			break;
 		}
-		var me = c.player;
-		boolean night = me.level().isDarkOutside() && me.level().canSeeSky(me.blockPosition().above());
-		if (planned >= 0 && agendaGoal && need < 0 && calm() && d.order[0] != planned && (!night || planned == Mind.MINE)) {   // set on its goal: the next step of it, not whatever small thing came to mind
+		if (c.mode == Companion.Mode.FREE) {                                   // its goals stack up by how necessary they are: only something more necessary cuts in
+			int pick = 0, most = necessity(d.order[0], f, planned);
 			for (int i = 1; i < d.order.length; i++) {
-				if (d.order[i] != planned) continue;
-				System.arraycopy(d.order, 0, d.order, 1, i);
-				d.order[0] = planned;
-				d.how[planned] = "set on it: " + planWhy;
-				break;
+				int n = necessity(d.order[i], f, planned);
+				if (n > most) {
+					most = n;
+					pick = i;
+				}
+			}
+			int o = d.order[pick];
+			if (pick > 0) {
+				System.arraycopy(d.order, 0, d.order, 1, pick);
+				d.order[0] = o;
+				d.how[o] = (most >= 3 ? "it can't wait: " : "set on its goal: ") + (o == planned && !planWhy.isEmpty() ? planWhy : Mind.SAYS[o]);
+			}
+			if (agendaGoal && planned >= 0 && o != planned && necessity(planned, f, planned) == 2) {
+				if (heldGoal == null) c.journal("thinks", "puts " + planWhy + " on hold: " + Mind.SAYS[o] + " is more necessary");
+				heldGoal = planWhy;
+			} else if (heldGoal != null && o == planned) {
+				c.journal("thinks", "back to " + heldGoal);
+				heldGoal = null;
 			}
 		}
 		if (ponderUntil == 0) {                                                // a new choice to make: it thinks it over first, as long as it needs
@@ -1355,8 +1391,10 @@ final class Goals {
 			c.chores.forWool = true;
 			return why(Mind.FOOD, "wool for a bed");
 		}
+		agendaGoal = tier <= 1;                                                  // (tools: the first steps of the main goal)
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
+		agendaGoal = false;
 		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
 				&& (enchantedSomething() || c.enchanter.table() == null && MindSense.count(c, n -> n.equals("obsidian") || n.equals("enchanting_table")) < 4
 						&& MindSense.count(c, n -> n.equals("book")) > 0 || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted, or the book and no obsidian for the table yet (the trip gets it, and it enchants before the portal), or two days on: a first look at the Nether
