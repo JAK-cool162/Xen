@@ -2803,6 +2803,10 @@ final class Chores {
 			doing = forWool ? "picking up what the sheep dropped" : "picking up food";
 			return c.stepTo(drop.position());                             // pick up what it hunted
 		}
+		if (c.player.getY() < 40 && !c.player.level().canSeeSky(c.player.blockPosition())) {   // (down in the caves: no animals to find, only lava to walk into)
+			finish(forWool ? "No sheep down here." : "No animals down here.");
+			return null;
+		}
 		doing = forWool ? "looking around for sheep" : "no animals in sight, looking around";
 		return lookAround();
 	}

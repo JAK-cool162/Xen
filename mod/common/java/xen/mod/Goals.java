@@ -1131,7 +1131,8 @@ final class Goals {
 		if (option < 0 || now - nightCheckedAt < 100 || !useMind() || c.mode != Companion.Mode.FREE || now < exploreAskedUntil) return false;
 		nightCheckedAt = now;
 		boolean outdoorWork = option == Mind.WOOD || option == Mind.EXPLORE || option == Mind.HOUSE || option == Mind.FARM
-				|| option == Mind.STONE && !needBlocksForTheNight() || option == Mind.REST;
+				|| option == Mind.STONE && !needBlocksForTheNight() || option == Mind.REST
+				|| option == Mind.FOOD && (!c.hands.hasWeapon() || c.player.getHealth() < 14);   // (hunting in the dark with bare hands: no)
 		boolean hurt = c.player.getHealth() <= 12 && option != Mind.SHELTER && option != Mind.SLEEP;
 		if (!outdoorWork && !hurt || !outAtNight()) return false;
 		var p = c.player;                                                     // out in the dark: a tip comes to mind, and it's its call

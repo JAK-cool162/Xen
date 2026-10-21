@@ -145,6 +145,8 @@ final class Builder {
 	}
 	private final List<Architect.Step> left = new ArrayList<>();
 	private final Set<BlockPos> skipped = new HashSet<>();
+	/** When it last got anything done on the build (a block, or the wood for it). */
+	private long workedAt, nextCalledAt;
 	private final Map<BlockPos, Integer> tries = new HashMap<>();
 	private final List<BlockPos> scaffold = new ArrayList<>();
 	private Architect.Step current;
@@ -674,7 +676,7 @@ final class Builder {
 		removingScaffold = false;
 		toldList = false;
 		placed = dug = 0;
-		started = lastProgress = now();
+		started = lastProgress = workedAt = now();
 		c.chores.cancel();
 		c.mode = Companion.Mode.STAY;                                         // it's working here now
 		c.anchor = made.middle();
@@ -846,8 +848,13 @@ final class Builder {
 		if (plan == null || c.player == null) return null;
 		ServerLevel level = (ServerLevel) c.player.level();
 		creative = c.player.isCreative();
+		if (now() - nextCalledAt > 200) workedAt = now();                   // (it was off doing something else: the clock starts again)
+		nextCalledAt = now();
 		if (gathering != null) {                                            // out getting wood or stone for it
-			if (c.chores.busy()) return c.chores.next();
+			if (c.chores.busy()) {
+				workedAt = now();
+				return c.chores.next();
+			}
 			gathering = null;
 			c.mode = Companion.Mode.STAY;
 			c.anchor = plan.middle();
@@ -861,8 +868,21 @@ final class Builder {
 			c.goals.instant = doing;
 			return Action.IDLE;
 		}
+		if (c.crafter.hasOrder() || !prepared && !creative) workedAt = now();
 		if (c.crafter.hasOrder()) return null;                               // making what it needs first
 		if (!prepared && !creative) return prepare();                        // everything it needs, first
+		if (!creative && now() - workedAt > 20 * 60 * 4) {                  // four minutes and not a block more: it gives up on it
+			XenMod.LOG.info("{} gives up on the {}: nothing done in 4 minutes ({} placed, {} left)", c.name, plan.name(), placed, left.size());
+			c.journal("build", "gives up on the " + plan.name() + ": four minutes and not a block more");
+			if (placed > 20) {
+				left.clear();
+				scaffold.clear();
+				return finish(level);
+			}
+			startedCorner = null;                                              // (not one to come back to)
+			cancel();
+			return null;
+		}
 		if (removingScaffold) return takeDownScaffold(level);
 		// what's left, in order: the first phase that still has work
 		left.removeIf(s -> done(level, s) || skipped.contains(s.pos()));
@@ -1342,7 +1362,7 @@ final class Builder {
 	private final Map<BlockPos, Integer> placedAt = new HashMap<>();
 
 	private void progress(boolean digging) {
-		lastProgress = now();
+		lastProgress = workedAt = now();
 		if (digging) dug++;
 		else {
 			placed++;

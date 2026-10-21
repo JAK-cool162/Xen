@@ -253,11 +253,16 @@ final class Gut {
 				|| c.commandedTo != null || c.mode == Companion.Mode.FOLLOW) return null;
 		int near = 0;
 		double closest = 99;
-		for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(12),
+		boolean onIt = false;                                                    // one coming at it now, or shooting at it: that first (digging, it's hit from behind)
+		for (var m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
 				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy)) {
+			double d = m.distanceTo(p);
+			if (m.getTarget() == p && (d < 6 || Companion.archer(m) && m.hasLineOfSight(p))) onIt = true;
+			if (d > 12) continue;
 			near++;
-			closest = Math.min(closest, m.distanceTo(p));
+			closest = Math.min(closest, d);
 		}
+		if (onIt) return null;
 		boolean bare = !c.hands.hasWeapon();
 		boolean fresh = level.getGameTime() - c.respawnedAt < 600;                 // (just back from dying, at the spawn, with nothing)
 		boolean coming = danger >= 0.6f || near > 0 && (p.getHealth() <= 10 || bare) || near >= 3 || fresh && bare;

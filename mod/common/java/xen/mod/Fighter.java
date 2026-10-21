@@ -441,7 +441,7 @@ final class Fighter {
 			}
 			Vec3 dir = escapeDir(foe);
 			if (shooter != null) dir = weave(dir);                              // zig-zag: an arrow aimed where it was going misses
-			if (outmatched && clearRun(dir)) return runAlong(dir, sprintable);   // a clear way: just sprint off (no time to work out a way)
+			if ((outmatched || desperate) && clearRun(dir)) return runAlong(dir, sprintable);   // a clear way: just sprint off (no time to work out a way)
 			return c.walkTo(p.position().add(dir.scale(8)));
 		}
 		fleeing = false;

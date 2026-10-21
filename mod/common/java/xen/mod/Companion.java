@@ -3948,6 +3948,12 @@ public final class Companion {
 	/** When it last picked a fight with a player (an aggressive one doesn't do it every minute). */
 	long lastPickedFight = -100000;
 
+	/** One that shoots from afar (a skeleton, a pillager...). */
+	static boolean archer(LivingEntity e) {
+		String k = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
+		return k.equals("skeleton") || k.equals("stray") || k.equals("bogged") || k.equals("pillager") || k.equals("piglin") && e.getMainHandItem().getItem() instanceof net.minecraft.world.item.CrossbowItem;
+	}
+
 	private LivingEntity foe() {
 		if (inArena) return duelFoe != null && duelFoe.isAlive() && duelFoe.level() == player.level() && player.distanceTo(duelFoe) < 32
 				? duelFoe : null;
@@ -3959,15 +3965,15 @@ public final class Companion {
 			if (player.distanceTo(creeper) < 7.5) return creeper;         // hissing close by: it hears that, and runs till it stops (past 7 blocks the fuse goes out)
 		}
 		long tick = player.level().getGameTime();
-		if (lastFoe != null && lastFoe.isAlive() && lastFoe.level() == player.level() && player.distanceTo(lastFoe) < 10 && tick - lastFoeAt < 60
+		if (lastFoe != null && lastFoe.isAlive() && lastFoe.level() == player.level() && player.distanceTo(lastFoe) < (archer(lastFoe) ? 16 : 10) && tick - lastFoeAt < 60
 				&& !diplomacy.atPeace(lastFoe) && !(lastFoe instanceof ServerPlayer sp0 && (sp0.isCreative() || sp0.isSpectator())))
 			return lastFoe;                                                     // in a fight: it stays in it (a step back, a moment out of sight, isn't the end of it)
 		LivingEntity coming = null;                                          // a monster coming for it, in sight: it deals with that before going on (a player turns round)
-		double comingD = 10;
-		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(10),
+		double comingD = 16;
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(16),
 				m -> m.isAlive() && m.getTarget() == player && hostile(m))) {
 			double d = player.distanceTo(m);
-			if (d < comingD && player.hasLineOfSight(m)) {
+			if (d < comingD && d < (archer(m) ? 16 : 10) && player.hasLineOfSight(m)) {   // (one shooting at it from further off too: going on with its errand, it's shot in the back)
 				comingD = d;
 				coming = m;
 			}

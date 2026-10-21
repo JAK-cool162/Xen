@@ -153,7 +153,7 @@ final class Jokes {
 		};
 		c.journal("thinks", "tries a joke on " + withName + ": \"" + opener + "\"");
 		XenMod.LOG.info("{} tries a joke on {}: {}", c.name, withName, opener);
-		c.lookAt(best, 100);
+		if (bestXen == null) c.lookAt(best, 60);                                 // (a player: it turns to them; a Xen's busy too, it just says it)
 		c.talker.sayNear(opener);
 		if (withXen != null) xenAnswers(now);
 		return true;
