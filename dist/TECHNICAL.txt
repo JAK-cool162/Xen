@@ -1,8 +1,20 @@
-XEN COMPANION 2.0.0-beta.43: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.44: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.44
+
+Fighter.snack(foe): food not full and nothing within 3.5 blocks: it eats. Hurt (under 12 health), food above 6 (it
+can sprint) and monsters close: it sprints along escapeDir (runAlong when the way is clear, else walkTo 8 blocks
+off), and eats once it's clear.
+XenPlayer.edgeGuard(), every tick before the physics: on the ground, not in water or lava, not flying or riding,
+and the walker's current move isn't a drop it planned (FALL, PARKOUR, DIG_DOWN, CLIMB_DOWN, Walker.meansToDrop()):
+it looks 0.45 and 0.9 blocks along its motion (or the way it faces, just setting off). A drop of 6 or more, or 4 or
+more that would leave it under 2 health: it crouches (the game won't let a crouching player walk off) and stops
+jumping. It lets go once the edge is behind it. Journal: "stops at the edge of an N-block drop".
+Not benchmarked before release.
 
 WHAT'S NEW IN 2.0.0-beta.43
 ===========================

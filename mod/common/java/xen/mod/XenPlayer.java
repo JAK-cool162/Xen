@@ -45,10 +45,63 @@ public class XenPlayer extends ServerPlayer {
 			if (up != 0) setDeltaMovement(getDeltaMovement().add(0, up * getAbilities().getFlyingSpeed() * 3, 0));
 		}
 		super.tick();
+		if (!minion) edgeGuard();
 		double x = getX(), y = getY(), z = getZ();
 		doTick();                                          // player physics a client would normally drive
 		doCheckFallDamage(getX() - x, getY() - y, getZ() - z, onGround());   // and what the server does with a client's moves:
 	}                                                      // falling counts (fall damage, and critical hits need it)
+
+	/** It crouched itself at an edge (so it lets go once the edge is behind it), and when it last said so. */
+	private boolean edgeCrouch;
+	private long edgeSaidAt;
+
+	/**
+	 * Whatever moves it (a chore, a fight, its own way-finding): a deep drop right ahead that it didn't choose, and it
+	 * crouches at the edge, as a player does (crouched, the game won't let it walk off). The drops its way-finder
+	 * planned (a short fall, a leap, a water clutch) go on as planned.
+	 */
+	private void edgeGuard() {
+		int drop = 0;
+		if (companion != null && onGround() && !isInWater() && !isInLava() && !getAbilities().flying && !isPassenger() && !companion.walker.meansToDrop()) {
+			var v = getDeltaMovement();
+			double sx = v.x, sz = v.z;
+			if (sx * sx + sz * sz < 0.0009 && zza != 0) {                         // (only just setting off: the way it faces)
+				double yaw = Math.toRadians(getYRot());
+				sx = -Math.sin(yaw) * Math.signum(zza);
+				sz = Math.cos(yaw) * Math.signum(zza);
+			}
+			double len = Math.sqrt(sx * sx + sz * sz);
+			if (len > 1e-3) for (double k : new double[] {0.45, 0.9}) {
+				drop = Math.max(drop, dropAt(net.minecraft.core.BlockPos.containing(getX() + sx / len * k, getY() + 0.01, getZ() + sz / len * k)));
+			}
+		}
+		boolean deep = drop >= 6 || drop >= 4 && drop - 3 >= getHealth() - 2;  // (more than a few hearts, or what it has left)
+		if (deep) {
+			setShiftKeyDown(true);
+			setJumping(false);
+			edgeCrouch = true;
+			long now = level().getGameTime();
+			if (now - edgeSaidAt > 200) {
+				edgeSaidAt = now;
+				companion.journal("moves", "stops at the edge of a " + drop + "-block drop");
+			}
+		} else if (edgeCrouch) {
+			edgeCrouch = false;
+			setShiftKeyDown(false);
+		}
+	}
+
+	/** How far it would fall stepping into this block (0: floor there, a wall, or water to land in). */
+	private int dropAt(net.minecraft.core.BlockPos at) {
+		var q = at.mutable();
+		for (int k = 0; k < 40; k++) {
+			var st = level().getBlockState(q);
+			if (!st.getFluidState().isEmpty()) return 0;
+			if (!st.getCollisionShape(level(), q).isEmpty()) return Math.max(0, k - 1);
+			q.move(net.minecraft.core.Direction.DOWN);
+		}
+		return 40;
+	}
 
 	/**
 	 * Riding: no game client moves its boat or horse (a player's client would), so the server does, and it steers by the

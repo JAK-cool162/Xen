@@ -201,6 +201,13 @@ final class Walker {
 		return path != null && index < path.size() && path.get(index).kind() == Kind.PARKOUR;
 	}
 
+	/** Is the move it's on a way down it chose (a drop, a leap, digging or climbing down)? */
+	boolean meansToDrop() {
+		if (path == null || index >= path.size()) return false;
+		Kind k = path.get(index).kind();
+		return k == Kind.FALL || k == Kind.PARKOUR || k == Kind.DIG_DOWN || k == Kind.CLIMB_DOWN;
+	}
+
 	void stop() {
 		if (path == null) return;
 		path = null;

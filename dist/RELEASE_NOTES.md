@@ -1,9 +1,21 @@
-**Xen Companion 2.0.0-beta.43**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.44**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.43: Xen gets a massive upgrade
+### 2.0.0-beta.44: Xen gets a massive upgrade
+
+* **Runs to eat**: hurt and hungry in a fight with monsters close, it sprints away first (monsters walk at about 2
+  to 2.5 blocks a second, a sprinting player does about 5.6), opens a gap, then eats. It used to stand and take hits.
+* **No more walking off cliffs**: whatever is moving it (mining, a cave, a fight, running away), it crouches at the
+  edge of a deep drop it didn't plan, like a player does. In the last test a third of the deaths were long falls at
+  full health (one Xen fell 75 blocks into a cave). The falls its pathfinder plans on purpose (a short drop, a jump
+  across a gap, a water-bucket landing) still happen.
+* Not benchmarked yet: both changes build and pass the 26.x compile check, but there was no server test before this
+  release. Numbers come next.
+
+### 2.0.0-beta.43
+
 
 * **Hybrid Xen**: the runner's lesson for every Xen. When it would take a breather while something needed is waiting
   (eat, craft, smelt its iron, wood, stone, mining, food for the bag), it does that first. Test, 6 Xens, same world

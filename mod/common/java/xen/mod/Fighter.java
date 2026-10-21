@@ -612,7 +612,7 @@ final class Fighter {
 				p.setSprinting(false);
 				return Action.BACK;
 			}
-			Action snack = snack();
+			Action snack = snack(foe);
 			if (snack != null) return snack;
 			if (useShield && !axe && h.raiseShield()) return idle();
 			if (foeRising && d < 3.5 && random.nextFloat() < gene(6)) return Action.BACK;   // it jumps in for a crit: step out
@@ -629,7 +629,7 @@ final class Fighter {
 		}
 		if (!ready && d < 3.2 + 0.8 * gene(2) && !opening) {                  // keep its distance until its sword is ready
 			h.watching = foe;
-			Action snack = snack();
+			Action snack = snack(foe);
 			return snack != null ? snack : idle();
 		}
 		boolean walker = !(foe instanceof Player) && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && !archer(foe)
@@ -1141,10 +1141,16 @@ final class Fighter {
 	 * A bite between swings, like a player: the food bar kept full in a fight, so its health keeps coming back. Only
 	 * while nothing's on top of it (none within 3.5 blocks: eating slows it and takes a second and a half). Null: not now.
 	 */
-	private Action snack() {
+	private Action snack(LivingEntity foe) {
 		var p = c.player;
 		if (p.getFoodData().getFoodLevel() >= 20 || !c.hands.canHeal()) return null;
-		return clearAround(3.5) ? Action.EAT : null;
+		if (clearAround(3.5)) return Action.EAT;
+		if (p.getHealth() >= 12 || p.getFoodData().getFoodLevel() <= 6) return null;   // (fine for now, or too hungry to sprint)
+		Vec3 dir = escapeDir(foe);                                             // hurt and hungry with them close: a sprint opens a gap (they're slower), then a bite
+		c.goals.instant = "running off to eat";
+		p.setSprinting(true);
+		if (clearRun(dir)) return runAlong(dir, true);
+		return c.walkTo(p.position().add(dir.scale(8)));
 	}
 
 	/** No monster within r blocks of it. */
