@@ -6,7 +6,7 @@ player's controls.
 ### 2.0.0-beta.46: Xen gets a massive upgrade
 
 * **Full diamond armor in under 25 minutes**: in a 20-minute test (3 Xens given an iron pickaxe, sword, shield and
-  chestplate, "Knows the world" on everything), **2 of the 3 made a diamond pickaxe, a diamond sword and all four
+  chestplate, "Knows the world" on everything, runner mode on), **2 of the 3 made a diamond pickaxe, a diamond sword and all four
   diamond armor pieces**. Counted from when each Xen joined: first diamonds at about 7 minutes, diamond pickaxe at
   about 9, the last armor piece at about 23 and 24. The third Xen found none (it started by the sea). **0 deaths** (beta.45 in the same test: 4 deaths,
   0 diamonds).
@@ -23,7 +23,7 @@ player's controls.
   towers up through the water.
 * **Enchanting**: the enchanting table is now a step of its own once it has a diamond pickaxe and two diamonds (a book,
   four obsidian, then lapis), with obsidian and lapis found through what it knows of the world. Not seen working in a
-  test yet: 0 enchants so far.
+  test yet: 0 enchants so far (and runner mode had no enchanting step: it has one now, on main).
 
 ### 2.0.0-beta.45
 

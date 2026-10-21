@@ -1854,6 +1854,19 @@ final class Goals {
 			diamondRun = true;
 			return trip(Mind.MINE, true, can, items, "runner: diamonds (a diamond pickaxe)");
 		}
+		if (tier >= 3 && can[Mind.ENCHANT] && !c.enchanter.on && now() > c.enchanter.retryAt) {   // (lapis, levels, the table: its gear enchanted before the Nether)
+			agendaGoal = true;
+			return why(Mind.ENCHANT, "runner: enchanting its gear (" + c.player.experienceLevel + " levels)");
+		}
+		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
+		if (tier >= 4 && !tabled && diamonds() >= 2) {
+			int next = planStep(can, "enchanting_table", 1, "runner: the enchanting table");
+			if (next >= 0) return next;
+		}
+		if (tier >= 4 && tabled && items.getOrDefault("lapis_lazuli", 0) < 3) {
+			int next = planStep(can, "lapis_lazuli", 3, "runner: lapis to enchant with");
+			if (next >= 0) return next;
+		}
 		if (tier >= 4 && !c.nether.busy() && now() > netherTryAt) {
 			netherTryAt = now() + 20 * 60 * 5;
 			String trip = c.nether.go("visit", 0);
