@@ -2360,7 +2360,8 @@ final class Chores {
 			// what it just mined is its too (a player picks up what they dig, cobblestone and all): close by, if there's room
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
-			if (!wanted && (JUNK.contains(k) || c.guide.leading() && (k.equals("cobblestone") || k.equals("cobbled_deepslate"))) && enoughBlocks()) continue;   // (dirt, granite...: it has plenty to build with; a player lets it lie; on its way to ore it knows of, the stone too)
+			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
+			if (!wanted && c.guide.leading() && (JUNK.contains(k) || k.equals("cobblestone")) && count("cobblestone") + countItem("dirt") >= 8) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;
