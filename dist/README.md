@@ -1545,6 +1545,7 @@ away in single player. On a server, operators use:
 | `/xen summon [name]` | Xen joins next to you (from the console: on the ground at world spawn, on its own) |
 | `/xen summon random <n>` | n Xens with random names and skins (as many as the limits allow) |
 | `/xen spawn <count> [radius]` | operators: many ownerless Xens, scattered on the surface up to `radius` blocks away (default 300) |
+| `/xen spawn 1 <name>` | operators: one ownerless Xen with that name (a bigger count: that many named after it) |
 | `/xen mode follow\|stay\|free` | the same as asking it to follow, stay or explore |
 | `/xen status` | who it is, health, hunger, mood, what it knows and what it's doing |
 | `/xen layout` | shows the place each Xen pictured (outlines in the world for 45 seconds) and says what's in it |

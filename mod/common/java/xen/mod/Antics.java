@@ -132,13 +132,14 @@ final class Antics {
 			boolean crouching = p.isShiftKeyDown();
 			Boolean was = wasCrouching.put(p.getUUID(), crouching);
 			if (was == null || was == crouching || !crouching) continue;
+			if (!WorldSenses.sees(c.player, c.hands.yaw, c.hands.pitch, p)) continue;   // (crouching behind its back, or behind a wall: it doesn't know)
 			int[] seen = crouches.computeIfAbsent(p.getUUID(), u -> new int[] {0, 0});
 			if (now - seen[1] > 40) seen[0] = 0;                               // a new round of crouches
 			seen[0]++;
 			seen[1] = (int) now;
 			if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} saw {} crouch ({} in a row; busy {})", c.name, p.getName().getString(), seen[0], doing);
 			boolean isXenDancing = p instanceof XenPlayer x && x.companion != null && x.companion.antics.doing.equals("dance");
-			if (seen[0] == 4 && !isXenDancing && c.player.hasLineOfSight(p)) greeted(p, now);   // a crouch greeting (always, like players)
+			if (seen[0] == 4 && !isXenDancing) greeted(p, now);   // a crouch greeting (always, like players)
 			if (!on()) continue;
 			boolean trusted = c.known.contains(p.getUUID()) || isXenDancing || c.trust(p.getUUID()) >= 0.3f;
 			if (seen[0] >= 10 && trusted && !busy() && now >= danceAgain && random.nextFloat() < 0.4f + 0.6f * playful()) {   // it keeps going: a dance

@@ -201,6 +201,11 @@ final class Fighter {
 	}
 
 	/** Mobs that only hit what they can reach (two blocks up, they can't): it can wait them out on a pillar. */
+	/** One that hits from a way off: not melee-only, or a drowned with a trident (it throws it). A pillar is no use against those. */
+	private static boolean ranged(LivingEntity m) {
+		return !meleeOnly(kind(m)) || kind(m).equals("drowned") && m.getMainHandItem().is(net.minecraft.world.item.Items.TRIDENT);
+	}
+
 	private static boolean meleeOnly(String kind) {
 		return switch (kind) {
 			case "zombie", "husk", "drowned", "zombie_villager", "zombified_piglin", "piglin_brute", "vindicator", "hoglin", "zoglin", "silverfish", "endermite" -> true;
@@ -215,18 +220,18 @@ final class Fighter {
 	/** Up two blocks is out of reach of everything at it (nothing shoots, climbs or flies), and it has the blocks and the room. */
 	private boolean canPerch(LivingEntity foe) {
 		var p = c.player;
-		if (!p.onGround() || p.isInWater() || p.isInLava() || c.hands.spareBlock() == null || !meleeOnly(kind(foe))) return false;
+		if (!p.onGround() || p.isInWater() || p.isInLava() || c.hands.spareBlock() == null || ranged(foe)) return false;
 		var feet = p.blockPosition();
 		if (!free(p.level(), feet.above(2)) || !free(p.level(), feet.above(3))) return false;
 		return p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(16),
-				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && !meleeOnly(kind(m)) && p.hasLineOfSight(m)).isEmpty();
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && ranged(m) && p.hasLineOfSight(m)).isEmpty();
 	}
 
 	/** Two blocks up and out of reach: it pillars up, then hits down at what it can reach, eats, heals. Null: it can't (it runs). */
 	private Action perch(LivingEntity foe, double d) {
 		XenPlayer p = c.player;
 		Hands h = c.hands;
-		if (perched && (!meleeOnly(kind(foe)) || p.tickCount % 10 == 0 && shooterInSight() != null)) {   // one that shoots (or climbs), or a skeleton come along: no use up there, down and away
+		if (perched && (ranged(foe) || p.tickCount % 10 == 0 && shooterInSight() != null)) {   // one that shoots (or climbs), or a skeleton come along: no use up there, down and away
 			perched = false;
 			return null;
 		}
@@ -403,8 +408,9 @@ final class Fighter {
 			escapedAt = now;
 		}
 		if (!outmatched && escaping) escaping = false;
-		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6),
-				m -> m.isAlive() && m.getTarget() == p).size() >= 2;           // (the terrain is its weapon: two on it, it takes the high ground before it's low)
+		int onIt = p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6), m -> m.isAlive() && m.getTarget() == p).size();
+		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && onIt >= 2   // (the terrain is its weapon: two on it, it takes the high ground before it's low)
+				|| onIt >= 3 && health < 0.75f;                                // (three or more: up while it still has the health to get there, not at its last heart)
 		if (perched || (outmatched || crowd) && canPerch(foe)) {
 			Action up = perch(foe, d);
 			if (up != null) return up;
@@ -451,9 +457,16 @@ final class Fighter {
 			}
 			LivingEntity shooter = shooterInSight();                           // one shooting at it: out of its sight, not just away (it'd be shot in the back)
 			if (shooter == null && desperate && foe instanceof Player) shooter = foe;   // (a player after it: out of their sight too, behind a tree)
-			if (shooter != null && (outmatched || desperate)) {
+			boolean meleeOnIt = !Companion.archer(foe) && !(foe instanceof Player) && d < 4.5;   // (a zombie at it: cover a step away from the arrows is no escape from that)
+			if (shooter != null && (outmatched || desperate) && !meleeOnIt) {
 				Action cover = takeCover(shooter);
-				if (cover != null) return cover;
+				if (cover != null) {
+					coverUntil = now + 30;
+					return cover;
+				}
+			} else if (shooter == null && cover != null && now < coverUntil && !meleeOnIt) {   // (on its way to cover and the shooter out of sight a moment: on to it, not off the other way)
+				c.goals.instant = "taking cover";
+				return c.walkTo(Vec3.atBottomCenterOf(cover));
 			}
 			Vec3 dir = escapeDir(foe);
 			if (shooter != null) dir = weave(dir);                              // zig-zag: an arrow aimed where it was going misses
@@ -552,6 +565,31 @@ final class Fighter {
 					h.watching = foe;
 					p.setSprinting(false);
 					return idle();
+				}
+				boolean edge = melee && dropBehind(foe);
+				int bunched = melee ? bunchedBy(foe) : 0;
+				if (bunched >= 1 && p.onGround() && net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath().endsWith("_sword")) {
+					h.watching = foe;                                          // a sweep: on the ground, not sprinting, a full swing: every one bunched by it is hit and knocked back too (Sweeping Edge: hard)
+					p.setSprinting(false);
+					Action a = hit(foe);
+					sTap = 4;
+					if (now - knockSaidAt > 200) {
+						knockSaidAt = now;
+						c.journal("fight", String.format(java.util.Locale.ROOT, "sweeps the %s and the %d by it, then steps back while its sword recharges", kindNow.replace('_', ' '), bunched));
+					}
+					return a;
+				}
+				if (melee && (around >= 2 || edge) && p.onGround() && p.getFoodData().getFoodLevel() > 6 && !foe.isBlocking()) {   // knockback: a sprint hit sends it flying (over the edge, into lava, or out of the crowd), then back while the sword recharges
+					h.watching = foe;
+					p.setSprinting(true);
+					Action a = hit(foe);
+					sTap = 4;
+					if (now - knockSaidAt > 200) {
+						knockSaidAt = now;
+						c.journal("fight", edge ? "knocks the " + kindNow.replace('_', ' ') + " back over the edge" : String.format(java.util.Locale.ROOT,
+								"knocks the %s back (a sprint hit: %d of them at it) and steps back while its sword recharges", kindNow.replace('_', ' '), around));
+					}
+					return a;
 				}
 				if (goCrit && p.onGround()) {
 					h.watching = foe;
@@ -895,6 +933,9 @@ final class Fighter {
 	private net.minecraft.core.BlockPos cover;
 	private int coverAt = -1000;
 
+	/** Till when it keeps going for its cover with the shooter out of sight (no flip-flopping between cover and away). */
+	private int coverUntil;
+
 	private Action takeCover(LivingEntity shooter) {
 		XenPlayer p = c.player;
 		var level = p.level();
@@ -1009,6 +1050,8 @@ final class Fighter {
 		return wall && p.onGround() ? Action.JUMP : Action.FORWARD;
 	}
 
+	static final boolean FIGHT_LOG = Boolean.getBoolean("xen.fightLog");
+
 	private Action hit(LivingEntity foe) {
 		combo = 0;
 		if (Companion.DEBUG) {
@@ -1016,6 +1059,12 @@ final class Fighter {
 			XenMod.LOG.info("[xen fight] {} hits: charge {} falling {} sprinting {} fall {} ground {} foe hp {}", c.name,
 					String.format("%.2f", p.getAttackStrengthScale(0.5f)), p.getDeltaMovement().y < 0, p.isSprinting(),
 					String.format("%.2f", p.fallDistance), p.onGround(), String.format("%.1f", foe.getHealth()));
+		}
+		if (FIGHT_LOG && foe instanceof Player) {                              // (-Dxen.fightLog: each swing at a player, for tests: how far, a crit or not)
+			var p = c.player;
+			boolean crit = p.getAttackStrengthScale(0.5f) > 0.9f && p.fallDistance > 0 && !p.onGround() && !p.onClimbable() && !p.isInWater() && !p.isSprinting();
+			XenMod.LOG.info("[xen pvp] {} swings at {}: d {} charge {} {}{}", c.name, foe.getName().getString(), String.format(java.util.Locale.ROOT, "%.2f", p.distanceTo(foe)),
+					String.format(java.util.Locale.ROOT, "%.2f", p.getAttackStrengthScale(0.5f)), crit ? "crit" : "plain", p.isSprinting() ? " sprint" : "");
 		}
 		c.hands.hit(foe);
 		c.skills.practice(Skills.FIGHT, 0.004f);
@@ -1082,6 +1131,31 @@ final class Fighter {
 	private Action strafe() {
 		if (random.nextFloat() < 0.1f) strafeRight = !strafeRight;
 		return strafeRight ? Action.RIGHT : Action.LEFT;
+	}
+
+	private int knockSaidAt = -1000;
+
+	/** Other monsters close enough to the one it's hitting for a sword's sweep to catch them too (a block round it, in reach). */
+	private int bunchedBy(LivingEntity foe) {
+		var p = c.player;
+		return p.level().getEntitiesOfClass(LivingEntity.class, foe.getBoundingBox().inflate(1.0, 0.25, 1.0),
+				m -> m != foe && m != p && m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && p.distanceToSqr(m) < 9).size();
+	}
+
+	/** Lava or a drop of four or more just behind it (as seen from here): a knock back sends it there. */
+	private boolean dropBehind(LivingEntity foe) {
+		var level = c.player.level();
+		Vec3 dir = foe.position().subtract(c.player.position()).multiply(1, 0, 1);
+		if (dir.lengthSqr() < 1e-4) return false;
+		dir = dir.normalize();
+		for (double k : new double[] {1.2, 2.2}) {
+			var q = net.minecraft.core.BlockPos.containing(foe.position().add(dir.scale(k)));
+			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.LAVA) || level.getFluidState(q.below()).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+			int air = 0;
+			while (air < 5 && level.getBlockState(q.below(air)).getCollisionShape(level, q.below(air)).isEmpty() && level.getFluidState(q.below(air)).isEmpty()) air++;
+			if (air >= 4) return true;
+		}
+		return false;
 	}
 
 	/** The start of a swing: decide how to play this one. */

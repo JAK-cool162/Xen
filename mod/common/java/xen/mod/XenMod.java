@@ -100,6 +100,7 @@ public class XenMod implements ModInitializer {
 	MinecraftServer server;
 	/** Gameplay logs (the gameplayLog setting), for training Xen Ex1. */
 	GameplayLog gameplayLog;
+	Duels duels;
 
 	MinecraftServer server() {
 		return server;
@@ -127,6 +128,7 @@ public class XenMod implements ModInitializer {
 		solverMind.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
+		duels = new Duels(configDir.resolve("xen").resolve("duels"));
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
 			xen.mod.talk.Banter.init(configDir.resolve("xen"));              // its talk model: what kind of line players say, and the answers (and which land)
@@ -488,6 +490,7 @@ public class XenMod implements ModInitializer {
 		arena.tick();
 		runLater();
 		gameplayLog.quietly(() -> gameplayLog.tick(s));
+		if (Duels.ON && duels != null) duels.tick(s);                            // (-Dxen.fightLog: duel rows, to learn fighting from a good player)
 		long tLuck = Perf.now();
 		Hunch.tick(this, s);
 		Perf.add("luck (looking at the world)", tLuck);
@@ -1061,7 +1064,24 @@ public class XenMod implements ModInitializer {
 						.then(Commands.argument("count", IntegerArgumentType.integer(1, 500))
 								.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), 300))
 								.then(Commands.argument("radius", IntegerArgumentType.integer(0, 30000))
-										.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), IntegerArgumentType.getInteger(ctx, "radius"))))))
+										.executes(ctx -> spawn(ctx, IntegerArgumentType.getInteger(ctx, "count"), IntegerArgumentType.getInteger(ctx, "radius"))))
+								.then(Commands.argument("name", StringArgumentType.word())          // (/xen spawn 1 Steve: that one's name, as /xen summon Steve)
+										.executes(ctx -> IntegerArgumentType.getInteger(ctx, "count") == 1 ? summon(ctx, StringArgumentType.getString(ctx, "name"))
+												: summonMany(ctx, StringArgumentType.getString(ctx, "name"), IntegerArgumentType.getInteger(ctx, "count"))))))
+				.then(Commands.literal("duel").requires(XenMod::mayRun)                   // (for tests: every Xen here takes on that player)
+						.then(Commands.argument("player", StringArgumentType.word()).executes(ctx -> {
+							String who = StringArgumentType.getString(ctx, "player");
+							ServerPlayer foe = server.getPlayerList().getPlayerByName(who);
+							if (foe == null) {
+								ctx.getSource().sendFailure(Component.literal("No player called " + who + " here."));
+								return 0;
+							}
+							return each(ctx, c -> {
+								if (c.player() == foe) return null;
+								c.goals.duel(foe);
+								return c.name + " takes on " + who + ".";
+							});
+						})))
 				.then(Commands.literal("dismiss").executes(ctx -> each(ctx, c -> {
 					away.remove(c.name);                                            // (sent home: it doesn't come back by itself)
 					c.leave();

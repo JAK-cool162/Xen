@@ -14,7 +14,8 @@ one: only the steps of the run, each started the moment the last one ends. Goals
 for free Xens (not minions, not in the arena) until the Xen has been to the Nether, in this order: under 14 food, eat;
 hurt and hungry, food; night with no pickaxe, dig in; anything better to craft, craft (Crafter.upgrade: the next
 pickaxe, a shield, a sword, a chestplate); no pickaxe, wood; a wooden one, stone; night, mine (safe under the ground);
-raw iron, smelt; under 3 coal, a coal run (Goals.fuelRun, even with logs to burn); a stone pickaxe and under 3 iron,
+raw iron, smelt; under 3 coal, a coal run (Goals.fuelRun, even with logs to burn) when it has seen coal or has nothing
+at all to burn (else the iron trip brings it: a dedicated coal run cost 5 to 7 minutes in the tests); a stone pickaxe and under 3 iron,
 iron; a villager in sight with something to trade, trade (once in 5 minutes); under 3 meals, food; the next step of its
 plan (Plans.ownGoal: a shield, an iron sword, a bucket, a chestplate); no iron gear yet, more iron (up to 17); sugar
 cane in sight and under 3 for paper, Plans goal sugar_cane x6, the spare planted by the water where it picked them
@@ -24,6 +25,36 @@ starts that step at once: no Mind.choose and no thinking it over, but the option
 memory, habits and its own rules still learn), journal "runner: ...". Danger or a friend in need still gives -1 (its
 own call, fights as ever). Hunch.oresNear: a runner's guide leads only to ore in the open air (not one behind a wall);
 caves it knows come first in Chores' mining as before. Antics, Jokes and Xen-to-Xen chats are off for runners.
+
+Hybrid Xen (runner + Xen, every free Xen). The runner's lesson for everyone: a runner gears up fastest because it
+never stands about. Goals.neededFirst gives the next thing needed (eat; craft something better; smelt its iron; wood
+with no pickaxe, by day; stone with a wooden one; mining with a pickaxe, at night too unless it believes the night is
+the monsters'; food for the bag; -1 in danger, hurt under 8 health or not on its own time). In thinkMind, when the
+mind's first choice is a breather, the needed step goes first ("no standing about: ..."). Everything else of the
+decision core is as before. A stronger version (side choices, a house, a farm, a look round, giving way too until it
+had an iron pickaxe and a shield, and no thinking it over) did worse: iron 2 of 6 by day 2 against 5 of 6.
+
+Two survival fixes found in the runner tests. Coming back from dying, its chores are cut off (Companion respawn:
+chores.cancel()): it no longer walks back through the monsters to "hide in its hole until morning" where it died. And
+fleeing (Fighter), it takes cover from a shooter only when no zombie or other melee monster is within 4.5 blocks (cover
+a step away from the arrows is no escape from that), and once headed for cover it keeps going for 1.5 s even when the
+shooter drops out of sight (coverUntil): it no longer flips between "taking cover" and "running for its life" every
+tick while a zombie hits it.
+
+Fighting monsters (Fighter, the mob training below):
+- Sweep: a sword, on the ground, another monster within a block of the one it hits (Fighter.bunchedBy) and in
+  reach: a full swing without sprinting, so the sweep catches them all and knocks them back (Sweeping Edge: real
+  damage to each), then an S-tap back while the sword recharges. Before, it went for a jump crit, which never sweeps.
+- Knockback: two or more at it, or lava or a drop of four just behind the one it hits (Fighter.dropBehind): a sprint
+  hit (setSprinting before the swing: the extra knockback), then a step back while it recharges.
+- Up a pillar sooner: three or more mobs after it and under 75% health, it pillars up two blocks then (before, only
+  when it was outmatched, often at a heart or two, and the climb itself got it killed).
+Crouching only counts when it sees it (Antics.watch: WorldSenses.sees, its view and line of sight): crouch spam behind
+its back or a wall no longer starts a greeting or a dance.
+/xen spawn 1 <name>: one Xen with that name (as /xen summon <name>; with a bigger count, as /xen summon <name> <n>).
+For tests: -Dxen.fightLog=true logs each swing at a player and each hit from one ([xen pvp]: distance, charge, crit),
+and Duels writes duel rows to config/xen/duels (distance, closing speed, both charges, ground, fall, hurt times, every
+tick); /xen duel <player> sends every Xen at that player.
 
 Villager pit (Visits.pitTrap, a runner in a village). How players trap one: a jobless adult villager in sight within
 16; a barrel made (slabs from planks, then the barrel) unless it carries a workstation; a spot 2 to 3 blocks off on

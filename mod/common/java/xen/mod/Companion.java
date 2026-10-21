@@ -4365,6 +4365,9 @@ public final class Companion {
 
 	/** Hurt: by what, how much, and what it was doing then (so a death can be read back). */
 	void journalHurt(DamageSource source, float amount) {
+		if (Fighter.FIGHT_LOG && source.getEntity() instanceof net.minecraft.world.entity.player.Player by)            // (-Dxen.fightLog: hit by a player, how far off)
+			XenMod.LOG.info("[xen pvp] {} hit by {}: d {} amount {} health {}", name, by.getName().getString(), String.format(java.util.Locale.ROOT, "%.2f", player.distanceTo(by)),
+					String.format(java.util.Locale.ROOT, "%.1f", amount), String.format(java.util.Locale.ROOT, "%.1f", player.getHealth()));
 		if (!mod.config.journal || mod.journal == null || inArena) return;
 		var k = source.getEntity();
 		String by = k != null ? BuiltInRegistries.ENTITY_TYPE.getKey(k.getType()).getPath().replace('_', ' ') : source.type().msgId();
@@ -4541,6 +4544,7 @@ public final class Companion {
 		} finally {
 			XenMod.quietJoin = false;
 		}
+		chores.cancel();                                              // (what it was doing where it died is over: hiding in a hole far off, a mine...)
 		habits.respawned();
 		goals.freshStart();
 		respawnedAt = player.level().getGameTime();

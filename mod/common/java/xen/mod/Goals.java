@@ -901,6 +901,14 @@ final class Goals {
 		Mind.Choice ch = mind.choose(f, can, caution, 0, random, bias(t));      // what its mind makes of each (and, unsure, thinks through)
 		Decision d = decide(f, can, caution, ch, planned, planWhy, situation);
 		if (d.order.length == 0) return false;
+		int need = d.order[0] == Mind.REST ? neededFirst(f, can) : -1;       // hybrid: a breather with something needed waiting, that first (what runners do)
+		for (int i = 1; need >= 0 && i < d.order.length; i++) {
+			if (d.order[i] != need) continue;
+			System.arraycopy(d.order, 0, d.order, 1, i);
+			d.order[0] = need;
+			d.how[need] = "no standing about: " + Mind.SAYS[need] + " first";
+			break;
+		}
 		if (ponderUntil == 0) {                                                // a new choice to make: it thinks it over first, as long as it needs
 			long think = thinkTicks(situation, f, d.difficulty);
 			if (think > 10) {
@@ -953,6 +961,29 @@ final class Goals {
 			return c.chores.busy();
 		}
 		return false;
+	}
+
+	/**
+	 * Hybrid Xen (runner + Xen): the runner's lesson. A runner gears up fastest because it never stands about: the next
+	 * thing needed, prepared before it's needed. So a Xen's own choice of a breather gives way to this: eat, craft,
+	 * smelt its iron, wood with no pickaxe (by day), stone with a wooden one, mining with a pickaxe (at night too,
+	 * unless it believes the night is the monsters'), food for the bag. Everything else it chooses stays its own
+	 * (a stronger version, its side things too giving way until it was geared, did worse in the tests). -1: nothing
+	 * needed (or danger, hurt, not its own time): the breather it is.
+	 */
+	private int neededFirst(float[] f, boolean[] can) {
+		if (f[Mind.DANGER] > 0.3f || c.player.getHealth() < 8 || c.mode != Companion.Mode.FREE) return -1;
+		var items = c.items();
+		int tier = c.crafter.pickTier();
+		boolean dark = f[Mind.NIGHT] > 0.5f, below = f[Mind.UNDERGROUND] > 0.5f;
+		if (can[Mind.EAT] && c.player.getFoodData().getFoodLevel() < 14) return Mind.EAT;
+		if (can[Mind.CRAFT]) return Mind.CRAFT;
+		if (can[Mind.SMELT] && items.getOrDefault("raw_iron", 0) >= 1) return Mind.SMELT;
+		if (tier == 0) return !dark && can[Mind.WOOD] ? Mind.WOOD : -1;
+		if (tier == 1 && can[Mind.STONE] && (!dark || below)) return Mind.STONE;
+		if (can[Mind.MINE] && (!dark || below || !c.personality.believes("night_belongs_to_monsters"))) return Mind.MINE;
+		if (items.getOrDefault("food", 0) < 3 && !dark && can[Mind.FOOD]) return Mind.FOOD;
+		return -1;
 	}
 
 	private long saidAgainstAt = -1_000_000;
@@ -1616,7 +1647,7 @@ final class Goals {
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "runner: stone (stone tools, a furnace)") : -1;
 		if (dark && !below && tier >= 2 && can[Mind.MINE]) return why(Mind.MINE, "runner: night: mining (safe under the ground)");
 		if (raw >= 1 && can[Mind.SMELT] && (raw >= 3 || tier == 2)) return why(Mind.SMELT, "runner: smelting its iron");
-		if (coal < 3 && iron < 24 && can[Mind.MINE] && now() - coalTriedAt > 2400) {
+		if (coal < 3 && iron < 24 && can[Mind.MINE] && now() - coalTriedAt > 2400 && (c.eyes.count("coal") > 0 || c.chores.fuel() == 0)) {   // (coal it has seen, or nothing at all to burn: else the iron trip brings it)
 			fuelRun = true;
 			return why(Mind.MINE, "runner: coal (to smelt with)");
 		}
