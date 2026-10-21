@@ -1639,11 +1639,12 @@ final class Chores {
 			} else if (now() - lastWet > 100) wetSince = -1;                   // (dry a good while: that was a splash, not a flood)
 			if (tunnelIn == null && !feet.equals(stairLooked)) {                // a look ahead each step: water, or daylight (out of the hill's side) that way? another way down
 				stairLooked = feet;
-				if (wet(feet, mineDir, 4) || opensUp(feet, mineDir)) {
+				boolean covered = !((ServerLevel) c.player.level()).canSeeSky(feet.above());   // (still up in the open at the top of its stairs: daylight all round, of course, nothing to turn for)
+				if (wet(feet, mineDir, 4) || covered && opensUp(feet, mineDir)) {
 					net.minecraft.core.Direction d = mineDir;
 					for (int r = 0; r < 3; r++) {
 						d = r == 1 ? d.getOpposite() : d.getClockWise();
-						if (!wet(feet, d, 4) && !opensUp(feet, d)) {
+						if (!wet(feet, d, 4) && !(covered && opensUp(feet, d))) {
 							c.journal("thinks", "turns its staircase " + d.getName() + " (" + (wet(feet, mineDir, 4) ? "water" : "daylight") + " ahead " + mineDir.getName() + ")");
 							mineDir = d;
 							mineRecordDir = d;
