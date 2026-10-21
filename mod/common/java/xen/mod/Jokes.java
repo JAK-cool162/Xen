@@ -117,7 +117,7 @@ final class Jokes {
 	// ------------------------------------------------------------------------------ starting a bit
 	/** Maybe start a bit with someone close by (said out loud): true when it did. Called when it has a moment to talk. */
 	boolean start(long now) {
-		if (!c.mod.config.antics || c.player == null || stage != Stage.NONE || now < next || c.inArena || c.minion) return false;
+		if (!c.mod.config.antics || c.mod.config.runner || c.player == null || stage != Stage.NONE || now < next || c.inArena || c.minion) return false;
 		if (c.player.getHealth() < 10 || c.player.isInWater() || c.talker.busy() || embarrassed()) return false;
 		if (c.rage.mad() > 0.5f || c.rage.mark != null || c.chosenFoe != null) return false;   // (not in the mood)
 		float humor = c.personality.hidden(Personality.HUMOR);

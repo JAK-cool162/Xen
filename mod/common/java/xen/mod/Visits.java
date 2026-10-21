@@ -121,7 +121,8 @@ final class Visits {
 		wantsIron = tier < 3 && items.getOrDefault("iron_ingot", 0) + items.getOrDefault("raw_iron", 0) < 3;
 		wantsBed = items.keySet().stream().noneMatch(n -> n.endsWith("_bed")) && !c.hasBed();
 		wantsFood = items.getOrDefault("food", 0) < 8;
-		wantsVillager = c.goals.home != null || c.personality.plan == xen.mod.core.Strategy.SETTLER || c.personality.plan == xen.mod.core.Strategy.BUILDER;
+		wantsVillager = c.goals.home != null || c.personality.plan == xen.mod.core.Strategy.SETTLER || c.personality.plan == xen.mod.core.Strategy.BUILDER
+				|| c.mod.config.runner;                                          // (a runner: one in a pit, to trade with on the way)
 		at = best;
 		kind = bestKind;
 		until = now() + 20 * 60 * 4;                                         // (four minutes, then: as long as it's getting somewhere)
@@ -190,7 +191,8 @@ final class Visits {
 		} else if (c.items().getOrDefault("wheat", 0) >= 3 && !c.crafter.hasOrder()) {
 			c.crafter.orderRecipe("bread", c.items().getOrDefault("wheat", 0) / 3);
 		}
-		Action v = wantsVillager ? boxVillager(level) : null;
+		Action v = wantsVillager && c.mod.config.runner ? pitTrap(level) : null;   // (a runner: the quick way players trap one)
+		if (v == null && wantsVillager && pitFor == null) v = boxVillager(level);
 		if (v != null) return v;
 		for (BlockPos d : doors) {                                            // past every house, so it sees what's inside
 			if (been.contains(d)) continue;
@@ -411,6 +413,162 @@ final class Visits {
 			boxing = null;
 		}
 		return null;
+	}
+
+	/** A villager pit: the villager it's for, the top block of the hole, since when, and when the workstation went in. */
+	private UUID pitFor;
+	private BlockPos pit;
+	private long pitSince, pitSetAt;
+	private static final Set<String> STATIONS = Set.of("barrel", "composter", "smoker", "blast_furnace", "fletching_table", "cartography_table",
+			"smithing_table", "stonecutter", "loom", "lectern", "grindstone", "brewing_stand", "cauldron");
+
+	/**
+	 * A villager with no job yet, trapped the way players do it: a hole three deep near it and a workstation at the
+	 * bottom (a barrel, from planks). The villager comes for the job, drops in, and can't climb out of two deep: one to
+	 * trade with, from the top. Null when there's no such villager (or no wood for the barrel), or it's done.
+	 */
+	private Action pitTrap(ServerLevel level) {
+		var p = c.player;
+		Villager v = pitFor == null ? null : level.getEntity(pitFor) instanceof Villager known && known.isAlive() ? known : null;
+		if (v == null) {
+			pitFor = null;
+			pit = null;
+			pitSetAt = 0;
+			double best = 16;
+			for (Villager e : level.getEntitiesOfClass(Villager.class, p.getBoundingBox().inflate(16), x -> x.isAlive() && !x.isBaby() && !x.isSleeping() && jobless(x))) {
+				double d = p.distanceTo(e);
+				if (d < best && WorldSenses.sees(p, c.hands.yaw, c.hands.pitch, e)) {
+					best = d;
+					v = e;
+				}
+			}
+			if (v == null) return null;
+			if (station() == null && MindSense.count(c, n -> n.endsWith("_planks")) + 4 * c.items().getOrDefault("log", 0) < 9) return null;   // (no wood for a barrel: a box instead)
+			pitFor = v.getUUID();
+			pitSince = now();
+		}
+		if (now() - pitSince > 20 * 60 * 3 || pitSetAt > 0 && now() - pitSetAt > 20 * 90) {   // (it won't come: not this one)
+			c.journal("does", "gives up on the villager pit: the villager didn't come for the job");
+			wantsVillager = false;
+			pitFor = null;
+			return null;
+		}
+		doing = "trapping a villager in a pit (to trade with)";
+		String station = station();
+		if (station == null) {                                               // a barrel: two slabs (three planks make six) and six planks
+			if (c.crafter.hasOrder()) return Action.IDLE;
+			String slab = null;
+			for (var e : c.items().keySet()) if (e.endsWith("_slab")) slab = e;
+			if (slab == null) {
+				String wood = null;
+				for (var e : c.items().keySet()) if (e.endsWith("_planks")) wood = e;
+				c.crafter.orderRecipe(wood != null ? wood.replace("_planks", "_slab") : "oak_slab", 1);
+			} else c.crafter.orderRecipe("barrel", 1);
+			if (!c.crafter.hasOrder()) {                                       // (it can't: a box instead)
+				pitFor = null;
+				return null;
+			}
+			return Action.IDLE;
+		}
+		if (pit == null) {
+			pit = pitSpot(level, v);
+			if (pit == null) {
+				pitFor = null;
+				return null;
+			}
+			c.journal("does", "digs a villager pit at " + pit.toShortString() + ": three deep, a " + station.replace('_', ' ') + " at the bottom (the villager comes for the job and drops in)");
+		}
+		BlockPos bottom = pit.below(2);
+		if (v.blockPosition().equals(pit.below()) || v.blockPosition().equals(bottom) && !STATIONS.contains(id(level, bottom))) {   // in: two deep, it can't get out
+			villagersBoxed++;
+			wantsVillager = false;
+			pitFor = null;
+			c.places.rememberAnother("villager", v.blockPosition(), 8);
+			c.journal("does", "trapped a villager in its pit at " + pit.toShortString() + ": one to trade with");
+			c.chatter(c.pick3("Got one. In the hole you go, buddy.", "Villager trapped. Trades whenever I want.", "Haha, it fell right in."), false);
+			return null;
+		}
+		if (STATIONS.contains(id(level, bottom))) {                           // the trap's set: out of the way, and wait for it
+			if (pitSetAt == 0) pitSetAt = now();
+			Vec3 back = Vec3.atBottomCenterOf(pit.above()).add(Vec3.atCenterOf(pit).subtract(v.position()).normalize().scale(4));
+			c.hands.face(Vec3.atCenterOf(pit));
+			return p.position().distanceTo(Vec3.atCenterOf(pit)) < 3 ? c.walkTo(back) : Action.IDLE;
+		}
+		net.minecraft.core.Direction side = null;                            // where it stands: beside the hole, not over it
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos st = pit.relative(d);
+			if (level.getBlockState(st.above()).isAir() && level.getBlockState(st.above(2)).isAir() && (side == null
+					|| st.distSqr(p.blockPosition().below()) < pit.relative(side).distSqr(p.blockPosition().below()))) side = d;
+		}
+		if (side == null) {
+			pit = null;
+			pitFor = null;
+			return null;
+		}
+		BlockPos stand = pit.relative(side).above();
+		if (!p.blockPosition().equals(stand)) return c.walkTo(Vec3.atBottomCenterOf(stand));
+		for (BlockPos b : new BlockPos[] {pit, pit.below(), bottom}) {        // three blocks down
+			if (level.getBlockState(b).isAir()) continue;
+			if (c.hands.mine(b)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			return Action.IDLE;
+		}
+		net.minecraft.core.Direction far = side.getOpposite();               // the workstation at the bottom, against the far wall
+		if (c.hands.placeItem(bottom, s -> STATIONS.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()), bottom.relative(far), side, -1)) {
+			c.acted = true;
+			return Action.PLACE;
+		}
+		if (c.hands.placeItem(bottom, s -> STATIONS.contains(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()), bottom.below(), net.minecraft.core.Direction.UP, -1)) {
+			c.acted = true;
+			return Action.PLACE;
+		}
+		c.journal("does", "can't set its villager pit (" + c.hands.cantPlace + ")");
+		pitFor = null;
+		wantsVillager = false;
+		return null;
+	}
+
+	private static boolean jobless(Villager v) {
+		return v.getVillagerData().profession().unwrapKey().map(k -> k.identifier().getPath()).orElse("none").equals("none");
+	}
+
+	/** A workstation it carries (or null). */
+	private String station() {
+		for (String k : c.items().keySet()) if (STATIONS.contains(k)) return k;
+		return null;
+	}
+
+	private static String id(ServerLevel level, BlockPos q) {
+		return BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath();
+	}
+
+	/**
+	 * Where the pit goes: ground two or three blocks from the villager, on its level, solid all the way down (and
+	 * round), with a floor under it and open air over it; the nearest such.
+	 */
+	private BlockPos pitSpot(ServerLevel level, Villager v) {
+		BlockPos vf = v.blockPosition();
+		BlockPos best = null;
+		for (int dx = -3; dx <= 3; dx++)
+			for (int dz = -3; dz <= 3; dz++) {
+				int d2 = dx * dx + dz * dz;
+				if (d2 < 4 || d2 > 10) continue;
+				BlockPos q = vf.offset(dx, -1, dz);
+				if (!level.getBlockState(q.above()).isAir() || !level.getBlockState(q.above(2)).isAir()) continue;
+				boolean ok = level.getBlockState(q.below(3)).isFaceSturdy(level, q.below(3), net.minecraft.core.Direction.UP);
+				for (int y = 0; y < 3 && ok; y++) {
+					BlockPos b = q.below(y);
+					var st = level.getBlockState(b);
+					ok = !st.isAir() && st.getFluidState().isEmpty() && st.getDestroySpeed(level, b) >= 0 && st.getDestroySpeed(level, b) < 5
+							&& !(st.getBlock() instanceof BedBlock) && !st.hasBlockEntity();
+					for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL)   // (walls all round: no way out sideways)
+						if (ok && y > 0) ok = level.getBlockState(b.relative(d)).isSolidRender() && level.getFluidState(b.relative(d)).isEmpty();
+				}
+				if (ok && (best == null || q.distSqr(vf) < best.distSqr(vf))) best = q.immutable();
+			}
+		return best;
 	}
 
 	// ---------------------------------------------------------------------------------- a ruined portal

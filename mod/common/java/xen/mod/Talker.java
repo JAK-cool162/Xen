@@ -112,7 +112,7 @@ final class Talker {
 			lastGreetCheck = now;
 			greet(now);
 		}
-		if (c.mod.config.talkToXens && now >= nextXenTalk && lines.isEmpty()) chatWithXen(now);
+		if (c.mod.config.talkToXens && !c.mod.config.runner && now >= nextXenTalk && lines.isEmpty()) chatWithXen(now);   // (a runner doesn't stop to chat)
 		if (now >= nextRemark && (now - anyoneSpoke > 200 || FAST) && lines.isEmpty() && !listeners(48).isEmpty()) {
 			nextRemark = now + (FAST ? 200 : (long) (2400 * (1.6f - c.personality.talkative()) * (0.7f + 0.6f * random.nextFloat())));
 			if (c.jokes.start(now)) {                                          // a bit: "Hey, guess what?"

@@ -93,13 +93,13 @@ public final class GameplayLog {
 	private boolean wants(ServerPlayer p) {
 		String mode = mod.config.gameplayLog;
 		if (p.isSpectator()) return false;
-		if (p instanceof XenPlayer x) return x.companion != null && (mode.equals("xens") || mode.equals("both"));
+		if (p instanceof XenPlayer x) return x.companion != null && (mode.equals("xens") || mode.equals("both") || mod.config.runner && !x.companion.minion);   // (a runner's play: always, what it sees and its fights too)
 		return mode.equals("players") || mode.equals("both");
 	}
 
 	/** Every server tick: a state for each one it logs when it's time, and new and finished files. */
 	void tick(MinecraftServer s) {
-		if (mod.config.gameplayLog.equals("off") && logs.isEmpty()) return;
+		if (mod.config.gameplayLog.equals("off") && !mod.config.runner && logs.isEmpty()) return;
 		String folder = String.valueOf(mod.config.gameplayLogFolder);
 		if (!folder.equals(lastFolder)) {                                   // (another folder: new files there from now on)
 			if (lastFolder != null) closeAll();

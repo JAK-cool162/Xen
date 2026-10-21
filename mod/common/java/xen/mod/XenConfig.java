@@ -91,6 +91,14 @@ public final class XenConfig {
 	/** Xen does unpredictable things for fun: dances along, shows off tricks (that don't always work), surprises in fights. */
 	public boolean antics = true;
 	/**
+	 * (Experiment) Runner: free Xens play only the run to the Nether, in order and quick, each step started at once:
+	 * wood, a table and tools, stone, coal, iron, smelting, food, more iron for iron gear, sugar cane (a little farm by
+	 * the water), diamonds, a diamond pickaxe, obsidian (water on lava), the portal. Only ore showing to the air, caves it
+	 * knows, a villager traded with (trapped in a pit first) if it comes across one; monsters fought as ever. No chats,
+	 * tricks or jokes on the way. Every runner's play is logged (gameplay logs, with what it sees), fights included.
+	 */
+	public boolean runner = false;
+	/**
 	 * Tribes: Xens that live together (one owner's, a team, free ones that get on) share their things and chests, build
 	 * their houses around one village, keep watch over it at night, and stand together when one of them is attacked.
 	 */

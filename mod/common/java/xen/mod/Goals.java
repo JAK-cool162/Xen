@@ -321,7 +321,7 @@ final class Goals {
 			case STORE -> c.storage.busy() ? "You will see to your chest." : c.storage.store();   // (a job it already started: leaving valuables, taking spares)
 			case ADVENTURE -> c.adventure.start();
 			case TRIALS -> c.trials.start();
-			case MINE -> fuelRun && c.chores.fuel() == 0 ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < 3 && readyForDiamonds() ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
+			case MINE -> fuelRun && (c.chores.fuel() == 0 || c.mod.config.runner) ? fuelRun() : c.crafter.pickTier() >= 3 && diamonds() < 3 && (readyForDiamonds() || diamondRun) ? c.chores.mine(c.lessons.depth("diamonds", -58), "diamonds", more(3) + (c.personality.believes("diamonds_forever") ? 2 : 0))
 					: c.crafter.pickTier() >= 2 ? c.chores.mine(c.lessons.depth("iron", 16), "iron", more(6)) : c.chores.mine(c.lessons.depth("coal", 40), "coal", more(8));   // (an iron pickaxe: down for diamonds, the iron on the way comes too; greed: more; at the height it believes)
 			case SMELT -> c.chores.smelt();
 			case FARM -> {                                                       // (a real farm: tilled, planted, looked after; then a pen for the animals about)
@@ -874,6 +874,27 @@ final class Goals {
 		float explore = c.mod.config.learn ? 0.02f + 0.06f * c.personality.curiosity : 0.01f;
 		int planned = agenda(f, can);                                          // the usual next step, like any player: advice, not an order
 		String planWhy = agendaWhy;
+		if (c.mod.config.runner && planned >= 0 && !planWhy.isEmpty() && planWhy.startsWith("runner: ")) {   // runner: the run's next step, at once
+			next = now + 10;
+			if (startOption(planned, nearby, now)) {
+				c.chores.own = true;
+				option = planned;
+				c.habits.started(option);
+				c.rules.started(option, f);
+				optionFeatures = f;
+				optionSituation = c.experience.situation();
+				optionExpect = null;
+				optionWhere = c.player.blockPosition().immutable();
+				optionFollowed = true;
+				optionAt = now;
+				optionHow = "the run";
+				optionSays = "";
+				c.purpose.goal = planWhy.substring(8);
+				c.journal("thinks", planWhy);
+				return c.chores.busy();
+			}
+			quickUntil[planned] = now + 200;                                   // (it couldn't: the next step of the run, or its own call, in a moment)
+		}
 		float[] situation = c.experience.situation();
 		next = now + thinkTicks(situation, f);                                 // (if nothing starts, it looks again when it's its own kind of quick)
 		Tribe t = c.tribe();
@@ -1182,6 +1203,11 @@ final class Goals {
 			return why(Mind.FIGHT, "bloodlust");                                         // (out for blood: it goes for them)
 		boolean calm = f[Mind.DANGER] < 0.3f && !can[Mind.HELP];
 		if (!calm && (can[Mind.FIGHT] || can[Mind.FLEE] || can[Mind.HELP] || can[Mind.GUARD])) return -1;   // danger, a friend in need: its own call
+		if (c.mod.config.runner && !c.minion && !c.inArena && !c.places.worlds().contains("the_nether")) {   // runner: only the run (to the Nether), then its own life
+			int run = runner(f, can, items);
+			if (run >= 0 && !agendaWhy.startsWith("runner: ")) agendaWhy = "runner: " + agendaWhy;
+			return run;
+		}
 		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);
 		int tier = c.crafter.pickTier();
 		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
@@ -1561,6 +1587,80 @@ final class Goals {
 	}
 
 	/** Off on a trip: ready for the worst first (food, blocks, a spare pickaxe; valuables left at home before a risky one). */
+	/** Runner mode: off for diamonds now (its iron gear made, or iron enough), whatever its nerve says. */
+	private boolean diamondRun;
+	private long runnerTradeAt = -100_000, runnerCaneAt = -100_000;
+
+	/**
+	 * Runner mode (/xen set runner true): the run to the Nether and nothing else, in order and quick, each step started at
+	 * once (no weighing it up): wood, a table and tools, stone, coal, iron, smelting, food, more iron for its iron gear,
+	 * sugar cane (a little farm of it by the water: paper for a book), diamonds, a diamond pickaxe, obsidian (water poured
+	 * on lava) and the portal. Each its own usual way (caves it knows, only ore it can see, a villager traded with if it
+	 * comes across one); monsters in the way it fights as ever (danger is its own call). -1: nothing of the run to do now
+	 * (or it's been to the Nether: its own life again).
+	 */
+	private int runner(float[] f, boolean[] can, Map<String, Integer> items) {
+		int tier = c.crafter.pickTier();
+		int hunger = c.player.getFoodData().getFoodLevel(), meals = items.getOrDefault("food", 0);
+		int raw = items.getOrDefault("raw_iron", 0), iron = raw + items.getOrDefault("iron_ingot", 0);
+		int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0);
+		boolean dark = f[Mind.NIGHT] > 0.5f, below = f[Mind.UNDERGROUND] > 0.5f;
+		if (can[Mind.EAT] && hunger < 14) return why(Mind.EAT, "runner: eating");
+		if (c.player.getHealth() < 10 && hunger < 18 && can[Mind.FOOD]) {
+			c.chores.forWool = false;
+			return why(Mind.FOOD, "runner: hurt, food to heal");
+		}
+		if (dark && tier == 0 && f[Mind.SHELTERED] < 0.5f && !below && can[Mind.SHELTER]) return why(Mind.SHELTER, "runner: night and no pickaxe yet: dig in");
+		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "runner: crafting (tools, gear)");
+		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "runner: wood (a table and a pickaxe)") : -1;
+		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "runner: stone (stone tools, a furnace)") : -1;
+		if (dark && !below && tier >= 2 && can[Mind.MINE]) return why(Mind.MINE, "runner: night: mining (safe under the ground)");
+		if (raw >= 1 && can[Mind.SMELT] && (raw >= 3 || tier == 2)) return why(Mind.SMELT, "runner: smelting its iron");
+		if (coal < 3 && iron < 24 && can[Mind.MINE] && now() - coalTriedAt > 2400) {
+			fuelRun = true;
+			return why(Mind.MINE, "runner: coal (to smelt with)");
+		}
+		if (tier == 2 && iron < 3 && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "runner: iron (an iron pickaxe)");
+		if (can[Mind.TRADE] && now() - runnerTradeAt > 20 * 60 * 5) {           // (a villager by the way: a trade, then on)
+			runnerTradeAt = now();
+			return why(Mind.TRADE, "runner: a villager to trade with");
+		}
+		if (meals < 3 && hunger < 20 && can[Mind.FOOD]) {
+			c.chores.forWool = false;
+			return why(Mind.FOOD, "runner: food for the run");
+		}
+		Plans.Step step = c.plans.advice();                                     // (its iron gear: a shield, a sword, a bucket, a chestplate)
+		if (step != null && step.option >= 0 && step.option < can.length && can[step.option] && step.option != Mind.EXPLORE)
+			return why(step.option, "runner: " + step.how);
+		boolean gear = c.crafter.has("_chestplate") && c.crafter.hasShield() && (items.getOrDefault("bucket", 0) + items.getOrDefault("water_bucket", 0) + items.getOrDefault("lava_bucket", 0) > 0);
+		if (tier == 3 && !gear && iron < 17 && !diamondRun && can[Mind.MINE]) return trip(Mind.MINE, false, can, items, "runner: more iron (iron gear)");
+		int cane = items.getOrDefault("sugar_cane", 0), paper = items.getOrDefault("paper", 0) + 3 * items.getOrDefault("book", 0);
+		if (cane >= 4 && c.farmer.caneHome == null) {                         // (sugar cane by the water here: the spare planted, a little farm of it)
+			c.farmer.caneHome = c.player.blockPosition().immutable();
+			c.journal("thinks", "runner: plants its spare sugar cane by the water here (a little farm)");
+		}
+		if (tier >= 3 && cane + paper < 3 && c.plans.goal == null && now() - runnerCaneAt > 20 * 60 * 15 && c.eyes.count("sugar_cane") > 0) {
+			runnerCaneAt = now();
+			c.plans.setGoal("sugar_cane", 6, null);
+			Plans.Step s = c.plans.advice();
+			if (s != null && s.option >= 0 && can[s.option]) return why(s.option, "runner: sugar cane (paper for a book, and a little farm)");
+		}
+		if (tier == 3 && can[Mind.MINE]) {
+			diamondRun = true;
+			return trip(Mind.MINE, true, can, items, "runner: diamonds (a diamond pickaxe)");
+		}
+		if (tier >= 4 && !c.nether.busy() && now() > netherTryAt) {
+			netherTryAt = now() + 20 * 60 * 5;
+			String trip = c.nether.go("visit", 0);
+			c.journal("thinks", "runner: the portal and the Nether (" + trip + ")");
+			if (trip.startsWith("You will")) {
+				c.chatter(c.pick3("Diamond pickaxe. Portal time.", "Obsidian next, then the Nether.", "Nether time!"), true);
+				return why(Mind.REST, "runner: off to the Nether");
+			}
+		}
+		return -1;
+	}
+
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
 		Prepared.Step first = c.prepared.before(option, deep, can, items);
 		return first != null ? why(first.option(), first.why()) : why(option, why);

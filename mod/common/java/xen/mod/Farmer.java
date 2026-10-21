@@ -366,8 +366,12 @@ final class Farmer {
 	 * grows, up to sixteen; the tall ones cut above the bottom (it grows back). Daytime, near home, nothing else on.
 	 * Null when there's nothing to do there.
 	 */
+	/** No home (runner mode): where it found sugar cane by the water, its spare planted there; three kept for paper. */
+	BlockPos caneHome;
+
 	Action cane() {
-		BlockPos home = c.goals.home;
+		BlockPos home = c.goals.home != null ? c.goals.home : caneHome;
+		int keep = c.goals.home != null ? 0 : 3;
 		if (home == null || on || tending || c.player.isCreative() || c.chores.busy() || c.crafter.hasOrder()) return null;
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (!Places.dim(level).equals("overworld") || level.isDarkOutside() || c.player.blockPosition().distSqr(home) > 40 * 40) return null;
@@ -384,7 +388,7 @@ final class Farmer {
 				planted++;
 				if (cut == null && id(level.getBlockState(q.above())).equals("sugar_cane")) cut = q.above().immutable();   // two high or more: cut above the bottom
 			}
-			if (cut == null && carried > 0 && planted < 16) {
+			if (cut == null && carried > keep && planted < (keep > 0 ? 8 : 16)) {
 				for (BlockPos q : BlockPos.betweenClosed(home.offset(-14, -4, -14), home.offset(14, 4, 14))) {
 					if (!caneGround(level, q)) continue;
 					if (plant == null || q.distSqr(home) < plant.distSqr(home)) plant = q.immutable();
@@ -420,6 +424,10 @@ final class Farmer {
 			if (id(level.getBlockState(at.above())).equals("sugar_cane")) canes.add(at);
 			caneAt = null;
 			nextCane = now() + 40;
+			return null;
+		}
+		if (keep > 0 && c.items().getOrDefault("sugar_cane", 0) <= keep) {             // (the rest is for paper)
+			caneAt = null;
 			return null;
 		}
 		return act(at, "planting sugar cane by the water", Farmer::isCane);

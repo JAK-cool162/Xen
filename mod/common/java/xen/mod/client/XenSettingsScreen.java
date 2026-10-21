@@ -301,19 +301,21 @@ public class XenSettingsScreen extends Screen {
 		keys.add("solver");
 		keys.add("journal");
 		keys.add("spawnAsXen");
+		keys.add("runner");
 		int half = (panelWidth - 4) / 2;
 		String[][] toggles = {
 				{"Path assist", "pathAssist", "Its legs find the way: walk, sprint, jump up, drop down, jump gaps, swim, climb ladders, open doors, dig through the ground, bridge and tower up out of holes. Its own mind still decides where to go, and how bold to be (brave Xens jump gaps, hurt or scared ones take the safe way)."},
 				{"Solver", "solver", "A second little mind for being stuck: it picks a way out (tower up, a staircase, dig through, a bolder way, go round, back off, swim out, ask for help) and learns which work where, also from watching players it trusts get out of holes. Its notes: config/xen/solver.json, every try in solver-tries.jsonl."},
 				{"Journal", "journal", "Keep a journal of what Xens see, think, say and hear, how they find their way and what the solver tries. Copy it or save it below."},
-				{"Spawn as Xen", "spawnAsXen", "A Xen named after you plays your character, with your things, and you watch through its eyes (a spectator on its camera). It lives its own life: its own goals, its own mind, and it listens to you. Turn it off to take over again, where it is, with what it has. Single player and LAN host only: it never works on a public (dedicated) server."}};
+				{"Spawn as Xen", "spawnAsXen", "A Xen named after you plays your character, with your things, and you watch through its eyes (a spectator on its camera). It lives its own life: its own goals, its own mind, and it listens to you. Turn it off to take over again, where it is, with what it has. Single player and LAN host only: it never works on a public (dedicated) server."},
+				{"Runner", "runner", "Free Xens play only the run to the Nether, quick and in order: wood, tools, stone, coal, iron, smelting, food, iron gear, a little sugar cane farm, diamonds, a diamond pickaxe, obsidian (water on lava), the portal. Only ore in the open, caves they know, a villager trapped in a pit and traded with if they find one; monsters fought as ever. Every runner's play is logged (with what it sees) for training."}};
 		for (int i = 0; i < toggles.length; i++) {
 			String key = toggles[i][1];
 			inPanel(addRenderableWidget(CycleButton.onOffBuilder(Boolean.parseBoolean(settings.value(key)))
 					.create(left + (i % 2) * (half + 4), top + (i / 2) * 24, half, 20, Component.literal(toggles[i][0]), (b, v) -> settings.set(key, "" + v))))
 					.setTooltip(tip(Component.literal(toggles[i][2])));
 		}
-		top += 50;
+		top += (toggles.length + 1) / 2 * 24 + 2;
 		// the journal: copy it, or save it as a file (bottom left, next to Reset and Done)
 		int by = height - 28, bw = Math.min(80, (panelWidth - 2 * Math.min(90, (panelWidth - 8) / 2) - 24) / 2);
 		StringWidget journalStatus = new StringWidget(left, by - 13, panelWidth, 12, Component.empty(), font);

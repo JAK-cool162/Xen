@@ -450,7 +450,7 @@ final class Hunch {
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
-				if (!f.kind().equals(kind) || !f.open() && !f.shallow()) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of)
+				if (!f.kind().equals(kind) || !f.open() && (!f.shallow() || c.mod.config.runner)) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of; a runner, only ore in the open)
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;

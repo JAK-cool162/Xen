@@ -43,6 +43,11 @@ final class Antics {
 		this.c = c;
 	}
 
+	/** Antics on (and not a runner: that one's busy). */
+	private boolean on() {
+		return c.mod.config.antics && !c.mod.config.runner;
+	}
+
 	/** How playful it is, 0 to 1. */
 	float playful() {
 		float tone = switch (c.personality.tone) {
@@ -64,13 +69,13 @@ final class Antics {
 
 	/** Something great happened: a little celebration dance. */
 	void celebrate() {
-		if (!c.mod.config.antics || busy()) return;
+		if (!on() || busy()) return;
 		start("dance", 40);
 	}
 
 	/** A trick or a spin, now (from a script). */
 	void showOff(boolean justSpin) {
-		if (!c.mod.config.antics || busy() || c.player == null) return;
+		if (!on() || busy() || c.player == null) return;
 		if (!justSpin && startTrick()) return;
 		start("spin", 12);
 	}
@@ -134,7 +139,7 @@ final class Antics {
 			if (Mimic.DEBUG) XenMod.LOG.info("[xen antics] {} saw {} crouch ({} in a row; busy {})", c.name, p.getName().getString(), seen[0], doing);
 			boolean isXenDancing = p instanceof XenPlayer x && x.companion != null && x.companion.antics.doing.equals("dance");
 			if (seen[0] == 4 && !isXenDancing && c.player.hasLineOfSight(p)) greeted(p, now);   // a crouch greeting (always, like players)
-			if (!c.mod.config.antics) continue;
+			if (!on()) continue;
 			boolean trusted = c.known.contains(p.getUUID()) || isXenDancing || c.trust(p.getUUID()) >= 0.3f;
 			if (seen[0] >= 10 && trusted && !busy() && now >= danceAgain && random.nextFloat() < 0.4f + 0.6f * playful()) {   // it keeps going: a dance
 				partner = p;
@@ -154,7 +159,7 @@ final class Antics {
 	 */
 	Action next(boolean fighting) {
 		if (c.inArena || c.player == null) return null;
-		if (!c.mod.config.antics) return null;
+		if (!on()) return null;
 		if (fighting || c.player.isInWater() || c.player.getHealth() < 10) {
 			if (busy() && !doing.equals("fight")) stop();
 			return null;
@@ -286,7 +291,7 @@ final class Antics {
 			if (!fidget.isEmpty()) endFidget();
 		}
 		idleSeen = now;
-		if (!c.mod.config.antics || c.inArena || busy() || p.isPassenger() || p.isInWater() || p.isSleeping() || p.isUsingItem()
+		if (!on() || c.inArena || busy() || p.isPassenger() || p.isInWater() || p.isSleeping() || p.isUsingItem()
 				|| c.emotions.fear > 0.4f || c.waving()) {
 			if (!fidget.isEmpty()) endFidget();
 			return null;
@@ -369,7 +374,7 @@ final class Antics {
 	 * retreat. Playful Xens do it more; never when it's losing.
 	 */
 	Action surprise(LivingEntity foe, double distance) {
-		if (!c.mod.config.antics || c.inArena) return null;
+		if (!on() || c.inArena) return null;
 		long now = now();
 		if (doing.equals("fight") && now <= until) return feint(foe);
 		if (doing.equals("fight")) doing = "";

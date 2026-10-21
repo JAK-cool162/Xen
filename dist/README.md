@@ -1444,6 +1444,17 @@ Both in the settings' **Experimental** tab (with custom instructions and your sc
   own mind, and it still listens to you. Turn it off to take over again, where it is, with what it has, in your game
   mode. Single player and a LAN world's host only: it never works on a dedicated (public) server.
 
+* **Runner** (`runner`, 2.0.0-beta.43): free Xens play only the run to the Nether, in order and quick, each step
+  started the moment the last one ends: wood, a table and tools, stone, coal, iron, smelting, food, more iron for iron
+  gear (a shield, a sword, a bucket, a chestplate), sugar cane (the spare planted by the water: a little farm), diamonds,
+  a diamond pickaxe, obsidian (water poured on a lava pool) and the portal. They do each their own usual way: caves
+  they know, only ore that shows in the open, a villager traded with if they come across one (trapped first like
+  players do: a hole three deep, a barrel at the bottom, and the villager drops in going for the job). Monsters in the
+  way they fight as ever. No chats, jokes or tricks on the way. Once in the Nether, back to their own lives. Every
+  runner's play is logged for training: a gameplay log with what it sees (config/xen/gameplay_logs) and its pictures,
+  every view in a fight, for Xen Glance (config/xen/glance_pictures; `python -m xen.vision.glance
+  config/xen/glance_pictures`).
+
 * **The solver** (`solver`): a second little mind for being stuck. When its legs can't find a way, keep failing, or
   it gets no closer, it looks at where it is (a hole? water? underground? is the goal above or below? blocks? a
   pickaxe?) and picks a way out: tower up, a staircase up, dig through, a bolder way, go round, back off and look
@@ -1514,6 +1525,7 @@ away in single player. On a server, operators use:
 | `localDeaths` | `true` | death messages only reach those within `chatRange` |
 | `hardcore` | `auto` | `on`: one life each (a Xen that dies is gone for good, and minds danger more); `off`; `auto`: as the world |
 | `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
+| `runner` | `false` | Experimental: free Xens play only the run to the Nether, quick and in order (wood, tools, iron, iron gear, sugar cane, diamonds, obsidian, the portal); their play is logged for training ([more](#the-solver-and-the-journal)) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
 | `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |

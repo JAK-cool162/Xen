@@ -325,7 +325,7 @@ public final class Vision {
 	void tick() {
 		var p = c.player;
 		if (p == null || !c.mod.config.vision || p.isSleeping() || c.minion && !c.awake()) return;
-		boolean near = c.watched || DUMP != null;
+		boolean near = c.watched || DUMP != null || dumpDir() != null && c.fightingNow();   // (a runner's fights: every view, for Glance)
 		int rows = near || p.tickCount % 4 == 0 ? 1 : 0;                        // (a row a tick near a player; out of sight, one every four)
 		if (rows == 0) return;
 		long t0 = System.nanoTime();
@@ -432,6 +432,13 @@ public final class Vision {
 	// ------------------------------------------------------------------------------ Xen Glance
 	/** Pictures for training Xen Glance (-Dxen.visionDump=folder): each whole view, halved, with what was really there. */
 	static final String DUMP = System.getProperty("xen.visionDump");
+
+	/** Where its pictures go: -Dxen.visionDump, or a runner's to config/xen/glance_pictures (what it saw, fights and all); null: nowhere. */
+	private String dumpDir() {
+		if (DUMP != null) return DUMP;
+		if (!c.mod.config.runner || c.minion) return null;
+		return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("glance_pictures").toString();
+	}
 	/** What Xen Glance made of its last whole view (null: none yet, or no Glance), and how dangerous that looks (0 to 1). */
 	float[] glance;
 	float threat;
@@ -464,12 +471,13 @@ public final class Vision {
 	/** Each whole view: what Glance makes of it (and, when collecting pictures, the picture with what was really there). */
 	private void glance(ServerLevel level) {
 		var model = c.mod.glance;
-		float[][] x = model != null || DUMP != null ? glanceInput() : null;
+		String dump = dumpDir();
+		float[][] x = model != null || dump != null ? glanceInput() : null;
 		if (model != null) {
 			glance = model.run(x);
 			threat = Math.max(glance[xen.mod.core.Glance.CLOSE], 0.6f * glance[xen.mod.core.Glance.NEAR]);
 		}
-		if (DUMP == null) return;
+		if (dump == null) return;
 		Map<Integer, Entity> byId = new HashMap<>();
 		for (Entity e : inView) byId.put(e.getId(), e);
 		boolean close = false, nearBy = false;
@@ -480,7 +488,7 @@ public final class Vision {
 		}
 		try {
 			if (dumpOut == null) {
-				Path dir = Path.of(DUMP);
+				Path dir = Path.of(dump);
 				Files.createDirectories(dir);
 				dumpOut = new java.io.DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(dir.resolve("glance_" + c.name.replaceAll("[^A-Za-z0-9_]", "_") + ".bin"),
 						java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND)));

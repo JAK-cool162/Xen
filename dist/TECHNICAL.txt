@@ -1,8 +1,42 @@
-XEN COMPANION 2.0.0-beta.42: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.43: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
 
+
+WHAT'S NEW IN 2.0.0-beta.43
+===========================
+
+Xen gets a massive upgrade.
+
+Runner (setting runner, Experimental tab, off by default). Our own take on what a speedrunning bot does, not a copy of
+one: only the steps of the run, each started the moment the last one ends. Goals.runner() replaces the usual agenda
+for free Xens (not minions, not in the arena) until the Xen has been to the Nether, in this order: under 14 food, eat;
+hurt and hungry, food; night with no pickaxe, dig in; anything better to craft, craft (Crafter.upgrade: the next
+pickaxe, a shield, a sword, a chestplate); no pickaxe, wood; a wooden one, stone; night, mine (safe under the ground);
+raw iron, smelt; under 3 coal, a coal run (Goals.fuelRun, even with logs to burn); a stone pickaxe and under 3 iron,
+iron; a villager in sight with something to trade, trade (once in 5 minutes); under 3 meals, food; the next step of its
+plan (Plans.ownGoal: a shield, an iron sword, a bucket, a chestplate); no iron gear yet, more iron (up to 17); sugar
+cane in sight and under 3 for paper, Plans goal sugar_cane x6, the spare planted by the water where it picked them
+(Farmer.caneHome; three kept for paper); an iron pickaxe, diamonds (diamondRun, whatever readyForDiamonds says); a
+diamond pickaxe, Nether.go("visit") (obsidian from a lava pool and a water bucket, flint, the portal, in). Goals.thinkMind
+starts that step at once: no Mind.choose and no thinking it over, but the option's bookkeeping as usual (outcome
+memory, habits and its own rules still learn), journal "runner: ...". Danger or a friend in need still gives -1 (its
+own call, fights as ever). Hunch.oresNear: a runner's guide leads only to ore in the open air (not one behind a wall);
+caves it knows come first in Chores' mining as before. Antics, Jokes and Xen-to-Xen chats are off for runners.
+
+Villager pit (Visits.pitTrap, a runner in a village). How players trap one: a jobless adult villager in sight within
+16; a barrel made (slabs from planks, then the barrel) unless it carries a workstation; a spot 2 to 3 blocks off on
+the villager's level, solid three deep with walls round and a floor under; it stands beside the spot, digs the three
+blocks and puts the workstation at the bottom (against the far wall, else on the floor). The villager walks over for
+the job and drops in: standing on the barrel, two deep, it can't jump out, and the Xen trades with it from the top.
+Done when the villager is in the hole (villagersBoxed, a "villager" place). It gives up after three minutes (90 s
+once the trap is set); with no jobless villager or no wood, the old box (Visits.boxVillager).
+
+Training data from runners. GameplayLog.wants logs every runner whatever gameplayLog says (config/xen/gameplay_logs,
+the recorder's format with the vision key: python -m xen.ex1.train, --elite from python -m xen.ex1.elite). Vision
+writes runners' pictures to config/xen/glance_pictures in the -Dxen.visionDump format (python -m xen.vision.glance):
+every view while it fights (a row a tick), else a row every fourth tick.
 
 WHAT'S NEW IN 2.0.0-beta.42 (and beta.41)
 =========================================
