@@ -204,6 +204,17 @@ final class Goals {
 					: current == Short.FARM ? !c.farmer.on && !c.chores.busy()
 					: building(current) ? !c.builder.busy() : current == Short.STORE ? !c.storage.busy()
 					: current == Short.ADVENTURE ? !c.adventure.on : current == Short.TRIALS ? !c.trials.on : !c.chores.busy();
+			if (!over && now - goalAt > 1200 && now >= dropCheckAt && optional(current) && mainGoalOpen() && calm()) {   // on something it can do without while the main goal waits: it drops it
+				dropCheckAt = now + 200;
+				String was = current.what;
+				if (current == Short.HOUSE || building(current)) c.builder.cancel();
+				if (current == Short.FARM) c.farmer.cancel();
+				c.chores.cancel();
+				drop();
+				c.journal("thinks", "drops \"" + was + "\" for now: the main goal comes first (it'll come back to that later)");
+				next = now;
+				return false;
+			}
 			if (!over) {
 				c.focus.watch();
 				return c.chores.busy() && !building(current);
@@ -709,6 +720,21 @@ final class Goals {
 		return current == Short.MINE && diamondsNext() || option == Mind.ENCHANT || c.nether.busy();
 	}
 
+	/** Someone asked it to build this (it keeps at it), and when it next weighs dropping what it's on. */
+	private boolean askedBuild;
+	private long dropCheckAt;
+
+	/** Something it can do without for now (its own idea, nobody asked): a house, a farm, a mob farm, a trial chamber. */
+	private boolean optional(Short s) {
+		return s == Short.HOUSE && !askedBuild || s == Short.FARM || s == Short.MOBFARM || s == Short.TRIALS;
+	}
+
+	/** The main goal still ahead and something it can do about it now: stone tools or better, and no diamond pickaxe or no Nether yet. */
+	private boolean mainGoalOpen() {
+		int tier = c.crafter.pickTier();
+		return c.mode == Companion.Mode.FREE && tier >= 2 && (tier < 4 || !c.places.worlds().contains("the_nether"));
+	}
+
 	/** The main goal's step it put on hold for something more necessary (null: none): it comes back on top after. */
 	private String heldGoal;
 
@@ -823,12 +849,14 @@ final class Goals {
 	 */
 	void adoptBuild() {
 		drop();
+		askedBuild = true;
 		current = Short.HOUSE;
 		rewardAtStart = c.genReward;
 	}
 
 	/** Someone asked it for something: that comes first. */
 	void drop() {
+		askedBuild = false;
 		exploreAskedUntil = 0;
 		current = null;
 		c.focus.forget();

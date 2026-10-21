@@ -101,6 +101,22 @@ final class Guide {
 		}
 		return at < 0 ? path.get(0) : path.get(Math.min(path.size() - 1, at + 5));
 	}
+
+	/** The very next place along its way from where it stands (on it, or the step back onto it), or null. */
+	BlockPos nextCell(BlockPos feet) {
+		if (path == null || path.isEmpty()) return null;
+		int at = -1;
+		double best = 2.1;
+		for (int i = 0; i < path.size(); i++) {
+			double d = path.get(i).distSqr(feet);
+			if (d <= best) {
+				best = d;
+				at = i;
+			}
+		}
+		if (at < 0) return feet.distSqr(path.get(0)) <= 3 ? path.get(0) : null;
+		return path.get(Math.min(path.size() - 1, path.get(at).equals(feet) ? at + 1 : at));
+	}
 	private static final String[] KINDS = {"coal", "iron", "lapis", "diamond"};
 
 	/**

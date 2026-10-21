@@ -1261,7 +1261,8 @@ final class Chores {
 		// A curious one nearly always, a lazy one seldom; not at night, not deep down already, not every trip.
 		caveLook = 0;
 		if (!dark && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && c.player.getBlockY() > 40
-				&& c.player.level().canSeeSky(c.player.blockPosition().above()) && now() - lastCaveLook > 20 * 60 * 4 && readyForCave(40)) {
+				&& c.player.level().canSeeSky(c.player.blockPosition().above()) && now() - lastCaveLook > 20 * 60 * 4 && readyForCave(40)
+				&& !(what.equals("diamonds") && c.mod.config.luck >= 2 && !c.hunch.oresNear("diamond", c.player.blockPosition(), 128, 160, 1).isEmpty())) {   // (knowing everything, after diamonds it knows of: straight there, no looking round)
 			{                                                                  // (by day a cave first, like a player: the walls show the ore; none close by, its own mine)
 				caveLook = now() + 20 * 60;
 				lastCaveLook = now();
@@ -1618,8 +1619,9 @@ final class Chores {
 					doing = c.guide.doing(got, want);
 					Action a = reach(t);
 					if (a != null) return a;
-				} else if (w != null && (c.mod.config.luck >= 2 || c.guide.leadingTo("diamond"))) {   // far: along the way it worked out, dry all the way, a few steps at a time
-					Action a = c.walkTo(Goal.block(w));
+				} else if (w != null && (c.mod.config.luck >= 2 || c.guide.leadingTo("diamond"))) {   // far: along the way it worked out, dry all the way, a step at a time
+					BlockPos n = c.guide.nextCell(here);
+					Action a = n != null ? routeStep(n) : c.walkTo(Goal.block(w));
 					if (a != null) {
 						doing = c.guide.doing(got, want);
 						return a;
@@ -2358,7 +2360,7 @@ final class Chores {
 			// what it just mined is its too (a player picks up what they dig, cobblestone and all): close by, if there's room
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
-			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
+			if (!wanted && (JUNK.contains(k) || c.guide.leading() && (k.equals("cobblestone") || k.equals("cobbled_deepslate"))) && enoughBlocks()) continue;   // (dirt, granite...: it has plenty to build with; a player lets it lie; on its way to ore it knows of, the stone too)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;
@@ -2667,6 +2669,26 @@ final class Chores {
 		stairDugAt = now;
 		BlockPos feet = c.player.blockPosition();
 		return digDown(feet.relative(stairDir, 2).below(2));
+	}
+
+	/**
+	 * One step along its guide's way: the blocks in the way mined (its head's room first, top down: a staircase step
+	 * down needs three clear, one on the level two, a step up the room over its head too), then it steps in.
+	 */
+	private Action routeStep(BlockPos n) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		int dx = n.getX() - feet.getX(), dy = n.getY() - feet.getY(), dz = n.getZ() - feet.getZ();
+		if (Math.abs(dx) + Math.abs(dz) > 1 || Math.abs(dy) > 1) return c.walkTo(Goal.block(n));   // (off its way: back onto it)
+		BlockPos[] clear = dy < 0 ? new BlockPos[] {n.above(2), n.above(), n} : dy > 0 ? new BlockPos[] {feet.above(2), n.above(), n} : new BlockPos[] {n.above(), n};
+		for (BlockPos b : clear) {
+			var st = level.getBlockState(b);
+			if (st.canBeReplaced() || st.getCollisionShape(level, b).isEmpty()) continue;
+			if (lavaNext(level, b)) return giveUp(b);
+			Action a = mine(b);
+			if (a != null) return a;
+		}
+		return c.walkTo(Goal.block(n));                                       // (clear: a step in)
 	}
 
 	private Action digDown(BlockPos t) {
