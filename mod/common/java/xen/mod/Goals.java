@@ -903,7 +903,12 @@ final class Goals {
 	private final int[] failsInRow = new int[Mind.N];
 
 	/** Back from dying with nothing: a fresh start (what didn't work before it died isn't held against it now). */
+	/** Has it had its look for a cave at the start of this life; when it last went for sugar cane. */
+	private boolean scouted;
+	private long caneAt = -1_000_000;
+
 	void freshStart() {
+		scouted = false;
 		java.util.Arrays.fill(failsInRow, 0);
 		java.util.Arrays.fill(quickUntil, 0L);
 	}
@@ -1391,10 +1396,35 @@ final class Goals {
 			c.chores.forWool = true;
 			return why(Mind.FOOD, "wool for a bed");
 		}
+		if (tier == 0 && !scouted && c.mod.config.luck > 0 && can[Mind.EXPLORE] && f[Mind.NIGHT] < 0.5f) {   // the start: trees first, or a look for a cave close by (its own call)
+			scouted = true;
+			Personality me = c.personality;
+			float lean = 0.2f + 0.4f * me.curiosity + (me.plan == Strategy.MINER || me.plan == Strategy.SPEEDRUN || me.plan == Strategy.EXPLORER ? 0.25f : 0);
+			BlockPos cave = random.nextFloat() < lean ? c.hunch.caveNear(c.player.blockPosition(), 64) : null;
+			if (cave != null) {
+				exploreToward(cave, "cave");
+				c.journal("thinks", "first a look for a cave close by: coal and iron show in its walls, quicker than digging for them (a tree on the way)");
+				agendaGoal = true;
+				return why(Mind.EXPLORE, "a look for a cave first");
+			}
+		}
 		agendaGoal = tier <= 1;                                                  // (tools: the first steps of the main goal)
 		if (tier == 0) return can[Mind.WOOD] ? why(Mind.WOOD, "wood for a pickaxe") : -1;
 		if (tier == 1) return can[Mind.STONE] ? why(Mind.STONE, "stone tools") : -1;
 		agendaGoal = false;
+		if (!c.mod.config.runner) {                                              // sugar cane early, the way a player who knows the game does: the books for an enchanting table later
+			int cane = items.getOrDefault("sugar_cane", 0), paper = items.getOrDefault("paper", 0) + 3 * items.getOrDefault("book", 0);
+			if (cane >= 4 && c.farmer.caneHome == null && home == null) c.farmer.caneHome = c.player.blockPosition().immutable();   // (the spare planted by the water here)
+			if (cane + paper < 3 && c.plans.goal == null && now() - caneAt > 20 * 60 * 15 && c.eyes.count("sugar_cane") > 0 && f[Mind.DANGER] < 0.2f) {
+				caneAt = now();
+				c.plans.setGoal("sugar_cane", 6, null);
+				Plans.Step s = c.plans.advice();
+				if (s != null && s.option >= 0 && s.option < can.length && can[s.option]) {
+					agendaGoal = true;
+					return why(s.option, "sugar cane now: paper for the books an enchanting table needs later");
+				}
+			}
+		}
 		if (tier >= 4 && c.mod.config.adventures && !c.places.worlds().contains("the_nether") && !c.nether.busy() && now() > netherTryAt
 				&& (enchantedSomething() || c.enchanter.table() == null && MindSense.count(c, n -> n.equals("obsidian") || n.equals("enchanting_table")) < 4
 						&& MindSense.count(c, n -> n.equals("book")) > 0 || now() - diamondPickAt() > 24000 * 2)) {    // a diamond pickaxe and its gear enchanted, or the book and no obsidian for the table yet (the trip gets it, and it enchants before the portal), or two days on: a first look at the Nether

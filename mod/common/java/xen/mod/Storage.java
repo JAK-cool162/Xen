@@ -368,6 +368,7 @@ final class Storage {
 			if (s.isEmpty()) continue;
 			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
 			if (NOT_WORTH.contains(n) && c.items().getOrDefault(n, 0) > 8) continue;
+			if (!VALUABLE.contains(n) && Worth.want(c, n, c.itemKey(s)) <= 0) continue;   // (only what it needs, like a player who knows the game: the rest stays)
 			if (took < 4) what.append(what.length() > 0 ? ", " : "").append(n.replace('_', ' '));
 			Compat.click(menu, i, true, c.player);
 			took++;
