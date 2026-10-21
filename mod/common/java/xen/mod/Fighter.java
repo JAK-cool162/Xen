@@ -1062,7 +1062,7 @@ final class Fighter {
 		XenPlayer p = c.player;
 		float t = 0;
 		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(12),
-				x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy && !(x instanceof net.minecraft.world.entity.monster.EnderMan))) {
+				x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy && !kind(x).equals("enderman"))) {
 			float e = expected(m) * (m.getTarget() == p ? 1f : m.hasLineOfSight(p) ? 0.5f : 0.2f) * (m.distanceTo(p) < 6 ? 1f : 0.6f);
 			t += e;
 		}
