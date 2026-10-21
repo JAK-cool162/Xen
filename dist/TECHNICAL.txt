@@ -47,8 +47,15 @@ Fighting monsters (Fighter, the mob training below):
   damage to each), then an S-tap back while the sword recharges. Before, it went for a jump crit, which never sweeps.
 - Knockback: two or more at it, or lava or a drop of four just behind the one it hits (Fighter.dropBehind): a sprint
   hit (setSprinting before the swing: the extra knockback), then a step back while it recharges.
-- Up a pillar sooner: three or more mobs after it and under 75% health, it pillars up two blocks then (before, only
-  when it was outmatched, often at a heart or two, and the climb itself got it killed).
+- A drowned with a trident counts as one that hits from a way off (Fighter.ranged): no pillar against it (up on one,
+  a trident killed it in the training). Pillaring up sooner against three or more was tried and taken back out: the
+  climb itself got it killed (husk 5: a death where the old way had none).
+- A bite between swings (Fighter.snack): food bar under 20, food or a golden apple to hand, sword recharging and no
+  monster within 3.5 blocks: it eats (the food bar kept full, its health keeps coming back). Fleeing, it eats only with
+  none within 4.5 (Fighter.clearAround): two deaths in the training were eating with a mob close by.
+Diamonds straight through the rock (Hunch.oresNear): an iron pickaxe, diamonds wanted and no cave within 160 blocks,
+its sense for where things are offers diamonds deep in solid rock too (not only ore in the open or one block in), and
+Guide.check gives a diamond dig 90 s of no progress before it lets it go (30 s for other ore).
 Crouching only counts when it sees it (Antics.watch: WorldSenses.sees, its view and line of sight): crouch spam behind
 its back or a wall no longer starts a greeting or a dance.
 /xen spawn 1 <name>: one Xen with that name (as /xen summon <name>; with a bigger count, as /xen summon <name> <n>).

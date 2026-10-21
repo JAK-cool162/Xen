@@ -1,7 +1,42 @@
-**Xen Companion 2.0.0-beta.42**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.43**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
+
+### 2.0.0-beta.43: Xen gets a massive upgrade
+
+* **Hybrid Xen**: the runner's lesson for every Xen. When it would take a breather while something needed is waiting
+  (eat, craft, smelt its iron, wood, stone, mining, food for the bag), it does that first. Test, 6 Xens, same world
+  and seed, iron by day 2: **5 of 6** (beta.42: 2 of 6). A stronger version that also put off houses, farms and
+  looking round until it had iron gear did worse (2 of 6) and isn't used.
+* **Fewer silly deaths**: coming back from dying it drops what it was doing where it died (it used to walk back
+  through the monsters to "hide in its hole"); running from a zombie it no longer flips between "take cover from the
+  skeleton" and "run" every tick; it doesn't pillar up against a drowned with a trident; it only eats in a fight
+  with nothing within 4.5 blocks of it.
+* **Fighting monsters**: a sword **sweep** when they're bunched up (one swing hits them all and knocks them back;
+  Sweeping Edge makes it hurt), a **sprint-hit knockback** against a crowd or to send one over an edge or into lava,
+  then a step back while the sword recharges, and a bite of food between swings to keep the food bar full.
+* **Diamonds**: with an iron pickaxe it goes to a cave first; with no cave about, its sense for where things are
+  leads it straight to diamonds through the rock (and it keeps at a long dig for 90 s before giving up, not 30 s).
+* **Runner mode** (Experimental tab, off by default): only the run to the Nether, in order and quick (wood, tools,
+  stone, coal, iron, smelting, food, iron gear, a little sugar cane farm, diamonds, obsidian with water on lava, the
+  portal), only ore in the open, caves first, a villager trapped in a pit (three deep, a barrel at the bottom) and
+  traded with. Every runner's play is logged with what it sees, fights too, for training the vision model.
+* Crouch spam only counts when the Xen can see it (not behind its back). `/xen spawn 1 <name>` names the Xen.
+
+**Benchmarks (honest numbers).** Mob training: one Xen in each of 4 bedrock pens, iron sword, shield, full iron
+armor, 1 to 5 mobs at once (zombies, husks, drowned, skeletons, strays, creepers, spiders, cave spiders, witches, an
+enderman, vindicators, pillagers, slimes, and mixed swarms of 5), 60 game seconds each.
+
+| Build | Overworld trials | Deaths | Health left |
+|---|---|---|---|
+| beta.42 fighting + this version's survival fixes | 76 | **0** | 19.4 |
+| first try of the new moves (with an early pillar-up) | 84 | 4 | 17.8 |
+
+The 4 deaths were 2 pillaring up early against 3+ mobs (taken back out) and 2 eating with mobs close (now it only eats
+with none within 4.5 blocks). Against 5 zombies the new moves did better (20 health left against 16.5); the final
+build with those two fixes was not swept again before this release. The Nether pens in this test didn't get the mobs
+to attack, so there are no Nether numbers yet.
 
 ### 2.0.0-beta.42: Xen gets a massive upgrade
 

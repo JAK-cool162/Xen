@@ -148,8 +148,8 @@ final class Guide {
 		if (d < closest - 0.5) {
 			closest = d;
 			closerAt = now();
-		} else if (now() - closerAt > 20 * 30) {
-			done(false, "no closer in 30 s");
+		} else if (now() - closerAt > 20 * (kind.startsWith("diamond") ? 90 : 30)) {   // (diamonds: a long way down through the rock, a staircase at a time)
+			done(false, kind.startsWith("diamond") ? "no closer in 90 s" : "no closer in 30 s");
 			return false;
 		}
 		return true;

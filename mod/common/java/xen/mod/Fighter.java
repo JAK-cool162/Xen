@@ -409,8 +409,7 @@ final class Fighter {
 		}
 		if (!outmatched && escaping) escaping = false;
 		int onIt = p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6), m -> m.isAlive() && m.getTarget() == p).size();
-		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && onIt >= 2   // (the terrain is its weapon: two on it, it takes the high ground before it's low)
-				|| onIt >= 3 && health < 0.75f;                                // (three or more: up while it still has the health to get there, not at its last heart)
+		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && onIt >= 2;   // (the terrain is its weapon: two on it, it takes the high ground before it's low)
 		if (perched || (outmatched || crowd) && canPerch(foe)) {
 			Action up = perch(foe, d);
 			if (up != null) return up;
@@ -449,7 +448,7 @@ final class Fighter {
 				return Action.BACK;
 			}
 			h.lowerShield();
-			if (d > (outmatched || desperate ? 6.5 : 5) && h.canHeal()) return Action.EAT;   // a golden apple (or food) at a safe distance (eating takes a second and a half: a zombie closes in)
+			if (d > (outmatched || desperate ? 6.5 : 5) && h.canHeal() && clearAround(4.5)) return Action.EAT;   // a golden apple (or food) at a safe distance from all of them (eating takes a second and a half: a zombie closes in)
 			p.setSprinting(sprintable);
 			if (desperate || outmatched) {
 				Action friend = toFriend(foe, d, sprintable);
@@ -613,6 +612,8 @@ final class Fighter {
 				p.setSprinting(false);
 				return Action.BACK;
 			}
+			Action snack = snack();
+			if (snack != null) return snack;
 			if (useShield && !axe && h.raiseShield()) return idle();
 			if (foeRising && d < 3.5 && random.nextFloat() < gene(6)) return Action.BACK;   // it jumps in for a crit: step out
 			if (opening) return idle();                                        // (its swing just went: no need to back off, it's ready first)
@@ -628,7 +629,8 @@ final class Fighter {
 		}
 		if (!ready && d < 3.2 + 0.8 * gene(2) && !opening) {                  // keep its distance until its sword is ready
 			h.watching = foe;
-			return idle();
+			Action snack = snack();
+			return snack != null ? snack : idle();
 		}
 		boolean walker = !(foe instanceof Player) && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && !archer(foe)
 				&& foe instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == p;
@@ -1134,6 +1136,23 @@ final class Fighter {
 	}
 
 	private int knockSaidAt = -1000;
+
+	/**
+	 * A bite between swings, like a player: the food bar kept full in a fight, so its health keeps coming back. Only
+	 * while nothing's on top of it (none within 3.5 blocks: eating slows it and takes a second and a half). Null: not now.
+	 */
+	private Action snack() {
+		var p = c.player;
+		if (p.getFoodData().getFoodLevel() >= 20 || !c.hands.canHeal()) return null;
+		return clearAround(3.5) ? Action.EAT : null;
+	}
+
+	/** No monster within r blocks of it. */
+	private boolean clearAround(double r) {
+		var p = c.player;
+		return p.level().getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(r),
+				m -> m != p && m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty();
+	}
 
 	/** Other monsters close enough to the one it's hitting for a sword's sweep to catch them too (a block round it, in reach). */
 	private int bunchedBy(LivingEntity foe) {

@@ -447,10 +447,11 @@ final class Hunch {
 		Map<Long, Chunk> known = WORLD.get(dim(level));
 		if (known == null) return out;
 		String kind = what.equals("diamonds") ? "diamond" : what;
+		boolean straight = kind.equals("diamond") && c.crafter.pickTier() >= 3 && c.caves.nearest(160) == null;   // (an iron pickaxe, diamonds wanted, no cave to look in: its sense of them leads it straight there, through the rock)
 		List<double[]> found = new ArrayList<>();
 		for (Chunk ch : known.values())
 			for (Find f : ch.finds()) {
-				if (!f.kind().equals(kind) || !f.open() && (!f.shallow() || c.mod.config.runner)) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of; a runner, only ore in the open)
+				if (!f.kind().equals(kind) || !straight && !f.open() && (!f.shallow() || c.mod.config.runner)) continue;   // (only ore showing to the air or one block behind a wall: ore deep in solid rock it acts as if it can't know of; a runner, only ore in the open)
 				BlockPos at = f.at();
 				int dx = Math.abs(at.getX() - from.getX()), dz = Math.abs(at.getZ() - from.getZ()), dy = from.getY() - at.getY();
 				if (dx > flat || dz > flat || dy > deep || dy < -6 || taken.contains(at.asLong())) continue;
