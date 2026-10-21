@@ -419,6 +419,10 @@ final class Fighter {
 			Action roof = underLowRoof(foe, d);                                // they can't get under a roof two blocks up: in there, and hit their legs
 			if (roof != null) return roof;
 		}
+		if (Companion.archer(foe) && !(foe instanceof Player) && !c.inArena && d > 6 && !h.carries("bow") && !h.carries("crossbow")) {   // a skeleton off over there: walled off, not fought (no bow to answer it with)
+			Action wall = wallOff(foe, kind(foe).replace('_', ' '));
+			if (wall != null) return wall;
+		}
 		Action gear = c.kit.use(foe, d, fleeing || outmatched || retreat > 0 && health < retreat);   // potions, cobwebs, pearls, golden apples
 		if (gear != null) return gear;
 		// About to die with nothing to fight with: anyone runs (its gut, not a choice), to a friend if one's about (and
