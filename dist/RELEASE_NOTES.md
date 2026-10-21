@@ -1,7 +1,17 @@
-**Xen Companion 2.0.0-beta.41**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.42**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
+
+### 2.0.0-beta.42: Xen gets a massive upgrade
+
+* **Skeletons**: backing off from one with a shield, the shield stays up facing it (test, 8 health, two skeletons:
+  2 of 6 died before, none now, 13.5 health left against 9.1).
+* **Creepers**: the shield up to a hissing one, a hit to knock it back, the creeper kept between it and a skeleton.
+* **Attention**: it keeps to where it's going for 2 seconds instead of changing its mind every moment (a quarter fewer
+  sudden turns), a staircase for stone goes one way (no more digging about in the dirt for minutes), and it gives a
+  chore at least 2.4 minutes before giving up.
+* Everything in beta.41 below, with the bare-handed "sprint away" taken back out (it lived less, not more).
 
 ### 2.0.0-beta.41: Xen gets a massive upgrade
 
