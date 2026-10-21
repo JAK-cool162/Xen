@@ -1140,9 +1140,10 @@ public final class Companion {
 		if (met != null) return met;
 		Action about = standingAbout();                                // a minute standing about with nothing to show: it moves on
 		if (about != null) return about;
-		Action whim = whims.next();                                   // bored stiff: a plan out loud, a party, a needless choice; a friend's party
+		boolean set = goals.determined();                              // (set on its goal: no whims, no showing off)
+		Action whim = set ? null : whims.next();                       // bored stiff: a plan out loud, a party, a needless choice; a friend's party
 		if (whim != null) return whim;
-		Action fun = antics.next(false);                              // dancing, showing off
+		Action fun = set ? null : antics.next(false);                  // dancing, showing off
 		if (fun != null) return fun;
 		Action grudge = mode == Mode.FREE ? uses.grudge() : null;      // someone hurt it badly: their house (the grief setting)
 		if (grudge != null) return grudge;

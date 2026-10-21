@@ -208,9 +208,12 @@ final class Goals {
 				c.focus.watch();
 				return c.chores.busy() && !building(current);
 			}
-			if (current == Short.MINE && c.guide.leadingTo("diamond") && diamonds() == 0 && c.player.getFoodData().getFoodLevel() >= 8 && c.player.getHealth() >= 10) {
-				String plan = chore(Short.MINE);                                     // its guide is taking it to diamonds: on with that (a player who knows where they are doesn't go off to build first)
+			if (current == Short.MINE && diamondsNext() && calm() && (c.guide.leadingTo("diamond") || now - goalAt > 200 && keptAt < 12)) {
+				if (diamonds() > keptDiamonds) keptAt = 0;
+				keptDiamonds = diamonds();
+				String plan = chore(Short.MINE);                                     // set on diamonds: the trip stopped short, so straight back down (a player set on something doesn't go off to build halfway)
 				if (!cant(plan)) {
+					keptAt++;
 					c.chores.own = true;
 					return c.chores.busy();
 				}
@@ -690,6 +693,27 @@ final class Goals {
 		return c.items().getOrDefault("diamond", 0);
 	}
 
+	/** Its mining is for diamonds now (an iron pickaxe, fewer than 3, and ready for them or on the run). */
+	private boolean diamondsNext() {
+		return c.crafter.pickTier() >= 3 && diamonds() < 3 && (readyForDiamonds() || diamondRun);
+	}
+
+	/** Nothing pressing (no danger, health and food fine): it can stay set on its goal. */
+	private boolean calm() {
+		var p = c.player;
+		return c.danger() < 0.3f && p.getHealth() >= 10 && p.getFoodData().getFoodLevel() >= 12;
+	}
+
+	/** Set on a step of the main goal now (diamonds, enchanting its gear, the Nether): no whims or showing off meanwhile. */
+	boolean determined() {
+		return current == Short.MINE && diamondsNext() || option == Mind.ENCHANT || c.nether.busy();
+	}
+
+	/** Times it went straight back to a diamond dig without a new diamond, and how many it had then. */
+	private int keptAt, keptDiamonds;
+	/** The agenda's step this time is part of the main goal (iron, diamonds, enchanting, or what they need first). */
+	private boolean agendaGoal;
+
 	private int blocks() {
 		var items = c.items();
 		return items.getOrDefault("dirt", 0) + items.getOrDefault("cobblestone", 0);
@@ -915,6 +939,17 @@ final class Goals {
 			d.order[0] = need;
 			d.how[need] = "no standing about: " + Mind.SAYS[need] + " first";
 			break;
+		}
+		var me = c.player;
+		boolean night = me.level().isDarkOutside() && me.level().canSeeSky(me.blockPosition().above());
+		if (planned >= 0 && agendaGoal && need < 0 && calm() && d.order[0] != planned && (!night || planned == Mind.MINE)) {   // set on its goal: the next step of it, not whatever small thing came to mind
+			for (int i = 1; i < d.order.length; i++) {
+				if (d.order[i] != planned) continue;
+				System.arraycopy(d.order, 0, d.order, 1, i);
+				d.order[0] = planned;
+				d.how[planned] = "set on it: " + planWhy;
+				break;
+			}
 		}
 		if (ponderUntil == 0) {                                                // a new choice to make: it thinks it over first, as long as it needs
 			long think = thinkTicks(situation, f, d.difficulty);
@@ -1229,6 +1264,7 @@ final class Goals {
 	 * stops gathering what it has plenty of (a chest full of logs doesn't get you anywhere). -1: its mind's call.
 	 */
 	private int agenda(float[] f, boolean[] can) {
+		agendaGoal = false;
 		var items = c.items();
 		int wood = MindSense.count(c, n -> n.endsWith("_planks")) + 4 * items.getOrDefault("log", 0);
 		int stone = items.getOrDefault("cobblestone", 0);
@@ -1298,6 +1334,7 @@ final class Goals {
 			}
 		}
 		if (tier >= 3 && can[Mind.ENCHANT] && !c.enchanter.on && now() > c.enchanter.retryAt) {   // the makings of an enchantment (lapis, levels, the table): a few seconds, before anything long (crafting too: enchanted gear is the better gear)
+			agendaGoal = true;
 			return why(Mind.ENCHANT, "enchant its gear (lapis, " + c.player.experienceLevel + " levels)");
 		}
 		if (can[Mind.CRAFT]) return why(Mind.CRAFT, "better gear");
@@ -1700,6 +1737,7 @@ final class Goals {
 	}
 
 	private int trip(int option, boolean deep, boolean[] can, Map<String, Integer> items, String why) {
+		agendaGoal = option == Mind.MINE;
 		Prepared.Step first = c.prepared.before(option, deep, can, items);
 		return first != null ? why(first.option(), first.why()) : why(option, why);
 	}
