@@ -47,6 +47,11 @@ final class Guide {
 		return target != null;
 	}
 
+	/** Leading it to this kind of ore now? */
+	boolean leadingTo(String what) {
+		return target != null && what.equals(kind);
+	}
+
 	/**
 	 * The nearest ore of this kind it can see a dry way to (within flat blocks round and deep down): offered, and the
 	 * Xen takes it or not. True if it follows.

@@ -208,6 +208,13 @@ final class Goals {
 				c.focus.watch();
 				return c.chores.busy() && !building(current);
 			}
+			if (current == Short.MINE && c.guide.leadingTo("diamond") && diamonds() == 0 && c.player.getFoodData().getFoodLevel() >= 8 && c.player.getHealth() >= 10) {
+				String plan = chore(Short.MINE);                                     // its guide is taking it to diamonds: on with that (a player who knows where they are doesn't go off to build first)
+				if (!cant(plan)) {
+					c.chores.own = true;
+					return c.chores.busy();
+				}
+			}
 			if (Focus.WATCHED.contains(current) && (c.focus.holding() || c.focus.cutOff(current) && c.focus.hold(current.what))) {   // cut off, not over: it holds on
 				String stale = c.focus.stale();
 				if (stale != null) {
