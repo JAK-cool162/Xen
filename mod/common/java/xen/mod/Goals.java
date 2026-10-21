@@ -208,7 +208,7 @@ final class Goals {
 				c.focus.watch();
 				return c.chores.busy() && !building(current);
 			}
-			if (current == Short.MINE && diamondsNext() && calm() && (c.guide.leadingTo("diamond") || now - goalAt > 200 && keptAt < 12)) {
+			if (current == Short.MINE && diamondsNext() && calm() && now - goalAt > 100 && (c.guide.leadingTo("diamond") || now - goalAt > 200 && keptAt < 12)) {
 				if (diamonds() > keptDiamonds) keptAt = 0;
 				keptDiamonds = diamonds();
 				String plan = chore(Short.MINE);                                     // set on diamonds: the trip stopped short, so straight back down (a player set on something doesn't go off to build halfway)
@@ -2027,7 +2027,7 @@ final class Goals {
 		optionWhere = null;
 		c.mod.mindExperiences++;
 		if (o == Mind.MINE && c.places.get("mine hut") == null && c.places.get("mine") != null && !c.builder.busy() && !c.player.isCreative()
-				&& c.crafter.pickTier() >= 3                                            // (once its mine has paid off: the first trips are for iron, not a hut)
+				&& c.crafter.pickTier() >= 3 && !diamondsNext()                         // (once its mine has paid off: the first trips are for iron, not a hut; set on diamonds, they come first)
 				&& c.chores.mineRecordY != Integer.MIN_VALUE && c.player.blockPosition().closerThan(c.places.get("mine"), 24)) {   // its mine gets a proper entrance
 			String hut = c.builder.startPlan(Architect.mineEntrance(c.places.get("mine"), c.chores.mineRecordDir,
 					Architect.ofWood(MindSense.count(c, n -> n.startsWith("spruce_")) > 8 ? "spruce" : "oak", true, false)), "", "mine");
