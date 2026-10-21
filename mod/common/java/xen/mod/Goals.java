@@ -1351,7 +1351,7 @@ final class Goals {
 			return why(Mind.FOOD, "low on food");
 		}
 		boolean bed = items.keySet().stream().anyMatch(k -> k.endsWith("_bed")) || c.bedAt != null;
-		if (!bed && tier >= 1 && can[Mind.FOOD] && wool() < 3 && sheepNear() && (tier != 2 || evening())) {   // (with stone tools: iron first, unless night's coming)
+		if (!bed && tier >= 1 && can[Mind.FOOD] && wool() < 3 && sheepNear() && (tier != 2 || evening()) && !diamondsNext()) {   // (with stone tools: iron first, unless night's coming; set on diamonds: the night underground needs no bed)
 			c.chores.forWool = true;
 			return why(Mind.FOOD, "wool for a bed");
 		}
