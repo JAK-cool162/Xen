@@ -1,6 +1,7 @@
 package xen.mod;
 
 import net.minecraft.core.BlockPos;
+import java.util.List;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
@@ -357,6 +358,13 @@ final class Nether {
 			if (a != null || lightAt != null) return a;
 		}
 		if (purpose == null) return null;
+		if ("table".equals(purpose) && lavaAt == null && c.chores.busy() && c.chores.serial == lavaChore && c.mod.config.luck >= 2) {   // down for lava: a pool it knows of now, and it's off there
+			BlockPos l = knownLava((ServerLevel) c.player.level());
+			if (l != null) {
+				lavaAt = l;
+				c.chores.cancel();
+			}
+		}
 		if (c.chores.busy() || c.builder.busy() || c.crafter.hasOrder()) return null;   // getting something for the trip
 		String dim = Places.dim(c.player.level());
 		if (dim.equals("the_end")) return null;                                   // (the dragon is another story)
@@ -431,7 +439,44 @@ final class Nether {
 	}
 
 	private BlockPos lavaAt;
-	private long pouredAt = -1, fetchTriedAt;
+	private long pouredAt = -1, fetchTriedAt, lavaLookedAt;
+
+	/**
+	 * A still lava block it knows of (luck: the server knows the world) with air over it and solid ground beside it to
+	 * stand on, not by water it would drown in: where it pours its water. Looked up every few seconds.
+	 */
+	private BlockPos knownLava(ServerLevel level) {
+		if (now() - lavaLookedAt < 100) return null;
+		lavaLookedAt = now();
+		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 96, 120, 12);
+		int dry = 0, open = 0;
+		for (BlockPos q : pools) {
+			for (BlockPos r : BlockPos.betweenClosed(q.offset(-3, -2, -3), q.offset(3, 2, 3))) {
+				if (!level.isLoaded(r) || !level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA) || !level.getFluidState(r).isSource()) continue;
+				if (!level.getBlockState(r.above()).isAir()) continue;
+				open++;
+				boolean stand = false;
+				for (Direction d : Direction.Plane.HORIZONTAL) {
+					BlockPos side = r.relative(d);
+					if (level.getBlockState(side).isFaceSturdy(level, side, Direction.UP) && level.getBlockState(side.above()).isAir() && level.getBlockState(side.above(2)).isAir()) stand = true;
+				}
+				boolean wet = false;
+				for (BlockPos w : BlockPos.betweenClosed(r.offset(-2, -1, -2), r.offset(2, 2, 2))) wet |= level.getFluidState(w).is(net.minecraft.tags.FluidTags.WATER);
+				if (!wet) dry++;
+				if (stand && !wet) {
+					c.journal("thinks", "knows of a lava pool at " + r.toShortString() + ": water on it makes obsidian");
+					return r.immutable();
+				}
+			}
+		}
+		if (now() - lavaSaidAt > 1200) {
+			lavaSaidAt = now();
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "no lava pool it can stand by (%d pools known, %d open to the air, %d dry)", pools.size(), open, dry));
+		}
+		return null;
+	}
+
+	private long lavaSaidAt = -10000;
 
 	/** The chore it started to go down for lava (its serial number), so another of its own errands doesn't hold it up. */
 	private int lavaChore = -1;
@@ -526,6 +571,7 @@ final class Nether {
 			return Action.PLACE;
 		}
 		if (lavaAt == null || !level.getFluidState(lavaAt).isSource()) lavaAt = visibleLava(20);
+		if (lavaAt == null && c.mod.config.luck >= 2 && !inNether()) lavaAt = knownLava(level);   // knowing everything: the nearest lava pool it can stand over
 		if (lavaAt == null) {
 			if (c.player.getY() > 10 && c.crafter.pickTier() >= 2 && !inNether()) {     // lava pools lie deep: down in the deepslate, where most are (diamonds too)
 				if (c.chores.busy() && c.chores.own && c.chores.serial != lavaChore) c.chores.cancel();   // (an errand of its own from before, the flint: done with)
@@ -552,10 +598,11 @@ final class Nether {
 		}
 		if (now() - pouredAt < 30) return Action.IDLE;                             // the water flows over it
 		pouredAt = -1;
-		c.hands.bucket(Vec3.atCenterOf(top), s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"));   // the water back
 		lavaAt = null;
 		c.acted = true;
 		c.chatter("Obsidian! Now to mine it.", false);
+		if ("table".equals(purpose)) return Action.IDLE;                          // (the water left flowing over it while it mines: each hole fills, the lava under turns to obsidian too, nothing drops in the lava)
+		c.hands.bucket(Vec3.atCenterOf(top), s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"));   // the water back
 		return Action.PLACE;
 	}
 

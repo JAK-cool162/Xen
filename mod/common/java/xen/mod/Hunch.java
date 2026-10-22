@@ -60,7 +60,8 @@ final class Hunch {
 			String n = BuiltInRegistries.BLOCK.getKey(b).getPath();
 			if (n.equals("ancient_debris")) ORES.put(b, "debris");
 			else if (n.equals("obsidian")) ORES.put(b, "obsidian");
-			else if (n.equals("sugar_cane")) ORES.put(b, "sugar_cane");             // (paper for the enchanting table's book: by the water, up on the land)                 // (an enchanting table's four, a portal's ten: by lava down deep, in ruined portals)
+			else if (n.equals("sugar_cane")) ORES.put(b, "sugar_cane");             // (paper for the enchanting table's book: by the water, up on the land)
+			else if (n.equals("lava")) ORES.put(b, "lava");                           // (a lava pool: water poured on it makes obsidian)                 // (an enchanting table's four, a portal's ten: by lava down deep, in ruined portals)
 			else if (n.endsWith("_ore")) ORES.put(b, n.replace("deepslate_", "").replace("nether_", "").replace("_ore", ""));
 		}
 	}
@@ -470,7 +471,7 @@ final class Hunch {
 		boolean straight = kind.equals("diamond") && c.crafter.pickTier() >= 3 && c.caves.nearest(160) == null   // (an iron pickaxe, diamonds wanted, no cave to look in: its sense of them leads it straight there, through the rock)
 				|| c.mod.config.luck >= 2;                                         // (knowing everything: every ore it needs, wherever it is, and further round)
 		if (c.mod.config.luck >= 2) {                                          // (diamonds: further round, they're rare; iron and coal there's some close by)
-			boolean rare = kind.equals("diamond") || kind.equals("obsidian") || kind.equals("lapis") || kind.equals("sugar_cane");
+			boolean rare = kind.equals("diamond") || kind.equals("obsidian") || kind.equals("lapis") || kind.equals("sugar_cane") || kind.equals("lava");
 			flat = Math.max(flat, rare ? 128 : 48);
 			deep = Math.max(deep, rare ? 160 : 72);
 		}
@@ -492,7 +493,8 @@ final class Hunch {
 		for (int i = 0; i < found.size() && out.size() < max && i < 4 * max; i++) {
 			BlockPos at = new BlockPos((int) found.get(i)[1], (int) found.get(i)[2], (int) found.get(i)[3]);
 			BlockPos r = stillThere(level, at, kind);
-			if (r != null && dry(level, r)) out.add(r);
+			boolean wet = kind.equals("lava") || kind.equals("sugar_cane");     // (lava is wet itself, sugar cane grows by the water: no dry check for those)
+			if (r != null && (wet || dry(level, r))) out.add(r);
 			else taken.add(at.asLong());
 		}
 		return out;

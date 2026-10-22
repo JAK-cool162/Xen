@@ -2647,7 +2647,7 @@ final class Chores {
 			if (!t.equals(working)) {
 				working = t.immutable();
 				workingSince = now();
-			} else if (now() - workingSince > 300) {
+			} else if (now() - workingSince > (c.player.level().getBlockState(t).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) ? 1200 : 300)) {   // (obsidian takes its time: ten seconds with a diamond pickaxe, more in water)
 				working = null;
 				c.journal("does", "gives up on the block at " + t.toShortString() + " (can't get at it)");
 				return giveUp(t);
@@ -2835,8 +2835,9 @@ final class Chores {
 
 	private Action mine(BlockPos b) {
 		ServerLevel level = (ServerLevel) c.player.level();
+		boolean quenched = level.getBlockState(b).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) && level.getFluidState(b.above()).is(net.minecraft.tags.FluidTags.WATER);   // (obsidian with water running over it: the hole fills with water, the lava by it turns to obsidian too)
 		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {   // lava right behind it (a player hears it pop, sees it drip): leave it
-			if (d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) {
+			if (!quenched && d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) {
 				c.journal("does", "leaves the block at " + b.toShortString() + " (lava behind it)");
 				if (c.personality.chattiness > 0.4f) c.chatter(c.personality.say("lava"), false);
 				return giveUp(b);
