@@ -1,7 +1,25 @@
-XEN COMPANION 2.0.0-beta.46: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.47: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.47
+
+Enchanting: Goals agenda planStep("enchanting_table") after the diamond pickaxe and 2 diamonds (before a home);
+with a book, Goals.tableTrip() starts Nether.go("table"): obsidianWanted() 4, Nether.tableTrip() (obsidian, the
+crafter's table, Enchanter), finishTrip without a portal. Plans: leather from Chores.slay("cow") (the nearest within
+128 at luck 2); FETCH obsidian is a MINE option; bucket and iron chestplate wants only below a diamond pickaxe.
+Hunch: lava and sugar cane recorded, exempt from the dry check; obsidian, lapis, sugar cane, lava with diamond range;
+sugar cane costs 8 per water sample on the way. Nether.knownLava(): a still lava source with air over it, ground
+beside it, no water within 2; the deep-mining fallback is cancelled once one is known; for the table trip the
+poured water is left running. Chores.mine(): obsidian with water over it is mined with lava beside it; 60 s before
+giving up on obsidian. Fetch targets with water within 2, at a lake bottom, refused as a long dive, or 3 minutes
+on: let go. Goals: no random exploration while determined() (agenda main-goal step) and never ADVENTURE.
+Companion.toAir(): towering up kept for 30 ticks; digging only through a block with air over it.
+
+Tests (gear_test, 3 Xens with diamond gear, 3 paper and a bucket, 20 min): books made, lava pools found, water
+poured; obsidian not mined out; 0 enchants. Deaths 1, 1 and 0 in the last three runs (drowning).
 
 
 WHAT'S NEW IN 2.0.0-beta.46

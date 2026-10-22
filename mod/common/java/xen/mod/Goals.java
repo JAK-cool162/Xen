@@ -738,7 +738,7 @@ final class Goals {
 
 	/** Set on a step of the main goal now (diamonds, enchanting its gear, the Nether): no whims or showing off meanwhile. */
 	boolean determined() {
-		return current == Short.MINE && diamondsNext() || option == Mind.ENCHANT || c.nether.busy();
+		return current == Short.MINE && diamondsNext() || option == Mind.ENCHANT || c.nether.busy() || agendaGoal;   // (or the agenda's step this time is the main goal's)
 	}
 
 	/** Someone asked it to build this (it keeps at it), and when it next weighs dropping what it's on. */
@@ -1059,9 +1059,12 @@ final class Goals {
 		ponderUntil = 0;
 		if (instant.equals("thinking about what to do next")) instant = "";
 		int first = d.order[0];
-		if (random.nextFloat() < explore && d.order.length > 1) {               // now and then something else, to find out
-			first = d.order[1 + random.nextInt(d.order.length - 1)];
-			d.how[first] = "let me try something different";
+		if (random.nextFloat() < explore && d.order.length > 1 && !determined()) {   // now and then something else, to find out (not when set on its main goal)
+			int other = d.order[1 + random.nextInt(d.order.length - 1)];
+			if (other != Mind.ADVENTURE) {                                        // (the dragon's no thing to try on a whim)
+				first = other;
+				d.how[first] = "let me try something different";
+			}
 		}
 		java.util.List<Integer> order = new java.util.ArrayList<>();
 		order.add(first);

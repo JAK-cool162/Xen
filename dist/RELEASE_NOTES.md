@@ -1,9 +1,24 @@
-**Xen Companion 2.0.0-beta.46**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.47**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.46: Xen gets a massive upgrade
+### 2.0.0-beta.47: Xen gets a massive upgrade
+
+* **The enchanting table is its own goal now**, right after the diamond pickaxe: a book (sugar cane it knows of on
+  its own shore, a cow it knows of for the leather), then a table trip (four obsidian, the table, its gear enchanted,
+  no portal). In tests (3 Xens given diamond gear) all of them made the book within about a minute.
+* **Obsidian from lava**: with "Knows the world" on it knows where lava pools are and that water on lava makes
+  obsidian; it pours its water on one. Not finished: in the last tests the Xens made the obsidian but couldn't mine
+  it out, so there were **0 enchants**. Still being worked on.
+* **Stays on the goal**: no random "something different" (no dragon trip on a whim) while it's on a main-goal step;
+  the enchanting table comes before a home; the Nether waits until it has enchanted.
+* **Safer around water**: obsidian and lapis by an aquifer or at a lake bottom are skipped; out of air it towers up
+  through the water and keeps at it; it only digs toward air through a block with air over it. Drowning still
+  happened in some tests (1 in each of two 20-minute tests).
+* The beta.46 diamond armor test ran with runner mode on (now noted there).
+
+### 2.0.0-beta.46
 
 * **Full diamond armor in under 25 minutes**: in a 20-minute test (3 Xens given an iron pickaxe, sword, shield and
   chestplate, "Knows the world" on everything, runner mode on), **2 of the 3 made a diamond pickaxe, a diamond sword and all four
