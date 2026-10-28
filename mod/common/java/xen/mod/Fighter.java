@@ -698,7 +698,7 @@ final class Fighter {
 	private boolean noRun;
 	/** Where its feet were when it began to dig in (the roof goes there), and when. */
 	private net.minecraft.core.BlockPos hole;
-	private int holeAt, quietSince;
+	private int holeAt, quietSince, holeLostAt = -1000;
 
 	/**
 	 * Back to Basics in a fight: one call, and it sticks to it. A creeper close by: hit it (that knocks it back), then
@@ -737,10 +737,24 @@ final class Fighter {
 			noRun = true;
 			return null;
 		}
+		LivingEntity shooter = shooterInSight();                                // one shooting at it: a hole is no cover from arrows (it was shot digging, every time)
+		if (shooter != null) {
+			if (h.hasWeapon() && p.getHealth() >= 6 && c.reachable(shooter)) {
+				noRun = true;                                                    // (close in on it, shield up, side to side: its usual way with a skeleton)
+				return null;
+			}
+			Action cover = takeCover(shooter);
+			if (cover != null) {
+				c.goals.instant = "out of the " + kind(shooter).replace('_', ' ') + "'s sight";
+				return cover;
+			}
+			noRun = true;
+			return null;
+		}
 		double nearest = Double.MAX_VALUE;
 		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
 				m -> m.isAlive() && m.getTarget() == p)) nearest = Math.min(nearest, p.distanceTo(m));
-		if (nearest > 6) {
+		if (nearest > 6 && now() - holeLostAt > 200) {                          // (knocked out of a hole: not another for ten seconds, it fights)
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
 		}
@@ -794,6 +808,7 @@ final class Fighter {
 		var level = (net.minecraft.server.level.ServerLevel) p.level();
 		net.minecraft.core.BlockPos feet = p.blockPosition();
 		if (Math.abs(feet.getX() - hole.getX()) + Math.abs(feet.getZ() - hole.getZ()) > 1 || feet.getY() > hole.getY() || now() - holeAt > 20 * 120) {
+			if (now() - holeAt <= 20 * 120) holeLostAt = now();
 			hole = null;                                                         // (knocked out of it, or two minutes: done)
 			return null;
 		}

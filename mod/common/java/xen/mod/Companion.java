@@ -860,6 +860,10 @@ public final class Companion {
 	 * Under water with a roof over its head (a flooded tunnel, an aquifer it dug into): swimming straight up only bumps
 	 * the roof, so it swims to the nearest air it can get to (back the way it came, most often), like a player would.
 	 */
+	/** The block it's digging through to air, and since when (it sticks to it). */
+	private BlockPos airDig;
+	private int airDigAt;
+
 	private Action toAir() {
 		ServerLevel level = (ServerLevel) player.level();
 		BlockPos head = BlockPos.containing(player.getEyePosition());
@@ -878,6 +882,12 @@ public final class Companion {
 		}
 		if (player.tickCount - airLast > 20) airSince = player.tickCount;      // (a new swim for air)
 		airLast = player.tickCount;
+		if (airDig != null && player.tickCount - airDigAt < 60 && !level.getBlockState(airDig).canBeReplaced() && hands.mine(airDig)) {   // digging its way already: on with that block, not off swimming between hits
+			goals.instant = "digging its way to air";
+			acted = true;
+			return Action.MINE;
+		}
+		airDig = null;
 		if (pillaring && player.tickCount - airPillarAt < 30) {                 // towering up already: it keeps at it (a block a jump), no changing its mind each tick
 			goals.instant = "towering up out of the water";
 			return Action.JUMP;
@@ -898,6 +908,8 @@ public final class Companion {
 				float hard = st.getDestroySpeed(level, b);
 				if (hard < 0 || hard > 10) continue;
 				if (hands.mine(b)) {
+					airDig = b.immutable();
+					airDigAt = player.tickCount;
 					goals.instant = "digging its way to air";
 					acted = true;
 					return Action.MINE;
