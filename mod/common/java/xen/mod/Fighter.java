@@ -397,6 +397,8 @@ final class Fighter {
 					rushSaidAt = now;
 					c.journal("fight", String.format(java.util.Locale.ROOT, "rushes the %s %.0f blocks off (two crits kill it; cover is further than that)", kind(foe).replace('_', ' '), d));
 				}
+			} else if (noRun) {
+				outmatched = false;                                                // (Back to Basics made its call: no tips, no second thoughts)
 			} else if (escaping || perched) outmatched = left < want + 4 && p.getHealth() < 18;   // (it took the tip: away till it has healed, then back at it)
 			else if (left < want || now < gutUntil && p.getHealth() < 16) {    // it sees it going badly (or feels it): a tip comes to mind, and it's its call
 				float pull = Math.max(0, Math.min(1, (want - left) / Math.max(4, want))) + (now < gutUntil ? 0.3f : 0);
@@ -404,7 +406,7 @@ final class Fighter {
 						p.getHealth(), kind(foe).replace('_', ' '), expected(foe), now < gutUntil ? ", its gut says get out" : ""), 60);
 			}
 		}
-		if (!rush && !outmatched && !(foe instanceof Player) && !c.inArena) {   // what's coming, not only what's on it: all of them about, the dark, its armor, before it's low
+		if (!noRun && !rush && !outmatched && !(foe instanceof Player) && !c.inArena) {   // what's coming, not only what's on it: all of them about, the dark, its armor, before it's low
 			float group = threatAround();
 			if (group > p.getHealth() - margin() && group > expected(foe) + 1) {
 				outmatched = true;

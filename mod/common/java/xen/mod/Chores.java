@@ -2274,6 +2274,8 @@ final class Chores {
 			smelterStage = raw > 0 ? 0 : 2;
 			until = now() + 20 * 120;
 			tookOut = 0;
+			droppedNow = 0;
+			gotRaw = false;
 			had = cooked();
 			return "You will drop your ore off at your smelter (it smelts on its own) and take out what it made.";
 		}
@@ -2346,8 +2348,8 @@ final class Chores {
 		return at != null && at.closerThan(c.player.blockPosition(), 128) ? at : null;
 	}
 
-	private boolean atSmelter;
-	private int smelterUnit, smelterStage, tookOut;
+	private boolean atSmelter, gotRaw;
+	private int smelterUnit, smelterStage, tookOut, droppedNow;
 	/** Raw ore it left at its smelter and hasn't been back for; when it last dropped off or took out. */
 	int droppedRaw;
 	long droppedAt = -1;
@@ -2374,14 +2376,15 @@ final class Chores {
 		if (smelterUnit >= units.size()) {
 			atSmelter = false;
 			droppedAt = now();
+			droppedRaw = droppedNow;                                            // (what it left in it this time is still to come out: it comes back for that)
 			int made = Math.max(tookOut, cooked() - had);
 			if (made > 0) c.mod.btbLearner.made("smelter", made);
-			finish("Done at its smelter: " + (droppedRaw > 0 ? droppedRaw + " raw ore left in it" : "nothing left in it") + (made > 0 ? ", took out " + made : "") + ".");
+			finish("Done at its smelter: " + (droppedNow > 0 ? droppedNow + " raw ore left in it" : "nothing new in it") + (made > 0 ? ", took out " + made : "") + ".");
 			return null;
 		}
 		Smelter.Unit u = units.get(smelterUnit);
 		BlockPos target = smelterStage == 0 ? u.input() : smelterStage == 1 ? (u.fuel() != null ? u.fuel() : u.furnace()) : (u.output() != null ? u.output() : u.furnace());
-		boolean skip = smelterStage == 0 && toSmelt() == 0 || smelterStage == 1 && fuel() == 0;
+		boolean skip = smelterStage == 0 && toSmelt() == 0 || smelterStage == 1 && (fuel() == 0 || !gotRaw);   // (fuel where the ore went: not a furnace with nothing to smelt)
 		if (skip) {
 			nextSmelterStage(units.size());
 			return null;
@@ -2418,7 +2421,10 @@ final class Chores {
 				int n = st.getCount();
 				Compat.click(menu, i, true, c.player);                           // (shift-click: into the barrel)
 				int moved = n - (slot.hasItem() ? slot.getItem().getCount() : 0);
-				if (smelterStage == 0) droppedRaw += moved;
+				if (smelterStage == 0) {
+					droppedNow += moved;
+					gotRaw |= moved > 0;
+				}
 				stacks++;
 			}
 			if (smelterStage == 2) {
@@ -2429,7 +2435,6 @@ final class Chores {
 					Compat.click(menu, i, true, c.player);                       // (everything it made: out into its bag)
 					tookOut += n - (slot.hasItem() ? slot.getItem().getCount() : 0);
 				}
-				droppedRaw = 0;
 			}
 		}
 		c.player.closeContainer();
@@ -2441,8 +2446,9 @@ final class Chores {
 
 	private void nextSmelterStage(int units) {
 		if (++smelterStage > 2) {
-			smelterStage = toSmelt() > 0 ? 0 : 1;
+			smelterStage = toSmelt() > 0 ? 0 : 2;                              // (the next furnace: ore in if any is left, else only what it made out)
 			smelterUnit++;
+			gotRaw = false;
 		}
 	}
 

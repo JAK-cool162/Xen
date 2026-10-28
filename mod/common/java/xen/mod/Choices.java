@@ -156,7 +156,7 @@ final class Choices {
 		Choice ch = decide(key.contains("@") ? key.substring(0, key.indexOf('@')) : key, w, now, caution());
 		float score = w.want - caution() * w.risk;
 		if (!w.hard && Math.abs(score) < 0.08f && w.want >= 0.05f) c.confusion.closeCall(key);
-		if (!ch.hard && c.confusion.flips()) {                        // confused: the other answer, now and then (a hesitation, a "why not")
+		if (!ch.hard && !c.btb.on() && c.confusion.flips()) {                        // confused: the other answer, now and then (a hesitation, a "why not")
 			ch = ch.yes() ? ch.as(Verdict.LATER, now + 20 * 5) : ch.verdict == Verdict.LATER && w.want >= 0.25f ? ch.as(Verdict.DO, 0) : ch;
 		}
 		Choice before = last.put(key, ch);
@@ -411,6 +411,14 @@ final class Choices {
 		if ((name.contains("gold") || name.equals("chest")) && c.nether.inNether() && c.knowledge.knows("piglin_anger")
 				&& !level.getEntitiesOfClass(net.minecraft.world.entity.monster.piglin.Piglin.class, new net.minecraft.world.phys.AABB(q).inflate(16)).isEmpty())
 			return choose(key, w.no("piglins about: they'd turn on me for touching gold"), false);
+		if (c.btb.on()) {                                                         // Back to Basics: what to mine is its job's (the ore it's after, what's in its way), not a mood or a hunch
+			float worth = worth(kind, name, w);
+			boolean wanted = kind != null && !kind.equals("log") && worth >= 0.25f;
+			Choice job = new Choice("mine " + name.replace('_', ' '), wanted || worth >= 0.25f ? Verdict.DO : Verdict.NOT, 0, worth, 0, true,
+					wanted ? "its job" : "", wanted ? "" : "not what it's after", "");
+			last.put(key, job);
+			return job;
+		}
 		float v = worth(kind, name, w);
 		float picky = c.personality.hidden(Personality.PICKINESS);                  // (a picky miner leaves the stone; one who mines anything takes it)
 		v *= kind != null && v >= 0.25f ? 0.85f + 0.3f * picky : 1.3f - 0.8f * picky;

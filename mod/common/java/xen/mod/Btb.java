@@ -141,6 +141,8 @@ final class Btb {
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
+		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && !goal.equals("home"))
+			out.add(new Option(Task.HOME, 0.9f, "nothing pressing: a home of its own (its mind's design)"));   // (its job has nothing on: its mind builds)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
 		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
 		// heals, eats, gets food first); none of the walking-about jobs with monsters round it; by water, a mine is the

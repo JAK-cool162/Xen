@@ -125,6 +125,7 @@ final class Gut {
 	Action override() {
 		var p = c.player;
 		if (p == null || c.inArena || p.isCreative() || p.isSpectator() || c.perceived == null || c.mod.brain == null) return null;
+		if (c.btb.on()) return null;                                             // Back to Basics: its job and its reflexes have the controls, not a feeling
 		judge();                                                                 // (it went against its gut: was the gut right?)
 		hearAnswer(p.level().getGameTime());                                     // (it asked someone: what did they say?)
 		// Instinct first (a clear danger), and under water short of air: air first, whatever the gut says. Drowning hurts
