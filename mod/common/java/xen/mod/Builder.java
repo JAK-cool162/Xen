@@ -389,6 +389,16 @@ final class Builder {
 		boolean pen = what.contains("pen") || what.contains("barn") || what.contains("animal");
 		Architect.Palette p = palette(level, feet);
 		Architect.Plan made;
+		if (what.contains("smelter") || what.contains("auto furnace") || what.contains("charcoal")) {   // an auto-smelter: as it learned to build one
+			int iron = count(x -> x.equals("iron_ingot")) + count(x -> x.equals("raw_iron"));
+			boolean out = Smelter.learnedOutput(c.mod.btbLearner) || iron >= 20, fuel = Smelter.learnedFuel(c.mod.btbLearner) || iron >= 30;
+			int n = 2;
+			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, n + 1, 4);
+			if (corner == null) return "You can't build a smelter here: there's no flat dry ground.";
+			c.journal("build", "a smelter: " + n + " furnaces, a hopper on top" + (out ? ", one under into a barrel" : "") + (fuel ? ", fuel from the back" : "")
+					+ (out || fuel ? (Smelter.learnedOutput(c.mod.btbLearner) || Smelter.learnedFuel(c.mod.btbLearner) ? " (as it learned from a schematic)" : " (iron to spare)") : ""));
+			return begin(Smelter.plan(corner, front, n, out, fuel), "", "its own");
+		}
 		if (what.contains("portal")) {
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, 6, 5);
 			if (corner == null) return "You can't build a portal here: there's no flat dry ground.";
@@ -998,6 +1008,10 @@ final class Builder {
 		if (schematic != null) {                                              // a schematic: how it went goes into its experience (Back to Basics)
 			double took = (now() - started) / 20.0;
 			c.mod.btbLearner.built(schematic.name, placed, miss, took);
+			if (!Smelter.scan(level, plan.middle(), 8).isEmpty()) {           // an auto-smelter in it: its smelter now (it drops its ore off there)
+				c.places.remember("smelter", plan.middle());
+				c.journal("build", "the " + schematic.name + " smelts on its own: it'll drop its ore off there");
+			}
 			c.journal("build", String.format(java.util.Locale.ROOT, "built the %s schematic: %d placed, %d left out, %.0f s%s", schematic.name, placed, miss, took,
 					schematic.note.has("makes") ? " (it makes " + schematic.note.get("makes").getAsString() + ")" : ""));
 			schematic = null;
@@ -1058,6 +1072,7 @@ final class Builder {
 		}
 		switch (plan.name()) {
 			case "farm" -> c.goals.farm = plan.middle();
+			case "smelter" -> c.places.remember("smelter", plan.middle());
 			case "mob farm" -> c.goals.mobFarm = plan.middle();
 			case "animal pen" -> c.goals.pen = plan.middle();
 			case "nether portal" -> c.nether.built(plan.middle(), plan.front(), plan.inside());

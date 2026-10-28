@@ -294,6 +294,18 @@ final class Schematic {
 		return new Architect.Plan(name, steps, middle, middle, Direction.NORTH, new net.minecraft.world.phys.AABB(middle));
 	}
 
+	/** Its bottom layer is mostly ground (grass, dirt, stone): it goes in place of the ground there, one block down. */
+	boolean groundLayer() {
+		int ground = 0;
+		for (Block b : blocks) {
+			if (b.at().getY() != 0) continue;
+			String n = b.spec().indexOf('[') >= 0 ? b.spec().substring(0, b.spec().indexOf('[')) : b.spec();
+			if (n.equals("grass_block") || n.equals("dirt") || n.equals("stone") || n.equals("coarse_dirt") || n.equals("podzol") || n.equals("sand")
+					|| n.equals("snow_block") || n.equals("deepslate") || n.equals("mud") || n.equals("moss_block")) ground++;
+		}
+		return ground * 2 >= sizeX * sizeZ;
+	}
+
 	/** What it says in /xen schematics. */
 	String describe() {
 		return String.format(Locale.ROOT, "%s: %d blocks, %dx%dx%d%s", name, blocks.size(), sizeX, sizeY, sizeZ,

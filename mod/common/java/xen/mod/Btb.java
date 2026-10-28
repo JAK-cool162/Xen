@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -121,7 +121,11 @@ final class Btb {
 		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
 		if (dusk && !o.sheltered) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
-		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0)) out.add(new Option(Task.SMELT, 4, "raw iron to smelt"));
+		boolean smelter = !c.chores.smelterUnits().isEmpty();
+		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
+		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
+		if (!smelter && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
+			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
@@ -265,6 +269,7 @@ final class Btb {
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> c.nether.go("table", 0);
 			case HOME -> c.builder.start("home");
+			case SMELTER -> c.builder.start("smelter");
 			case EXPLORE -> "You will look around.";
 			case NONE -> null;
 		};
@@ -307,7 +312,8 @@ final class Btb {
 		double gained = worth() - worthAt;
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
 		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
-				|| task == Task.SMELT && o.iron > ironAt) && !dropped;
+				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
+				|| task == Task.SMELTER && !c.chores.smelterUnits().isEmpty()) && !dropped;
 		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),

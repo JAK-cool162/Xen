@@ -2267,6 +2267,18 @@ final class Chores {
 
 	String smelt() {
 		int raw = toSmelt();
+		List<Smelter.Unit> units = smelterUnits();
+		if (!units.isEmpty() && (raw > 0 || droppedRaw > 0)) {               // its auto-smelter: drop it off, take out what it made, no waiting
+			begin(Kind.SMELT);
+			atSmelter = true;
+			smelterUnit = 0;
+			smelterStage = raw > 0 ? 0 : 2;
+			until = now() + 20 * 120;
+			tookOut = 0;
+			had = cooked();
+			return "You will drop your ore off at your smelter (it smelts on its own) and take out what it made.";
+		}
+		atSmelter = false;
 		if (raw == 0) return "You have nothing to smelt.";
 		if (fuel() == 0) return "You have nothing to burn in a furnace (coal, charcoal or wood).";
 		furnace = findFurnace();
@@ -2328,7 +2340,113 @@ final class Chores {
 		return best;
 	}
 
+	/** Its auto-smelter close by (one it built, or one it was told about): what's there now. */
+	List<Smelter.Unit> smelterUnits() {
+		if (c.player == null) return List.of();
+		BlockPos at = c.places.get("smelter");
+		if (at == null || !at.closerThan(c.player.blockPosition(), 96) || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return List.of();
+		return Smelter.scan((ServerLevel) c.player.level(), at, 6);
+	}
+
+	private boolean atSmelter;
+	private int smelterUnit, smelterStage, tookOut;
+	/** Raw ore it left at its smelter and hasn't been back for; when it last dropped off or took out. */
+	int droppedRaw;
+	long droppedAt = -1;
+
+	/** At its smelter: per furnace, the ore into the top, fuel into the back (or the furnace), what it made out. */
+	private Action smelterNext() {
+		List<Smelter.Unit> units = smelterUnits();
+		if (units.isEmpty() || now() > until) {
+			atSmelter = false;
+			finish(units.isEmpty() ? "Its smelter isn't there any more." : "Took too long at its smelter.");
+			return null;
+		}
+		if (smelterUnit >= units.size()) {
+			atSmelter = false;
+			droppedAt = now();
+			int made = Math.max(tookOut, cooked() - had);
+			if (made > 0) c.mod.btbLearner.made("smelter", made);
+			finish("Done at its smelter: " + (droppedRaw > 0 ? droppedRaw + " raw ore left in it" : "nothing left in it") + (made > 0 ? ", took out " + made : "") + ".");
+			return null;
+		}
+		Smelter.Unit u = units.get(smelterUnit);
+		BlockPos target = smelterStage == 0 ? u.input() : smelterStage == 1 ? (u.fuel() != null ? u.fuel() : u.furnace()) : (u.output() != null ? u.output() : u.furnace());
+		boolean skip = smelterStage == 0 && toSmelt() == 0 || smelterStage == 1 && fuel() == 0;
+		if (skip) {
+			nextSmelterStage(units.size());
+			return null;
+		}
+		if (!c.hands.canClick(target)) {
+			doing = "going to its smelter";
+			return c.walkTo(Vec3.atBottomCenterOf(target));
+		}
+		doing = smelterStage == 0 ? "dropping its ore off at its smelter" : smelterStage == 1 ? "fuel into its smelter" : "taking out what its smelter made";
+		c.hands.stop();
+		c.hands.use(target);
+		var menu = c.player.containerMenu;
+		if (menu == c.player.inventoryMenu) return Action.IDLE;              // (not open yet: next tick)
+		int size = menu.slots.size() - 36;
+		if (menu instanceof net.minecraft.world.inventory.AbstractFurnaceMenu fm) {
+			if (smelterStage == 1 && !fm.getSlot(1).hasItem() && !moveInto(fm, 1, st -> isItem(st, "coal") || isItem(st, "charcoal")))
+				moveInto(fm, 1, st -> {
+					String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+					return n.endsWith("_planks") || n.endsWith("_log");
+				});
+			if (smelterStage == 2 && fm.getSlot(2).hasItem()) {
+				tookOut += fm.getSlot(2).getItem().getCount();
+				Compat.click(fm, 2, true, c.player);
+			}
+		} else if (size > 0) {
+			int stacks = 0;
+			for (int i = size; i < menu.slots.size(); i++) {
+				var slot = menu.slots.get(i);
+				if (!slot.hasItem()) continue;
+				ItemStack st = slot.getItem();
+				boolean in = smelterStage == 0 && smeltable(st) && stacks < Math.max(1, (smeltStacks() + units.size() - 1 - smelterUnit) / (units.size() - smelterUnit))
+						|| smelterStage == 1 && (isItem(st, "coal") || isItem(st, "charcoal"));
+				if (!in) continue;
+				int n = st.getCount();
+				Compat.click(menu, i, true, c.player);                           // (shift-click: into the barrel)
+				int moved = n - (slot.hasItem() ? slot.getItem().getCount() : 0);
+				if (smelterStage == 0) droppedRaw += moved;
+				stacks++;
+			}
+			if (smelterStage == 2) {
+				for (int i = 0; i < size; i++) {
+					var slot = menu.slots.get(i);
+					if (!slot.hasItem()) continue;
+					int n = slot.getItem().getCount();
+					Compat.click(menu, i, true, c.player);                       // (everything it made: out into its bag)
+					tookOut += n - (slot.hasItem() ? slot.getItem().getCount() : 0);
+				}
+				droppedRaw = 0;
+			}
+		}
+		c.player.closeContainer();
+		Compat.swing(c.player);
+		c.acted = true;
+		nextSmelterStage(units.size());
+		return Action.IDLE;
+	}
+
+	private void nextSmelterStage(int units) {
+		if (++smelterStage > 2) {
+			smelterStage = toSmelt() > 0 ? 0 : 1;
+			smelterUnit++;
+		}
+	}
+
+	/** Stacks of raw things it carries (ore, food), shared out over its furnaces. */
+	private int smeltStacks() {
+		int n = 0;
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) if (!inv.getItem(i).isEmpty() && smeltable(inv.getItem(i))) n++;
+		return n;
+	}
+
 	private Action smeltNext() {
+		if (atSmelter) return smelterNext();
 		ServerLevel level = (ServerLevel) c.player.level();
 		int made = cooked() - had;
 		if (furnace != null && !level.getBlockState(furnace).is(net.minecraft.world.level.block.Blocks.FURNACE)) furnace = null;

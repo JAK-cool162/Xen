@@ -2038,7 +2038,9 @@ public class XenMod implements ModInitializer {
 			ctx.getSource().sendFailure(Component.literal("You have no Xen here. /xen summon"));
 			return 0;
 		}
-		String plan = best.builder.startSchematic(s, net.minecraft.core.BlockPos.containing(at));
+		var corner = net.minecraft.core.BlockPos.containing(at);
+		if (s.groundLayer()) corner = corner.below();                         // (its ground layer where the ground is)
+		String plan = best.builder.startSchematic(s, corner);
 		String msg = best.name + ": " + xen.mod.talk.Chat.plainly("Plan: " + plan, "") + " (" + s.describe() + ")";
 		ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
 		return 1;
