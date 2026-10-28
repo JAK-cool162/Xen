@@ -28,6 +28,8 @@ final class BtbLearner {
 	private Map<String, double[]> memory = new HashMap<>();
 	/** How much sooner to deal with each kind of mob in a fight (1 to start; the ones that hurt it most go up). */
 	private Map<String, Float> mob = new HashMap<>();
+	/** Each schematic it built: times, blocks placed, left out, seconds in all (and what it made, kept by its user). */
+	private Map<String, double[]> builds = new HashMap<>();
 	private Path file;
 	private boolean dirty;
 
@@ -43,6 +45,8 @@ final class BtbLearner {
 			if (memory == null) memory = new HashMap<>();
 			if (o.has("mob")) mob = new Gson().fromJson(o.get("mob"), new TypeToken<Map<String, Float>>() {}.getType());
 			if (mob == null) mob = new HashMap<>();
+			if (o.has("builds")) builds = new Gson().fromJson(o.get("builds"), new TypeToken<Map<String, double[]>>() {}.getType());
+			if (builds == null) builds = new HashMap<>();
 			XenMod.LOG.info("Xen BTB: learned values for {} spots, {} tasks remembered", q.size(), memory.size());
 		} catch (IOException | RuntimeException e) {
 			XenMod.LOG.warn("Xen BTB: couldn't read what it learned ({}), starting fresh", e.toString());
@@ -61,6 +65,7 @@ final class BtbLearner {
 			o.add("q", g.toJsonTree(q));
 			o.add("memory", g.toJsonTree(memory));
 			o.add("mob", g.toJsonTree(mob));
+			o.add("builds", g.toJsonTree(builds));
 			Files.writeString(file, g.toJson(o));
 			dirty = false;
 		} catch (IOException e) {
@@ -96,6 +101,22 @@ final class BtbLearner {
 		if (worked) m[1]++;
 		if (died) m[2]++;
 		m[3] += seconds;
+		dirty = true;
+	}
+
+	/** A schematic built: into its experience. */
+	synchronized void built(String name, int placed, int left, double seconds) {
+		double[] b = builds.computeIfAbsent(name, k -> new double[5]);
+		b[0]++;
+		b[1] += placed;
+		b[2] += left;
+		b[3] += seconds;
+		dirty = true;
+	}
+
+	/** Something a build of it made (taken out of its output): counted with it. */
+	synchronized void made(String name, int items) {
+		builds.computeIfAbsent(name, k -> new double[5])[4] += items;
 		dirty = true;
 	}
 

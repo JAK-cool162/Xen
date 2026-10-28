@@ -325,6 +325,7 @@ final class Builder {
 	}
 
 	void cancel() {
+		schematic = null;
 		if (plan != null && helping == null && plan.name().endsWith("house") && startedCorner != null && c.player != null && !left.isEmpty()
 				&& (building != null || copied != null)) {                     // a house of its own, not done: it remembers it
 			unfinished = new Unfinished(startedCorner, startedFront, Places.dim(c.player.level()), copied == null ? building : null,
@@ -655,6 +656,21 @@ final class Builder {
 		return begin(made, of, look);
 	}
 
+	/** The schematic it's building (null: one of its own designs), and the corner it went at. */
+	Schematic schematic;
+	BlockPos schematicAt;
+
+	/** A schematic (config/xen/schematics/), its lowest corner at origin, as it was saved. */
+	String startSchematic(Schematic s, BlockPos origin) {
+		creative = c.player.isCreative();
+		design = null;
+		copied = null;
+		String plan = begin(s.plan((ServerLevel) c.player.level(), origin), " from the schematic", "the schematic's");
+		schematic = s;
+		schematicAt = origin.immutable();
+		return plan;
+	}
+
 	/** Start on a plan (a house, a farm, a statue...): what it tells itself it will do. */
 	private String begin(Architect.Plan made, String of, String look) {
 		beginning = true;
@@ -971,6 +987,13 @@ final class Builder {
 		String what = plan.name();
 		int miss = skipped.size();
 		if (c.player != null) PROJECTS.remove(c.player.getUUID());
+		if (schematic != null) {                                              // a schematic: how it went goes into its experience (Back to Basics)
+			double took = (now() - started) / 20.0;
+			c.mod.btbLearner.built(schematic.name, placed, miss, took);
+			c.journal("build", String.format(java.util.Locale.ROOT, "built the %s schematic: %d placed, %d left out, %.0f s%s", schematic.name, placed, miss, took,
+					schematic.note.has("makes") ? " (it makes " + schematic.note.get("makes").getAsString() + ")" : ""));
+			schematic = null;
+		}
 		if (helping != null) {                                                // a friend's build: done (or its part of it); not its home
 			XenMod.LOG.info("{} finished helping {} with the {} ({} placed)", c.name, helpingName, what, placed);
 			c.say(c.pick3("Done! " + helpingName + "'s " + what + " looks great.", "There, finished with " + helpingName + ".",
@@ -1413,6 +1436,10 @@ final class Builder {
 			if (!c.crafter.hasOrder()) c.crafter.orderRecipe("torch", 4);
 			return false;
 		}
+		if (n.equals("hopper") && count(x -> x.equals("iron_ingot")) >= 5 && (count(x -> x.equals("chest")) > 0 || logs + planks > 0)) {   // a chest and five iron
+			if (!c.crafter.hasOrder()) c.crafter.orderRecipe(count(x -> x.equals("chest")) > 0 ? "hopper" : "chest", 1);
+			return false;
+		}
 		return false;
 	}
 
@@ -1424,6 +1451,23 @@ final class Builder {
 		boolean woodish = n.endsWith("_planks") || n.endsWith("_log") || n.endsWith("_stem") || n.endsWith("_wood") || n.endsWith("_stairs")
 				|| n.endsWith("_slab") || n.endsWith("_door") || n.endsWith("_fence") || n.endsWith("_fence_gate") || n.endsWith("_trapdoor")
 				|| n.endsWith("_pressure_plate") || n.equals("crafting_table") || n.equals("chest") || n.equals("barrel") || n.equals("ladder");
+		if (n.equals("hopper")) {                                                // five iron (and a chest): smelted, or mined first
+			int iron = count(x -> x.equals("iron_ingot")), raw = count(x -> x.equals("raw_iron"));
+			String plan;
+			if (iron >= 5) {
+				gathering = "wood";
+				plan = c.chores.gather("wood", 4);
+			} else if (iron + raw >= 5) {
+				gathering = "iron";
+				plan = c.chores.smelt();
+			} else {
+				gathering = "iron";
+				plan = c.chores.mine(c.lessons.depth("iron", 16), "iron", 5 - iron - raw);
+			}
+			c.chores.own = true;
+			c.journal("build", "for the hoppers of the " + plan().name() + ": " + plan);
+			return null;
+		}
 		if (!stone && !woodish && !n.equals("dirt")) {                          // nothing wood or stone makes: it does without
 			skip(s.pos(), "can't make " + n);
 			return null;

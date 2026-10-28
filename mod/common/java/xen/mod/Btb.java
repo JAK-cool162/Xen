@@ -147,7 +147,7 @@ final class Btb {
 		return out;
 	}
 
-	private long nightCheckedAt;
+	private long nightCheckedAt, shelterSaidAt = -1000;
 	/** Its task was dropped (the night): not done, whatever it picked up meanwhile. */
 	private boolean dropped;
 	/** Mining trips in a row that came to nothing within a minute and a half (its mine is no good: water, a ravine). */
@@ -194,12 +194,17 @@ final class Btb {
 			Option other = opts.get(c.random().nextInt(opts.size()));
 			if (now() >= notBefore.getOrDefault(other.task, 0L)) best = other;
 		}
-		if (best == null) return null;
+		if (best == null)                                                        // (out in the dark with nothing it can start: on to other ground, not standing there)
+			return (o.night || c.goals.sunDown()) && o.overworld && !o.under && !o.sheltered ? c.goals.exploreStep() : null;
 		String plan = start(best.task, o);
 		if (plan == null || !plan.startsWith("You will")) {                      // (it can't now: not again for a minute)
-			notBefore.put(best.task, now() + 20 * 60);
-			if (plan != null) c.journal("thinks", "can't " + best.task.name().toLowerCase(Locale.ROOT) + " now: " + plan);
-			if (best.task == Task.EXPLORE) return c.goals.exploreStep();
+			boolean shelter = best.task == Task.SHELTER;
+			notBefore.put(best.task, now() + (shelter ? 20 * 5 : 20 * 60));      // (a roof: again in a few steps, from other ground)
+			if (plan != null && (!shelter || now() - shelterSaidAt > 400)) {
+				c.journal("thinks", "can't " + best.task.name().toLowerCase(Locale.ROOT) + " now: " + plan + (shelter ? " (other ground, then again)" : ""));
+				if (shelter) shelterSaidAt = now();
+			}
+			if (best.task == Task.EXPLORE || shelter) return c.goals.exploreStep();   // (never standing about out in the dark: on to ground it can dig into)
 			return null;
 		}
 		task = best.task;
@@ -228,13 +233,26 @@ final class Btb {
 			case DIAMONDS -> ch.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, c.goals.diamondsWanted() - o.diamonds));
 			case SMELT -> ch.smelt();
 			case FOOD -> ch.hunt(3);
-			case SHELTER -> o.under ? ch.digIn() : ch.shelter();
+			case SHELTER -> shelterOrPlanB(o);
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> c.nether.go("table", 0);
 			case HOME -> c.builder.start("home");
 			case EXPLORE -> "You will look around.";
 			case NONE -> null;
 		};
+	}
+
+	/** A roof, or plan B: a hole dug by hand here or close by (never left standing about out in the dark). */
+	private String shelterOrPlanB(Obs o) {
+		Chores ch = c.chores;
+		String plan = o.under ? ch.digIn() : ch.shelter();
+		if (plan != null && plan.startsWith("You will")) return plan;
+		String dig = ch.digIn();
+		if (dig != null && dig.startsWith("You will")) {
+			c.journal("thinks", "btb: no shelter here (" + (plan == null ? "no spot" : plan) + "): digs in by hand");
+			return dig;
+		}
+		return plan;
 	}
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */

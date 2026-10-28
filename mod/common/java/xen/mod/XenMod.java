@@ -1236,9 +1236,31 @@ public class XenMod implements ModInitializer {
 										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
 				.then(Commands.literal("build").then(Commands.argument("what", StringArgumentType.greedyString()).suggests((ctx, b) -> {
 									for (String w : new String[] {"house", "base", "farm", "pen", "mob farm"}) b.suggest(w);
+									for (String w : Schematic.list()) b.suggest(w);
 									return b.buildFuture();
-								}).executes(ctx -> each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: "
-										+ c.builder.start(StringArgumentType.getString(ctx, "what")), "")))))
+								}).executes(ctx -> {
+									String what = StringArgumentType.getString(ctx, "what");
+									if (Schematic.list().contains(what) || what.endsWith(".litematic")) return buildSchematic(ctx, what);   // a schematic: the nearest Xen, at your feet
+									return each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: " + c.builder.start(what), ""));
+								})))
+				.then(Commands.literal("schematics").executes(ctx -> {             // what's in config/xen/schematics/
+					List<String> all = Schematic.list();
+					if (all.isEmpty()) {
+						ctx.getSource().sendSuccess(() -> Component.literal("No schematics yet: put .litematic files in config/xen/schematics/, then /xen build <name>."), false);
+						return 0;
+					}
+					for (String n : all) {
+						String line;
+						try {
+							line = Schematic.load(n).describe();
+						} catch (IOException e) {
+							line = n + ": can't read it (" + e.getMessage() + ")";
+						}
+						String l = line;
+						ctx.getSource().sendSuccess(() -> Component.literal(l), false);
+					}
+					return all.size();
+				}))
 				.then(Commands.literal("goto").then(Commands.argument("where", StringArgumentType.greedyString())
 						.executes(ctx -> {
 							String where = StringArgumentType.getString(ctx, "where");
@@ -1974,6 +1996,38 @@ public class XenMod implements ModInitializer {
 			for (Companion c : companions) if (c.player() != null) joinTeam(c);
 			deathMessages();
 		});
+	}
+
+	/** /xen build <schematic>: the nearest of your Xens builds it, its lowest corner where you stand (as it was saved). */
+	private int buildSchematic(CommandContext<CommandSourceStack> ctx, String name) {
+		Schematic s;
+		try {
+			s = Schematic.load(name);
+		} catch (IOException e) {
+			ctx.getSource().sendFailure(Component.literal("Couldn't read that schematic: " + e.getMessage()));
+			return 0;
+		}
+		ServerPlayer p = ctx.getSource().getPlayer();
+		var at = ctx.getSource().getPosition();
+		Companion best = null;
+		double bestD = Double.MAX_VALUE;
+		for (Companion c : companions) {
+			if (c.player() == null || c.player().level() != ctx.getSource().getLevel()) continue;
+			if (p != null && !p.getUUID().equals(c.owner) && !op(ctx)) continue;
+			double d = c.player().position().distanceTo(at);
+			if (d < bestD) {
+				bestD = d;
+				best = c;
+			}
+		}
+		if (best == null) {
+			ctx.getSource().sendFailure(Component.literal("You have no Xen here. /xen summon"));
+			return 0;
+		}
+		String plan = best.builder.startSchematic(s, net.minecraft.core.BlockPos.containing(at));
+		String msg = best.name + ": " + xen.mod.talk.Chat.plainly("Plan: " + plan, "") + " (" + s.describe() + ")";
+		ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
+		return 1;
 	}
 
 	private int each(CommandContext<CommandSourceStack> ctx, java.util.function.Function<Companion, String> f) {

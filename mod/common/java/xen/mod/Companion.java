@@ -3185,6 +3185,15 @@ public final class Companion {
 	private Vec3 headingFor(Vec3 goal) {
 		long now = player.level().getGameTime();
 		boolean urgent = fightingNow() || player.hurtTime > 0 || danger() > 0.4f || player.isInWater() && player.getAirSupply() < player.getMaxAirSupply() / 2;
+		if (btb.on()) {                                                     // Back to Basics: one place it's going, till it's there (not a new spot every second)
+			if (heldGoal == null || player.position().distanceTo(heldGoal) < 2 || goal.distanceTo(heldGoal) > (urgent ? 4 : 8)
+					|| now - heldCalled > 20 || now - heldSince > 20 * 30) {
+				heldGoal = goal;
+				heldSince = now;
+			}
+			heldCalled = now;
+			return heldGoal;
+		}
 		if (heldGoal == null || urgent || now - heldCalled > 20 || now - heldSince >= 40 || player.position().distanceTo(heldGoal) < 2) {
 			if (heldGoal == null || goal.distanceTo(heldGoal) > 0.5) heldSince = now;   // (a new spot: two seconds of it, even a block or two over; the same spot, on it goes)
 			heldGoal = goal;
@@ -3200,6 +3209,14 @@ public final class Companion {
 		if (g == null && (voyager.flying() || voyager.shouldFly(goal))) {   // far, under the sky, with an elytra: it flies there
 			Action f = voyager.flyTo(goal);
 			if (f != null) return f;
+		}
+		if (mod.config.pathAssist && btb.on()) {                             // Back to Basics: its way-finder gets it there (walking, digging, bridging, pillaring), no improvising
+			Action w = g != null ? walker.go(g) : walker.go(goal);
+			if (w != null && !walker.stuck()) return w;
+			if (w == null && player.position().distanceTo(goal) < 2) return digToward(goal);
+			if (walker.stuck()) walker.stop();                                // (no closer: a new way from where it is now, next tick)
+			if (w != null) return w;
+			return digToward(goal);                                          // (no way it knows of: straight there, digging through)
 		}
 		if (mod.config.pathAssist) {
 			if (solver.active()) {
