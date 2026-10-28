@@ -50,10 +50,9 @@ jobs:
 
       # The jars this commit makes, kept a week (to try a build before a release).
       - name: Keep the jars
-        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: jars
+          name: jars-${{ matrix.os }}
           path: |
             mod/mc1.21.11/build/libs/xen-companion-*.jar
             mod/mc26/build/libs/xen-companion-*.jar
