@@ -150,7 +150,10 @@ final class Btb {
 	Action next() {
 		if (c.player == null || !c.player.isAlive()) return null;
 		Obs o = observe();
-		if (task != Task.NONE) finish(o);                                         // (its chore ended: how did that go?)
+		if (task != Task.NONE) {
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : null;   // (still on it: a trip, a build, a look around)
+			finish(o);                                                                // (its chore ended: how did that go?)
+		}
 		thinkGoal(o);
 		List<Option> opts = options(o);
 		String key = o.key();
@@ -213,6 +216,7 @@ final class Btb {
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
 	boolean busy() {
+		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !c.player.level().isDarkOutside();   // (a look around: most of a minute)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on);
 	}
 

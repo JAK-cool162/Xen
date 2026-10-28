@@ -1498,6 +1498,7 @@ final class Chores {
 	private BlockPos toMine;
 	/** The lowest step of its staircase so far: where the next step goes from (kept in its places as "mine head"). */
 	private BlockPos stairHead;
+	private long backSince;
 
 	/** On its staircase: at its lowest step (or a block off it), or on one of the steps above it, on the way down. */
 	private boolean onStairs(BlockPos feet) {
@@ -1768,10 +1769,13 @@ final class Chores {
 					stairHead = feet.immutable();
 					if (!caveMode) c.places.remember("mine head", stairHead);
 				}
+				if (onStairs) backSince = 0;
 				if (!onStairs && !feet.equals(stairHead) && feet.distManhattan(stairHead) <= 48 && c.player.onGround()) {   // off its stairs (a fight, a pickup, up for air): back down them, not a new hole from here
 					doing = "back to its staircase (y " + stairHead.getY() + ")";
-					Action back = c.walkTo(Vec3.atBottomCenterOf(stairHead));
+					if (backSince == 0) backSince = now();
+					Action back = now() - backSince < 20 * 30 ? c.walkTo(Vec3.atBottomCenterOf(stairHead)) : null;   // (half a minute at most)
 					if (back != null) return back;
+					backSince = 0;
 					c.journal("way", "can't get back to its staircase at " + stairHead.toShortString() + ": goes on down from here");
 					stairHead = feet.immutable();
 				}
