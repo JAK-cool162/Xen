@@ -126,6 +126,10 @@ final class Chores {
 	void cancel() {
 		if (kind != null) endedItself = false;
 		if (DEBUG && kind != null) endWhy("cut off");
+		if (kind == Kind.SHELTER || kind == Kind.HIDE) {                  // its shelter kept it put: cut off (it died, a fight), it's free again, not left staying for good
+			if (resume != null && c.mode == Companion.Mode.STAY) c.mode = resume;
+			resume = null;
+		}
 		stop();
 	}
 
