@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.48
+# Xen Companion (Fabric mod) 2.0.0-beta.49
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -14,8 +14,8 @@ network. **Xen 2.0**, the learned mind that weighs what it wants against what it
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.48+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.48+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.49+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.49+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -35,6 +35,22 @@ picks one task (wood, stone, coal, iron, smelting, food, a shelter, diamonds, en
 simple rules, and does it with the parts it already has: its way-finder (one path to the goal, walking, digging,
 bridging and pillaring, the way Baritone does it), its fighter, crafter and chores. It keeps at that task until it's
 done or fails. A fight in between and it goes back to it.
+
+**The job and the mind.** Getting on in the game (which ore to mine, what to dig or place on the way, the next tool)
+is its job's, like Baritone at the controls: one place it's going till it's there, its way-finder gets it there, no
+hunches, no second thoughts. Its mind (its taste, its nature, its friends) has the rest: its home and what it builds,
+talking, trading, its village. With nothing pressing by day, its mind builds it a home.
+
+**Fights: one call, then it sticks to it.** It deals with the most urgent mob first (a creeper close by, then what's
+hitting it, a baby zombie before the rest, then a skeleton it can get to), weighted by what has hurt it most. Armed,
+12 health or more and one or two on it: it fights, no running. Hurt, outnumbered or unarmed, with none within six
+blocks: it digs in (two down, a block over its head) and stays till they've gone. With them already on it, it stands
+and fights, shield up. A skeleton shooting at it: at it if it can get to it, else out of its sight (a hole is no cover
+from arrows). It only runs from a creeper's blast.
+
+**No risks it doesn't need**: no mining when hurt or with nothing to eat (food first, then it heals); a roof from the
+evening on; with no shelter possible where it is, a hole dug by hand, or on to other ground, never standing about
+in the dark.
 
 How each task went is its learning: Q-learning over a few facts (pickaxe, health, food, night, under the ground,
 danger) and a memory of tries, successes, deaths and time per task, kept in `config/xen/btb.json` and shared by all
@@ -89,7 +105,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.48+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.49+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -1542,6 +1558,7 @@ away in single player. On a server, operators use:
 | `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
 | `runner` | `false` | Experimental: free Xens play only the run to the Nether, quick and in order (wood, tools, iron, iron gear, sugar cane, diamonds, obsidian, the portal); their play is logged for training ([more](#the-solver-and-the-journal)) |
 | `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
+| `killAura` | `true` | a charged swing goes into the nearest hostile mob in reach, even while it mines, eats or digs in, without turning to face it (the normal attack, reach and cooldown; never players, pets or villagers; never in duels). Off: it only hits what it looks at |
 | `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |
 | `evolution` | `false` | replace the worst ownerless Xens with children of the best |
 | `generationDays` | `3` | Minecraft days per generation |
@@ -1552,6 +1569,33 @@ away in single player. On a server, operators use:
 | `followDistance` | `4` | follow mode: catch up when further than this |
 | `leaveWithOwner` | `true` | Xen leaves when its owner leaves |
 | `saveMinutes` | `5` | how often the brain is saved |
+
+## Schematics
+
+Put Litematica schematics (`.litematic`) in `config/xen/schematics/` (Litematica itself isn't needed). `/xen build
+<name>` has the nearest of your Xens build one where you stand, the way a player builds a machine: what's in the way
+dug out, solid blocks bottom up, sand and gravel once there is something under them, then stairs, slabs, fences and
+doors, then chests, hoppers and furnaces, the redstone after that, and the water, the lava and the switch last. The
+exact block states (facing, half, shape) are the schematic's. A schematic whose bottom layer is ground (grass, dirt,
+stone) goes in place of the ground. In survival it gets what it needs as it goes: wood, stone, hoppers (it mines and
+smelts the iron); what it can't make it leaves out and says so.
+
+A note next to a schematic, the same name ending in `.json`, can say what it is for: `{"makes": "smelted iron"}`.
+
+**It learns from them, not only copies them.** Building one (or `/xen study <name>`) teaches it:
+* from a house, its **style**: which material goes where (the walls, the frame, the base, the roof, the floor, the
+  windows, the door, the lights). Its own houses then use a style it learned now and then, in survival made from what
+  it can get (stone where the style has stone, its own wood where the style has wood);
+* what was **inside** (beds, chests, barrels, lanterns, carpets...): its own houses are furnished that way, along the
+  walls;
+* from a machine or a farm, **how its parts join** ("a hopper pointing down on a furnace", "a chest on a hopper"),
+  counted. Its own smelter is built from those: after studying an auto-smelter it adds the output and the fuel hoppers.
+
+What it learned is kept in `config/xen/btb.json` with the rest of its experience, with what each build took.
+
+**The auto-smelter.** With an auto-smelter (its own, `/xen build smelter`, or one from a schematic) a Xen drops its raw
+iron and fuel off and goes on with its day, and takes the ingots out the next time it's by. A Back to Basics Xen
+builds one on its own once it has the iron for the hoppers.
 
 ## Commands
 
@@ -1571,7 +1615,10 @@ away in single player. On a server, operators use:
 | `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
 | `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
 | `/xen goto <x> <y> <z>` (or `<x> <z>`) | your Xen walks to that exact block and stays (in chat: "Pip, go to 120 64 -40") (`/xen goto Pip 100 64 200`: just that Xen) |
-| `/xen build <what>` | the same as asking it: `house`, `modern house`, `stilt house`, `tower`, `cottage`, `base`, `farm`, `pen`, `mob farm` |
+| `/xen build <what>` | the same as asking it: `house`, `modern house`, `stilt house`, `tower`, `cottage`, `base`, `farm`, `pen`, `mob farm`, `smelter` (an auto-smelter: furnaces, hoppers, barrels, no redstone) |
+| `/xen build <schematic>` | the nearest of your Xens builds a schematic from `config/xen/schematics/` ([below](#schematics)), its corner where you stand |
+| `/xen schematics` | the schematics in `config/xen/schematics/`: blocks, size, what each makes |
+| `/xen study <schematic>` | it learns from a schematic without building it: the style, what's inside, how a machine's parts join ([below](#schematics)) |
 | `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
 | `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
 | `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |

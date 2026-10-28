@@ -1,9 +1,60 @@
-**Xen Companion 2.0.0-beta.48**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.49**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.48: Xen gets a massive upgrade (Xen 2.0: Back to Basics)
+### 2.0.0-beta.49: Xen gets a massive upgrade
+
+* **Getting on is its job; building is its mind's.** Back to Basics now plays the progression like Baritone at the
+  controls: one place it's going till it's there, its way-finder gets it there (walking, digging, bridging,
+  pillaring), which ore to mine is the job's call, no hunches, no gut grabbing the controls, no changing its mind every
+  second. Its mind (its taste and nature) has its home, what it builds, talking, trading and its village; with nothing
+  pressing by day, its mind builds it a home.
+* **Fights: one call, then it sticks to it.** The most urgent mob first (a creeper close by, then what's hitting it,
+  a baby zombie before the rest, then a skeleton it can reach), weighted by what has hurt it most (that's learned).
+  Armed, 12 health or more and one or two on it: it fights, no running. Outnumbered, hurt or unarmed with none within
+  six blocks: it digs in (two down, out of a zombie's reach even before the block goes over its head) and stays till
+  they've gone. Already surrounded: it stands and fights, shield up (a hole started with a crowd round it, the block
+  never in time, is how it used to die). A skeleton shooting at it: at it if it can get there, else out of its sight.
+* **Kill aura** (setting `killAura`, on): a charged swing goes into the nearest hostile mob in reach, even while it
+  mines, eats or digs in. Never players, pets or villagers, never in duels; the normal reach and cooldown.
+* **No risks it doesn't need**: no mining hurt or with nothing to eat (food first, then it heals), a roof from the
+  evening on, and with no shelter possible where it stands, a hole dug by hand or on to other ground, never standing
+  about in the dark. Out of air it sticks to the block it's digging through (it used to switch between digging and
+  swimming every tick until it drowned).
+* **Schematics**: put `.litematic` files in `config/xen/schematics/` and `/xen build <name>`: the nearest of your
+  Xens builds it where you stand, in a machine builder's order (supports first, sand and gravel once there's something
+  under them, redstone and water last), exact block states, gathering what it needs in survival (hoppers too).
+  `/xen schematics` lists them.
+* **It learns from schematics, not only copies them**: from a house, its style (what goes where) and what was inside,
+  which its own houses then use; from a machine, how its parts join. `/xen study <name>` teaches it without building.
+* **Auto-smelter**: `/xen build smelter`, or a Back to Basics Xen builds one itself once it has the iron. It drops its
+  raw iron and fuel off and gets on with its day instead of waiting at a furnace. Its design comes from what it
+  learned: after studying an auto-smelter schematic it adds the output and the fuel hoppers.
+
+**Test** (the same two worlds for both, 3 fresh Xens each with nothing, "Knows the world" on, 12 minutes at double
+speed, about 1.2 game days per world):
+
+| | beta.48 | beta.49 |
+|---|---|---|
+| deaths (both worlds, 6 Xens) | 3 | **0** |
+| iron pickaxes at the end (of 6) | 0 | **5** |
+| first iron pickaxe, world 1 | minute 4 | minute 4 |
+| first iron pickaxe, world 2 | minute 6 (lost at minute 9) | minute 5 |
+| all three with an iron pickaxe, world 2 | never | **minute 8** |
+
+Step by step on world 1 (one run each): the new fighting alone cut deaths from 2 to 1; adding the night fallback and
+the one-destination walking first made it worse (3 deaths: holes dug under skeleton fire, a drowning), and the fixes
+for those (no digging in under arrows, sticking to the block it digs for air, the danger-aware tasks) brought it to 0.
+
+**Schematic and smelter test** (one Xen): an auto-smelter schematic (32 blocks: chests, hoppers, two furnaces) built in creative in 40 s, **32 of 32
+blocks exactly as in the file**; its own smelter (two furnaces, the hopper design learned from that schematic) built,
+then 12 raw iron and coal dropped off in 24 s, and a few minutes later the output barrel held **12 iron ingots**.
+Not seen yet: the trip back to take them out (it was off mining when the test ended), and a learned style or
+furnishing in a full house build. In one earlier smelter test a hopper was missing after the build; the cause wasn't
+found.
+
+### 2.0.0-beta.48: Xen 2.0 Back to Basics
 
 * **Back to Basics, the new default brain** (`brain` `"btb"`). One simple state machine decides what a Xen does
   (surviving, fighting, doing what it's told, working, exploring, resting), and the parts it already has do it: its

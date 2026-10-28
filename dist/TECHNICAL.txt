@@ -1,7 +1,79 @@
-XEN COMPANION 2.0.0-beta.48: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.49: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.49
+
+Fights (btb only). Companion.scoredFoe(): hostile mobs within 16 (on it, or within 4; a creeper within 6), score =
+threat x BtbLearner.mobWeight(kind) / seconds to reach (distance past reach / 5.6 + 0.4). Threat: creeper 12 within 4
+(else 3), shooter 2.5 if Companion.reachable() (within 16, |dy| <= 3, no water on the line) else 0.6, others 2; x1.6
+for babies; +3 for what hurt it in the last 2 s. mobWeight starts at 1, +0.01 per health a kind takes off it (max 2),
+back toward 1 by 5% per kill (min 0.6); kept in btb.json "mob". Fighter.btbPlan() before the rest of next(): a hole
+it's in or digging: on with it; a creeper within 4.5: hit at 0.9 charge (sTap 8) else BACK; a shooter it can't reach:
+takeCover(); armed, health >= 12 and <= 2 on it within 12: noRun (retreat 0, no outmatched, no crowd perch, no wall-off,
+no desperate run, no tips); a shooter in sight: rush if armed, health >= 6 and reachable, else cover; no mob on it within
+6 and no hole lost in the last 10 s: startDigIn() (two natural, diggable, non-falling blocks under it with no fluid
+beside, a floor under them) then digIn() (mine down to hole.y - 2, place a block at hole if it can, IDLE till 10 quiet
+seconds, 2 minutes at most); else noRun. Companion.fightBack(): with no foe in sight it stays dug in (Fighter.stayDug()).
+
+Kill aura (config killAura, default true): after the action starts each tick, with charge >= 0.95 and no hit this tick,
+the nearest hostile mob (Companion.hostile, not at peace) whose box is within reach of its eyes and in line of sight is
+attacked (Player.attack, swing). Not in the arena.
+
+Survival (btb). Btb.shelterOrPlanB(): shelter() or digIn(); no spot: SHELTER again in 5 s (not 60) and
+Goals.exploreStep() meanwhile; nothing it can start out in the dark: exploreStep(). options(): health < 14 or no food
+in the bag (and food < 16): no COAL, IRON, DIAMONDS (FOOD 4.8 with nothing to eat); hurt with danger >= 1: no EXPLORE,
+HOME, WOOD, STONE; water within 3: mining tasks -1.5; fed (>= 18) and hurt: only FOOD (it heals). Companion.toAir():
+the block it digs through to air is kept for 60 ticks (it switched between digging and swimming each tick).
+
+The job and the mind (btb). Companion.headingFor(): a destination is kept till within 2 blocks, replaced by one more
+than 8 away (4 when urgent), or 30 s old. walkTo(): Walker only (stuck: walker.stop() and replan; no way: digToward), no
+Solver. Choices.mine(): after the hard checks (bedrock, made by someone, unsafeToBreak, piglins) DO if worth >= 0.25,
+else NOT, with no weighing or confusion; Choices.choose(): no confusion flips. Gut.override(): off. Btb: HOME 0.9 by day
+with no home (its mind's design, learned styles, furnished).
+
+Schematics. Schematic.java reads .litematic (gzip or plain NBT, own reader: no Minecraft NBT API) from
+config/xen/schematics/: each region's BlockStatePalette and BlockStates (bits = max(2, ceil(log2(palette))), values
+packed across longs, index (y * sizeZ + z) * sizeX + x, a negative size runs back from Position); air and other mods'
+blocks left out; up to 4 million cells. plan(): DIG for empty cells with a solid block there; phases: SUPPORT full
+collision cubes, FRAME falling blocks, WALLS shaped blocks, INSIDE containers, beds and attached blocks, OUTSIDE
+redstone and rails, DOORS doors, fluids, levers and buttons; each phase bottom up; upper halves and bed heads left to
+their other half; decor (carpets, flowers, pots, lanterns) may be left out in survival. groundLayer(): a bottom layer
+half ground goes one block down. Builder.startSchematic(); hoppers: crafted from 5 iron and a chest (iron smelted or
+mined first). XenMod: /xen build <schematic> (the nearest of your Xens), /xen schematics, /xen study <name>.
+
+Studied.java (learning from schematics): style() per part the most used block (base: lowest third of the non-terrain
+height, walls: the middle, the frame's logs, the roof's stairs and slab material in the top half, doors, windows,
+fences, trapdoors, lights); null without a door, windows or a roof. interior(): beds, chests, barrels, tables, furnaces,
+lanterns, carpets, pots and the like, counted. rules(): for machine blocks (hoppers, chests, furnaces, redstone parts,
+farmland, water...), each pair of neighbours as "a>facing above b>facing" or "a beside b (dir)", counted. Kept in
+btb.json ("styles", "interior", "rules"; a schematic counted once per session). Builder.palette(): a learned style 60%
+of the time in survival (Studied.palette: stone parts as cobblestone if it has 24, its own wood for wood parts, a
+stripped frame stays stripped, torches), 50% in creative (its own blocks). Builder.begin(): houses furnished with the
+learned interior (Studied.furnish: floor cells inside along the walls, not by the door, the commonest first, two of
+each, one per four spots, as decor). BtbLearner.built()/made(): each schematic's builds, blocks placed and left out,
+seconds, items its smelter made.
+
+Smelter.java. scan(): furnaces (any kind) with a hopper over them pointing down and a chest or barrel over that hopper;
+fuel: a hopper beside pointing in with a container over it; output: a hopper under it into a container. plan(): n = 2
+furnaces facing front; per furnace a top hopper and barrel, the output hopper and barrel if learnedOutput() (a learned
+"furnace above hopper" join) or 20 iron, the fuel hopper and barrel if learnedFuel() or 30 iron. "smelter" remembered
+when one is built (its own, or a schematic with an auto-furnace in it). Chores.smelt(): with one within 128, a trip:
+there, then per furnace the raw ore in (shared by stacks), fuel where the ore went (its barrel, or the furnace), what it
+made out; it leaves; droppedRaw says it comes back (SMELT 3.7 two minutes after). Btb: SMELTER 3.6 with no smelter,
+tier >= 2, iron + raw >= 12, cobblestone >= 16, by day.
+
+CI: both jobs (x86-64, ARM64) keep their jars ("jars-<os>", 7 days).
+
+Tests (prog_test: 3 fresh Xens, luck 2, tick rate 40, 12 minutes; seeds 20261028 and 424242, the same for both):
+beta.48 deaths 2 + 1, iron pickaxes at the end 0 + 0, first iron pickaxe minute 4 / 6; beta.49 deaths 0 + 0, iron
+pickaxes at the end 2 + 3, first minute 4 / 5, all three on seed 424242 by minute 8. Steps on seed 20261028: fights
+only 1 death; with plan B and held destinations 3 (holes under arrows, a drowning switching between digging and
+swimming); with the danger-aware tasks and those fixes 0. sch_test (one Xen): an auto-smelter schematic 32 of 32
+blocks matching the file (execute if block), 40 s in creative; its own smelter built; 12 raw iron and coal dropped
+off in 24 s, 12 iron ingots in its output barrel afterwards (the trip to take them out not seen in the 6 minutes).
 
 
 WHAT'S NEW IN 2.0.0-beta.48
