@@ -240,7 +240,10 @@ a good player (sprint, jump gaps, drop down, swim, climb, open doors, dig throug
 bridge, tower out of holes), a **solver** learns ways out when it's stuck (also
 from watching you), fights can end in a **truce**, and `/xen minions` gives it
 sidekicks that don't load chunks and help it build a village. It mines, fights back, swims, eats and learns.
-Since 1.1.0 main Xens decide with **Xen 2.0**: an option-level mind with a reward
+Since 2.0.0-beta.48 main Xens decide with **Back to Basics**: a simple state machine that
+picks one task and sticks to it, done by its way-finder, fighter, crafter and chores, and that learns from how its
+tasks go with Q-learning and a memory of what worked (no neural network; `config/xen/btb.json`). Before that (and
+still a setting, `brain` `"xen2"`) main Xens decided with **Xen 2.0**: an option-level mind with a reward
 critic, a fear (harm) critic and a world model that imagines ahead, trained from
 scratch in a simulated survival life and still learning in your world (minions keep
 the classic brain). Xens have a hidden nature (aggressive, passive or friendly;

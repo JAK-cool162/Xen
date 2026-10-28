@@ -1,7 +1,55 @@
-XEN COMPANION 2.0.0-beta.47: TECHNICAL NOTES
+XEN COMPANION 2.0.0-beta.48: TECHNICAL NOTES
 ============================================
 
 Everything about how Xens work, what changed, the settings and the commands. The short version is on the release page.
+
+
+WHAT'S NEW IN 2.0.0-beta.48
+
+Xen 2.0 Back to Basics (config brain = "btb", the new default; "xen2" and "dmm" stay). Btb.java is the state
+machine, BtbLearner.java its learning. Companion.instinct(): reflexes, eating, fights and what it was told come first
+as before; then, with btb on (not for minions), btbStep(): pace, crafter, its lost things, pickups, water, bed,
+torches, the follow leash, a starving bite, Btb.nightfall(), then whatever chore, build, storage, Nether trip or
+enchanting is running, and only when nothing is running Btb.next() picks a task. Companion.tick() skips the small
+brain's decide() (and Xen 2.0's mind) under btb.
+
+Btb.observe(): pickaxe tier, health, food, meals in the bag, night, under a roof or the ground, danger (0-2), iron,
+raw iron, fuel, diamonds, logs, stone, sheltered (a shelter chore or MindSense.enclosed), overworld. Its key for
+learning: tier, health 0-2, food 0-2, meals 0-2, night, under, danger.
+Tasks: WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE. options(): rules with
+base priorities (shelter 5 from the evening out under the sky, food 4.5/2.5, smelt 4, wood 4 at tier 0 and 4.6 when
+Crafter.shortOfWood(), stone 4 at tier 1, coal 4 with raw iron and nothing to burn, iron 3.8 at tier 2, iron or
+diamonds 3.5 for the gear goal, enchant 4.2 / table 3.2 for the enchant goal, home 3, explore 0.5); from sundown out
+under the sky only shelter, smelt, enchant, coal, iron, diamonds (stone when sheltered). next(): a running task is
+kept while its chore/build/trip/enchanting runs (explore: 45 s, ends at dark); score = base + learner bias; 4-8% of
+the time another sensible option (to find out); a task that couldn't start waits 60 s, one that came to nothing 40 s.
+Started through the existing parts: Chores.gather/mine/smelt/hunt/shelter/digIn, Enchanter.start, Nether.go("table"),
+Builder.start("home"), Goals.exploreStep. Btb.nightfall(): wood, stone or food at sundown under the open sky: the
+chore is cancelled and the task counts as not done. Two mining tasks in a row that came to nothing within 90 s: its
+mine, mine base and mine head are forgotten (a new mine next time).
+The longer goal (the DMM, thinkGoal every 3 minutes or when done): gear (tier 4 and Goals.diamondsWanted() 0), then
+enchant (a table and something enchanted), then home, then world.
+BtbLearner: Q(s,a) += 0.2 (r + 0.8 max Q(s',.) - Q(s,a)); reward = 0.05 x worth gained (Worth.ALL: (1 + 3 x from)
+x min(count, want)) + 20 per pickaxe tier - health lost - 40 if it died - seconds/120. bias = clamp(0.05 Q - (0.5 -
+success rate, after 4 tries), +-1.5). Memory per task: tries, worked, deaths, seconds. Saved in config/xen/btb.json
+(with the rest, on save), shared by all Xens.
+
+One staircase: Chores keeps stairHead (the lowest step, in its places as "mine head", forgotten with a new mine). Off
+its stairs (not within a block of the head or of the steps back up along mineDir) within 48 blocks and on the
+ground: it walks back to the head (30 s at most, then on down from where it is); turning the staircase moves the
+head. Before, each step went from wherever its feet were, so every detour began a new staircase.
+
+Chores.cancel(): a SHELTER or HIDE chore cut off gives back the mode it saved (resume). Before, a Xen that died in its
+shelter respawned in stay mode for good (respawn() cancels its chore), for every brain.
+
+Crafter.shortOfWood(): the makings of its next pickaxe (3 diamonds, 3 iron ingots, or 3 stone at tier 1) but not the
+wood for the sticks and a table.
+
+CI (check.yml) keeps both jars it builds for 7 days (artifact "jars").
+
+Tests (prog_test, the same seed, 3 fresh Xens, luck 2, 12 minutes at tick rate 40): xen2 first iron pickaxe minute 5,
+1 death, end tiers 1/2/3; btb first iron pickaxe minute 4, all three stone by minute 4, 2 diamonds, 2 deaths
+(skeletons in caves), end tiers 1/2/2. Earlier btb runs before the night and stay fixes: 3 and 6 deaths.
 
 
 WHAT'S NEW IN 2.0.0-beta.47

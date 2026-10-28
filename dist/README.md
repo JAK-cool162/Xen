@@ -1,4 +1,4 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.41
+# Xen Companion (Fabric mod) 2.0.0-beta.48
 
 Xen as a survival companion: a player that joins your world, learns, thinks,
 feels fear and chats. Ask it for things in plain words ("Xen, get me some
@@ -8,13 +8,14 @@ of its own, and talks on its own and with other Xens. Every Xen has its own name
 skin and personality, and with evolution the ones that do well pass their
 nature on. It plays fair: its mind only knows what it can sense, and it acts
 only through a player's inputs (its luck, a setting, is the one exception: how
-often it happens to wander the right way). Since 1.1.0 main Xens think with **Xen 2.0**, a
-learned mind that weighs what it wants against what it fears (below).
+often it happens to wander the right way). Since 2.0.0-beta.48 main Xens decide with **Back to Basics** (below): a
+simple state machine that picks one task and sticks to it, and learns from how its tasks go without a neural
+network. **Xen 2.0**, the learned mind that weighs what it wants against what it fears, is still a setting.
 
 | file | Minecraft | Java |
 |---|---|---|
-| `xen-companion-2.0.0-beta.41+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.41+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| `xen-companion-2.0.0-beta.48+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
+| `xen-companion-2.0.0-beta.48+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
 
 Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
 nothing runs online. This is a prototype, so expect rough edges.
@@ -26,7 +27,21 @@ an ARM64 machine (GitHub Actions: the tests and both builds).
 How it all works inside (the networks, the training, the numbers) is in
 `TECHNICAL.txt` on the Releases page.
 
-## Xen 2.0: how it decides
+## Back to Basics: how it decides (the default)
+
+One state machine decides what a Xen does: surviving, fighting, doing what it's told, working, exploring or resting.
+What it was told, its reflexes (air, lava, falls, eating) and its fights always come first. The rest of the time it
+picks one task (wood, stone, coal, iron, smelting, food, a shelter, diamonds, enchanting, a home, a look around) from
+simple rules, and does it with the parts it already has: its way-finder (one path to the goal, walking, digging,
+bridging and pillaring, the way Baritone does it), its fighter, crafter and chores. It keeps at that task until it's
+done or fails. A fight in between and it goes back to it.
+
+How each task went is its learning: Q-learning over a few facts (pickaxe, health, food, night, under the ground,
+danger) and a memory of tries, successes, deaths and time per task, kept in `config/xen/btb.json` and shared by all
+Xens. What it learns only shifts the rules a little. Every few minutes it thinks over its longer goal: gear, then the
+enchanting table, then a home, then the world.
+
+## Xen 2.0: how it decides (`brain` `"xen2"`)
 
 Every few seconds a main Xen picks what to do next out of 22 things a player
 does (get wood, get stone, craft, eat, build a house, farm, mine, smelt,
@@ -74,7 +89,7 @@ the **1.21.11** jar, which needs Java 21 (these launchers include it).
 1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
    has a Fabric installer built in).
 2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.41+mc1.21.11.jar` (and Mod
+   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.48+mc1.21.11.jar` (and Mod
    Menu if you like).
 3. In the settings, give Minecraft as much memory as your phone allows (2 GB
    is fine).
@@ -1489,7 +1504,7 @@ away in single player. On a server, operators use:
 | setting | default | meaning |
 |---|---|---|
 | `chat` | `true` | Xen answers and understands chat |
-| `brain` | `"xen2"` | how main Xens decide: `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides)) or `"dmm"` (the classic small brain) |
+| `brain` | `"btb"` | how main Xens decide: `"btb"` (Back to Basics, [above](#back-to-basics-how-it-decides-the-default)), `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides-brain-xen2)) or `"dmm"` (the classic small brain) |
 | `learn` | `true` | keep learning in the world |
 | `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
 | `maxXens` | `50` | Xens the whole world may have (0 = no limit) |

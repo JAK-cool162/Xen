@@ -1,9 +1,50 @@
-**Xen Companion 2.0.0-beta.47**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.48**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
 
-### 2.0.0-beta.47: Xen gets a massive upgrade
+### 2.0.0-beta.48: Xen gets a massive upgrade (Xen 2.0: Back to Basics)
+
+* **Back to Basics, the new default brain** (`brain` `"btb"`). One simple state machine decides what a Xen does
+  (surviving, fighting, doing what it's told, working, exploring, resting), and the parts it already has do it: its
+  way-finder (one path to the goal, walking, digging, bridging and pillaring as needed, the way Baritone does it),
+  its fighter, crafter and chores. Like a player at the controls, it picks a task and **sticks to it** until it is
+  done or fails. A fight or a meal in between, and it goes back to the same task, never off to something else halfway.
+  No small neural net runs every tick any more, so it's lighter on the CPU.
+* **It learns without a neural network**: Q-learning over simple game facts (pickaxe tier, health, food, night, under
+  the ground, danger) plus a memory of how each task went (tries, how many worked, deaths, time). What it learns only
+  nudges the rules, so one bad run can't make it do something silly. Every Xen adds to the same book, kept in
+  `config/xen/btb.json` between sessions.
+* **Its longer goal (the DMM) is thought over only every few minutes**: gear first (tools, iron, diamonds), then the
+  enchanting table, then a home, then the world.
+* **One straight staircase**: a Xen pulled off its staircase (a fight, a pickup, up for air) walks back down to the
+  lowest step and digs on from there. Before, it started a new staircase from wherever it was, which left giant holes
+  all over the map and slowed everything down.
+* **No more Xens stuck "staying" after a death**: a Xen that died in (or near) its night shelter came back in stay
+  mode and never played again. Fixed for every brain.
+* **Nights**: a roof from the evening on (before the dark), and wood, stone and food are dropped at sundown when
+  it's out under the sky. Mining goes on (it's under the ground in a few steps).
+* **Wood for sticks**: with the iron (or stone, or diamonds) for its next pickaxe in its bag but no wood for the
+  sticks, it gets a few logs first, instead of wandering about with the ingots.
+
+**Test** (the same world, 3 fresh Xens with nothing, "Knows the world" on, 12 minutes at double speed, about 1.2
+game days):
+
+| | Xen 2.0 (`xen2`, beta.47's brain) | Back to Basics (`btb`) |
+|---|---|---|
+| 2 of the 3 with a stone pickaxe | minute 3 | minute 2 |
+| stone pickaxe or better, all 3 at once | never (one drowned at minute 4) | minute 4 |
+| first iron pickaxe | minute 5 | minute 4 |
+| diamonds | 0 | 2 |
+| deaths | 1 (drowned) | 2 (skeletons in caves) |
+| pickaxes at the end | wood, stone, iron | wood, stone, stone |
+
+About even with Xen 2.0 so far: a little faster early on and the only diamonds, but one more death (both were
+skeleton fights underground, its fighter's job, next on the list). Earlier Back to Basics runs, before the night and
+"stuck staying" fixes, died 3 and 6 times, which is why those fixes are in. One run each, so treat the numbers as a
+rough guide. `xen2` and `dmm` are still there in the settings (Xen 2.0 tab, or `/xen set brain xen2`).
+
+### 2.0.0-beta.47
 
 * **The enchanting table is its own goal now**, right after the diamond pickaxe: a book (sugar cane it knows of on
   its own shore, a cow it knows of for the leather), then a table trip (four obsidian, the table, its gear enchanted,
