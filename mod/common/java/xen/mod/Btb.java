@@ -137,7 +137,7 @@ final class Btb {
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
-		if (o.night && o.overworld && !o.under) {                                // dark out: only what's done under a roof or under the ground
+		if ((o.night || c.goals.sunDown()) && o.overworld && !o.under) {        // the sun down: only what's done under a roof or under the ground
 			out.removeIf(op -> switch (op.task) {
 				case SHELTER, SMELT, ENCHANT, COAL, IRON, DIAMONDS -> false;
 				case STONE -> !o.sheltered;
@@ -148,6 +148,10 @@ final class Btb {
 	}
 
 	private long nightCheckedAt;
+	/** Its task was dropped (the night): not done, whatever it picked up meanwhile. */
+	private boolean dropped;
+	/** Mining trips in a row that came to nothing within a minute and a half (its mine is no good: water, a ravine). */
+	private int quickFails;
 
 	/**
 	 * The sun going down and it's out under the sky on wood, stone or food: that waits for the morning, a roof now.
@@ -160,6 +164,7 @@ final class Btb {
 		if (p.level().dimension() != Level.OVERWORLD || !c.goals.sunDown() || MindSense.enclosed(p) || !p.level().canSeeSky(p.blockPosition().above())) return false;
 		c.journal("does", "btb: the sun's going down: drops " + task.name().toLowerCase(Locale.ROOT) + " for a roof");
 		c.chores.cancel();
+		dropped = true;
 		return true;
 	}
 
@@ -256,10 +261,20 @@ final class Btb {
 		double gained = worth() - worthAt;
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
 		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
-				|| task == Task.SMELT && o.iron > ironAt);
+				|| task == Task.SMELT && o.iron > ironAt) && !dropped;
+		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
 				ok ? "worked" : "came to nothing", seconds, reward, died ? ", died" : ""));
+		boolean mining = task == Task.IRON || task == Task.COAL || task == Task.DIAMONDS;
+		if (mining) quickFails = !ok && !died && seconds < 90 ? quickFails + 1 : 0;
+		if (quickFails >= 2) {                                                    // twice straight out of its mine with nothing: a new one, from somewhere else
+			quickFails = 0;
+			c.places.forget("mine");
+			c.places.forget("mine base");
+			c.places.forget("mine head");
+			c.journal("thinks", "btb: its mine keeps coming to nothing: a new one next time");
+		}
 		if (!ok) notBefore.put(task, now() + 20 * 40);                            // (not the same thing again straight away)
 		task = Task.NONE;
 		why = "";
