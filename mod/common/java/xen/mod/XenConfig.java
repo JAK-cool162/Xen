@@ -139,11 +139,13 @@ public final class XenConfig {
 	 */
 	public boolean adventures = true;
 	/**
-	 * What decides what a Xen does next: "xen2" (Xen 2.0: a bigger mind trained from scratch in SimLife, with a
-	 * reward critic, a fear critic and a world model that thinks ahead; it keeps learning) or "dmm" (the classic small
-	 * brain with hand-made goals). Minions always use the classic one.
+	 * What decides what a Xen does next: "btb" (Back to Basics, the default: a state machine picks one task at a time
+	 * and keeps to it, the Xen's own muscle memory does it, and what worked is learned without a neural network, kept
+	 * between sessions), "xen2" (Xen 2.0: a bigger mind trained from scratch in SimLife, with a reward critic, a fear
+	 * critic and a world model that thinks ahead) or "dmm" (the classic small brain with hand-made goals). Minions
+	 * always use the classic one.
 	 */
-	public String brain = "xen2";
+	public String brain = "btb";
 	/**
 	 * Team members can hurt each other: being on a team doesn't stop a fight (each Xen decides for itself who to fight,
 	 * by its temper, its motives and who it trusts).

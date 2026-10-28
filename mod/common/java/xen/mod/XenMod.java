@@ -126,6 +126,7 @@ public class XenMod implements ModInitializer {
 		if (config.realSkins) skins.keepLooking(8, java.util.Set.of());   // (real players' skins in before the first Xen comes)
 		if (config.realNameStyle()) skins.prepareReal(Skins.realNames(configDir));   // (their skins ready before anyone summons a Xen)
 		solverMind.load(configDir.resolve("xen"));
+		btbLearner.load(configDir.resolve("xen"));
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
 		duels = new Duels(configDir.resolve("xen").resolve("duels"));
@@ -369,6 +370,8 @@ public class XenMod implements ModInitializer {
 
 	/** What all Xens have learned about getting unstuck (the solver). */
 	final Solver.Mind solverMind = new Solver.Mind();
+	/** What the Back to Basics brain learned (shared by every Xen, kept in config/xen/btb.json). */
+	final BtbLearner btbLearner = new BtbLearner();
 	/** What Xens see, think, say and hear (for the Experimental tab's log). */
 	public Journal journal;
 
@@ -386,6 +389,7 @@ public class XenMod implements ModInitializer {
 
 	private void save() {
 		solverMind.save();
+		btbLearner.save();
 		try {
 			xen.mod.talk.Words.saveLearned(brainFile().resolveSibling("words-learned.json"));
 		} catch (IOException e) {

@@ -545,9 +545,16 @@ public final class Companion {
 		perceived = next;
 		ex1Step(Math.max(0f, lastHealthBefore - player.getHealth()));
 		long tIn = Perf.now();
+		btb.tick();
 		Action instinct = instinct();
 		Perf.add("choosing: instincts (building, chores, ways)", tIn);
-		Brain.Thought thought = mod.brain.decide(next, emotions, mod.config.learn);
+		Brain.Thought thought;
+		if (btb.on()) {                                                      // Back to Basics: no network picking keys each tick (its state machine and muscle memory do it)
+			thought = new Brain.Thought();
+			thought.action = Action.IDLE.ordinal();
+			thought.mode = "btb";
+			thought.text = "Nothing to do this moment.";
+		} else thought = mod.brain.decide(next, emotions, mod.config.learn);
 		Action sensible = instinct == null ? sensible(Action.values()[thought.action]) : null;
 		if (sensible != null && sensible.ordinal() == thought.action) sensible = null;
 		int action = instinct != null ? instinct.ordinal() : sensible != null ? sensible.ordinal() : thought.action;
@@ -1165,6 +1172,7 @@ public final class Companion {
 		if (through != null) return through;
 		Action off = backOffFromOwner();                              // its owner kept hitting it: it keeps away for a bit
 		if (off != null) return off;
+		if (btb.on()) return btbStep();                                // Back to Basics: its state machine has it from here
 		Action met = reactions.next();                                // someone came into view: hello, a wary step back, a stare...
 		if (met != null) return met;
 		Action about = standingAbout();                                // a minute standing about with nothing to show: it moves on
@@ -1323,6 +1331,76 @@ public final class Companion {
 			Action m = goals.mindStep();
 			if (m != null) return m;
 		}
+		return keepUp();
+	}
+
+	/**
+	 * Back to Basics, after its reflexes, its fights and what it was told: its muscle memory first (a tool that broke,
+	 * crafting, its things, a bed at night, a torch), then whatever it is on (a chore, a build, a trip, enchanting),
+	 * kept to until it's done; then its state machine picks the next task. No whims, no antics, no wandering off.
+	 */
+	private Action btbStep() {
+		Action pause = pace.next();
+		if (pause != null) return pause;
+		if (crafter.ready() && !farBehind()) {
+			Action craft = crafter.next();
+			if (craft != null) return craft;
+		}
+		Action back = backForMyThings();
+		if (back != null) return back;
+		Action pick = pickUpNearby();
+		if (pick != null) return pick;
+		Action water = fillBucket();
+		if (water != null) return water;
+		Action bed = bedtime();
+		if (bed != null) return bed;
+		Action light = lightUp();
+		if (light != null) return light;
+		if (mode == Mode.FOLLOW) watchLeaderMoving();
+		if (chores.busy() && chores.own && mode == Mode.FOLLOW && (!leaderWithin(LEASH) || leaderMoving())) {   // its friend is leaving: that comes first
+			if (asked != null) resumeAsked = true;
+			chores.cancel();
+		}
+		if (resumeAsked && !chores.busy() && asked != null && askedBy != null && !fighting && mode != Mode.FOLLOW) {
+			resumeAsked = false;
+			chores.gather(asked.intent(), asked.amount());
+		}
+		Action hungry = starving();
+		if (hungry != null) return hungry;
+		if (chores.busy()) {
+			Action chore = chores.next();
+			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;
+			if (chore != null || chores.busy()) return chore;
+		}
+		if (builder.busy()) {
+			Action b = builder.next();
+			if (!builder.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = builder.doing;
+			if (b != null || builder.busy()) return b;
+		}
+		if (storage.busy()) {
+			Action st = storage.next();
+			if (st != null || storage.busy()) return st;
+		}
+		if (nether.busy()) {
+			Action n = nether.next();
+			if (n != null) return n;
+		}
+		if (enchanter.on) {
+			goals.instant = "enchanting";
+			Action e = enchanter.next();
+			if (e != null) return e;
+		}
+		if (mode == Mode.FREE && mod.config.wants && !minion) {
+			Action b = btb.next();
+			if (goals.instant.isEmpty() && !btb.why.isEmpty()) goals.instant = btb.why;
+			if (b != null) return b;
+			if (chores.busy()) return chores.next();
+		}
+		return keepUp();
+	}
+
+	/** Following someone (close up, then it waits) or staying put (back to where it was told to stay). */
+	private Action keepUp() {
 		Vec3 goal = null;
 		if (mode == Mode.FOLLOW && leader != null) {
 			ServerPlayer o = server.getPlayerList().getPlayer(leader);
@@ -3349,6 +3427,8 @@ public final class Companion {
 	final Biomes biomes = new Biomes(this);
 	/** Tidying up after itself: the pillars it climbed come down again. */
 	final Tidy tidy = new Tidy(this);
+	/** Xen 2.0 Back to Basics: the state machine that picks its tasks (the "btb" brain). */
+	final Btb btb = new Btb(this);
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */
@@ -4638,7 +4718,7 @@ public final class Companion {
 		}
 		return xen.mod.talk.Chat.notes(emotions.mood(), emotions.pain > 0.15f, player.getHealth(),
 				player.getFoodData().getFoodLevel(), carrying.toString(), senses.describe())
-				+ " " + goals.describe() + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
+				+ " " + (btb.on() ? btb.describe() : goals.describe()) + " " + crafter.describe() + (builder.busy() ? " " + builder.describe() : "")
 				+ join(places.describe(), storage.describe(), tribe() == null ? "" : tribe().describe(this), nether.describe(), adventure.describe(),
 						trials.describe(), dragon.describe(), farmer.describe(), knowledge.describe(), shop.describe(), taste.describe(),
 						skills.describe(), rumors.describe(), life.describe(), caves.describe(), structures.describe(), habits.routine())

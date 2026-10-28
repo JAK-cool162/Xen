@@ -1195,6 +1195,7 @@ final class Chores {
 		had = count(items);
 		mineStart = c.player.blockPosition();
 		mineBase = null;
+		stairHead = null;
 		mineDir = c.player.getDirection();
 		mineY = y;
 		mineLeg = 0;
@@ -1218,6 +1219,7 @@ final class Chores {
 				mineLeg = mineRecordLeg;
 				mineBase = c.places.get("mine base");
 			}
+			stairHead = c.places.get("mine head");                             // (where its staircase got to: on from there, not a new one)
 			using = ownMine(entrance);
 			return "You will go back to your mine for " + what + " (down the staircase at " + entrance.getX() + " " + entrance.getZ() + ", on with tunnel "
 					+ (mineLeg / 2 + 1) + ").";
@@ -1298,6 +1300,7 @@ final class Chores {
 		mineRecordDir = mineDir;
 		mineRecordLeg = 0;
 		c.places.forget("mine base");
+		c.places.forget("mine head");
 		return "You will dig your own mine for " + what + ": a staircase down to about y " + y + " (you'll come back to it), then tunnels, mining the ore you see.";
 	}
 
@@ -1493,6 +1496,21 @@ final class Chores {
 	int mineRecordY = Integer.MIN_VALUE, mineRecordLeg;
 	net.minecraft.core.Direction mineRecordDir = net.minecraft.core.Direction.NORTH;
 	private BlockPos toMine;
+	/** The lowest step of its staircase so far: where the next step goes from (kept in its places as "mine head"). */
+	private BlockPos stairHead;
+
+	/** On its staircase: at its lowest step (or a block off it), or on one of the steps above it, on the way down. */
+	private boolean onStairs(BlockPos feet) {
+		if (Math.abs(feet.getX() - stairHead.getX()) <= 1 && Math.abs(feet.getZ() - stairHead.getZ()) <= 1 && Math.abs(feet.getY() - stairHead.getY()) <= 1) return true;
+		net.minecraft.core.Direction back = mineDir.getOpposite();
+		for (int k = 1; k <= 96; k++) {
+			BlockPos up = stairHead.relative(back, k).above(k);
+			if (up.getY() > feet.getY() + 1) break;
+			if (feet.distManhattan(up) <= 1) return true;
+		}
+		return false;
+	}
+
 	/** Mining in a cave (not its own staircase): the spot it's heading for in there, and since when. */
 	private boolean caveMode;
 	/** First a look around for a cave (its call, by its nature): till when, where it's headed, and when it last did. */
@@ -1718,6 +1736,7 @@ final class Chores {
 							c.journal("thinks", "turns its staircase " + d.getName() + " (" + (wet(feet, mineDir, 4) ? "water" : "daylight") + " ahead " + mineDir.getName() + ")");
 							mineDir = d;
 							mineRecordDir = d;
+							stairHead = feet.immutable();                              // (the new leg starts here)
 							break;
 						}
 					}
@@ -1742,6 +1761,20 @@ final class Chores {
 				mineRecordY = feet.getY();
 				c.chatter("Down at y " + feet.getY() + ". Tunnels now.", false);
 				return null;
+			}
+			if (tunnelIn == null) {                                             // one staircase: the lowest step it got to is where it goes on from
+				boolean onStairs = stairHead != null && onStairs(feet);
+				if (stairHead == null || onStairs && feet.getY() < stairHead.getY()) {
+					stairHead = feet.immutable();
+					if (!caveMode) c.places.remember("mine head", stairHead);
+				}
+				if (!onStairs && !feet.equals(stairHead) && feet.distManhattan(stairHead) <= 48 && c.player.onGround()) {   // off its stairs (a fight, a pickup, up for air): back down them, not a new hole from here
+					doing = "back to its staircase (y " + stairHead.getY() + ")";
+					Action back = c.walkTo(Vec3.atBottomCenterOf(stairHead));
+					if (back != null) return back;
+					c.journal("way", "can't get back to its staircase at " + stairHead.toShortString() + ": goes on down from here");
+					stairHead = feet.immutable();
+				}
 			}
 			int down = feet.getY() - mineY, step = Math.min(down, 3);        // (a few steps ahead at a time: a straight staircase, not a far point it digs about for)
 			if (tunnelIn != null && (feet.distManhattan(tunnelIn) <= 0 || feet.distManhattan(tunnelIn) > 6 || now() - legStarted > 300)) tunnelIn = null;   // (in, or no getting in there: down from here)

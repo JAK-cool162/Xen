@@ -47,3 +47,14 @@ jobs:
       - name: Mod for 26.x compiles against 26.3
         working-directory: mod/mc26
         run: ./gradlew compileJava -Pminecraft_version=26.3 -Pfabric_api_version=0.161.0+26.3 -Pmc_range=~26.3 --no-daemon
+
+      # The jars this commit makes, kept a week (to try a build before a release).
+      - name: Keep the jars
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: |
+            mod/mc1.21.11/build/libs/xen-companion-*.jar
+            mod/mc26/build/libs/xen-companion-*.jar
+          retention-days: 7
