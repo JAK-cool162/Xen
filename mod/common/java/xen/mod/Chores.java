@@ -2267,8 +2267,7 @@ final class Chores {
 
 	String smelt() {
 		int raw = toSmelt();
-		List<Smelter.Unit> units = smelterUnits();
-		if (!units.isEmpty() && (raw > 0 || droppedRaw > 0)) {               // its auto-smelter: drop it off, take out what it made, no waiting
+		if (smelterAt() != null && (raw > 0 || droppedRaw > 0)) {            // its auto-smelter: drop it off, take out what it made, no waiting
 			begin(Kind.SMELT);
 			atSmelter = true;
 			smelterUnit = 0;
@@ -2340,12 +2339,11 @@ final class Chores {
 		return best;
 	}
 
-	/** Its auto-smelter close by (one it built, or one it was told about): what's there now. */
-	List<Smelter.Unit> smelterUnits() {
-		if (c.player == null) return List.of();
+	/** Where its auto-smelter is (one it built, or one from a schematic), if it's within 128 blocks: from memory. */
+	BlockPos smelterAt() {
+		if (c.player == null || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
 		BlockPos at = c.places.get("smelter");
-		if (at == null || !at.closerThan(c.player.blockPosition(), 96) || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return List.of();
-		return Smelter.scan((ServerLevel) c.player.level(), at, 6);
+		return at != null && at.closerThan(c.player.blockPosition(), 128) ? at : null;
 	}
 
 	private boolean atSmelter;
@@ -2356,10 +2354,21 @@ final class Chores {
 
 	/** At its smelter: per furnace, the ore into the top, fuel into the back (or the furnace), what it made out. */
 	private Action smelterNext() {
-		List<Smelter.Unit> units = smelterUnits();
-		if (units.isEmpty() || now() > until) {
+		BlockPos at = smelterAt();
+		if (at == null || now() > until) {
 			atSmelter = false;
-			finish(units.isEmpty() ? "Its smelter isn't there any more." : "Took too long at its smelter.");
+			finish("Took too long getting to its smelter.");
+			return null;
+		}
+		if (!at.closerThan(c.player.blockPosition(), 24)) {                 // (there first: what's there is looked at when it's by it)
+			doing = "going to its smelter";
+			return c.walkTo(Vec3.atBottomCenterOf(at));
+		}
+		List<Smelter.Unit> units = Smelter.scan((ServerLevel) c.player.level(), at, 6);
+		if (units.isEmpty()) {
+			atSmelter = false;
+			c.places.forget("smelter");
+			finish("Its smelter isn't there any more.");
 			return null;
 		}
 		if (smelterUnit >= units.size()) {
