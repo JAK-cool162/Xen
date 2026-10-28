@@ -131,6 +131,12 @@ public final class XenConfig {
 	 * to dig there, mine it and live through it; what it does about anyone (a fight, a talk) is its own call.
 	 */
 	public double luck = 2.0;
+	/**
+	 * Kill aura: it hits every hostile mob in reach the moment its swing is charged, without turning to face it, even
+	 * while it mines, eats or digs in (the normal attack, reach and cooldown; never players, pets or villagers, never in
+	 * a duel). Off: it only hits what it looks at, like a player.
+	 */
+	public boolean killAura = true;
 	/** XenTalk: Xen's own small talk model words its chats (from what's true for it; the classic voice when it has nothing that sticks to the facts). */
 	public boolean xentalk = true;
 	/**

@@ -582,6 +582,7 @@ public final class Companion {
 		if (!fighting && action != Action.FORWARD.ordinal() && action != Action.JUMP.ordinal()) run(false);   // stopped: no more running
 		if (!walker.touched) walker.stop();                                // doing something else now: it lets go of the keys
 		if (!pillaring && !acted) hands.start(Action.values()[action]);
+		if (mod.config.killAura) killAura();
 		if (mod.config.journal) {
 			String thinking = Action.values()[action].verb + " - " + lastThought + (goals.instant.isEmpty() ? "" : " [" + goals.instant + "]");
 			if (!thinking.equals(journaledThought)) journal("thinks", thinking);
@@ -3396,6 +3397,8 @@ public final class Companion {
 		fighting = foe != null;
 		hands.watching = null;
 		if (foe == null) {
+			Action dug = fighter.stayDug();
+			if (dug != null) return dug;
 			hands.lowerShield();
 			player.setSprinting(false);
 			fighter.reset();
@@ -4087,12 +4090,89 @@ public final class Companion {
 		return k.equals("skeleton") || k.equals("stray") || k.equals("bogged") || k.equals("pillager") || k.equals("piglin") && e.getMainHandItem().getItem() instanceof net.minecraft.world.item.CrossbowItem;
 	}
 
+	/**
+	 * Back to Basics: which mob to deal with now, by threat over the seconds it takes to get it in reach. A creeper
+	 * within four blocks first, then whatever is hitting it (a baby zombie before the rest), then a skeleton it can get
+	 * to, then the nearest. Each kind's weight is its learning's (the ones that hurt it most come sooner). A skeleton
+	 * it can't get to (far, across water, up a cliff) still counts, a little: it gets out of its sight.
+	 */
+	private LivingEntity scoredFoe() {
+		LivingEntity best = null;
+		double bestScore = 0;
+		long now = player.tickCount;
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(16),
+				m -> m.isAlive() && hostile(m) && !diplomacy.atPeace(m))) {
+			double d = player.distanceTo(m);
+			boolean onIt = m.getTarget() == player, sees = player.hasLineOfSight(m);
+			boolean creeper = m instanceof net.minecraft.world.entity.monster.Creeper;
+			if (!onIt && d > (creeper ? 6 : 4) || !sees && d > 4) continue;
+			boolean hitting = player.getLastHurtByMob() == m && now - player.getLastHurtByMobTimestamp() < 40;
+			double threat = creeper ? (d <= 4 ? 12 : 3) : archer(m) ? (reachable(m) ? 2.5 : 0.6) : 2;
+			if (m.isBaby()) threat *= 1.6;
+			if (hitting) threat += 3;
+			double seconds = Math.max(0, d - player.entityInteractionRange()) / 5.6 + 0.4;   // (to get it in reach, sprinting)
+			double score = threat * mod.btbLearner.mobWeight(BuiltInRegistries.ENTITY_TYPE.getKey(m.getType()).getPath()) / seconds;
+			if (score > bestScore) {
+				bestScore = score;
+				best = m;
+			}
+		}
+		return best;
+	}
+
+	/** A shooter it can get to: within 16, not far above or below (a cliff), no water between. */
+	boolean reachable(LivingEntity m) {
+		double d = player.distanceTo(m);
+		if (d > 16 || Math.abs(m.getY() - player.getY()) > 3) return false;
+		Vec3 a = player.position(), b = m.position();
+		int steps = (int) Math.ceil(d);
+		for (int i = 1; i < steps; i++) {
+			BlockPos q = BlockPos.containing(a.lerp(b, i / (double) steps));
+			if (!player.level().getFluidState(q).isEmpty() || !player.level().getFluidState(q.below()).isEmpty() && player.level().getBlockState(q.below()).getCollisionShape(player.level(), q.below()).isEmpty())
+				return false;
+		}
+		return true;
+	}
+
+	/** Hostile mobs after it within r blocks. */
+	int mobsOnIt(double r) {
+		return player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(r),
+				m -> m.isAlive() && m.getTarget() == player && hostile(m)).size();
+	}
+
+	/** The kill aura setting: a charged swing goes into the nearest hostile mob in reach, whatever it's looking at. */
+	private void killAura() {
+		if (inArena || !player.isAlive() || player.isSpectator() || player.getAttackStrengthScale(0.5f) < 0.95f || hands.lastHitAt == player.level().getGameTime()) return;
+		double reach = player.entityInteractionRange();
+		LivingEntity best = null;
+		double bestD = Double.MAX_VALUE;
+		Vec3 eye = player.getEyePosition();
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, player.getBoundingBox().inflate(reach + 1),
+				m -> m.isAlive() && hostile(m) && !diplomacy.atPeace(m))) {
+			var box = m.getBoundingBox();
+			double dd = eye.distanceToSqr(Math.max(box.minX, Math.min(eye.x, box.maxX)), Math.max(box.minY, Math.min(eye.y, box.maxY)), Math.max(box.minZ, Math.min(eye.z, box.maxZ)));
+			if (dd <= reach * reach && dd < bestD && player.hasLineOfSight(m)) {
+				bestD = dd;
+				best = m;
+			}
+		}
+		if (best == null) return;
+		player.attack(best);
+		Compat.swing(player);
+		hands.lastHit = best;
+		hands.lastHitAt = player.level().getGameTime();
+	}
+
 	private LivingEntity foe() {
 		if (inArena) return duelFoe != null && duelFoe.isAlive() && duelFoe.level() == player.level() && player.distanceTo(duelFoe) < 32
 				? duelFoe : null;
 		if (chosenFoe != null && diplomacy.atPeace(chosenFoe)) chosenFoe = null;   // a truce is a truce: it keeps its word
 		if (chosenFoe != null && chosenFoe.isAlive() && chosenFoe.level() == player.level() && player.distanceTo(chosenFoe) < 6
 				&& player.hasLineOfSight(chosenFoe) && !(chosenFoe instanceof ServerPlayer sp && (sp.isCreative() || sp.isSpectator()))) return chosenFoe;
+		if (btb.on()) {                                                      // Back to Basics: the most urgent one, by a score
+			LivingEntity scored = scoredFoe();
+			if (scored != null) return scored;
+		}
 		for (var creeper : player.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Creeper.class,
 				player.getBoundingBox().inflate(8), x -> x.isAlive() && x.getSwellDir() > 0)) {
 			if (player.distanceTo(creeper) < 7.5) return creeper;         // hissing close by: it hears that, and runs till it stops (past 7 blocks the fuse goes out)
@@ -4477,6 +4557,8 @@ public final class Companion {
 
 	/** Hurt: by what, how much, and what it was doing then (so a death can be read back). */
 	void journalHurt(DamageSource source, float amount) {
+		if (btb.on() && source.getEntity() instanceof net.minecraft.world.entity.Mob m && !(m instanceof AbstractGolem))   // (what hurts it most, it deals with sooner next time)
+			mod.btbLearner.mobHurt(BuiltInRegistries.ENTITY_TYPE.getKey(m.getType()).getPath(), amount);
 		if (Fighter.FIGHT_LOG && source.getEntity() instanceof net.minecraft.world.entity.player.Player by)            // (-Dxen.fightLog: hit by a player, how far off)
 			XenMod.LOG.info("[xen pvp] {} hit by {}: d {} amount {} health {}", name, by.getName().getString(), String.format(java.util.Locale.ROOT, "%.2f", player.distanceTo(by)),
 					String.format(java.util.Locale.ROOT, "%.1f", amount), String.format(java.util.Locale.ROOT, "%.1f", player.getHealth()));

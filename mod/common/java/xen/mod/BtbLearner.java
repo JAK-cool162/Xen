@@ -26,6 +26,8 @@ final class BtbLearner {
 	private Map<String, Map<String, Float>> q = new HashMap<>();
 	/** What happened when it did each task: tries, worked, deaths, seconds in all. */
 	private Map<String, double[]> memory = new HashMap<>();
+	/** How much sooner to deal with each kind of mob in a fight (1 to start; the ones that hurt it most go up). */
+	private Map<String, Float> mob = new HashMap<>();
 	private Path file;
 	private boolean dirty;
 
@@ -39,11 +41,14 @@ final class BtbLearner {
 			if (o.has("memory")) memory = new Gson().fromJson(o.get("memory"), new TypeToken<Map<String, double[]>>() {}.getType());
 			if (q == null) q = new HashMap<>();
 			if (memory == null) memory = new HashMap<>();
+			if (o.has("mob")) mob = new Gson().fromJson(o.get("mob"), new TypeToken<Map<String, Float>>() {}.getType());
+			if (mob == null) mob = new HashMap<>();
 			XenMod.LOG.info("Xen BTB: learned values for {} spots, {} tasks remembered", q.size(), memory.size());
 		} catch (IOException | RuntimeException e) {
 			XenMod.LOG.warn("Xen BTB: couldn't read what it learned ({}), starting fresh", e.toString());
 			q = new HashMap<>();
 			memory = new HashMap<>();
+			mob = new HashMap<>();
 		}
 	}
 
@@ -55,6 +60,7 @@ final class BtbLearner {
 			Gson g = new Gson();
 			o.add("q", g.toJsonTree(q));
 			o.add("memory", g.toJsonTree(memory));
+			o.add("mob", g.toJsonTree(mob));
 			Files.writeString(file, g.toJson(o));
 			dirty = false;
 		} catch (IOException e) {
@@ -90,6 +96,24 @@ final class BtbLearner {
 		if (worked) m[1]++;
 		if (died) m[2]++;
 		m[3] += seconds;
+		dirty = true;
+	}
+
+	/** How soon this kind of mob is dealt with in a fight (0.6 to 2). */
+	synchronized float mobWeight(String kind) {
+		return mob.getOrDefault(kind, 1f);
+	}
+
+	/** Hurt by this kind: next time it's dealt with a little sooner. */
+	synchronized void mobHurt(String kind, float amount) {
+		mob.put(kind, Math.min(2f, mob.getOrDefault(kind, 1f) + 0.01f * amount));
+		dirty = true;
+	}
+
+	/** Beat one: its weight drifts back toward 1. */
+	synchronized void mobBeaten(String kind) {
+		float w = mob.getOrDefault(kind, 1f);
+		mob.put(kind, Math.max(0.6f, w + (1 - w) * 0.05f));
 		dirty = true;
 	}
 

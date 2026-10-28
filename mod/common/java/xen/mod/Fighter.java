@@ -163,6 +163,7 @@ final class Fighter {
 		float[] e = engaged.remove(foe.getId());
 		if (e == null || foe instanceof Player) return;
 		learn(kind(foe), e[0] / Math.max(1, e[1]));
+		if (c.btb.on()) c.mod.btbLearner.mobBeaten(kind(foe));
 	}
 
 	/** It died fighting: whatever it was fighting cost more than it had. */
@@ -360,7 +361,13 @@ final class Fighter {
 			return runFrom(foe, sprintable);
 		}
 
-		Action screen = creeperScreen();                                       // a skeleton and a creeper: the creeper between it and the arrows
+		noRun = false;
+		if (c.btb.on() && !(foe instanceof Player) && !c.inArena) {          // Back to Basics: one call (fight, dig in, out of sight), then it sticks to it
+			Action plan = btbPlan(foe, d);
+			if (plan != null) return plan;
+		}
+
+		Action screen = noRun ? null : creeperScreen();                        // a skeleton and a creeper: the creeper between it and the arrows
 		if (screen != null) return screen;
 
 		float retreat = 0.4f * gene(8) * Math.max(0.2f, 1 - 0.5f * c.personality.sin(xen.mod.core.Sins.PRIDE) - 0.3f * c.personality.sin(xen.mod.core.Sins.WRATH));
@@ -373,6 +380,7 @@ final class Fighter {
 			float more = Math.min(0.3f, 0.12f * Math.max(0, mobs - 1)) + (p.level().isDarkOutside() && p.level().getMaxLocalRawBrightness(p.blockPosition()) < 7 ? 0.08f : 0);
 			retreat = Math.max(retreat, Math.min(0.6f, retreat + (c.personality.believes("warrior_never_runs") ? 0.5f : 1f) * more));
 		}
+		if (noRun) retreat = 0;                                                // (it chose to fight: it fights)
 		float health = p.getHealth() / p.getMaxHealth();
 		// Can it win this? What this kind (and the others at it) have cost it before, against the health it has: if it would
 		// come out of it with next to nothing, a player gets out of reach first (two blocks up: a zombie can't hit that) or
@@ -414,13 +422,14 @@ final class Fighter {
 				c.journal("fight", "a piglin brute: its axe takes half my hearts and I'm not in diamond, so away");
 			}
 		}
+		if (noRun) outmatched = false;
 		if (outmatched && !escaping) {
 			escaping = true;
 			escapedAt = now;
 		}
 		if (!outmatched && escaping) escaping = false;
 		int onIt = p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(6), m -> m.isAlive() && m.getTarget() == p).size();
-		boolean crowd = style() == Style.CONTROLLER && health < 0.85f && onIt >= 2;   // (the terrain is its weapon: two on it, it takes the high ground before it's low)
+		boolean crowd = !noRun && style() == Style.CONTROLLER && health < 0.85f && onIt >= 2;   // (the terrain is its weapon: two on it, it takes the high ground before it's low)
 		if (perched || (outmatched || crowd) && canPerch(foe)) {
 			Action up = perch(foe, d);
 			if (up != null) return up;
@@ -430,7 +439,7 @@ final class Fighter {
 			Action roof = underLowRoof(foe, d);                                // they can't get under a roof two blocks up: in there, and hit their legs
 			if (roof != null) return roof;
 		}
-		if (Companion.archer(foe) && !(foe instanceof Player) && !c.inArena && d > 6 && !h.carries("bow") && !h.carries("crossbow")) {   // a skeleton off over there: walled off, not fought (no bow to answer it with)
+		if (!noRun && Companion.archer(foe) && !(foe instanceof Player) && !c.inArena && d > 6 && !h.carries("bow") && !h.carries("crossbow")) {   // a skeleton off over there: walled off, not fought (no bow to answer it with)
 			Action wall = wallOff(foe, kind(foe).replace('_', ' '));
 			if (wall != null) return wall;
 		}
@@ -440,14 +449,15 @@ final class Fighter {
 		// shouts for help), else behind something it can't be seen through (a tree, a wall), else just away.
 		boolean bareInTheDark = !h.hasWeapon() && !(foe instanceof Player) && p.level().isDarkOutside() && !(foe instanceof net.minecraft.world.entity.monster.Creeper)
 				&& expected(foe) > p.getHealth() * 0.4f;                       // (just respawned at night with nothing, say: fists against a zombie is how it died)
-		boolean desperate = !c.inArena && !c.skills.sparringWith(foe.getUUID()) && (p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal()) || bareInTheDark);
+		boolean desperate = !noRun && !c.inArena && !c.skills.sparringWith(foe.getUUID()) && (p.getHealth() <= 6 && (!h.hasWeapon() || p.getHealth() <= 3 && !h.canHeal()) || bareInTheDark);
 		boolean finishing = !(foe instanceof Player) && !desperate && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && d <= p.entityInteractionRange() + 0.5
 				&& p.getHealth() >= 6 && foe.getHealth() <= hitNow() && p.getAttackStrengthScale(0.5f) >= 0.8f;   // nearly dead and in reach: it takes the hit to finish it (a trade worth making)
 		if (finishing && (health < retreat || outmatched) && now - saidWhyAt > 100) {
 			saidWhyAt = now;
 			c.journal("fight", String.format(java.util.Locale.ROOT, "takes a hit to finish the %s (%.0f health left on it, %.0f on itself)", kind(foe).replace('_', ' '), foe.getHealth(), p.getHealth()));
 		}
-		if (!finishing && !rush && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f) || fleeing && !c.inArena && !safe() && (p.getHealth() < 16 || threatAround() > p.getHealth() - margin()))) {   // (once it's getting out, it keeps at it till it's safe, or healed with nothing it can't handle)
+		if (noRun) fleeing = false;
+		if (!finishing && !rush && !noRun && (outmatched || desperate || retreat > 0 && (health < retreat || fleeing && health < retreat + 0.2f) || fleeing && !c.inArena && !safe() && (p.getHealth() < 16 || threatAround() > p.getHealth() - margin()))) {   // (once it's getting out, it keeps at it till it's safe, or healed with nothing it can't handle)
 			if (!fleeing && !c.inArena) {
 				c.chatter(c.personality.say("flee"), false);
 				c.journal("fight", String.format(java.util.Locale.ROOT, "backs off at %.0f health (%s: keeps %.0f in hand)%s", p.getHealth(), style().words, retreat * p.getMaxHealth(),
@@ -682,6 +692,139 @@ final class Fighter {
 			return phase == 0 ? Action.LEFT : phase == 2 ? Action.RIGHT : Action.FORWARD;
 		}
 		return c.walkTo(foe.position());                                       // go after it (sprinting: a sprint hit)
+	}
+
+	/** Back to Basics chose to fight this one: no backing off, no running (its old ways off). */
+	private boolean noRun;
+	/** Where its feet were when it began to dig in (the roof goes there), and when. */
+	private net.minecraft.core.BlockPos hole;
+	private int holeAt, quietSince;
+
+	/**
+	 * Back to Basics in a fight: one call, and it sticks to it. A creeper close by: hit it (that knocks it back), then
+	 * back out of its blast. A shooter it can't get to (far, across water, up a cliff): out of its sight, never after it.
+	 * Armed, 12 health or more and one or two at it: it fights, no running. Else, if none is within six blocks (time to
+	 * finish), it digs in: two down (out of a zombie's reach even with no roof yet), then a block over its head. With them
+	 * already on it, it fights where it stands (shield up between swings): a hole started with a crowd round it is how
+	 * it died, the roof never in time. Null: its usual fighting, with noRun saying whether it may back off.
+	 */
+	private Action btbPlan(LivingEntity foe, double d) {
+		XenPlayer p = c.player;
+		Hands h = c.hands;
+		if (hole != null) {                                                     // digging in, or dug in: on with that
+			Action in = digIn();
+			if (in != null) return in;
+		}
+		if (foe instanceof net.minecraft.world.entity.monster.Creeper && d <= 4.5) {
+			if (d <= p.entityInteractionRange() && p.getAttackStrengthScale(0.5f) >= 0.9f) {
+				sTap = 8;
+				return hit(foe);
+			}
+			h.watching = foe;
+			p.setSprinting(false);
+			c.goals.instant = "out of the creeper's blast";
+			return Action.BACK;
+		}
+		if (Companion.archer(foe) && !c.reachable(foe)) {
+			Action cover = takeCover(foe);
+			if (cover != null) {
+				c.goals.instant = "out of the " + kind(foe).replace('_', ' ') + "'s sight (no way to get at it)";
+				return cover;
+			}
+		}
+		int on = c.mobsOnIt(12);
+		if (h.hasWeapon() && p.getHealth() >= 12 && on <= 2) {
+			noRun = true;
+			return null;
+		}
+		double nearest = Double.MAX_VALUE;
+		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
+				m -> m.isAlive() && m.getTarget() == p)) nearest = Math.min(nearest, p.distanceTo(m));
+		if (nearest > 6) {
+			Action dig = startDigIn(on);
+			if (dig != null) return dig;
+		}
+		noRun = true;                                                            // (no time to dig, nowhere better: it stands and fights, shield up between swings)
+		if (now() - standSaidAt > 400) {
+			standSaidAt = now();
+			c.journal("fight", String.format(java.util.Locale.ROOT, "%d at it, %.0f health%s: no time to dig in, it stands and fights", on, p.getHealth(), h.hasWeapon() ? "" : ", no weapon"));
+		}
+		return null;
+	}
+
+	private int standSaidAt = -1000;
+
+	/** Dug in and none in sight (the roof is on): it stays down there till they've gone, not back out into them. */
+	Action stayDug() {
+		return hole == null ? null : digIn();
+	}
+
+	private int now() {
+		return c.player.tickCount;
+	}
+
+	/** Two blocks down right here, a floor under that, nothing that falls or flows: a hole to dig in. Null if not here. */
+	private Action startDigIn(int on) {
+		XenPlayer p = c.player;
+		if (!p.onGround() || p.isInWater() || p.isInLava()) return null;
+		var level = (net.minecraft.server.level.ServerLevel) p.level();
+		net.minecraft.core.BlockPos feet = p.blockPosition();
+		for (net.minecraft.core.BlockPos b : new net.minecraft.core.BlockPos[] {feet.below(), feet.below(2)}) {
+			var st = level.getBlockState(b);
+			if (st.isAir() || !level.getFluidState(b).isEmpty() || !Hands.natural(st) || st.getBlock() instanceof net.minecraft.world.level.block.FallingBlock
+					|| c.hands.tooSlowToMine(b)) return null;
+			for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				net.minecraft.core.BlockPos side = b.relative(dir);
+				if (!level.getFluidState(side).isEmpty()) return null;            // (water or lava beside it: not here)
+			}
+		}
+		net.minecraft.core.BlockPos floor = feet.below(3);
+		if (level.getBlockState(floor).getCollisionShape(level, floor).isEmpty() || !level.getFluidState(floor).isEmpty()) return null;
+		hole = feet.immutable();
+		holeAt = now();
+		quietSince = -1;
+		c.journal("fight", String.format(java.util.Locale.ROOT, "%d at it, %.0f health%s: digs in (two down, a block over its head)", on, p.getHealth(),
+				c.hands.hasWeapon() ? "" : ", no weapon"));
+		return digIn();
+	}
+
+	/** Down the hole, then the roof, then it waits there till they've gone (kill aura or not, it hits what comes in reach). */
+	private Action digIn() {
+		XenPlayer p = c.player;
+		var level = (net.minecraft.server.level.ServerLevel) p.level();
+		net.minecraft.core.BlockPos feet = p.blockPosition();
+		if (Math.abs(feet.getX() - hole.getX()) + Math.abs(feet.getZ() - hole.getZ()) > 1 || feet.getY() > hole.getY() || now() - holeAt > 20 * 120) {
+			hole = null;                                                         // (knocked out of it, or two minutes: done)
+			return null;
+		}
+		if (feet.getY() > hole.getY() - 2) {
+			net.minecraft.core.BlockPos under = feet.below();
+			c.goals.instant = "digging in";
+			p.setSprinting(false);
+			if (c.hands.mine(under)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			if (under.equals(c.hands.cantMine)) {
+				hole = null;
+				return null;
+			}
+			return Action.LOOK_DOWN;
+		}
+		var roof = level.getBlockState(hole);
+		if (roof.canBeReplaced() && c.hands.placeAt(hole, "any")) {             // (no block, or one in the way: it stays down anyway, out of their reach)
+			c.acted = true;
+			c.goals.instant = "a block over its head";
+			return Action.PLACE;
+		}
+		c.goals.instant = "dug in till they've gone";
+		if (c.mobsOnIt(12) > 0) quietSince = -1;
+		else if (quietSince < 0) quietSince = now();
+		if (quietSince >= 0 && now() - quietSince > 200) {                     // ten quiet seconds: out again (its task, or the night in there)
+			hole = null;
+			return null;
+		}
+		return Action.IDLE;
 	}
 
 	/**
