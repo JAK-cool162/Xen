@@ -1,5 +1,6 @@
 package xen.mod;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import xen.mod.core.Action;
 
@@ -137,6 +138,24 @@ final class Btb {
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
+		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
+		// heals, eats, gets food first); none of the walking-about jobs with monsters round it; by water, a mine is the
+		// last thing (its holes fill, it swims off its staircase).
+		boolean hurt = o.health < 14, noFood = o.meals == 0 && o.food < 16, wet = nearWater();
+		if (noFood) out.replaceAll(op -> op.task == Task.FOOD ? new Option(Task.FOOD, 4.8f, "nothing to eat in its bag") : op);
+		out.removeIf(op -> switch (op.task) {
+			case COAL, IRON, DIAMONDS -> hurt || noFood;
+			case EXPLORE, HOME, WOOD, STONE -> o.danger >= 1 && hurt;
+			default -> false;
+		});
+		if (wet) out.replaceAll(op -> op.task == Task.COAL || op.task == Task.IRON || op.task == Task.DIAMONDS ? new Option(op.task, op.base - 1.5f, op.why + " (water close: elsewhere if it can)") : op);
+		if (hurt && !noFood && o.food >= 18 && out.stream().noneMatch(op -> op.task == Task.SHELTER || op.task == Task.SMELT)) {
+			out.removeIf(op -> op.task != Task.FOOD);                          // (fed and hurt: it heals first, a few seconds)
+			if (now() - restSaidAt > 600) {
+				restSaidAt = now();
+				c.journal("thinks", String.format(Locale.ROOT, "btb: %.0f health: heals before anything risky", o.health));
+			}
+		}
 		if ((o.night || c.goals.sunDown()) && o.overworld && !o.under) {        // the sun down: only what's done under a roof or under the ground
 			out.removeIf(op -> switch (op.task) {
 				case SHELTER, SMELT, ENCHANT, COAL, IRON, DIAMONDS -> false;
@@ -147,7 +166,16 @@ final class Btb {
 		return out;
 	}
 
-	private long nightCheckedAt, shelterSaidAt = -1000;
+	private long nightCheckedAt, shelterSaidAt = -1000, restSaidAt = -1000;
+
+	/** Water within three blocks of its feet (a mine dug here floods, a fight here ends in the water). */
+	private boolean nearWater() {
+		var level = c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -2, -3), feet.offset(3, 1, 3)))
+			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
+		return false;
+	}
 	/** Its task was dropped (the night): not done, whatever it picked up meanwhile. */
 	private boolean dropped;
 	/** Mining trips in a row that came to nothing within a minute and a half (its mine is no good: water, a ravine). */

@@ -30,6 +30,9 @@ final class BtbLearner {
 	private Map<String, Float> mob = new HashMap<>();
 	/** Each schematic it built: times, blocks placed, left out, seconds in all (and what it made, kept by its user). */
 	private Map<String, double[]> builds = new HashMap<>();
+	/** From the schematics it studied: styles (by schematic), what was inside, and how machine parts join (all counted). */
+	private Map<String, String[]> styles = new HashMap<>();
+	private Map<String, Integer> interior = new HashMap<>(), rules = new HashMap<>();
 	private Path file;
 	private boolean dirty;
 
@@ -47,6 +50,12 @@ final class BtbLearner {
 			if (mob == null) mob = new HashMap<>();
 			if (o.has("builds")) builds = new Gson().fromJson(o.get("builds"), new TypeToken<Map<String, double[]>>() {}.getType());
 			if (builds == null) builds = new HashMap<>();
+			if (o.has("styles")) styles = new Gson().fromJson(o.get("styles"), new TypeToken<Map<String, String[]>>() {}.getType());
+			if (o.has("interior")) interior = new Gson().fromJson(o.get("interior"), new TypeToken<Map<String, Integer>>() {}.getType());
+			if (o.has("rules")) rules = new Gson().fromJson(o.get("rules"), new TypeToken<Map<String, Integer>>() {}.getType());
+			if (styles == null) styles = new HashMap<>();
+			if (interior == null) interior = new HashMap<>();
+			if (rules == null) rules = new HashMap<>();
 			XenMod.LOG.info("Xen BTB: learned values for {} spots, {} tasks remembered", q.size(), memory.size());
 		} catch (IOException | RuntimeException e) {
 			XenMod.LOG.warn("Xen BTB: couldn't read what it learned ({}), starting fresh", e.toString());
@@ -66,6 +75,9 @@ final class BtbLearner {
 			o.add("memory", g.toJsonTree(memory));
 			o.add("mob", g.toJsonTree(mob));
 			o.add("builds", g.toJsonTree(builds));
+			o.add("styles", g.toJsonTree(styles));
+			o.add("interior", g.toJsonTree(interior));
+			o.add("rules", g.toJsonTree(rules));
 			Files.writeString(file, g.toJson(o));
 			dirty = false;
 		} catch (IOException e) {
@@ -102,6 +114,46 @@ final class BtbLearner {
 		if (died) m[2]++;
 		m[3] += seconds;
 		dirty = true;
+	}
+
+	/** What it learned from a schematic (studying it twice doesn't count it twice: the latest look replaces the last). */
+	private final java.util.Set<String> studied = new java.util.HashSet<>();
+
+	synchronized void learnStyle(String from, String[] style) {
+		styles.put(from, style);
+		dirty = true;
+	}
+
+	synchronized void learnInterior(String from, Map<String, Integer> seen) {
+		if (!studied.add("in:" + from)) return;
+		seen.forEach((k, v) -> interior.merge(k, v, Integer::sum));
+		dirty = true;
+	}
+
+	synchronized void learnRules(String from, Map<String, Integer> seen) {
+		if (!studied.add("rules:" + from)) return;
+		seen.forEach((k, v) -> rules.merge(k, v, Integer::sum));
+		dirty = true;
+	}
+
+	/** One of the styles it learned (null: none yet), and which. */
+	synchronized Map.Entry<String, String[]> style(java.util.Random random) {
+		if (styles.isEmpty()) return null;
+		var all = new java.util.ArrayList<>(styles.entrySet());
+		return all.get(random.nextInt(all.size()));
+	}
+
+	synchronized Map<String, Integer> interior() {
+		return new HashMap<>(interior);
+	}
+
+	/** How often it saw this join ("hopper>down above furnace>east"...): 0 if never. */
+	synchronized int rule(String key) {
+		return rules.getOrDefault(key, 0);
+	}
+
+	synchronized Map<String, Integer> rules() {
+		return new HashMap<>(rules);
 	}
 
 	/** A schematic built: into its experience. */

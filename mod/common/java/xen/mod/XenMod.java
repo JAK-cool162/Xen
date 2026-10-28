@@ -1243,6 +1243,20 @@ public class XenMod implements ModInitializer {
 									if (Schematic.list().contains(what) || what.endsWith(".litematic")) return buildSchematic(ctx, what);   // a schematic: the nearest Xen, at your feet
 									return each(ctx, c -> c.name + ": " + xen.mod.talk.Chat.plainly("Plan: " + c.builder.start(what), ""));
 								})))
+				.then(Commands.literal("study").then(Commands.argument("name", StringArgumentType.greedyString()).suggests((ctx, b) -> {
+									for (String w : Schematic.list()) b.suggest(w);
+									return b.buildFuture();
+								}).executes(ctx -> {                                       // learn from a schematic without building it: its style, its insides, how its machine joins
+									try {
+										String out = Studied.study(Schematic.load(StringArgumentType.getString(ctx, "name")), btbLearner);
+										btbLearner.save();
+										ctx.getSource().sendSuccess(() -> Component.literal("Xen " + out), false);
+										return 1;
+									} catch (IOException e) {
+										ctx.getSource().sendFailure(Component.literal("Couldn't read that schematic: " + e.getMessage()));
+										return 0;
+									}
+								})))
 				.then(Commands.literal("schematics").executes(ctx -> {             // what's in config/xen/schematics/
 					List<String> all = Schematic.list();
 					if (all.isEmpty()) {

@@ -665,6 +665,7 @@ final class Builder {
 		creative = c.player.isCreative();
 		design = null;
 		copied = null;
+		c.journal("learns", Studied.study(s, c.mod.btbLearner));                // (building it, it learns from it too)
 		String plan = begin(s.plan((ServerLevel) c.player.level(), origin), " from the schematic", "the schematic's");
 		schematic = s;
 		schematicAt = origin.immutable();
@@ -678,6 +679,8 @@ final class Builder {
 		beginning = false;
 		modeBefore = c.mode;
 		prepared = creative;
+		String nm = made.name();
+		if (nm.contains("house") || nm.contains("home") || nm.contains("cottage") || nm.contains("cabin")) made = Studied.furnish(made, c.mod.btbLearner.interior());   // (inside, the way it saw)
 		plan = made;
 		left.addAll(made.steps());
 		var box = new net.minecraft.world.phys.AABB(made.middle());
@@ -759,11 +762,16 @@ final class Builder {
 	/** The look: in creative one of the designed palettes (fitting where it is); in survival its own wood. */
 	private Architect.Palette palette(ServerLevel level, BlockPos feet) {
 		if (creative) {
+			var learned = c.mod.btbLearner.style(random);
+			if (learned != null && random.nextFloat() < 0.5f) return Studied.palette(learned.getKey(), learned.getValue(), true, woodType(), true, true);
 			String biome = level.getBiome(feet).unwrapKey().map(k -> k.identifier().getPath()).orElse("plains");
 			String[] fits = paletteFor(biome);
 			return Architect.PALETTES.get(fits[random.nextInt(fits.length)]);
 		}
 		var items = c.items();
+		var learned = c.mod.btbLearner.style(random);                         // a style it learned from a schematic, now and then (its own blocks, the same choices)
+		if (learned != null && random.nextFloat() < 0.6f)
+			return Studied.palette(learned.getKey(), learned.getValue(), false, woodType(), items.getOrDefault("cobblestone", 0) >= 24, count(n -> n.equals("glass_pane")) >= 6);
 		return Architect.ofWood(woodType(), items.getOrDefault("cobblestone", 0) >= 24, count(n -> n.equals("glass_pane")) >= 6);
 	}
 
