@@ -144,6 +144,16 @@ final class Crafter {
 		return count(n -> n.equals("diamond")) >= 3 && wood() >= woodForSticks + woodForTable;
 	}
 
+	/** The makings of its next pickaxe are in its bag, but not the wood for the sticks or a table. */
+	boolean shortOfWood() {
+		if (c.player == null) return false;
+		int tier = pickTier();
+		if (tier < 4 && count(n -> n.equals("diamond")) >= 3) return !canMake(4);
+		if (tier < 3 && count(n -> n.equals("iron_ingot")) >= 3) return !canMake(3);
+		if (tier == 1 && count(Crafter::isStoneMaterial) >= 3) return !canMake(2);
+		return false;
+	}
+
 	/** What it would make now, most needed first (null: nothing). */
 	private String wanted() {
 		int tier = pickTier();

@@ -1367,6 +1367,7 @@ public final class Companion {
 		}
 		Action hungry = starving();
 		if (hungry != null) return hungry;
+		btb.nightfall();
 		if (chores.busy()) {
 			Action chore = chores.next();
 			if (!chores.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = chores.doing;

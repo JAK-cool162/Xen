@@ -38,7 +38,7 @@ final class Btb {
 	private long taskAt;
 	private String stateAt = "";
 	private float hurtSince;
-	private int deathsAt, tierAt;
+	private int deathsAt, tierAt, ironAt;
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
@@ -77,7 +77,7 @@ final class Btb {
 		float d = c.danger();
 		return new Obs(c.crafter.pickTier(), p.getHealth(), p.getFoodData().getFoodLevel(), items.getOrDefault("food", 0),
 				p.level().isDarkOutside(), !p.level().canSeeSky(p.blockPosition().above()), d < 0.2f ? 0 : d < 0.6f ? 1 : 2, iron, raw, fuel,
-				items.getOrDefault("diamond", 0), items.getOrDefault("log", 0), items.getOrDefault("cobblestone", 0), c.chores.sheltered(),
+				items.getOrDefault("diamond", 0), items.getOrDefault("log", 0), items.getOrDefault("cobblestone", 0), c.chores.sheltered() || MindSense.enclosed(p),
 				p.level().dimension() == Level.OVERWORLD);
 	}
 
@@ -117,11 +117,12 @@ final class Btb {
 	/** The tasks that make sense now, with how much (the rules), most needed first. */
 	private List<Option> options(Obs o) {
 		List<Option> out = new ArrayList<>();
-		boolean dusk = o.night && !o.under && o.overworld;
+		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
 		if (dusk && !o.sheltered) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
 		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0)) out.add(new Option(Task.SMELT, 4, "raw iron to smelt"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
+		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));
@@ -144,6 +145,22 @@ final class Btb {
 			});
 		}
 		return out;
+	}
+
+	private long nightCheckedAt;
+
+	/**
+	 * The sun going down and it's out under the sky on wood, stone or food: that waits for the morning, a roof now.
+	 * (Mining goes on: it's under the ground in a few steps.) True if it dropped its task.
+	 */
+	boolean nightfall() {
+		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD || now() - nightCheckedAt < 40) return false;
+		nightCheckedAt = now();
+		var p = c.player;
+		if (p.level().dimension() != Level.OVERWORLD || !c.goals.sunDown() || MindSense.enclosed(p) || !p.level().canSeeSky(p.blockPosition().above())) return false;
+		c.journal("does", "btb: the sun's going down: drops " + task.name().toLowerCase(Locale.ROOT) + " for a roof");
+		c.chores.cancel();
+		return true;
 	}
 
 	/** Its next task (or null to let its other habits have the moment). */
@@ -189,6 +206,7 @@ final class Btb {
 		deathsAt = c.genDeaths;
 		tierAt = o.tier;
 		worthAt = worth();
+		ironAt = o.iron;
 		c.journal("thinks", String.format(Locale.ROOT, "btb: %s (%s; goal %s)", task.name().toLowerCase(Locale.ROOT), why, goal));
 		if (task == Task.EXPLORE) return c.goals.exploreStep();
 		return null;                                                                 // (its chore starts next tick)
@@ -198,7 +216,7 @@ final class Btb {
 	private String start(Task t, Obs o) {
 		Chores ch = c.chores;
 		return switch (t) {
-			case WOOD -> ch.gather("wood", o.tier == 0 ? 5 : 10);
+			case WOOD -> ch.gather("wood", o.tier == 0 ? 5 : 4);
 			case STONE -> ch.gather("stone", 16);
 			case COAL -> ch.mine(c.lessons.depth("coal", 40), "coal", 8);
 			case IRON -> ch.mine(c.lessons.depth("iron", 16), "iron", o.tier == 2 ? 3 : 10);
@@ -237,7 +255,8 @@ final class Btb {
 		boolean died = c.genDeaths > deathsAt;
 		double gained = worth() - worthAt;
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
-		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething());
+		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
+				|| task == Task.SMELT && o.iron > ironAt);
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
 				ok ? "worked" : "came to nothing", seconds, reward, died ? ", died" : ""));
