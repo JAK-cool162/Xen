@@ -3214,6 +3214,8 @@ public final class Companion {
 		return heldGoal;
 	}
 
+	private int straightUntil;
+
 	private Action walkTo(Goal g, Vec3 goal) {
 		if (g == null) goal = headingFor(goal);                         // (no changing its mind about where it's going every tick)
 		Action ore = oreOnTheWay();                                     // on its way: ore right there, it takes it (like a player would)
@@ -3223,12 +3225,20 @@ public final class Companion {
 			if (f != null) return f;
 		}
 		if (mod.config.pathAssist && btb.on()) {                             // Back to Basics: its way-finder gets it there (walking, digging, bridging, pillaring), no improvising
+			if (player.tickCount < straightUntil) {                           // (stuck just now: straight at it a moment, digging through, then a new way)
+				Action d = digToward(goal);
+				if (d != null) return d;
+			}
 			Action w = g != null ? walker.go(g) : walker.go(goal);
 			if (w != null && !walker.stuck()) return w;
 			if (w == null && player.position().distanceTo(goal) < 2) return digToward(goal);
-			if (walker.stuck()) walker.stop();                                // (no closer: a new way from where it is now, next tick)
-			if (w != null) return w;
-			return digToward(goal);                                          // (no way it knows of: straight there, digging through)
+			if (walker.stuck()) {                                            // (the same move failing: not again and again, for minutes)
+				walker.stop();
+				straightUntil = player.tickCount + 60;
+				journal("way", "stuck (" + (walker.lastProblem.isEmpty() ? "no closer" : walker.lastProblem) + "): straight at it, digging through, then a new way");
+			}
+			Action d = digToward(goal);                                      // (no way it knows of, or stuck: straight there, digging through)
+			return d != null ? d : w;
 		}
 		if (mod.config.pathAssist) {
 			if (solver.active()) {

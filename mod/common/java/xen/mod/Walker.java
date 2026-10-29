@@ -1595,6 +1595,10 @@ final class Walker {
 			return;
 		}
 		p.zza = 0;
+		if (p.getBoundingBox().intersects(new net.minecraft.world.phys.AABB(under).deflate(0.01))) {   // (its own body over the gap: the block won't go there; a step back first)
+			p.zza = -0.4f;
+			return;
+		}
 		if (c.hands.busy()) return;
 		int slot = -1;
 		String spare = c.hands.spareBlock();                                // (dirt before the stone it makes things of)

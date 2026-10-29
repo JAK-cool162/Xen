@@ -367,7 +367,7 @@ final class Btb {
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
 	boolean busy() {
-		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !c.player.level().isDarkOutside();   // (a look around: most of a minute)
+		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on);
 	}
 
