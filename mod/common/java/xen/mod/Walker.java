@@ -326,6 +326,13 @@ final class Walker {
 				XenMod.LOG.info("[walk] {} plan from {} to {} (goal {}, partial {}, moved {}, was {}): {}", c.name, p.blockPosition().toShortString(),
 						BlockPos.containing(to).toShortString(), want, partial, moved, was == null ? "-" : was.kind() + ">" + was.to().toShortString(), w);
 			}
+			if (longDive() && now() >= noDiveUntil) {                        // a long way under water: first a way through the rock round it (no ways under for a minute), then it decides
+				noDiveUntil = now() + 20 * 60;
+				c.journal("way", "a long way under water to " + BlockPos.containing(to).toShortString() + ": a way through the rock instead");
+				path = null;
+				release();
+				return null;
+			}
 			if (longDive()) {                                                  // a long way with its head under water and no air on it: it'd drown (it thinks first)
 				c.journal("way", "won't go: a long way under water to " + BlockPos.containing(to).toShortString());
 				lastProblem = "it's too far under water";
