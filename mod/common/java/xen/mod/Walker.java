@@ -843,7 +843,7 @@ final class Walker {
 		for (int[] dd : new int[][] {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}) {
 			BlockPos q = p.offset(dd[0], 0, dd[1]), a = p.offset(dd[0], 0, 0), b = p.offset(0, 0, dd[1]);
 			if ((floor(q) || water(q)) && passable(q) && passable(q.above()) && passable(a) && passable(a.above()) && passable(b) && passable(b.above())) {
-				add(water(q) ? Kind.SWIM : Kind.DIAGONAL, p, q, (water(q) ? SWIM : SPRINT) * 1.414 + danger(q), List.of());
+				add(water(q) ? Kind.SWIM : Kind.DIAGONAL, p, q, (water(q) ? SWIM : SPRINT) * 1.414 + danger(q) + under(q), List.of());
 			}
 		}
 		// up and down on the spot
@@ -1109,7 +1109,12 @@ final class Walker {
 		if (!water(p.above())) return 0;
 		var body = c.player;
 		if (body.getAirSupply() < body.getMaxAirSupply() / 2) noDiveUntil = now() + 600;   // (nearly out of air just now: no more ways under for 30 s)
-		return body.getAirSupply() < body.getMaxAirSupply() * 0.8 || now() < noDiveUntil ? INF : 30;
+		if (body.getAirSupply() < body.getMaxAirSupply() * 0.8 || now() < noDiveUntil) return INF;
+		for (int up = 2; up <= 4; up++) {                                     // air a stroke or two over its head: a dive it comes up from
+			BlockPos q = p.above(up);
+			if (!water(q)) return passable(q) ? 30 : INF;                      // (rock over the water, a flooded cave: no air to come up to)
+		}
+		return INF;                                                           // (deep water: too far up for air)
 	}
 
 	/** Till when it plans no way with its head under water (it ran short of air there). */
