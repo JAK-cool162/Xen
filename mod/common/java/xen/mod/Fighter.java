@@ -750,7 +750,7 @@ final class Fighter {
 				c.goals.instant = "out of the " + kind(shooter).replace('_', ' ') + "'s sight";
 				return cover;
 			}
-			noRun = true;
+			noRun = h.hasWeapon();                                               // (no weapon: its fists against arrows is how it died again and again; away, the old way)
 			return null;
 		}
 		double nearest = Double.MAX_VALUE;
@@ -760,7 +760,7 @@ final class Fighter {
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
 		}
-		noRun = true;                                                            // (no time to dig, nowhere better: it stands and fights, shield up between swings)
+		noRun = h.hasWeapon();                                                   // (no time to dig, nowhere better: it stands and fights, shield up between swings; with no weapon it gets away first, then digs in)
 		if (now() - standSaidAt > 400) {
 			standSaidAt = now();
 			c.journal("fight", String.format(java.util.Locale.ROOT, "%d at it, %.0f health%s: no time to dig in, it stands and fights", on, p.getHealth(), h.hasWeapon() ? "" : ", no weapon"));
