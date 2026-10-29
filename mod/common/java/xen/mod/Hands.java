@@ -466,7 +466,7 @@ public final class Hands {
 			limit = 2;                                                // nothing to mine there
 			return;
 		}
-		String unsafe = p.companion == null ? null : p.companion.choices.unsafeToBreak(pos);
+		String unsafe = p.companion == null || pos.equals(wayDig) ? null : p.companion.choices.unsafeToBreak(pos);
 		if (unsafe != null) {                                         // Xen 2.0's doubter: a hard no (lava behind it, a drop under its feet)
 			if (!pos.equals(cantMine)) p.companion.journal("chooses", "mine " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + ": no | doubter: " + unsafe);
 			cantMine = pos.immutable();
@@ -724,6 +724,9 @@ public final class Hands {
 
 	/** This dig may go on without seeing the block (a builder boxed in by its own walls: set from blindOk when it starts). */
 	private boolean digBlind;
+
+	/** The block its way-finder is digging through (it weighed it already): no doubter on that one. */
+	BlockPos wayDig;
 
 	boolean mine(BlockPos pos) {
 		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange()) return false;

@@ -60,8 +60,6 @@ final class Walker {
 	private long badSince;
 	/** For /xen status and the journal: what it's doing on its way, and what went wrong last. */
 	String doing = "", lastProblem = "";
-	/** When it last turned a way down because it was too long under water. */
-	long diveRefusedAt = -1000;
 	private String journaled = "";
 
 	/** The blocks it walked on lately, and when: a new plan doesn't go back over them unless it has to (no back and forth). */
@@ -325,22 +323,6 @@ final class Walker {
 				for (int i = 0; i < Math.min(path.size(), 12); i++) w.append(path.get(i).kind()).append('>').append(path.get(i).to().toShortString()).append("; ");
 				XenMod.LOG.info("[walk] {} plan from {} to {} (goal {}, partial {}, moved {}, was {}): {}", c.name, p.blockPosition().toShortString(),
 						BlockPos.containing(to).toShortString(), want, partial, moved, was == null ? "-" : was.kind() + ">" + was.to().toShortString(), w);
-			}
-			if (longDive() && now() >= noDiveUntil) {                        // a long way under water: first a way through the rock round it (no ways under for a minute), then it decides
-				noDiveUntil = now() + 20 * 60;
-				c.journal("way", "a long way under water to " + BlockPos.containing(to).toShortString() + ": a way through the rock instead");
-				path = null;
-				release();
-				return null;
-			}
-			if (longDive()) {                                                  // a long way with its head under water and no air on it: it'd drown (it thinks first)
-				c.journal("way", "won't go: a long way under water to " + BlockPos.containing(to).toShortString());
-				lastProblem = "it's too far under water";
-				badSince = now();
-				diveRefusedAt = now();
-				path = null;
-				release();
-				return null;
 			}
 			String plan = summary();
 			if (!plan.equals(journaled)) c.journal("way", path.size() + " moves to " + BlockPos.containing(to).toShortString() + ": " + plan);
@@ -1237,6 +1219,7 @@ final class Walker {
 			c.player.setSprinting(false);
 			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(b)) > c.player.blockInteractionRange()) break;   // closer first
 			doing = "digging through";
+			c.hands.wayDig = b.immutable();                                   // (its way-finder already weighed this block: water, lava, gravel; no second no)
 			if (!c.hands.mine(b)) {
 				problem(m, "can't dig " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(b).getBlock()).getPath());
 				return false;
@@ -1260,18 +1243,6 @@ final class Walker {
 		}
 		drive(m);
 		return true;
-	}
-
-	/** Twelve moves or more in a row with its head under water (no air on the way): a dive it wouldn't come back from. */
-	private boolean longDive() {
-		int run = 0;
-		for (int i = index; i < path.size(); i++) {
-			Move m = path.get(i);
-			if (m.kind() == Kind.SWIM && wet(m.to().above())) {
-				if (++run >= 12) return true;
-			} else run = 0;
-		}
-		return false;
 	}
 
 	/** The far end of the first long swim on its way (a lake, a sea: 24 swims or more in a row; a river it just swims), or null. */

@@ -2058,7 +2058,7 @@ final class Chores {
 				doing = "picking up " + fetchDrop.replace('_', ' ');
 				return c.stepTo(drop.position());
 			}
-			boolean noWay = now() - c.walker.diveRefusedAt < 2 && now() - fetchAt > 40 || now() - fetchAt > 20 * 180;   // (too long under water to get there, or three minutes on this one: the next)
+			boolean noWay = now() - fetchAt > 20 * 180;   // (three minutes on this one: the next)
 			if (noWay) c.journal("way", "lets the " + fetchKind.replace('_', ' ') + " at " + pickupAt.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
 			if (!noWay && fetchMatch.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath())) {
 				doing = String.format(java.util.Locale.ROOT, "getting %s (%d of %d)", fetchDrop.replace('_', ' '), countItem(fetchDrop) - had, fetchWant);
@@ -2949,7 +2949,7 @@ final class Chores {
 			oreBest = gap;
 			oreBestAt = now();
 			oreBestKind = kind;
-		} else if (now() - oreBestAt > 300 || now() - c.walker.diveRefusedAt < 2 && now() - oreBestAt > 20) {   // fifteen seconds and no closer (walled off), or the way there is too long under water: the next one
+		} else if (now() - oreBestAt > 300) {   // fifteen seconds and no closer (walled off): the next one
 			c.journal("way", "lets the " + kind + " at " + nearest.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
 			c.hunch.taken(nearest);
 			skip.add(Perception.Beliefs.key(nearest.getX(), nearest.getY(), nearest.getZ()));
