@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -40,7 +40,23 @@ final class Btb {
 	private String stateAt = "";
 	private float hurtSince;
 	private int deathsAt, tierAt, ironAt, enchantStuffAt;
-	private long enchantFrom, enchantSkipUntil;
+	private long enchantFrom, enchantSkipUntil, netherFrom, netherSkipUntil;
+	private int rodsAt, pearlsAt;
+
+	/** Blaze rods (as powder for the eyes: one rod, two) and ender pearls for twelve eyes of ender, counting the eyes it has. */
+	private int rods() {
+		var it = c.items();
+		return 2 * it.getOrDefault("blaze_rod", 0) + it.getOrDefault("blaze_powder", 0) + it.getOrDefault("ender_eye", 0);
+	}
+
+	private int pearls() {
+		var it = c.items();
+		return it.getOrDefault("ender_pearl", 0) + it.getOrDefault("ender_eye", 0);
+	}
+
+	private boolean netherNeeds() {
+		return rods() < 12 || pearls() < 12;
+	}
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
@@ -93,6 +109,7 @@ final class Btb {
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
 		else if ((!tabled || !enchantedSomething()) && now() >= enchantSkipUntil) goal = "enchant";
+		else if (netherNeeds() && now() >= netherSkipUntil) goal = "nether";   // (blaze rods and ender pearls: the eyes for the End)
 		else if (c.goals.home == null && c.mod.config.wants) goal = "home";
 		else goal = "world";
 		if (goal.equals("enchant") && !was.equals("enchant")) enchantFrom = now();
@@ -101,6 +118,12 @@ final class Btb {
 			goal = c.goals.home == null && c.mod.config.wants ? "home" : "world";
 			c.journal("thinks", "btb: no enchanting after a quarter of an hour: " + goal + " first, the enchanting again later");
 		}
+		if (goal.equals("nether") && !was.equals("nether")) netherFrom = now();
+		if (goal.equals("nether") && now() - netherFrom > 20 * 60 * 25) {        // (nearly half an hour of it: the rest first, again later)
+			netherSkipUntil = now() + 20 * 60 * 20;
+			goal = c.goals.home == null && c.mod.config.wants ? "home" : "world";
+			c.journal("thinks", "btb: no blaze rods and pearls after twenty-five minutes: " + goal + " first, the Nether again later");
+		}
 		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
 	}
 
@@ -108,6 +131,7 @@ final class Btb {
 		return switch (goal) {
 			case "gear" -> o.tier >= 4 && c.goals.diamondsWanted() == 0;
 			case "enchant" -> enchantedSomething();
+			case "nether" -> !netherNeeds();
 			case "home" -> c.goals.home != null;
 			default -> false;
 		};
@@ -150,6 +174,10 @@ final class Btb {
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
+		if (goal.equals("nether")) {
+			if (rods() < 12) out.add(new Option(Task.BLAZE, 3.6f, "blaze rods: a fortress in the Nether"));
+			if (pearls() < 12) out.add(new Option(Task.PEARLS, rods() < 12 ? 3.3f : 3.7f, "ender pearls: endermen"));
+		}
 		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && !goal.equals("home") && !diamondsToGet)
 			out.add(new Option(Task.HOME, 0.9f, "nothing pressing: a home of its own (its mind's design)"));   // (its job has nothing on: its mind builds)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
@@ -174,6 +202,7 @@ final class Btb {
 		if ((o.night || c.goals.sunDown()) && o.overworld && !o.under) {        // the sun down: only what's done under a roof or under the ground
 			out.removeIf(op -> switch (op.task) {
 				case SHELTER, SMELT, ENCHANT, COAL, IRON, DIAMONDS -> false;
+				case PEARLS -> false;                                            // (endermen are out at night: in its diamond armor, that's when)
 				case STONE -> !o.sheltered;
 				default -> true;
 			});
@@ -261,6 +290,8 @@ final class Btb {
 		worthAt = worth();
 		ironAt = o.iron;
 		enchantStuffAt = enchantStuff();
+		rodsAt = rods();
+		pearlsAt = pearls();
 		c.journal("thinks", String.format(Locale.ROOT, "btb: %s (%s; goal %s)", task.name().toLowerCase(Locale.ROOT), why, goal));
 		if (task == Task.EXPLORE) return c.goals.exploreStep();
 		return null;                                                                 // (its chore starts next tick)
@@ -282,6 +313,8 @@ final class Btb {
 			case TABLE -> tableStep();
 			case HOME -> c.builder.start("home");
 			case SMELTER -> c.builder.start("smelter");
+			case BLAZE -> c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
+			case PEARLS -> c.chores.slay("enderman", "ender_pearl", 12 - pearls(), "ender pearls");
 			case EXPLORE -> "You will look around.";
 			case NONE -> null;
 		};
@@ -358,7 +391,8 @@ final class Btb {
 		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null
-				|| task == Task.TABLE && enchantStuff() > enchantStuffAt) && !dropped;
+				|| task == Task.TABLE && enchantStuff() > enchantStuffAt
+				|| task == Task.BLAZE && rods() > rodsAt || task == Task.PEARLS && pearls() > pearlsAt) && !dropped;
 		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
