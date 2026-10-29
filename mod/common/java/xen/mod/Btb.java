@@ -118,6 +118,7 @@ final class Btb {
 	/** The tasks that make sense now, with how much (the rules), most needed first. */
 	private List<Option> options(Obs o) {
 		List<Option> out = new ArrayList<>();
+		boolean diamondsToGet = goal.equals("gear") && o.tier >= 3 && o.diamonds < c.goals.diamondsWanted();   // (diamond gear still to get: the smelter and a home wait)
 		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
 		if (dusk && !o.sheltered) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
@@ -131,7 +132,6 @@ final class Btb {
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));
-		boolean diamondsToGet = goal.equals("gear") && o.tier >= 3 && o.diamonds < c.goals.diamondsWanted();
 		if (diamondsToGet) {                                                      // the iron pickaxe: straight for diamonds (its armor is diamond, not iron first)
 			boolean spare = c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2;
 			if (o.tier == 3 && c.crafter.pickWorn() < 0.2 && !spare) {         // (a pickaxe nearly gone and no spare: the iron for one first, not a trip it breaks on)
