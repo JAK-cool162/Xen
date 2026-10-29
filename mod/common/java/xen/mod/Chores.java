@@ -907,6 +907,11 @@ final class Chores {
 	Action next() {
 		if (kind == null) return null;
 		if (fruitless()) return null;
+		if (kind == Kind.MINE && "diamonds".equals(tripWhat) && c.crafter.pickTier() == 3 && c.crafter.pickWorn() < 0.08
+				&& c.crafter.count(n -> n.equals("iron_pickaxe")) <= 1) {       // (its pickaxe all but gone, no spare: up for iron, not on till it breaks down there)
+			finish("My pickaxe is nearly worn out. Iron for a new one first.");
+			return null;
+		}
 		progress();
 		if (now() > until && kind != Kind.HIDE) {
 			if (now() - progressAt < stallTicks()) {                          // still getting somewhere: on with it, as long as it takes
@@ -2566,7 +2571,7 @@ final class Chores {
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
 			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
-			if (!wanted && (c.guide.leading() || onOreWay()) && (JUNK.contains(k) || k.equals("cobblestone") || k.equals("cobbled_deepslate")) && count("cobblestone") + countItem("cobbled_deepslate") + countItem("dirt") >= 8) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls)
+			if (!wanted && (c.guide.leading() || onOreWay()) && (JUNK.contains(k) || k.equals("cobblestone") || k.equals("cobbled_deepslate")) && count("cobblestone") + countItem("cobbled_deepslate") + countItem("dirt") >= 24) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls, once it has enough to stop water)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
 				break;

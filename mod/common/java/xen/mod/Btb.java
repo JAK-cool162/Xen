@@ -124,24 +124,26 @@ final class Btb {
 		boolean smelter = c.chores.smelterAt() != null;
 		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
-		if (!smelter && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
+		if (!smelter && !diamondsToGet && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));
-		if (goal.equals("gear") && o.tier >= 3) {
-			boolean diamonds = c.goals.readyForDiamonds() || o.iron + o.raw >= 24;
-			if (!diamonds) out.add(new Option(Task.IRON, 3.5f, "iron for armor and a shield"));
-			else if (o.diamonds < c.goals.diamondsWanted()) out.add(new Option(Task.DIAMONDS, 3.5f, "diamonds (a diamond pickaxe, a sword, armor)"));
+		boolean diamondsToGet = goal.equals("gear") && o.tier >= 3 && o.diamonds < c.goals.diamondsWanted();
+		if (diamondsToGet) {                                                      // the iron pickaxe: straight for diamonds (its armor is diamond, not iron first)
+			boolean spare = c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2;
+			if (o.tier == 3 && c.crafter.pickWorn() < 0.2 && !spare) {         // (a pickaxe nearly gone and no spare: the iron for one first, not a trip it breaks on)
+				if (o.iron + o.raw < 3) out.add(new Option(Task.IRON, 4.1f, "iron for a new pickaxe (this one is nearly worn out)"));
+			} else out.add(new Option(Task.DIAMONDS, 3.9f, "diamonds (a diamond pickaxe, a sword, armor)"));
 		}
 		if (goal.equals("enchant")) {
 			if (c.enchanter.possible()) out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
-		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && !goal.equals("home"))
+		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && !goal.equals("home") && !diamondsToGet)
 			out.add(new Option(Task.HOME, 0.9f, "nothing pressing: a home of its own (its mind's design)"));   // (its job has nothing on: its mind builds)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
 		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
