@@ -39,7 +39,8 @@ final class Btb {
 	private long taskAt;
 	private String stateAt = "";
 	private float hurtSince;
-	private int deathsAt, tierAt, ironAt;
+	private int deathsAt, tierAt, ironAt, enchantStuffAt;
+	private long enchantFrom, enchantSkipUntil;
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
@@ -91,9 +92,15 @@ final class Btb {
 		boolean geared = o.tier >= 4 && c.goals.diamondsWanted() == 0;
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
-		else if (!tabled || !enchantedSomething()) goal = "enchant";
+		else if ((!tabled || !enchantedSomething()) && now() >= enchantSkipUntil) goal = "enchant";
 		else if (c.goals.home == null && c.mod.config.wants) goal = "home";
 		else goal = "world";
+		if (goal.equals("enchant") && !was.equals("enchant")) enchantFrom = now();
+		if (goal.equals("enchant") && now() - enchantFrom > 20 * 60 * 15) {      // a quarter of an hour on it and nothing enchanted: on with the rest, again in twenty minutes
+			enchantSkipUntil = now() + 20 * 60 * 20;
+			goal = c.goals.home == null && c.mod.config.wants ? "home" : "world";
+			c.journal("thinks", "btb: no enchanting after a quarter of an hour: " + goal + " first, the enchanting again later");
+		}
 		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
 	}
 
@@ -253,6 +260,7 @@ final class Btb {
 		tierAt = o.tier;
 		worthAt = worth();
 		ironAt = o.iron;
+		enchantStuffAt = enchantStuff();
 		c.journal("thinks", String.format(Locale.ROOT, "btb: %s (%s; goal %s)", task.name().toLowerCase(Locale.ROOT), why, goal));
 		if (task == Task.EXPLORE) return c.goals.exploreStep();
 		return null;                                                                 // (its chore starts next tick)
@@ -271,7 +279,7 @@ final class Btb {
 			case FOOD -> ch.hunt(3);
 			case SHELTER -> shelterOrPlanB(o);
 			case ENCHANT -> c.enchanter.start();
-			case TABLE -> c.nether.go("table", 0);
+			case TABLE -> tableStep();
 			case HOME -> c.builder.start("home");
 			case SMELTER -> c.builder.start("smelter");
 			case EXPLORE -> "You will look around.";
@@ -290,6 +298,38 @@ final class Btb {
 			return dig;
 		}
 		return plan;
+	}
+
+	/** What it has toward an enchanting table and enchanting: leather, sugar cane, paper, books, lapis, obsidian, a table. */
+	private int enchantStuff() {
+		var it = c.items();
+		return it.getOrDefault("leather", 0) + it.getOrDefault("sugar_cane", 0) + it.getOrDefault("paper", 0) + 3 * it.getOrDefault("book", 0)
+				+ it.getOrDefault("lapis_lazuli", 0) + 2 * it.getOrDefault("obsidian", 0) + 20 * it.getOrDefault("enchanting_table", 0)
+				+ (c.enchanter.table() != null ? 20 : 0);
+	}
+
+	/**
+	 * Toward its enchanting table, one step at a time, by its plans (the recipe tree): the book first (leather from a cow,
+	 * sugar cane into paper), lapis to enchant with, then the obsidian trip (made from lava if it has to) and the table.
+	 */
+	private String tableStep() {
+		var it = c.items();
+		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
+		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
+		if (it.getOrDefault("lapis_lazuli", 0) < 3) {
+			String lapis = planFor("lapis_lazuli", 3, "lapis to enchant with");
+			if (lapis.startsWith("You will")) return lapis;
+		}
+		return c.nether.go("table", 0);
+	}
+
+	/** The next step of its plan for this (the recipe tree works out what's missing): started, "You will ...", or why not. */
+	private String planFor(String item, int n, String why) {
+		if (!item.equals(c.plans.goal)) c.plans.setGoal(item, n, null);
+		Plans.Step s = c.plans.advice();
+		if (s == null) return "no way to " + item.replace('_', ' ') + " it knows of";
+		if (c.plans.start(s.option)) return "You will " + s.says() + " (" + why + ").";
+		return "can't now: " + s.says();
 	}
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
@@ -317,7 +357,8 @@ final class Btb {
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
 		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
-				|| task == Task.SMELTER && c.chores.smelterAt() != null) && !dropped;
+				|| task == Task.SMELTER && c.chores.smelterAt() != null
+				|| task == Task.TABLE && enchantStuff() > enchantStuffAt) && !dropped;
 		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
