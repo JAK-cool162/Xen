@@ -341,7 +341,7 @@ final class Fighter {
 				h.watching = foe;
 				c.goals.instant = "shield up to the hissing creeper";
 				p.setSprinting(false);
-				return Action.BACK;
+				return ledgeBehind(p, foe) ? Action.LEFT : Action.BACK;             // (a drop behind it: sideways, not backwards off the edge)
 			}
 			if (d < 3 && p.getAttackStrengthScale(0.5f) > 0.9f && d <= p.entityInteractionRange()) {
 				sTap = 6;                                                      // a hit knocks it back (then away: back, till it stops hissing)
@@ -725,7 +725,7 @@ final class Fighter {
 			h.watching = foe;
 			p.setSprinting(false);
 			c.goals.instant = "out of the creeper's blast";
-			return Action.BACK;
+			return ledgeBehind(p, foe) ? Action.LEFT : Action.BACK;
 		}
 		if (Companion.archer(foe) && !c.reachable(foe)) {
 			Action cover = takeCover(foe);
@@ -769,6 +769,23 @@ final class Fighter {
 	}
 
 	private int standSaidAt = -1000;
+
+	/** Backing away from it, a step behind: a drop of more than three blocks, or lava (it died backing off a ledge from a creeper). */
+	private static boolean ledgeBehind(XenPlayer p, LivingEntity from) {
+		double dx = p.getX() - from.getX(), dz = p.getZ() - from.getZ(), len = Math.max(0.01, Math.hypot(dx, dz));
+		var level = p.level();
+		for (double step : new double[] {0.8, 1.6}) {
+			net.minecraft.core.BlockPos q = net.minecraft.core.BlockPos.containing(p.getX() + dx / len * step, p.getY(), p.getZ() + dz / len * step);
+			boolean ground = false;
+			for (int k = 0; k <= 3 && !ground; k++) {
+				net.minecraft.core.BlockPos b = q.below(k + 1);
+				if (level.getFluidState(b).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+				ground = !level.getBlockState(b).getCollisionShape(level, b).isEmpty() || !level.getFluidState(b).isEmpty();
+			}
+			if (!ground) return true;
+		}
+		return false;
+	}
 
 	/** Dug in and none in sight (the roof is on): it stays down there till they've gone, not back out into them. */
 	Action stayDug() {
