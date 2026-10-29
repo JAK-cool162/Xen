@@ -2909,6 +2909,13 @@ final class Chores {
 		return busy() && now() - oreWalkAt < 100;
 	}
 
+	/** Water within two blocks of it (it sits in or by an aquifer, a flooded cave): no way there but a swim. */
+	private static boolean byWater(ServerLevel level, BlockPos o) {
+		for (BlockPos q : BlockPos.betweenClosed(o.offset(-2, -1, -2), o.offset(2, 2, 2)))
+			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
+		return false;
+	}
+
 	private Action knownOre(String kind, int got, int want) {
 		var p = c.player;
 		ServerLevel level = (ServerLevel) p.level();
@@ -2916,7 +2923,9 @@ final class Chores {
 		if (!kind.equals(knownKind) || now() - knownAt > 100 || known.isEmpty()) {
 			knownKind = kind;
 			knownAt = now();
-			known = new ArrayList<>(c.hunch.oresNear(kind, feet, 128, 160, 12));
+			known = new ArrayList<>(c.hunch.oresNear(kind, feet, 128, 160, 48));
+			known.removeIf(o -> byWater(level, o));                               // (deep aquifers: a diamond in the water is a long dive it won't take; the dry ones first)
+			if (known.size() > 12) known = new ArrayList<>(known.subList(0, 12));
 		}
 		known.removeIf(o -> !level.getBlockState(o).getBlock().getDescriptionId().contains(kind) || skip.contains(Perception.Beliefs.key(o.getX(), o.getY(), o.getZ())));
 		if (known.isEmpty()) return null;
