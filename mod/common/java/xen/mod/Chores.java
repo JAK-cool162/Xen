@@ -1552,17 +1552,21 @@ final class Chores {
 				intoHill = false;
 			} else {
 				doing = "going to its mine";
-				if (caveMode && c.player.isInWater()) {                         // a cave under a lake: not one it can get to dry
+				if (c.player.isInWater()) {                                      // a cave under a lake, its mine across one: not one it can get to dry
 					if (wetSince < 0) wetSince = now();
 					else if (now() - wetSince > 200) {
-						c.caves.done(toMine);
-						c.journal("thinks", "the cave at " + toMine.toShortString() + " is under water: its own mine instead");
+						if (caveMode) c.caves.done(toMine);
+						else {
+							c.places.forget("mine");
+							mineRecordY = Integer.MIN_VALUE;
+						}
+						c.journal("thinks", (caveMode ? "the cave at " : "its mine at ") + toMine.toShortString() + " is past water: a new mine somewhere drier");
 						wetSince = -1;
 						int left = Math.max(1, want - (count(items) - had));
-						mine(mineY, tripWhat, left);                               // (the trip again, without that cave)
+						mine(mineY, tripWhat, left);                               // (the trip again, without that cave or mine)
 						return null;
 					}
-				} else if (!c.player.isInWater()) wetSince = -1;
+				} else wetSince = -1;
 				c.run(c.player.blockPosition().distSqr(toMine) > 400);
 				Action a = c.walkTo(Vec3.atBottomCenterOf(toMine));
 				if (a == null) toMine = null;                                     // (no way there: it digs where it is)
