@@ -1157,10 +1157,7 @@ final class Walker {
 			BlockPos n = p.relative(d);
 			var f = level.getFluidState(n);
 			if (f.is(FluidTags.LAVA)) return INF;                               // lava anywhere by it
-			if (f.is(FluidTags.WATER)) {
-				if (d == Direction.UP || f.isSource()) return INF;                // water over it (even running), or a source by it
-				if (level.getFluidState(n.below()).isEmpty()) return INF;         // running water by it that would run in (not just down)
-			}
+			if (f.is(FluidTags.WATER)) return INF;                              // water by it, any (it would run in: no mining into water)
 			if (d != Direction.UP && (cell(n) & K_FALLING) != 0 && !passable(n) && passable(n.below())) return INF;   // sand or gravel by it with nothing under: it'd come down
 		}
 		if ((cell(p.above()) & K_FALLING) != 0 && !passable(p.above())) return INF;
