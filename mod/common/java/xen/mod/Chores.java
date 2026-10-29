@@ -2827,7 +2827,8 @@ final class Chores {
 				working = t.immutable();
 				workingSince = now();
 			} else if (now() - workingSince > (c.player.level().getBlockState(t).is(net.minecraft.world.level.block.Blocks.OBSIDIAN)
-					|| c.player.level().getBlockState(t).is(net.minecraft.tags.BlockTags.DIAMOND_ORES) ? 1200 : 300)) {   // (obsidian takes its time: ten seconds with a diamond pickaxe, more in water; a diamond is worth a minute, what it picks up on the way included)
+					|| c.player.level().getBlockState(t).is(net.minecraft.world.level.block.Blocks.DIAMOND_ORE)
+					|| c.player.level().getBlockState(t).is(net.minecraft.world.level.block.Blocks.DEEPSLATE_DIAMOND_ORE) ? 1200 : 300)) {   // (obsidian takes its time: ten seconds with a diamond pickaxe, more in water; a diamond is worth a minute, what it picks up on the way included)
 				working = null;
 				c.journal("does", "gives up on the block at " + t.toShortString() + " (can't get at it)");
 				return giveUp(t);
