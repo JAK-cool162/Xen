@@ -538,7 +538,8 @@ final class Nether {
 			return null;
 		}
 		ServerLevel level = (ServerLevel) c.player.level();
-		if (now() > visibleTriedAt && visible("obsidian", 16) != null) {
+		boolean pourFirst = has("water_bucket") && !inNether() && visibleLava(20) != null;   // (obsidian by a lava lake: lava under it and round it, every block; Cid plugged one side, found lava on the next, left it, four minutes. Water first, as players do: then it's safe to mine)
+		if (now() > visibleTriedAt && !pourFirst && visible("obsidian", 16) != null) {
 			visibleTriedAt = now() + 20 * 60;                                    // (not straight back to it if it couldn't get at it: the lava and its bucket next)
 			c.chores.mineFor("obsidian", "obsidian", obsidianWanted() - obsidian(), "obsidian");
 			c.chores.own = true;
