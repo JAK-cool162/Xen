@@ -675,7 +675,7 @@ final class Fighter {
 			Action snack = snack(foe);
 			return snack != null ? snack : idle();
 		}
-		boolean walker = !(foe instanceof Player) && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && !archer(foe)
+		boolean walker = !(foe instanceof Player) && !(foe instanceof net.minecraft.world.entity.monster.Creeper) && !archer(foe) && !shoots(kind(foe))   // (a witch's potions, a blaze's fire: a shield up and waiting is no defense, and they don't come to it; Ann waited, shield up, two harming potions, dead)
 				&& foe instanceof net.minecraft.world.entity.Mob mob && mob.getTarget() == p;
 		if (walker && unsure() && d < 7 && h.carries("shield") && h.raiseShield()) {   // defense first: a monster on its way to it, shield up, let it come
 			h.watching = foe;
