@@ -1237,7 +1237,8 @@ final class Chores {
 		BlockPos entrance = c.places.get("mine");
 		toMine = null;
 		BlockPos at = c.player.blockPosition();
-		if (entrance != null && !c.player.level().canSeeSky(at.above()) && at.getY() < entrance.getY() - 4) {   // down in it already (the last trip ended down here): on from here, not back up to the top of its stairs
+		boolean tooDeep = what.contains("coal") && at.getY() < y - 16;          // (coal: next to none down in the deepslate; Ann dug for it at y -23, three trips, iron each time)
+		if (entrance != null && !c.player.level().canSeeSky(at.above()) && at.getY() < entrance.getY() - 4 && !tooDeep) {   // down in it already (the last trip ended down here): on from here, not back up to the top of its stairs
 			mineY = y;
 			if (at.getY() <= y + 1) mineBase = at;
 			stairHead = at;

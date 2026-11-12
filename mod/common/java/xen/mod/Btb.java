@@ -39,7 +39,7 @@ final class Btb {
 	private long taskAt;
 	private String stateAt = "";
 	private float hurtSince;
-	private int deathsAt, tierAt, ironAt, enchantStuffAt, levelAt;
+	private int deathsAt, tierAt, ironAt, fuelAt, enchantStuffAt, levelAt;
 	private int rodsAt, pearlsAt;
 
 	/** Blaze rods (as powder for the eyes: one rod, two) and ender pearls for twelve eyes of ender, counting the eyes it has. */
@@ -314,6 +314,7 @@ final class Btb {
 		tierAt = o.tier;
 		worthAt = worth();
 		ironAt = o.iron;
+		fuelAt = o.fuel;
 		enchantStuffAt = enchantStuff();
 		levelAt = c.player.experienceLevel;
 		rodsAt = rods();
@@ -436,7 +437,7 @@ final class Btb {
 		boolean died = c.genDeaths > deathsAt;
 		double gained = worth() - worthAt;
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
-		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
+		boolean ok = !died && (task == Task.COAL ? o.fuel > fuelAt : gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null
 				|| task == Task.TABLE && (enchantStuff() > enchantStuffAt || c.player.experienceLevel > levelAt)
