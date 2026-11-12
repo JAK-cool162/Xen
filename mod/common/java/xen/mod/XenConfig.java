@@ -159,9 +159,10 @@ public final class XenConfig {
 	public boolean friendlyFire = true;
 	/**
 	 * Chat is local: what a player (or a Xen) says reaches only those within chatRange blocks (2 chunks), and only the
-	 * Xens that close hear it, so someone nearby can overhear (a spy). Off: chat reaches the whole server.
+	 * Xens that close hear it, so someone nearby can overhear (a spy). Off (the default): chat reaches the whole server,
+	 * and a Xen hears what's said to it from anywhere (its own small talk is still only heard close by).
 	 */
-	public boolean localChat = true;
+	public boolean localChat = false;
 	/** How far local chat (and local death messages) carry, in blocks (32 = 2 chunks). */
 	public int chatRange = 32;
 	/** Death messages reach only those within chatRange blocks of where it happened (this turns the show_death_messages game rule off). */

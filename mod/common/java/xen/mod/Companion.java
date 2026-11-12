@@ -3667,7 +3667,7 @@ public final class Companion {
 		if (way.equals("this way")) return null;                                 // ("come this way": follow)
 		int far = m.group(1) == null ? -1 : Math.min(400, Integer.parseInt(m.group(1)));
 		ServerLevel level = (ServerLevel) player.level();
-		boolean near = from != null && from.level() == player.level() && from.distanceTo(player) < 48;
+		boolean near = from != null && from.level() == player.level();   // (heard from anywhere: their way, wherever they are)
 		double yaw = switch (way) {                                              // (Minecraft: south is +z, yaw 0)
 			case "north" -> 180;
 			case "south" -> 0;
@@ -3676,11 +3676,7 @@ public final class Companion {
 			default -> near ? from.getYRot() : player.getYRot();
 		};
 		BlockPos target = null;
-		if (far < 0 && near && (way.contains("there") || way.equals("yonder"))) {   // "over there": the spot they're looking at
-			Vec3 eye = from.getEyePosition(), to = eye.add(from.getLookAngle().scale(160));
-			var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.ANY, from));
-			if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) target = hit.getBlockPos().above();
-		}
+		if (far < 0 && (way.contains("there") || way.equals("yonder"))) target = spotMeant(from, "there");   // "over there": the spot they're looking at, however far off they are
 		if (target == null) {
 			double d = far > 0 ? far : 30;
 			d *= 0.92 + 0.16 * random().nextDouble();                           // (about that far)
@@ -3697,6 +3693,22 @@ public final class Companion {
 		journal("does", "goes " + (far > 0 ? "about " + far + " blocks " : "") + way + ", as it was told");
 		return far > 0 ? pick3("Okay, about " + far + " that way.", "On it, " + far + " blocks or so.", "Sure, heading " + (way.contains("th") && !way.contains("there") ? way : "that way") + ".")
 				: way.contains("there") || way.equals("yonder") ? pick3("Over there? On my way.", "Okay, going there.", "Sure, over there.") : pick3("Okay, that way.", "Heading " + way + ".", "Sure.");
+	}
+
+	/**
+	 * The spot someone means by "here" or "there": here (over here, right here, by me) is where they stand, there (over
+	 * there, that spot, yonder) where they're looking (the block their eyes are on, 160 blocks at most; nothing in the
+	 * way: 24 blocks along their look). Null if they named no spot, or they're in another world.
+	 */
+	BlockPos spotMeant(ServerPlayer from, String words) {
+		if (from == null || player == null || from.level() != player.level()) return null;
+		String w = words.toLowerCase(java.util.Locale.ROOT);
+		if (w.matches("(?s).*\\b(over here|right here|here|by me|next to me)\\b.*")) return from.blockPosition();
+		if (!w.matches("(?s).*\\b(over there|right there|there|that spot|yonder)\\b.*")) return null;
+		Vec3 eye = from.getEyePosition(), to = eye.add(from.getLookAngle().scale(160));
+		var hit = from.level().clip(new net.minecraft.world.level.ClipContext(eye, to, net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.ANY, from));
+		if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) return hit.getBlockPos().relative(hit.getDirection());
+		return BlockPos.containing(eye.add(from.getLookAngle().scale(24)));
 	}
 
 	/** Off to a place it knows ("the cave", "home"): where, how far; or that it doesn't know one. */
@@ -4383,7 +4395,7 @@ public final class Companion {
 		long floor = switch (mod.config.talkAmount) {
 			case "quiet" -> 120_000L;
 			case "chatty" -> 20_000L;
-			default -> 45_000L;
+			default -> 90_000L;                                                   // (a line every minute and a half at most: no chatter over every little thing)
 		};
 		return Math.max(floor, personality.chatterGapMillis());
 	}
@@ -4403,8 +4415,16 @@ public final class Companion {
 		if (ownSaid.size() > 200) ownSaid.values().removeIf(t -> now - t > 300_000);
 		ownSaid.put(key, now);
 		lastChatter = now;
-		say(text);
+		smallTalk = !always && !talking;
+		try {
+			say(text);
+		} finally {
+			smallTalk = false;
+		}
 	}
+
+	/** What it's saying now is its own small talk (heard close by only). */
+	private boolean smallTalk;
 
 	/** What it said lately (the meaning, numbers aside) and when: it doesn't say the same thing again for a while. */
 	private final java.util.Map<String, Long> ownSaid = new java.util.HashMap<>();
@@ -4500,7 +4520,10 @@ public final class Companion {
 		}
 		text = typed(text);
 		Component line = Component.literal("<" + name + "> " + text);
-		if (mod.config.localChat && player != null) {                     // local chat: only those close by hear it
+		if (smallTalk && player != null) {                                 // small talk (its own, about simple things): only those close by hear it, not the whole server
+			for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer) && p.level() == player.level() && p.distanceTo(player) <= 48) p.sendSystemMessage(line);
+			XenMod.LOG.info("<{}> {} (small talk)", name, text);
+		} else if (mod.config.localChat && player != null) {               // local chat: only those close by hear it
 			for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer) && mod.inRange(p, player)) p.sendSystemMessage(line);
 			XenMod.LOG.info("<{}> {} (local chat)", name, text);
 		} else {
@@ -5293,8 +5316,9 @@ public final class Companion {
 					asked = null;
 					resumeAsked = false;
 					mode = Mode.STAY;
-					anchor = player.blockPosition();
-					plan = "You will stay here.";
+					BlockPos meant = spotMeant(from, words);
+					anchor = meant != null ? meant : player.blockPosition();
+					plan = meant != null && !meant.closerThan(player.blockPosition(), 3) ? "You will go to " + meant.toShortString() + " and stay there." : "You will stay here.";
 				}
 				case "explore" -> {
 					chores.cancel();
@@ -5342,7 +5366,7 @@ public final class Companion {
 				}
 				case "build" -> plan = r.thing().equals("upgrade") ? builder.upgrade()
 						: r.thing().startsWith("statue") ? builder.statue(r.thing().substring(Math.min(r.thing().length(), 7)), from)
-						: r.thing().equals("farm") ? farmer.start() : builder.start(r.thing());
+						: r.thing().equals("farm") ? farmer.start() : spotMeant(from, words) != null ? builder.startNear(r.thing(), spotMeant(from, words)) : builder.start(r.thing());
 				case "quest" -> plan = switch (r.thing()) {
 					case "nether" -> nether.go(nether.inNether() ? "home" : "visit", 0);
 					case "blaze" -> nether.go("blaze", Math.max(1, r.amount() > 0 ? r.amount() : 6));
