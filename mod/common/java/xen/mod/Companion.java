@@ -233,6 +233,7 @@ public final class Companion {
 		if (player != null) {
 			hands.keepTool();                                           // (mid-dig: the tool it picked is what it holds, whatever else went on this tick)
 			instinct.tick();                                            // (and a clear danger over everything)
+			LiveView.tick(this);                                        // (its view and how it is, once a second, if config/xen/live is there)
 		}
 	}
 
@@ -4799,6 +4800,7 @@ public final class Companion {
 
 	/** A line in the journal (the Experimental tab's log): what it sees, thinks, says, how it goes. */
 	void journal(String kind, String text) {
+		LiveView.journaled(name, kind, text);                           // (watched live: config/xen/live)
 		if (mod.config.journal && mod.journal != null) mod.journal.add(name, kind, text);
 	}
 
