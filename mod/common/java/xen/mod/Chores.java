@@ -1217,6 +1217,8 @@ final class Chores {
 		debrisHunt = what.equals("debris");
 		if (debrisHunt) set(new int[] {Blocks.GOLD}, new String[] {"ancient_debris"}, "ancient debris", "ancient debris");   // (the Nether: and gold on the way)
 		else if (what.equals("diamonds")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.GOLD, Blocks.COAL}, new String[] {"diamond"}, "diamonds", "diamond ore");
+		else if (what.equals("lapis")) set(new int[] {Blocks.DIAMOND, Blocks.IRON, Blocks.COAL}, new String[] {"lapis_lazuli"}, "lapis", "lapis ore");   // (for its enchanting table: the lapis it knows of, ore on the way)
+		else if (what.equals("coal")) set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal ore");   // (coal it was sent for: with an iron pickaxe this was an iron trip, coal never counted)
 		else if (tier >= 3) set(new int[] {Blocks.IRON, Blocks.GOLD, Blocks.COAL, Blocks.DIAMOND}, new String[] {"raw_iron"}, "iron", "iron ore");
 		else if (tier == 2) set(new int[] {Blocks.IRON, Blocks.COAL}, new String[] {"raw_iron"}, "iron", "iron ore");
 		else set(new int[] {Blocks.COAL}, new String[] {"coal"}, "coal", "coal ore");
@@ -1620,7 +1622,7 @@ final class Chores {
 		}
 		int got = count(items) - had;
 		if (got >= want || "diamonds".equals(what) && c.btb.on() && countItem("diamond") >= c.goals.diamondsWanted()) {   // (diamonds: all it still needs in its bag, whatever it made of the rest meanwhile)
-			finish("I got " + Math.max(got, countItem("diamond")) + " " + what + "! Heading back up.");
+			finish("I got " + ("diamonds".equals(what) ? Math.max(got, countItem("diamond")) : got) + " " + what + "! Heading back up.");
 			return null;
 		}
 		if (what.equals("iron") && c.crafter.pickTier() == 2 && count("raw_iron") + countItem("iron_ingot") >= 3 && dropToPickUp() == null) {
@@ -1645,7 +1647,7 @@ final class Chores {
 			return reach(bonus);
 		}
 		if (c.mod.config.luck >= 2 && !debrisHunt && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {   // knowing everything: straight to the ore it knows of
-			Action a = knownOre(what.equals("diamonds") ? "diamond" : what.equals("iron") ? "iron" : "coal", got, want);
+			Action a = knownOre("diamonds".equals(tripWhat) ? "diamond" : "lapis".equals(tripWhat) ? "lapis" : "coal".equals(tripWhat) ? "coal" : what.equals("iron") ? "iron" : "coal", got, want);
 			if (a != null) return a;
 		}
 		int[] seek = mineCats();

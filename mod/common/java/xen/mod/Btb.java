@@ -380,8 +380,8 @@ final class Btb {
 		var it = c.items();
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (it.getOrDefault("lapis_lazuli", 0) < 3) {                          // (down there after its diamonds: the lapis and the obsidian first, the book's up on the surface)
-			String lapis = planFor("lapis_lazuli", 3, "lapis to enchant with");
-			if (lapis.startsWith("You will")) return lapis;
+			String lapis = c.chores.mine(c.lessons.depth("lapis", 0), "lapis", 3);   // (a mining trip to the lapis it knows of: the fetch walked at one 128 blocks off, ten minutes, none)
+			if (lapis != null && lapis.startsWith("You will")) return lapis + " (lapis to enchant with)";
 		}
 		if (!tabled && it.getOrDefault("obsidian", 0) < 4) {
 			String obsidian = c.nether.go("table", 0);
