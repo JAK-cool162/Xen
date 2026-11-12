@@ -190,9 +190,9 @@ final class Btb {
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
-		else if (o.tier >= 2 && o.overworld && !o.under && goal.equals("gear") && woodInBag() < 8 && now() - packedWoodAt > 20 * 60 * 10)
+		else if (o.tier >= 2 && o.overworld && !o.under && !o.night && goal.equals("gear") && woodInBag() < 8 && now() - packedWoodAt > 20 * 60 * 10)
 			out.add(new Option(Task.WOOD, 4.4f, "a few logs before it goes down (sticks for a new pickaxe, a table, fuel for its furnace)"));   // (like a player: Bob's pickaxe broke at the bottom of his mine, no wood on him, no way to make another)
-		else if (o.tier >= 1 && o.overworld && woodInBag() == 0 && bag.getOrDefault("crafting_table", 0) == 0 && now() - packedWoodAt > 20 * 60 * 10)
+		else if (o.tier >= 1 && o.overworld && !o.night && woodInBag() == 0 && bag.getOrDefault("crafting_table", 0) == 0 && now() - packedWoodAt > 20 * 60 * 10)   // (not at night: Bob went up for wood in the dark, skeletons, a zombie, a spider)
 			out.add(new Option(Task.WOOD, 4.0f, "no wood at all: no table, no sticks, no furnace (up for some)"));   // (Ann, none on her: three minutes twice trying to make a furnace)
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0 && !tabling) out.add(new Option(Task.COAL, 4, "iron and nothing to smelt it with"));
