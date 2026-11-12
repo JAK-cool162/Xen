@@ -494,7 +494,8 @@ public final class Hands {
 		digSlot = p.getInventory().getSelectedSlot();
 		digItem = p.getInventory().getItem(digSlot).getItem();
 		progress = 0;
-		limit = 200;                                                  // give up after 10 seconds
+		float dry = state.getDestroyProgress(p, level, pos) * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1);   // (as fast as it goes standing on dry ground)
+		limit = ticks + Math.max(200, Math.min(1200, (int) Math.ceil(1.3f / Math.max(dry, 1e-4f)) + 10));   // give up after ten seconds, or a third longer than the block takes: obsidian takes 9.4 s with a diamond pickaxe, and a tick or two off the ground went past ten every time (Cid dug at his obsidian four minutes, over and over from nothing)
 		habitCrouch = ModHabits.wants("mine", BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getPath(), "crouch");   // (a habit it was taught for a mod: a tree feller, a vein miner)
 		if (habitCrouch) p.setShiftKeyDown(true);
 		p.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, face(),

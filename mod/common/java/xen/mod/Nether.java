@@ -504,6 +504,19 @@ final class Nether {
 
 	private long lavaSaidAt = -10000;
 
+	/** Where it poured water on lava for obsidian, and when. */
+	private BlockPos pouredTop;
+	private long pouredTopAt;
+
+	/**
+	 * Water it poured on lava for its obsidian (five minutes): left there while it mines (each hole fills, the lava under
+	 * turns too, nothing drops in the lava), not taken back up for a fall (Cid poured, made obsidian, and his bucket habit
+	 * had the water back a second later; four minutes, none mined).
+	 */
+	boolean keepsWater(BlockPos q) {
+		return pouredTop != null && now() - pouredTopAt < 20 * 60 * 5 && q.closerThan(pouredTop, 6);
+	}
+
 	/** Lava by some it couldn't get to (six blocks round): the same pool, not tried again. */
 	private boolean triedLava(BlockPos r) {
 		for (BlockPos b : badLava) if (b.closerThan(r, 6)) return true;
@@ -672,6 +685,8 @@ final class Nether {
 			c.goals.instant = "pouring water on the lava";
 			c.hands.pour(top, Direction.UP);
 			pouredAt = now();
+			pouredTop = top.immutable();
+			pouredTopAt = now();
 			c.acted = true;
 			return Action.PLACE;
 		}
