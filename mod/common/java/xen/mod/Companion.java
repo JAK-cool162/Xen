@@ -1048,6 +1048,7 @@ public final class Companion {
 			if (!openWater(level, feet)) return null;
 			Vec3 going = walker.goal();
 			if (going != null && going.distanceTo(player.position()) < 24 && XenMod.surface(level, (int) Math.floor(going.x), (int) Math.floor(going.z)) != null) return null;   // (crossing to land close by)
+			if (btb.on() && walker.active() && !walker.stuck()) return null;     // (Back to Basics: its way-finder planned this swim, it goes on with it)
 			if (mode == Mode.FOLLOW && leader != null) {
 				ServerPlayer l = server.getPlayerList().getPlayer(leader);
 				if (l != null && l.isInWater() && l.distanceTo(player) < 16) return null;   // (its friend is swimming: it keeps up)
