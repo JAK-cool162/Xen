@@ -491,6 +491,22 @@ Speed (decisions) and **Experimental**:
 The full list of requests, settings and phone launchers (Zalith Launcher 2,
 PojavLauncher, Amethyst) is in [`dist/README.md`](dist/README.md).
 
+#### Watching a Xen live (no Minecraft open)
+
+On a server with nobody on it (a test run, a headless server), you can still see what each Xen is up to.
+Make the folder `config/xen/live` on the server. About once a second, each Xen then writes a picture of what it
+sees there, with its health, gear, goal, what it's doing and the last lines of its journal. The picture is drawn
+on the server from the blocks and mobs in front of its eyes: block colours and the game's shading, no textures.
+Delete the folder to turn it off. To watch, run the page that comes with the repo and open http://localhost:8765:
+
+```bash
+mkdir <server>/config/xen/live
+python3 scripts/liveview/serve.py <server>/config/xen/live
+```
+
+It also shows how the Xens' eyes (Xen Glance) are learning as they play. That learning is kept in
+`config/xen/glance_learned.json`: delete it to start again from the model that comes with the mod.
+
 #### Evolution: 30 days in real Minecraft
 
 With evolution on, every few days the worst quarter of the ownerless Xens
