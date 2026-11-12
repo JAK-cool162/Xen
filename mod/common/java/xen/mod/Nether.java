@@ -481,10 +481,10 @@ final class Nether {
 			c.journal("thinks", "knows of a lava pool by water at " + wetOne.toShortString() + ": its obsidian's there or soon will be");
 			return wetOne;
 		}
-		BlockPos open = openDry != null ? openDry : openAny;                     // (72 open to the air, 46 dry, and "none it could stand by": Ann and Bob stood about)
-		if (open != null) {
-			c.journal("thinks", "knows of lava open to the air at " + open.toShortString() + ": close enough to pour on will do");
-			return open;
+		BlockPos airy = openDry != null ? openDry : openAny;                     // (72 open to the air, 46 dry, and "none it could stand by": Ann and Bob stood about)
+		if (airy != null) {
+			c.journal("thinks", "knows of lava open to the air at " + airy.toShortString() + ": close enough to pour on will do");
+			return airy;
 		}
 		if (now() - lavaSaidAt > 1200) {
 			lavaSaidAt = now();
