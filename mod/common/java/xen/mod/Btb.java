@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -59,6 +59,8 @@ final class Btb {
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
 	private long visitLookedAt = -100_000;
+	/** When it could first sleep this night, on its way to bed (-1: not yet). */
+	private long sleepFrom = -1;
 	private boolean visitThere;
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
 	String goal = "gear";
@@ -177,6 +179,9 @@ final class Btb {
 		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
 		boolean digsIn = diamondsToGet && o.tier >= 3 && o.health >= 14 && o.meals > 0;   // (night, an iron pickaxe, well and fed: down its staircase is its roof, and the diamonds are down there; Cid hid in a hole ten minutes)
 		if (dusk && !o.sheltered && !digsIn) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
+		boolean bed = c.items().keySet().stream().anyMatch(n -> n.endsWith("_bed"));
+		if ((dusk || o.night) && bed && o.overworld && !o.under && now() >= notBefore.getOrDefault(Task.SLEEP, 0L))
+			out.add(new Option(Task.SLEEP, 5.5f, "night, a bed in its bag: down in it (no night out in the open, and the night's over sooner)"));   // (most of its deaths were at night)
 		boolean hurtNoFood = o.meals == 0 && o.food < 18 && o.health <= 12;     // (hurt, under 18 it doesn't heal, nothing to eat: food comes first; Ann at five health went after diamonds, then coal, ten minutes)
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
@@ -377,6 +382,7 @@ final class Btb {
 			case PEARLS -> c.chores.slay("enderman", "ender_pearl", 12 - pearls(), "ender pearls");
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
+			case SLEEP -> "You will sleep in your bed.";
 			case NONE -> null;
 		};
 	}
@@ -436,6 +442,18 @@ final class Btb {
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
 	boolean busy() {
+		if (task == Task.SLEEP) {                                                 // (the night in its bed; half a minute and not asleep, something else: no room for it, monsters about)
+			if (c.player.isSleeping()) return true;
+			long day = Compat.timeOfDay(c.player.level()) % 24000;
+			boolean bedTime = day >= 12600 && day <= 23400;                          // (when a bed can be slept in)
+			if (bedTime && sleepFrom < 0) sleepFrom = now();
+			if (!bedTime && !c.goals.evening() || sleepFrom >= 0 && now() - sleepFrom > 20 * 30) {
+				sleepFrom = -1;
+				notBefore.put(Task.SLEEP, now() + 20 * 60 * 2);
+				return false;
+			}
+			return true;
+		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || task == Task.VISIT && c.visits.visiting());
 	}
