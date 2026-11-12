@@ -1133,7 +1133,7 @@ final class Walker {
 	/** Lava next to the way, a drop into the void: it keeps well clear. */
 	private double danger(BlockPos p) {
 		double d = nightSky && level.canSeeSky(p.above()) ? 6 : 0;
-		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 40;
+		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 300;   // (lava by its way: well round it, like Baritone; a slip or a shove there is death)
 		if ((cell(p.below()) & K_SICK) != 0) d += 30;                       // sulfur gas makes you sick
 		return d;
 	}

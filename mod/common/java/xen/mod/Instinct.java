@@ -136,8 +136,24 @@ final class Instinct {
 		return s.getCollisionShape(level, q).isEmpty() && !s.getFluidState().is(FluidTags.LAVA) && !s.is(Blocks.FIRE) && !s.is(Blocks.SOUL_FIRE);
 	}
 
+	/** When it last poured its water in the lava. */
+	private int pouredAt = -1000;
+
 	private String outOfLava(ServerLevel level) {
 		var p = c.player;
+		if (p.tickCount - pouredAt > 40) {                                   // its water bucket on it, like a player: the lava round it turns to stone, the fire goes out
+			int slot = c.hands.hotbar(st -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals("water_bucket"));
+			if (slot >= 0) {
+				pouredAt = p.tickCount;
+				c.hands.stop();
+				p.getInventory().setSelectedSlot(slot);
+				p.setXRot(90f);
+				c.hands.pitch = -1;
+				p.gameMode.useItem(p, level, p.getInventory().getSelectedItem(), net.minecraft.world.InteractionHand.MAIN_HAND);
+				Compat.swing(p);
+				c.journal("instinct", "in the lava: pours its water on it");
+			}
+		}
 		BlockPos to = safeStep(level, true);
 		p.setJumping(true);                                            // (in lava, space is what keeps you up)
 		p.setShiftKeyDown(false);
