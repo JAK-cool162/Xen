@@ -510,7 +510,7 @@ final class Walker {
 		}
 		int top = Math.max(1, maxGap), tt = moveTries[Kind.PARKOUR.ordinal()][top], tf = moveFails[Kind.PARKOUR.ordinal()][top];
 		if (maxGap >= 1 && maxGap < 3 && tt >= 6 && tf * 10 < tt && h >= 14 && fear < 0.4f) maxGap++;
-		if (now() - badSince > 400) bad.clear();                           // (old troubles forgotten)
+		if (now() - badSince > 1200) bad.clear();                          // (old troubles forgotten, after a minute)
 	}
 
 	/** What a block it puts down costs it ({@link #placeWorth}), and whether the stone it digs is stone it wants. */
@@ -658,7 +658,9 @@ final class Walker {
 				best = n;
 			}
 			for (Move m : moves(n.pos, n.placedFloor, blocks - n.placed)) {
-				double cost = m.cost() * (bad.isEmpty() ? 1 : 1 + bad.get(key(m)) * 4) * back(m.to(), target);
+				int failedHere = bad.isEmpty() ? 0 : bad.get(key(m));
+				if (failedHere >= 2) continue;                                       // (the same move failed twice right here: not that one again, a way round)
+				double cost = m.cost() * (1 + failedHere * 4) * back(m.to(), target);
 				if (cost >= INF) continue;
 				long nk = m.to().asLong();
 				Node next = nodes.get(nk);
