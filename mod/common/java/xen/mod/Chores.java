@@ -3089,22 +3089,22 @@ final class Chores {
 
 	/** The block it's putting blocks in the lava round (to mine it), and how many so far. */
 	private BlockPos plugTarget;
-	private int plugs;
+	private int lavaPlugs;
 
 	private Action mine(BlockPos b) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		boolean quenched = level.getBlockState(b).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) && level.getFluidState(b.above()).is(net.minecraft.tags.FluidTags.WATER);   // (obsidian with water running over it: the hole fills with water, the lava by it turns to obsidian too)
 		if (!b.equals(plugTarget)) {
 			plugTarget = b.immutable();
-			plugs = 0;
+			lavaPlugs = 0;
 		}
 		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {   // lava right behind it (a player hears it pop, sees it drip): a block in the lava first, as players do; none to put: leave it
 			if (!quenched && d != net.minecraft.core.Direction.DOWN && level.getFluidState(b.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) {
 				BlockPos lava = b.relative(d);
 				String spare = c.hands.spareBlock();
-				if (spare != null && plugs < 8 && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(lava)) <= c.player.blockInteractionRange() - 0.3
+				if (spare != null && lavaPlugs < 8 && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(lava)) <= c.player.blockInteractionRange() - 0.3
 						&& c.hands.placeItem(lava, st -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals(spare), b, d, -1)) {
-					plugs++;
+					lavaPlugs++;
 					c.journal("does", "puts a block in the lava by the block at " + b.toShortString() + ", then mines it");
 					c.acted = true;
 					return Action.IDLE;
