@@ -569,7 +569,18 @@ final class Nether {
 			}
 			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(water)) > 2.5) {   // (right by it: water it found by knowing, not by sight, may be behind a wall from four blocks off)
 				fillSince = -1;
-				return c.walkTo(Vec3.atBottomCenterOf(water));
+				if (!water.equals(walkWaterAt)) {
+					walkWaterAt = water.immutable();
+					walkWaterSince = now();
+				} else if (now() - walkWaterSince > 20 * 20) {                   // twenty seconds and not up to it yet: other water (Cid walked at water out in the sea for three and a half minutes)
+					badWater.add(water.immutable());
+					farWaterLooked = -100_000;
+					walkWaterAt = null;
+					c.journal("thinks", "can't get up to the water at " + water.toShortString() + ": other water");
+					return null;
+				}
+				BlockPos shore = shoreBy(level, water);                          // (to the dry ground beside it, not into it)
+				return c.walkTo(Vec3.atBottomCenterOf(shore != null ? shore : water));
 			}
 			if (fillSince < 0 || !water.equals(fillAt)) {
 				fillSince = now();
@@ -651,13 +662,26 @@ final class Nether {
 			if (!level.isLoaded(q)) continue;
 			var f = level.getFluidState(q);
 			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir() || badWater.contains(q)) continue;
-			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
+			if (best != null && q.distSqr(feet) >= best.distSqr(feet) || shoreBy(level, q) == null) continue;   // (water with dry ground beside it to stand on: the edge of a pond, not the middle of the sea)
+			best = q.immutable();
 		}
 		farWaterAt = best;
 		if (best != null) c.journal("thinks", "water for its bucket at " + best.toShortString());
 		return best;
 	}
 
+	/** Dry ground beside this water to stand on and fill a bucket from (null: none, it's out in the water). */
+	private static BlockPos shoreBy(net.minecraft.world.level.Level level, BlockPos water) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos n = water.relative(d);
+			if (level.getFluidState(n).isEmpty() && level.getBlockState(n).getCollisionShape(level, n).isEmpty() && level.getBlockState(n.above()).getCollisionShape(level, n.above()).isEmpty()
+					&& level.getBlockState(n.below()).isFaceSturdy(level, n.below(), net.minecraft.core.Direction.UP) && level.getFluidState(n.below()).isEmpty()) return n.immutable();
+		}
+		return null;
+	}
+
+	private BlockPos walkWaterAt;
+	private long walkWaterSince;
 	private BlockPos farWaterAt;
 	private long farWaterLooked = -100_000;
 	/** Water its bucket wouldn't fill at (behind something), where it's filling now, since when. */
