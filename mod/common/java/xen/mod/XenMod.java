@@ -130,6 +130,7 @@ public class XenMod implements ModInitializer {
 		journal = new Journal(configDir.resolve("xen").resolve("logs"));
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
 		duels = new Duels(configDir.resolve("xen").resolve("duels"));
+		xen.mod.talk.Rive.folder(configDir.resolve("xen").resolve("rivescript"));   // its chat scripts: the mod's, and yours there
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
 			xen.mod.talk.Banter.init(configDir.resolve("xen"));              // its talk model: what kind of line players say, and the answers (and which land)

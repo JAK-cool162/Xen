@@ -19,6 +19,8 @@ dependencies {
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 	modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+	implementation("com.rivescript:rivescript-core:0.11.0") { transitive = false }   // its chat scripts (RiveScript, MIT): pure Java, 80 KB; slf4j comes with Minecraft
+	include "com.rivescript:rivescript-core:0.11.0"
 	modLocalRuntime "com.terraformersmc:modmenu:${project.modmenu_version}"   // only in test runs (./gradlew runClient)
 	testImplementation "junit:junit:4.13.2"
 }

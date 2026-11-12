@@ -5530,6 +5530,14 @@ public final class Companion {
 				return null;
 			}
 		}
+		if (plan == null && r.intent().equals("chat")) {                     // its scripts (RiveScript): replies written for it (the mod's, and yours in config/xen/rivescript)
+			String scripted = xen.mod.talk.Rive.reply(name + "|" + who, talkFacts(from), words);
+			if (scripted != null) {
+				journal("thinks", "its script: " + scripted);
+				say(scripted);
+				return null;
+			}
+		}
 		if (plan == null && r.intent().equals("chat") && said != null && !(grammar != null && aboutAThing(grammar))) {   // its talk model: a player's answer to a player
 			xen.mod.talk.Banter.Answer a = banter.answer(who, said, player.level().getGameTime());
 			journal("thinks", "talk model: " + banter.lastHeard + (a == null ? " (not sure: the rest of its chat answers)" : " -> " + a.id()));
@@ -5672,6 +5680,36 @@ public final class Companion {
 
 	/** Its talk model: what kind of line a player said, and a player's answer, true to it (see {@link xen.mod.talk.Banter}). */
 	final xen.mod.talk.Banter banter = new xen.mod.talk.Banter(new BanterSelf(), new java.util.Random());
+
+	/** What its chat scripts may use: its name, who's talking, what it's doing, its health, its gear, its goal, the time, where it is. */
+	private Map<String, String> talkFacts(ServerPlayer from) {
+		Map<String, String> f = new HashMap<>();
+		BanterSelf self = new BanterSelf();
+		f.put("name", name);
+		f.put("player", from == null ? "you" : from.getName().getString());
+		f.put("doing", self.doing());
+		f.put("place", self.place());
+		f.put("mood", emotions.mood());
+		if (player != null) {
+			f.put("health", String.valueOf((int) player.getHealth()));
+			f.put("food", String.valueOf(player.getFoodData().getFoodLevel()));
+			f.put("time", player.level().isDarkOutside() ? "night" : "day");
+		}
+		f.put("diamonds", String.valueOf(items().getOrDefault("diamond", 0)));
+		int tier = crafter.pickTier();
+		f.put("pick", tier >= 5 ? "netherite" : tier == 4 ? "diamond" : tier == 3 ? "iron" : tier == 2 ? "stone" : tier == 1 ? "wood" : "none");
+		f.put("goal", switch (btb.goal) {
+			case "gear" -> "diamond gear";
+			case "enchant" -> "enchanting my gear";
+			case "nether" -> "blaze rods and ender pearls in the nether";
+			case "home" -> "building a home";
+			case "world" -> "exploring";
+			default -> "not sure yet";
+		});
+		f.put("owner", ownerName == null ? "none" : ownerName);
+		f.put("home", goals.home == null ? "none" : goals.home.getX() + " " + goals.home.getY() + " " + goals.home.getZ());
+		return f;
+	}
 
 	/** What its talk knows of it, all true, all now. */
 	private final class BanterSelf implements xen.mod.talk.Banter.Self {
