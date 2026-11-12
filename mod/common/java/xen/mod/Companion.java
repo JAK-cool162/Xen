@@ -916,7 +916,18 @@ public final class Companion {
 				}
 			}
 		}
-		if (step == null) return airPocket(level, start);
+		if (step == null) {
+			Vec3 flow = level.getFluidState(start).getFlow(level, start);   // no air it can find: with the current (it runs from where the water got in, back toward the open)
+			if (flow.horizontalDistanceSqr() > 1.0E-4 && player.getAirSupply() < player.getMaxAirSupply() / 2) {
+				goals.instant = "swimming with the current";
+				player.setSprinting(true);
+				player.setShiftKeyDown(false);
+				hands.steer = player.position().add(flow.x * 3, 0, flow.z * 3);
+				hands.face(player.getEyePosition().add(flow.x, 0, flow.z));
+				return Action.FORWARD;
+			}
+			return airPocket(level, start);
+		}
 		goals.instant = "swimming to air";
 		hands.steer = Vec3.atBottomCenterOf(step);
 		if (step.getY() < start.getY()) {                              // the way out starts down (under the edge of the roof): it dives
@@ -2875,10 +2886,11 @@ public final class Companion {
 
 	private Action pickUpNearby() {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
+		boolean stocked = btb.on() && (chores.busy() || nether.busy()) && walker.blocks() >= 32;   // (on its way with blocks enough: the stone it digs through stays lying, no stopping for every piece)
 		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
 		double bestScore = 0, currentScore = 0;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
-				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && x.getOwner() != player && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
+				x -> x.isAlive() && !leftLying.contains(x.getUUID()) && x.getOwner() != player && !(stocked && CHEAP.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())) && (WORTH.contains(BuiltInRegistries.ITEM.getKey(x.getItem().getItem()).getPath())
 						|| x.getItem().isDamageableItem() || sharing.expected(x.getItem()) || minedIt(x)))) {   // (a tool or armor lying there too; what a friend just tossed to it; what it mined; never what it threw itself)
 			if (!player.hasLineOfSight(e)) continue;
 			double score = Math.max(pickValue(e.getItem()), minedIt(e) ? 1 : 0) / (1 + 0.25 * e.distanceTo(player));   // the best first, then the nearest

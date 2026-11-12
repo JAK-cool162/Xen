@@ -783,7 +783,7 @@ final class Walker {
 			// walk (or swim) across, digging through what's in the way
 			if (floor(q) || water(q)) {
 				double br = breaks(q.above()) + breaks(q);
-				if (br < INF) add(water(q) || inWater ? Kind.SWIM : Kind.WALK, p, q, (water(q) ? SWIM : SPRINT) + br + danger + door(q) + under(q) + (farmland(q) ? 8 : 0),
+				if (br < INF) add(water(q) || inWater ? Kind.SWIM : Kind.WALK, p, q, (water(q) ? SWIM : SPRINT) + br + danger + door(q) + under(q) + flowing(q) + (farmland(q) ? 8 : 0),
 						br > 0 ? List.of(q.above(), q) : List.of());
 			}
 			// jump up a block (digging a staircase up if need be: over its head, then the two above the step)
@@ -843,7 +843,7 @@ final class Walker {
 		for (int[] dd : new int[][] {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}}) {
 			BlockPos q = p.offset(dd[0], 0, dd[1]), a = p.offset(dd[0], 0, 0), b = p.offset(0, 0, dd[1]);
 			if ((floor(q) || water(q)) && passable(q) && passable(q.above()) && passable(a) && passable(a.above()) && passable(b) && passable(b.above())) {
-				add(water(q) ? Kind.SWIM : Kind.DIAGONAL, p, q, (water(q) ? SWIM : SPRINT) * 1.414 + danger(q) + under(q), List.of());
+				add(water(q) ? Kind.SWIM : Kind.DIAGONAL, p, q, (water(q) ? SWIM : SPRINT) * 1.414 + danger(q) + under(q) + flowing(q), List.of());
 			}
 		}
 		// up and down on the spot
@@ -1115,6 +1115,11 @@ final class Walker {
 			if (!water(q)) return passable(q) ? 30 : INF;                      // (rock over the water, a flooded cave: no air to come up to)
 		}
 		return INF;                                                           // (deep water: too far up for air)
+	}
+
+	/** Running water (not a still pool, a sea or a river): it pushes a body off its way, so the way goes round it (Baritone's rule). */
+	private double flowing(BlockPos p) {
+		return water(p) && !level.getFluidState(p).isSource() ? 20 : 0;
 	}
 
 	/** Till when it plans no way with its head under water (it ran short of air there). */
