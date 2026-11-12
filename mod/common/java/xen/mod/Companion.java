@@ -4460,10 +4460,39 @@ public final class Companion {
 			}
 		}
 		if (best == null) return;
+		boolean falling = !player.onGround() && player.getDeltaMovement().y < 0 && player.fallDistance > 0;
+		int sinceJump = player.tickCount - auraJumpAt;
+		if (!falling && sinceJump > 14 && critJumpOk()) {                       // a jump first: the swing on the way down is a critical hit (x1.5), as players do
+			auraJumpAt = player.tickCount;
+			player.setJumping(true);
+			return;
+		}
+		if (!falling && sinceJump <= 14 && !player.onGround()) return;           // up in the air, still rising: the swing on the way down
+		if (sinceJump <= 14 && player.onGround() && sinceJump < 3) return;      // (the jump's on its way)
+		if (falling) player.setSprinting(false);                                 // (a crit wants no sprint)
+		player.setJumping(false);
 		player.attack(best);
 		Compat.swing(player);
 		hands.lastHit = best;
 		hands.lastHitAt = player.level().getGameTime();
+	}
+
+	private int auraJumpAt = -100;
+
+	/**
+	 * A jump for a crit here is safe and does something: on the ground, not in water, lava or on a ladder, not sneaking
+	 * (bridging, at an edge), not pillaring, room over its head, and solid ground all round its feet (no drop to jump into).
+	 */
+	private boolean critJumpOk() {
+		if (!player.onGround() || player.isInWater() || player.isInLava() || player.onClimbable() || player.isShiftKeyDown() || pillaring || fighting) return false;
+		var level = player.level();
+		BlockPos feet = player.blockPosition();
+		if (!level.getBlockState(feet.above(2)).getCollisionShape(level, feet.above(2)).isEmpty()) return false;   // (a ceiling: no jump to speak of)
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			BlockPos under = feet.below().relative(d);
+			if (level.getBlockState(under).getCollisionShape(level, under).isEmpty() || !level.getFluidState(under).isEmpty()) return false;
+		}
+		return true;
 	}
 
 	private LivingEntity foe() {

@@ -59,8 +59,9 @@ async function poll(){try{const r=await fetch('xens',{cache:'no-store'});const d
  setTabs(names);for(const n of names)draw(n,d[n])}catch(e){}setTimeout(poll,1000)}poll();
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
 function exam(d){const x=document.getElementById('exam');if(!d||!d.heads){x.replaceChildren();return}x.replaceChildren();
- x.append(el('h2','',"Its eyes' exam (Xen Glance)"),el('div','sub','Each new picture is a test before it learns from it: what it guessed against what was really there. '+(d.status||'')));
- const qs=el('div','qs');for(const h of d.heads){const q=el('div','q');q.append(el('b','',h.question+'?'));
+ x.append(el('h2','',"Its eyes' exam (Xen Glance)"),el('div','sub','Each new picture is a test before it learns from it: what it guessed against what was really there. Balanced: the last 100 times each thing was there and the last 300 it wasn\'t, kept apart, so rare things count. '+(d.status||'')));
+ const qs=el('div','qs');const bal=(c,t,f,n)=>t&&n?Math.round(((c/t)+(1-f/n))/2*100)+'%':'–';for(const h of d.heads){const q=el('div','q');q.append(el('b','',h.question+'?'));
+  q.append(el('div','n',`balanced score ${bal(h.caught,h.there,h.falseAlarms,h.notThere)}`),el('div','vs',`the mod's own: ${bal(h.caughtMods,h.there,h.falseAlarmsMods,h.notThere)} (50% is guessing, 100% is perfect)`));
   q.append(el('div','n',`caught ${h.caught} of ${h.there} (${pct(h.caught,h.there)})`),el('div','vs',`the mod's own: ${h.caughtMods} (${pct(h.caughtMods,h.there)})`),
    el('div','n',`false alarms ${h.falseAlarms} of ${h.notThere} (${pct(h.falseAlarms,h.notThere)})`),el('div','vs',`the mod's own: ${h.falseAlarmsMods} (${pct(h.falseAlarmsMods,h.notThere)})`));qs.append(q)}
  x.append(qs);const ps=el('div','pics');const names=d.heads.map(h=>h.question);

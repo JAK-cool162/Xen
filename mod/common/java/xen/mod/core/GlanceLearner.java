@@ -162,9 +162,14 @@ public final class GlanceLearner {
 	}
 
 	// ------------------------------------------------------------------------------------------------ its exam
-	/** The last few hundred new pictures, each a question per head: what was there, what each Glance said (yes over a half). */
-	private final boolean[][] examTruth = new boolean[FAIR][], examShipped = new boolean[FAIR][], examLearned = new boolean[FAIR][];
-	private int examAt, examN;
+	/**
+	 * Its exam, balanced: for each question (head), the last hundred pictures where it was there and the last three
+	 * hundred where it wasn't, kept apart, so a rare thing (a monster in view: one picture in three hundred) gets a fair
+	 * sample of its own. Each: [0] what the learning Glance said, [1] what the mod's said (yes over a half).
+	 */
+	private static final int THERE = 100, NOT_THERE = 300;
+	private final boolean[][][] thereRing = new boolean[Glance.HEADS.length][THERE][], notRing = new boolean[Glance.HEADS.length][NOT_THERE][];
+	private final int[] thereAt = new int[Glance.HEADS.length], thereN = new int[Glance.HEADS.length], notAt = new int[Glance.HEADS.length], notN = new int[Glance.HEADS.length];
 	/** A few of the latest pictures (some with something in them, some with nothing) and what each said: for a page to show. */
 	private final java.util.ArrayDeque<Example> examples = new java.util.ArrayDeque<>(), emptyOnes = new java.util.ArrayDeque<>();
 
@@ -180,37 +185,43 @@ public final class GlanceLearner {
 			b[i] = ol[i] > 0.5f;
 			something |= t[i] || a[i] || b[i];
 		}
-		examTruth[examAt] = t;
-		examShipped[examAt] = a;
-		examLearned[examAt] = b;
-		examAt = (examAt + 1) % FAIR;
-		examN = Math.min(FAIR, examN + 1);
+		for (int i = 0; i < y.length; i++) {
+			boolean[] said = {b[i], a[i]};
+			if (t[i]) {
+				thereRing[i][thereAt[i]] = said;
+				thereAt[i] = (thereAt[i] + 1) % THERE;
+				thereN[i] = Math.min(THERE, thereN[i] + 1);
+			} else {
+				notRing[i][notAt[i]] = said;
+				notAt[i] = (notAt[i] + 1) % NOT_THERE;
+				notN[i] = Math.min(NOT_THERE, notN[i] + 1);
+			}
+		}
 		var keep = something ? examples : emptyOnes;                          // (eight with something in them, said or there; four with nothing)
 		keep.addLast(new Example(px, y.clone(), os.clone(), ol.clone(), System.currentTimeMillis()));
 		while (keep.size() > (something ? 8 : 4)) keep.removeFirst();
 	}
 
 	/**
-	 * Its exam on the last few hundred pictures it hadn't learned from, each head a question ("a monster close?"): of the
-	 * times it was there, how many it caught; of the times it wasn't, how many it said it was (false alarms); for the
-	 * Glance that's learning and the one that came with the mod. [head][0 there, 1 caught learning, 2 caught mod's,
+	 * Its exam on pictures it hadn't learned from, each head a question ("a monster close?"): of the last hundred times
+	 * it was there, how many it caught; of the last three hundred it wasn't, how many it said it was (false alarms); for
+	 * the Glance that's learning and the one that came with the mod. [head][0 there, 1 caught learning, 2 caught mod's,
 	 * 3 not there, 4 false alarms learning, 5 false alarms mod's].
 	 */
 	public synchronized int[][] exam() {
 		int[][] out = new int[Glance.HEADS.length][6];
-		for (int k = 0; k < examN; k++)
-			for (int i = 0; i < out.length; i++) {
-				boolean t = examTruth[k][i];
-				if (t) {
-					out[i][0]++;
-					if (examLearned[k][i]) out[i][1]++;
-					if (examShipped[k][i]) out[i][2]++;
-				} else {
-					out[i][3]++;
-					if (examLearned[k][i]) out[i][4]++;
-					if (examShipped[k][i]) out[i][5]++;
-				}
+		for (int i = 0; i < out.length; i++) {
+			for (int k = 0; k < thereN[i]; k++) {
+				out[i][0]++;
+				if (thereRing[i][k][0]) out[i][1]++;
+				if (thereRing[i][k][1]) out[i][2]++;
 			}
+			for (int k = 0; k < notN[i]; k++) {
+				out[i][3]++;
+				if (notRing[i][k][0]) out[i][4]++;
+				if (notRing[i][k][1]) out[i][5]++;
+			}
+		}
 		return out;
 	}
 
