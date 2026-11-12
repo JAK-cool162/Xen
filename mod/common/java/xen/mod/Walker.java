@@ -255,6 +255,7 @@ final class Walker {
 	private Goal want;
 	private String wantKey = "";
 	private boolean partial;
+	private long thrashSaidAt = -100_000;
 	/** Its last way was only a piece, and that piece hardly any nearer (2,500 places thought about and the best a step off). */
 	private boolean stalled;
 
@@ -280,6 +281,13 @@ final class Walker {
 		// was pacing back and forth it keeps to the way it chose for a while.
 		double tolerance = now() < lockedUntil ? 12 : Math.max(1.5, Math.min(6, 0.15 * gap));
 		boolean moved = goal == null || (g == null ? goal.distanceTo(to) > tolerance || want != null : !g.toString().equals(wantKey));
+		if (moved && goal != null && path != null && index < path.size() && now() - plannedAt < 10 && p.onGround()) {
+			moved = false;                                                       // (a new goal within half a second of its last way: that way a moment more, not a new one every tick; two of its habits took turns at its legs, each with its own goal, and Ann planned eighty ways a second for half an hour and never moved)
+			if (now() - thrashSaidAt > 20 * 60) {
+				thrashSaidAt = now();
+				c.journal("debug", "way: a new goal every tick (" + (g != null ? g.toString() : BlockPos.containing(to).toShortString()) + " after " + (wantKey != null && !wantKey.isEmpty() ? wantKey : BlockPos.containing(goal).toShortString()) + "): keeps to its way a moment");
+			}
+		}
 		boolean nearEnd = partial && path != null && path.size() - index <= 2;   // (a piece of a long way: the next piece now)
 		// It keeps to its way (like a player who knows where they're going): a new plan only when the way is done, the goal
 		// moved, a move failed, or what it sees now blocks the next steps.
