@@ -1225,6 +1225,17 @@ final class Chores {
 		// its own mine: one it dug before for this depth, it goes back to (down the same staircase, on with the next tunnel)
 		BlockPos entrance = c.places.get("mine");
 		toMine = null;
+		BlockPos at = c.player.blockPosition();
+		if (entrance != null && !c.player.level().canSeeSky(at.above()) && at.getY() < entrance.getY() - 4) {   // down in it already (the last trip ended down here): on from here, not back up to the top of its stairs
+			mineY = y;
+			if (at.getY() <= y + 1) mineBase = at;
+			stairHead = at;
+			caveMode = false;
+			caveLook = 0;
+			caveTarget = null;
+			c.journal("thinks", "already down at y " + at.getY() + ": goes on from here, not back up to its mine's top");
+			return "You will go on mining for " + what + " from where you are (y " + at.getY() + ").";
+		}
 		if (entrance != null && mineRecordY != Integer.MIN_VALUE && entrance.closerThan(c.player.blockPosition(), dark ? 32 : 300)) {
 			toMine = entrance;
 			mineDir = mineRecordDir;
