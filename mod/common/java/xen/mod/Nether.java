@@ -643,7 +643,7 @@ final class Nether {
 				c.journal("thinks", "can't fill its bucket at " + water.toShortString() + ": other water");
 				return null;
 			}
-			c.hands.bucket(Vec3.atCenterOf(water).add(0, 0.4, 0), s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"));
+			if (!c.hands.fill(water)) c.hands.bucket(Vec3.atCenterOf(water).add(0, 0.4, 0), s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"));
 			c.acted = true;
 			return Action.PLACE;
 		}

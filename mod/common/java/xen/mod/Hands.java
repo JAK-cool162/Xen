@@ -1124,6 +1124,37 @@ public final class Hands {
 	}
 
 	/**
+	 * Fill an empty bucket from that very fluid block (a source, within reach, nothing solid between its eyes and it),
+	 * looking at it, as a player who aims right does. False if it has no empty bucket, it's out of reach or sight, or
+	 * it didn't take. (Aiming its look and using the bucket missed, again and again: Ann, ten tries at a cave pool,
+	 * "can't get up to the water", a minute and a half.)
+	 */
+	boolean fill(BlockPos q) {
+		int slot = findHotbar(st -> st.getItem() == net.minecraft.world.item.Items.BUCKET);
+		if (slot < 0) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		Vec3 eye = p.getEyePosition(), at = Vec3.atCenterOf(q);
+		if (eye.distanceTo(at) > p.blockInteractionRange() || !level.getFluidState(q).isSource()) return false;
+		var hit = level.clip(new net.minecraft.world.level.ClipContext(eye, at, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+		if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hit.getBlockPos().equals(q)) return false;   // (a wall between)
+		BlockState bs = level.getBlockState(q);
+		if (!(bs.getBlock() instanceof net.minecraft.world.level.block.BucketPickup pickup)) return false;
+		stop();
+		p.getInventory().setSelectedSlot(slot);
+		face(at);
+		ItemStack got = pickup.pickupBlock(p, level, q, bs);
+		if (got.isEmpty()) return false;
+		ItemStack hand = p.getInventory().getSelectedItem();
+		p.getInventory().setItem(slot, net.minecraft.world.item.ItemUtils.createFilledResult(hand, p, got));
+		Compat.swing(p);
+		current = Action.PLACE;
+		ticks = 0;
+		limit = 4;
+		return true;
+	}
+
+	/**
 	 * Pour a water (or lava) bucket into that block, looking at it, as a player who aims right does (the bucket empties
 	 * there; in survival an empty bucket is left in its hand). False if it has no full bucket or it didn't go.
 	 */

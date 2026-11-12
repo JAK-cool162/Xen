@@ -3018,7 +3018,7 @@ public final class Companion {
 			if (nether.keepsWater(q)) continue;                                   // (its own water on the lava, making its obsidian: left there)
 			Vec3 at = Vec3.atCenterOf(q).add(0, 0.4, 0);
 			if (player.getEyePosition().distanceTo(at) > player.blockInteractionRange() - 0.5) continue;
-			if (!hands.bucket(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"))) return null;
+			if (!hands.fill(q) && !hands.bucket(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"))) return null;
 			goals.instant = "filling its bucket with water";
 			journal("does", "filled its bucket at " + q.toShortString() + " (water for a fall)");
 			acted = true;
