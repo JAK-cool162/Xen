@@ -150,7 +150,7 @@ final class Guide {
 		int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0) + 2 * items.getOrDefault("log", 0);   // (logs burn too: Ann carried five and went after coal instead of diamonds till her pickaxe wore out)
 		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
 		return switch (k) {
-			case "coal" -> coal < 3 && items.getOrDefault("raw_iron", 0) > 0 ? 3 : coal < 3 && items.getOrDefault("torch", 0) < 8 ? 2 : coal < 8 ? 1 : 0;
+			case "coal" -> coal < 3 && items.getOrDefault("raw_iron", 0) > 0 && tier < 3 ? 3 : coal < 3 && items.getOrDefault("torch", 0) < 8 ? (tier >= 3 ? 1 : 2) : coal < 8 ? 1 : 0;   // (smelting is a must only for its first iron pickaxe: with one in hand, diamonds first; Cid followed his feeling to coal on two diamond trips, twelve minutes)
 			case "iron" -> tier < 3 ? 3 : iron < 24 && !c.crafter.has("_chestplate") ? 1 : 0;
 			case "diamond" -> tier >= 3 && items.getOrDefault("diamond", 0) < c.goals.diamondsWanted() ? 2 : 0;
 			case "lapis" -> tier >= 3 && items.getOrDefault("lapis_lazuli", 0) < 3 ? (tier >= 4 ? 2 : 1) : 0;   // (enchanting: with a diamond pickaxe, as needed as the diamonds)
