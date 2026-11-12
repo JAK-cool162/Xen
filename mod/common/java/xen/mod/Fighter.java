@@ -771,6 +771,10 @@ final class Fighter {
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
 		}
+		if (p.getHealth() < 8 && canPerch(foe)) {                               // low, and they're still at it: two blocks up, out of their reach, and heal up there (Bob stood and ate among three zombies at 3 health, then a skeleton)
+			Action up = perch(foe, d);
+			if (up != null) return up;
+		}
 		noRun = h.hasWeapon();                                                   // (no time to dig, nowhere better: it stands and fights, shield up between swings; with no weapon it gets away first, then digs in)
 		if (now() - standSaidAt > 400) {
 			standSaidAt = now();
