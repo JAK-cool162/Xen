@@ -249,6 +249,26 @@ public final class Companion {
 	final Instinct instinct = new Instinct(this);
 
 	/** Its head is in a block (sand fell on it, it was pushed in, it woke up in a wall): it breaks it, like a player. */
+	private int dousedAt = -100;
+
+	/**
+	 * On fire, out of the lava, not in water: its water bucket emptied at its feet, as a player does (the fire's out the
+	 * moment it's in the water; its bucket habit takes the water back up after). Not in the Nether, where water boils
+	 * away. (Cid, mining obsidian by the lava, caught fire and burned to death with a water bucket on him.)
+	 */
+	private boolean douse() {
+		if (!player.isOnFire() || player.isInLava() || player.isInWater() || player.tickCount - dousedAt < 20
+				|| player.hasEffect(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE) || player.level().dimension() == net.minecraft.world.level.Level.NETHER) return false;
+		BlockPos feet = player.blockPosition();
+		var level = player.level();
+		if (!level.getBlockState(feet).canBeReplaced() || !level.getFluidState(feet).isEmpty()) return false;
+		dousedAt = player.tickCount;
+		if (!hands.pour(feet, net.minecraft.core.Direction.UP, s -> s.getItem() == net.minecraft.world.item.Items.WATER_BUCKET)) return false;
+		journal("does", "on fire: water at its feet");
+		acted = true;
+		return true;
+	}
+
 	private void digOut() {
 		BlockPos head = BlockPos.containing(player.getEyePosition());
 		var level = player.level();
@@ -418,6 +438,7 @@ public final class Companion {
 		Perf.add("watching players", t0);
 		script.tick(hurtNow);                                           // its owner's own rules
 		if (mimic.clutchTick()) return;                                 // falling: a water clutch, this very tick
+		if (douse()) return;                                            // on fire out of the lava: its water bucket at its feet
 		if (tactics.pearlTick()) return;                               // flung, or off the edge: an ender pearl
 		if (hurtNow && !inArena && player.getLastHurtByMob() instanceof ServerPlayer by && by != player
 				&& player.tickCount - player.getLastHurtByMobTimestamp() < 5) {

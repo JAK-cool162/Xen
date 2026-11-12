@@ -1159,7 +1159,12 @@ public final class Hands {
 	 * there; in survival an empty bucket is left in its hand). False if it has no full bucket or it didn't go.
 	 */
 	boolean pour(BlockPos into, Direction face) {
-		int slot = findHotbar(s -> s.getItem() instanceof net.minecraft.world.item.BucketItem && s.getItem() != net.minecraft.world.item.Items.BUCKET);
+		return pour(into, face, s -> s.getItem() instanceof net.minecraft.world.item.BucketItem && s.getItem() != net.minecraft.world.item.Items.BUCKET);
+	}
+
+	/** Pour this kind of full bucket (water only, say) into that block; see {@link #pour(BlockPos, Direction)}. */
+	boolean pour(BlockPos into, Direction face, java.util.function.Predicate<ItemStack> which) {
+		int slot = findHotbar(which);
 		if (slot < 0) return false;
 		stop();
 		p.getInventory().setSelectedSlot(slot);
