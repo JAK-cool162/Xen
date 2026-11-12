@@ -3369,6 +3369,18 @@ public final class Companion {
 	}
 
 
+	/**
+	 * Down in its own mine with somewhere up on the surface to get to: the top of its staircase first (the way it dug,
+	 * dry, no lava by it), then on over the land. Null: not that (no mine, not down in it, not going up).
+	 */
+	private Vec3 upItsStairs(Vec3 goal) {
+		if (player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		BlockPos top = places.get("mine"), feet = player.blockPosition();
+		if (top == null || goal.y < feet.getY() + 15 || player.level().canSeeSky(feet.above())) return null;
+		if (feet.closerThan(top, 3) || Math.hypot(top.getX() - feet.getX(), top.getZ() - feet.getZ()) > 64 || top.getY() < feet.getY() + 10) return null;
+		return Vec3.atBottomCenterOf(top);
+	}
+
 	private Action walkTo(Goal g, Vec3 goal) {
 		if (g == null) goal = headingFor(goal);                         // (no changing its mind about where it's going every tick)
 		Action ore = oreOnTheWay();                                     // on its way: ore right there, it takes it (like a player would)
@@ -3378,7 +3390,8 @@ public final class Companion {
 			if (f != null) return f;
 		}
 		if (mod.config.pathAssist && btb.on()) {                             // Back to Basics: its way-finder gets it there (walking, digging, bridging, pillaring), and it goes that way, no second-guessing
-			Action w = g != null ? walker.go(g) : walker.go(goal);
+			Vec3 stairs = g == null ? upItsStairs(goal) : null;               // (down in its mine, off up to the surface: up its own staircase first, dry and known, not through the caves)
+			Action w = g != null ? walker.go(g) : walker.go(stairs != null ? stairs : goal);
 			if (walker.stuck()) walker.stop();                                // (the same move failing: a new way from where it is now, next tick)
 			if (w != null) return w;
 			return digToward(goal);                                          // (no way at all: straight there, digging through)
