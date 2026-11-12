@@ -135,8 +135,10 @@ final class Visits {
 			lookUp();
 			p = k.equals("village") ? knownVillage : knownPortal;
 		}
-		if (p == null || visited.contains(p) || visited.stream().anyMatch(v -> Math.abs(v.getX() - p.getX()) + Math.abs(v.getZ() - p.getZ()) < 48)) return null;
-		return Math.hypot(p.getX() - feet.getX(), p.getZ() - feet.getZ()) < (k.equals("village") ? 256 : 160) ? p : null;
+		if (p == null || visited.contains(p)) return null;
+		final BlockPos q = p;
+		if (visited.stream().anyMatch(v -> Math.abs(v.getX() - q.getX()) + Math.abs(v.getZ() - q.getZ()) < 48)) return null;
+		return Math.hypot(q.getX() - feet.getX(), q.getZ() - feet.getZ()) < (k.equals("village") ? 256 : 160) ? q : null;
 	}
 
 	/** A place worth a visit it could go to now (for its brain: a village's chests, a ruined portal's, before digging for it). */
