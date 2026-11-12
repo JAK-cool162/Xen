@@ -189,8 +189,6 @@ final class Btb {
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, tabling ? 1.9f : 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));
-		if (o.tier >= 1 && o.fuel == 0 && c.items().getOrDefault("torch", 0) < 4 && goal.equals("gear") && now() - coalForLightAt > 20 * 60 * 10)
-			out.add(new Option(Task.COAL, 4.05f, "coal for torches before it goes deep (and fuel, and levels)"));   // (Bob dug in the dark at y -21 for twenty minutes, not a torch on him: no coal, and none down there)
 		if (diamondsToGet) {                                                      // the iron pickaxe: straight for diamonds (its armor is diamond, not iron first)
 			boolean spare = c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2;
 			if (o.tier == 3 && c.crafter.pickWorn() < 0.2 && !spare) {         // (a pickaxe nearly gone and no spare: the iron for one first, not a trip it breaks on)
