@@ -448,8 +448,9 @@ final class Nether {
 	private BlockPos knownLava(ServerLevel level) {
 		if (now() - lavaLookedAt < 100) return null;
 		lavaLookedAt = now();
-		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 96, 120, 12);
+		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 128, 160, 16);
 		int dry = 0, open = 0;
+		BlockPos wetOne = null;                                                 // (by water: water's on it already, or soon; the next best)
 		for (BlockPos q : pools) {
 			boolean tried = false;
 			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
@@ -470,7 +471,12 @@ final class Nether {
 					c.journal("thinks", "knows of a lava pool at " + r.toShortString() + ": water on it makes obsidian");
 					return r.immutable();
 				}
+				if (stand && wetOne == null) wetOne = r.immutable();
 			}
+		}
+		if (wetOne != null) {
+			c.journal("thinks", "knows of a lava pool by water at " + wetOne.toShortString() + ": its obsidian's there or soon will be");
+			return wetOne;
 		}
 		if (now() - lavaSaidAt > 1200) {
 			lavaSaidAt = now();

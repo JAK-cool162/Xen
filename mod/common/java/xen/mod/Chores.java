@@ -1221,6 +1221,8 @@ final class Chores {
 		int tier = Math.max(c.crafter.pickTier(), c.crafter.canMake(2) ? 2 : c.crafter.canMake(1) ? 1 : 0);
 		int need = what.equals("debris") ? 4 : what.equals("diamonds") ? 3 : what.equals("iron") ? 2 : 1;
 		if (tier < need) return "You can't go mining for " + what + " yet: you need " + Crafter.tierName(need) + " first.";
+		if (what.equals("diamonds") && c.btb.on() && countItem("diamond") >= c.goals.diamondsWanted())   // (it has what it needs: a trip that ended the moment it began, over and over, Ann standing still two minutes)
+			return "You have the diamonds you need already.";
 		begin(Kind.MINE);
 		until = now() + 20 * 60 * 6;                                        // (six minutes, then: still getting somewhere? on, as long as it takes)
 		tripWhat = what;
