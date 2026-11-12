@@ -523,11 +523,14 @@ final class Nether {
 	 * what someone built), no lava or water beside that stone to run in when it's opened (lava doesn't run up: under it
 	 * is fine), and dry round about.
 	 */
+	private static final java.util.Set<String> LIDS = java.util.Set.of("stone", "deepslate", "cobblestone", "cobbled_deepslate", "tuff", "granite", "diorite",
+			"andesite", "calcite", "dirt", "smooth_basalt", "basalt", "netherrack", "dripstone_block");
+
 	private static boolean sealable(ServerLevel level, BlockPos r) {
 		BlockPos lid = r.above();
 		var st = level.getBlockState(lid);
 		if (st.getDestroySpeed(level, lid) < 0 || st.getDestroySpeed(level, lid) > 5 || st.is(net.minecraft.world.level.block.Blocks.OBSIDIAN)
-				|| !WorldSenses.isNaturalStone(BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath())) return false;
+				|| !LIDS.contains(BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath())) return false;   // (the rock down there: deepslate, tuff, granite... not only stone; Bob, forty-eight pools and none it could open)
 		for (Direction d : Direction.values()) {
 			if (d == Direction.DOWN) continue;
 			if (!level.getFluidState(lid.relative(d)).isEmpty()) return false;
