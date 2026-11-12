@@ -4531,16 +4531,16 @@ public final class Companion {
 		if (ownSaid.size() > 200) ownSaid.values().removeIf(t -> now - t > 300_000);
 		ownSaid.put(key, now);
 		lastChatter = now;
-		smallTalk = !always && !talking;
+		sayingSmallTalk = !always && !talking;
 		try {
 			say(text);
 		} finally {
-			smallTalk = false;
+			sayingSmallTalk = false;
 		}
 	}
 
 	/** What it's saying now is its own small talk (heard close by only). */
-	private boolean smallTalk;
+	private boolean sayingSmallTalk;
 
 	/** What it said lately (the meaning, numbers aside) and when: it doesn't say the same thing again for a while. */
 	private final java.util.Map<String, Long> ownSaid = new java.util.HashMap<>();
@@ -4636,7 +4636,7 @@ public final class Companion {
 		}
 		text = typed(text);
 		Component line = Component.literal("<" + name + "> " + text);
-		if (smallTalk && player != null) {                                 // small talk (its own, about simple things): only those close by hear it, not the whole server
+		if (sayingSmallTalk && player != null) {                           // small talk (its own, about simple things): only those close by hear it, not the whole server
 			for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer) && p.level() == player.level() && p.distanceTo(player) <= 48) p.sendSystemMessage(line);
 			XenMod.LOG.info("<{}> {} (small talk)", name, text);
 		} else if (mod.config.localChat && player != null) {               // local chat: only those close by hear it
