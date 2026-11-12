@@ -179,7 +179,10 @@ final class Btb {
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.2;          // (a good pickaxe in hand: its diamonds before iron it doesn't need yet)
-		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter))
+		var bag = c.items();
+		boolean tableOrWood = bag.getOrDefault("crafting_table", 0) > 0 || woodInBag() >= 4;
+		boolean canFurnace = bag.getOrDefault("furnace", 0) > 0 || tableOrWood && o.stone >= 8 || c.chores.furnaceNear();   // (Ann tried to make one with no table and no wood to make one: three minutes, twice)
+		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter) && (canFurnace || smelter))
 			out.add(new Option(Task.SMELT, tabling ? 2 : goal.equals("gear") && pickFine ? 3.85f : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
 		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
@@ -189,6 +192,8 @@ final class Btb {
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
 		else if (o.tier >= 2 && o.overworld && !o.under && goal.equals("gear") && woodInBag() < 8 && now() - packedWoodAt > 20 * 60 * 10)
 			out.add(new Option(Task.WOOD, 4.4f, "a few logs before it goes down (sticks for a new pickaxe, a table, fuel for its furnace)"));   // (like a player: Bob's pickaxe broke at the bottom of his mine, no wood on him, no way to make another)
+		else if (o.tier >= 1 && o.overworld && woodInBag() == 0 && bag.getOrDefault("crafting_table", 0) == 0 && now() - packedWoodAt > 20 * 60 * 10)
+			out.add(new Option(Task.WOOD, 4.0f, "no wood at all: no table, no sticks, no furnace (up for some)"));   // (Ann, none on her: three minutes twice trying to make a furnace)
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
 		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, tabling ? 1.9f : 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));

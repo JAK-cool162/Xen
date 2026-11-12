@@ -2323,6 +2323,12 @@ final class Chores {
 
 	// ------------------------------------------------------------------------------ smelting
 	private BlockPos furnace;
+
+	/** A furnace it put down, still there, close by (it smelts there, no need to make one). */
+	boolean furnaceNear() {
+		return furnace != null && c.player != null && furnace.closerThan(c.player.blockPosition(), 32)
+				&& c.player.level().getBlockState(furnace).is(net.minecraft.world.level.block.Blocks.FURNACE);
+	}
 	private long checkFurnaceAt;
 
 	/**
