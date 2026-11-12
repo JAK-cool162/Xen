@@ -772,7 +772,7 @@ final class Nether {
 			} catch (RuntimeException e) {
 				found = null;
 			}
-			if (found != null && !badPortals.contains(found) && Math.hypot(found.getX() - p.getX(), found.getZ() - p.getZ()) < 700) {
+			if (found != null && !badPortals.contains(found) && Math.hypot(found.getX() - p.getX(), found.getZ() - p.getZ()) < 160) {   // (close by only: Ann and Bob, off over the land to one five hundred blocks away, both died in sand on the way, all their diamond gear lost)
 				portalAt = found.immutable();
 				portalClosest = Double.MAX_VALUE;
 				portalCloserAt = now();

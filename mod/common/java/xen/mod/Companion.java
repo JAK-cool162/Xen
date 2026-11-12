@@ -268,6 +268,7 @@ public final class Companion {
 			goals.instant = "stepping out of the block its head is in";
 			return;
 		}
+		if (!Chores.lavaBehind((ServerLevel) level, head)) hands.wayDig = head.immutable();   // (out, water behind it or not: a flooded tunnel beats suffocating; Ann's doubter said "it would flood the tunnel" and she died under the sand, sixteen health in two seconds)
 		if (hands.mine(head)) {
 			goals.instant = "digging out of a wall";
 			if (DEBUG) XenMod.LOG.info("[xen debug] {} digs out of {} at {}", name, level.getBlockState(head), head);
