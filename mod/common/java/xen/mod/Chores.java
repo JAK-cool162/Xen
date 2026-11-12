@@ -125,7 +125,7 @@ final class Chores {
 	/** Stopped from outside (a fight, its gut, something to pick up, someone asking): the chore didn't end, it was cut off (see {@link Focus}). */
 	void cancel() {
 		if (kind != null) endedItself = false;
-		if (DEBUG && kind != null) endWhy("cut off");
+		if (kind != null) endWhy("cut off");                                  // (by what: always in its journal, a trip that ends at once is a bug)
 		if (kind == Kind.SHELTER || kind == Kind.HIDE) {                  // its shelter kept it put: cut off (it died, a fight), it's free again, not left staying for good
 			if (resume != null && c.mode == Companion.Mode.STAY) c.mode = resume;
 			resume = null;
@@ -991,6 +991,7 @@ final class Chores {
 	}
 
 	private void finish(String say) {
+		if (kind != null) endWhy("ended (" + say + ")");                      // (always in its journal, whatever it says out loud)
 		stop();
 		String s = say.toLowerCase(java.util.Locale.ROOT);
 		if (s.startsWith("got") || s.startsWith("done") || s.startsWith("here")) c.belief.up(0.015f, say);   // (what it set out to do: done)
