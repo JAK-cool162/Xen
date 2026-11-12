@@ -70,6 +70,47 @@ public final class Rive {
 		}
 	}
 
+	/**
+	 * A reply someone taught it ("when I say wassup, say not much"): kept in config/xen/rivescript/taught.rive, and the
+	 * scripts read again so it's used from now on. False if it can't be kept.
+	 */
+	public static synchronized boolean teach(String heard, String say) {
+		if (folder == null) return false;
+		String trigger = substituted(heard.toLowerCase(java.util.Locale.ROOT)).replaceAll("[^a-z0-9 *]", " ").replaceAll("\\s+", " ").trim();
+		String reply = say.replaceAll("[\\r\\n]", " ").trim();
+		if (trigger.isEmpty() || reply.isEmpty() || trigger.length() > 120 || reply.length() > 200) return false;
+		Path taught = folder.resolve("taught.rive");
+		try {
+			Files.createDirectories(folder);
+			String before = Files.exists(taught) ? Files.readString(taught, StandardCharsets.UTF_8) : "! version = 2.0\n// Replies players taught their Xens in chat (\"when I say ..., say ...\").\n";
+			Files.writeString(taught, before + "\n+ " + trigger + "\n- " + reply + "\n", StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			return false;
+		}
+		reload();
+		return true;
+	}
+
+	/** The scripts' own word swaps (! sub wassup = what is up), as what's said goes through them before it's matched. */
+	private static java.util.Map<String, String> subs;
+
+	private static String substituted(String words) {
+		if (subs == null) {
+			subs = new java.util.HashMap<>();
+			try (InputStream in = Rive.class.getResourceAsStream("/assets/xen/rivescript/xen.rive")) {
+				if (in != null) for (String l : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+					var m = java.util.regex.Pattern.compile("^!\\s*sub\\s+(\\S+)\\s*=\\s*(.+?)\\s*$").matcher(l);
+					if (m.find()) subs.put(m.group(1).toLowerCase(java.util.Locale.ROOT), m.group(2));
+				}
+			} catch (IOException e) {
+				// (none: as said)
+			}
+		}
+		StringBuilder b = new StringBuilder();
+		for (String w : words.trim().split("\\s+")) b.append(b.length() == 0 ? "" : " ").append(subs.getOrDefault(w.replaceAll("[.,!?;:]", ""), w));
+		return b.toString();
+	}
+
 	/** Read the scripts again (after you change them). */
 	public static synchronized void reload() {
 		bot = null;

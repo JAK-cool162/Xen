@@ -5352,6 +5352,15 @@ public final class Companion {
 			}
 			if (trade) r = new xen.mod.talk.Chat.Request("chat", "", 0);
 		}
+		if (Habits.teaching(words)) {                                       // "when you mine logs, crouch": a habit for a mod, kept (its owner's say)
+			say(owner != null && !owner.equals(u) ? "Only " + ownerName + " can teach me habits." : Habits.heard(words));
+			return null;
+		}
+		String taught = teachReply(u, words);                               // "when I say wassup, say not much": a reply, kept in its scripts
+		if (taught != null) {
+			say(taught);
+			return null;
+		}
 		String sum = Sums.answer(words);                                    // a sum (15% of 64, 12*4, split 30 between 4): worked out, never guessed
 		if (sum != null) {
 			say(sum);
@@ -5680,6 +5689,17 @@ public final class Companion {
 
 	/** Its talk model: what kind of line a player said, and a player's answer, true to it (see {@link xen.mod.talk.Banter}). */
 	final xen.mod.talk.Banter banter = new xen.mod.talk.Banter(new BanterSelf(), new java.util.Random());
+
+	private static final java.util.regex.Pattern TEACH_REPLY = java.util.regex.Pattern.compile(
+			"\\b(?:when|if|whenever) (?:i|someone|anyone|people|somebody|a player) (?:say|says|said|type|types|ask|asks) [\"']?(.+?)[\"']?,? (?:you )?(?:should )?(?:say|reply|answer|respond|tell them)(?: with)? [\"']?(.+?)[\"']?[.!]*$");
+
+	/** "When I say wassup, say not much": a reply kept in its scripts (config/xen/rivescript/taught.rive), every Xen's from then on. Its owner's say. */
+	private String teachReply(UUID u, String words) {
+		var m = TEACH_REPLY.matcher(words.toLowerCase(java.util.Locale.ROOT).trim());
+		if (!m.find()) return null;
+		if (owner != null && !owner.equals(u)) return "Only " + ownerName + " can teach me what to say.";
+		return xen.mod.talk.Rive.teach(m.group(1), m.group(2)) ? pick3("Got it! I'll say that.", "Okay, noted.", "Sure, I'll remember that one.") : "Hm, I couldn't remember that one.";
+	}
 
 	/** What its chat scripts may use: its name, who's talking, what it's doing, its health, its gear, its goal, the time, where it is. */
 	private Map<String, String> talkFacts(ServerPlayer from) {

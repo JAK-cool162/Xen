@@ -495,6 +495,8 @@ public final class Hands {
 		digItem = p.getInventory().getItem(digSlot).getItem();
 		progress = 0;
 		limit = 200;                                                  // give up after 10 seconds
+		habitCrouch = Habits.wants("mine", BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getPath(), "crouch");   // (a habit it was taught for a mod: a tree feller, a vein miner)
+		if (habitCrouch) p.setShiftKeyDown(true);
 		p.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, face(),
 				level.getMaxY(), 0);
 		if (level.getBlockState(pos).isAir()) {                       // broke instantly
@@ -525,7 +527,16 @@ public final class Hands {
 	/** Packing up its own bed in the morning: the one time it breaks a bed. */
 	boolean mayBreakBed;
 
+	/** Crouching through this dig, as it was taught (released when the block's done). */
+	private boolean habitCrouch;
+
 	private void keepMining() {
+		if (habitCrouch) {
+			if (digging == null && !turning) {
+				habitCrouch = false;
+				p.setShiftKeyDown(false);
+			} else p.setShiftKeyDown(true);
+		}
 		if (turning && aim != null && aimPoint != null) {                  // eyes to the block first, then the pickaxe
 			if (turnToward(aimPoint, 40f, 30f)) {
 				turning = false;
@@ -1056,6 +1067,7 @@ public final class Hands {
 				|| clicked instanceof net.minecraft.world.level.block.FenceGateBlock || clicked instanceof net.minecraft.world.level.block.ButtonBlock
 				|| clicked instanceof net.minecraft.world.level.block.LeverBlock || clicked instanceof net.minecraft.world.level.block.DiodeBlock
 				|| clicked instanceof net.minecraft.world.level.block.AnvilBlock;
+		if (!sneak) sneak = Habits.wants("place", BuiltInRegistries.ITEM.getKey(p.getInventory().getSelectedItem().getItem()).getPath(), "crouch");   // (a habit it was taught for a mod)
 		if (sneak) p.setShiftKeyDown(true);
 		var result = p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
 		if (sneak) p.setShiftKeyDown(false);
