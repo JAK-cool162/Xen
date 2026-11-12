@@ -2999,7 +2999,7 @@ final class Chores {
 				return null;
 			}
 		} else oreWetSince = -1;
-		if (c.guide.leadingTo(kind) || nearest.getY() < feet.getY() - 8 && !caveMode && toMine == null) {   // its guide has a dry way to one (it owns the way there), or they're deep under it (its staircase, then its way-finder for the last of it): not a second way over theirs
+		if (c.guide.leadingTo(kind) || nearest.getY() < feet.getY() - 8 && toMine == null) {   // (in a cave too: the cave takes it down, not a way-finder's way through seventy blocks of rock)   // its guide has a dry way to one (it owns the way there), or they're deep under it (its staircase, then its way-finder for the last of it): not a second way over theirs
 			oreBest = Double.MAX_VALUE;                                         // (no clock on it meanwhile)
 			oreBestAt = now();
 			return null;
