@@ -553,6 +553,10 @@ final class Nether {
 				return null;
 			}
 		}
+		if (c.mod.config.luck >= 2 && !inNether() && !pourHere) {              // knowing everything: a ruined portal (obsidian out in the open, no lava under it), before a lava pool deep in the rock
+			Action toPortal = toRuinedPortal(level);
+			if (toPortal != null) return toPortal;
+		}
 		if (!c.knowledge.knows("obsidian") && lookingSince > 0 && now() - lookingSince > 20 * 60 * 3)   // three minutes of looking: it remembers how
 			c.knowledge.learn("obsidian", Knowledge.How.TRIED);
 		if (!c.knowledge.knows("obsidian") && c.mod.config.luck < 2) {      // it doesn't know you can make it: it looks for some (knowing everything, it knows that too)
@@ -709,6 +713,61 @@ final class Nether {
 	}
 
 	private long visibleTriedAt = -1;
+	private BlockPos portalAt;
+	private long portalLookedAt = -100_000, portalCloserAt;
+	private double portalClosest;
+	private final java.util.Set<BlockPos> badPortals = new java.util.HashSet<>();
+
+	/**
+	 * Knowing everything: the nearest ruined portal (looked up every five minutes, within 700 blocks) and the way to it;
+	 * there, its obsidian is out in the open for the mining (null: none, it's there, or it's let go). The obsidian deep
+	 * down is all by lava (every block of it: Xens stood at lava lakes plugging one side and finding the next), and the
+	 * lava pools it could stand by, often none of sixteen.
+	 */
+	private Action toRuinedPortal(ServerLevel level) {
+		var p = c.player;
+		if (portalAt == null && now() - portalLookedAt > 20 * 60 * 5) {
+			portalLookedAt = now();
+			BlockPos found = null;
+			try {
+				found = level.findNearestMapStructure(net.minecraft.tags.StructureTags.RUINED_PORTAL, p.blockPosition(), 32, false);
+			} catch (RuntimeException e) {
+				found = null;
+			}
+			if (found != null && !badPortals.contains(found) && Math.hypot(found.getX() - p.getX(), found.getZ() - p.getZ()) < 700) {
+				portalAt = found.immutable();
+				portalClosest = Double.MAX_VALUE;
+				portalCloserAt = now();
+				c.journal("thinks", String.format(Locale.ROOT, "knows of a ruined portal at %d %d, %.0f blocks off: obsidian out in the open", found.getX(), found.getZ(),
+						Math.hypot(found.getX() - p.getX(), found.getZ() - p.getZ())));
+			}
+		}
+		if (portalAt == null) return null;
+		double d = Math.hypot(portalAt.getX() + 0.5 - p.getX(), portalAt.getZ() + 0.5 - p.getZ());
+		if (d < 12 && Math.abs(p.getY() - portalAt.getY()) < 24 || d < 12 && level.canSeeSky(p.blockPosition().above())) {   // there: its obsidian's the kind it can see
+			if (visible("obsidian", 16) != null) {
+				visibleTriedAt = -1;                                                 // (its mining next, straight away)
+				return null;
+			}
+			badPortals.add(portalAt);
+			c.journal("thinks", "no obsidian to be had at the ruined portal at " + portalAt.toShortString());
+			portalAt = null;
+			return null;
+		}
+		if (d < portalClosest - 1) {
+			portalClosest = d;
+			portalCloserAt = now();
+		} else if (now() - portalCloserAt > 20 * 60) {                              // a minute no closer: not that one
+			badPortals.add(portalAt);
+			c.journal("thinks", "can't get to the ruined portal at " + portalAt.toShortString());
+			portalAt = null;
+			return null;
+		}
+		c.goals.instant = "going to a ruined portal for its obsidian";
+		int y = level.hasChunkAt(portalAt) ? level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, portalAt.getX(), portalAt.getZ())
+				: (int) Math.max(p.getY(), 64);
+		return c.walkTo(new Vec3(portalAt.getX() + 0.5, y, portalAt.getZ() + 0.5));
+	}
 	private final java.util.Set<BlockPos> badLava = new java.util.HashSet<>();
 	private BlockPos lavaWalkAt;
 	private double lavaClosest = Double.MAX_VALUE;
