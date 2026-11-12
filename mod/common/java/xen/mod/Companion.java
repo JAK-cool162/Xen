@@ -3377,11 +3377,28 @@ public final class Companion {
 	 */
 	private Vec3 upItsStairs(Vec3 goal) {
 		if (player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
-		BlockPos top = places.get("mine"), feet = player.blockPosition();
+		BlockPos feet = player.blockPosition();
+		long now = player.level().getGameTime();
+		if (stairsTo != null) {                                              // on its way up them: to the top (no changing its mind on the way)
+			if (feet.closerThan(stairsTo, 3) || now > stairsUntil) {
+				stairsTo = null;
+				stairsDoneUntil = now + 20 * 120;
+				return null;
+			}
+			return Vec3.atBottomCenterOf(stairsTo);
+		}
+		if (now < stairsDoneUntil) return null;
+		BlockPos top = places.get("mine");
 		if (top == null || goal.y < feet.getY() + 15 || player.level().canSeeSky(feet.above())) return null;
 		if (feet.closerThan(top, 3) || Math.hypot(top.getX() - feet.getX(), top.getZ() - feet.getZ()) > 64 || top.getY() < feet.getY() + 10) return null;
+		stairsTo = top;
+		stairsUntil = now + 20 * 90;
 		return Vec3.atBottomCenterOf(top);
 	}
+
+	/** The top of its staircase it's going up to, till when; and till when it doesn't again (it's been up them). */
+	private BlockPos stairsTo;
+	private long stairsUntil, stairsDoneUntil;
 
 	private Action walkTo(Goal g, Vec3 goal) {
 		if (g == null) goal = headingFor(goal);                         // (no changing its mind about where it's going every tick)

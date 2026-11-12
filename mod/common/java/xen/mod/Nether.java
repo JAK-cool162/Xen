@@ -562,6 +562,7 @@ final class Nether {
 				return null;
 			}
 			BlockPos water = visibleWater(16);
+			if (water == null) water = farWater();                              // (none by it: water further off it can get to, under the ground too, before off up to the surface)
 			if (water == null) {
 				say("I need water for my bucket.");
 				return c.goals.exploreStep();
@@ -626,6 +627,26 @@ final class Nether {
 				net.minecraft.world.level.ClipContext.Fluid.ANY, c.player));
 		return hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.getBlockPos().equals(q);
 	}
+
+	/** Water further off (forty blocks round, twelve up or down: a pool in a cave, an aquifer's edge), looked for every half minute; null if none. */
+	private BlockPos farWater() {
+		if (now() - farWaterLooked < 20 * 30) return farWaterAt;
+		farWaterLooked = now();
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-40, -12, -40), feet.offset(40, 12, 40))) {
+			if (!level.isLoaded(q)) continue;
+			var f = level.getFluidState(q);
+			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir()) continue;
+			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
+		}
+		farWaterAt = best;
+		if (best != null) c.journal("thinks", "water for its bucket at " + best.toShortString());
+		return best;
+	}
+
+	private BlockPos farWaterAt;
+	private long farWaterLooked = -100_000;
 
 	private BlockPos visibleWater(int r) {
 		ServerLevel level = (ServerLevel) c.player.level();
