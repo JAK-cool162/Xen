@@ -125,6 +125,7 @@ final class LiveView {
 			for (String l : d) lines.add(l);
 		}
 		o.add("journal", lines);
+		if (c.mod.glanceSchool != null) o.addProperty("eyes", c.mod.glanceSchool.status());
 		String json = o.toString(), name = c.name;
 		Path to = dir;
 

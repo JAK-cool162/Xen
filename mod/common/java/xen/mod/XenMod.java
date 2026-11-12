@@ -78,6 +78,8 @@ public class XenMod implements ModInitializer {
 	xen.mod.core.Ex1 ex1;
 	/** Xen Glance: what its eyes' picture looks like at a glance (a monster close, a drop...), or null. */
 	xen.mod.core.Glance glance;
+	/** Xen Glance learning while they play (null: not learning). */
+	xen.mod.core.GlanceLearner glanceSchool;
 	/** Xen 2.0's mind (what to do next: one for all main Xens, it keeps learning); null: the old way. */
 	xen.mod.core.Mind mind;
 	/** How many of its choices Xen 2.0 has seen turn out (in this world), and learned from. */
@@ -266,6 +268,8 @@ public class XenMod implements ModInitializer {
 		ex1 = xen.mod.core.Ex1.bundled();                                       // Xen Ex1: trained on recorded play
 		glance = xen.mod.core.Glance.load();                                   // Xen Glance: the picture network
 		if (glance != null) LOG.info("Xen Glance loaded (trained on {} pictures)", glance.trainedOn);
+		if (glance != null && !"false".equals(System.getProperty("xen.glanceLearns")))   // (it goes on learning as they play: config/xen/glance_learned.json)
+			glanceSchool = new xen.mod.core.GlanceLearner(glance, FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("glance_learned.json"));
 		if (ex1 != null) {
 			Path learned = brainFile().resolveSibling("ex1-learned.json");
 			try {

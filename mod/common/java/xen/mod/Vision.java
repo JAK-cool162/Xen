@@ -470,14 +470,15 @@ public final class Vision {
 
 	/** Each whole view: what Glance makes of it (and, when collecting pictures, the picture with what was really there). */
 	private void glance(ServerLevel level) {
-		var model = c.mod.glance;
+		var school = c.mod.glanceSchool;                                    // (learning while it plays: the Glance it sees with is the better of the two)
+		var model = school != null ? school.current() : c.mod.glance;
 		String dump = dumpDir();
 		float[][] x = model != null || dump != null ? glanceInput() : null;
 		if (model != null) {
 			glance = model.run(x);
 			threat = Math.max(glance[xen.mod.core.Glance.CLOSE], 0.6f * glance[xen.mod.core.Glance.NEAR]);
 		}
-		if (dump == null) return;
+		if (dump == null && school == null) return;
 		Map<Integer, Entity> byId = new HashMap<>();
 		for (Entity e : inView) byId.put(e.getId(), e);
 		boolean close = false, nearBy = false;
@@ -486,6 +487,8 @@ public final class Vision {
 			if (dist[px] <= 6) close = true;
 			if (dist[px] <= 16) nearBy = true;
 		}
+		if (school != null && x != null) school.see(x, new boolean[] {close, nearBy, drop, caveMouth});   // (what was really there: its lesson)
+		if (dump == null) return;
 		try {
 			if (dumpOut == null) {
 				Path dir = Path.of(dump);
