@@ -1646,7 +1646,8 @@ final class Chores {
 				}
 			}
 		}
-		if (ores.size() > 1 && c.mod.config.pathAssist && !c.guide.leading()) {   // (its guide leading it to ore it needs more: that way, not round the ones it happens to have seen)
+		boolean ownersWay = c.mod.config.luck >= 2 && what.equals("diamonds") && !debrisHunt;   // (knowing everything, after diamonds: its guide's way and the diamonds it knows of, not the coal it happens to have seen)
+		if (ores.size() > 1 && c.mod.config.pathAssist && !c.guide.leading() && !ownersWay) {   // (its guide leading it to ore it needs more: that way, not round the ones it happens to have seen)
 			// The same set for a while (a new set is a new goal: the walker would plan afresh every step), less the ones gone.
 			ServerLevel level = (ServerLevel) c.player.level();
 			if (oreWay != null) oreWay.removeIf(o -> !java.util.Arrays.stream(seek).anyMatch(k -> k == WorldSenses.category(level, o, level.getBlockState(o)))
@@ -1654,6 +1655,25 @@ final class Chores {
 			if (oreWay == null || oreWay.isEmpty() || now() - oreWayAt > 200) {
 				oreWay = ores;
 				oreWayAt = now();
+			}
+			BlockPos here = c.player.blockPosition();
+			BlockPos closestOre = oreWay.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(here))).orElse(null);
+			if (closestOre != null) {
+				double gap = Math.sqrt(closestOre.distSqr(here));
+				if (gap < oreWayBest - 1) {
+					oreWayBest = gap;
+					oreWayBestAt = now();
+				} else if (now() - oreWayBestAt > 300) {                         // fifteen seconds and no closer: that one's not to be had from here, the next
+					c.journal("way", "lets the ore at " + closestOre.toShortString() + " go: no closer in fifteen seconds (" + c.walker.lastProblem + ")");
+					skip.add(Perception.Beliefs.key(closestOre.getX(), closestOre.getY(), closestOre.getZ()));
+					oreWay.remove(closestOre);
+					oreWayBest = Double.MAX_VALUE;
+					oreWayBestAt = now();
+					if (oreWay.isEmpty()) {
+						oreWay = null;
+						return null;
+					}
+				}
 			}
 			doing = String.format(java.util.Locale.ROOT, "going for the ore that's quickest to get to (%d it knows; %d of %d %s so far)", oreWay.size(), got, want, what);
 			List<Goal> goals = new ArrayList<>();
@@ -2926,7 +2946,8 @@ final class Chores {
 	 * them, digging the way there (the cheapest it can work out, through the rock as needed); one in arm's reach it
 	 * mines at once. No way to any: the nearest is let go, the rest stay. Null: none known.
 	 */
-	private long oreWalkAt = -1000, oreBestAt, fetchAt;
+	private long oreWalkAt = -1000, oreBestAt, fetchAt, oreWayBestAt;
+	private double oreWayBest = Double.MAX_VALUE;
 	private double oreBest = Double.MAX_VALUE;
 	private String oreBestKind = "";
 
