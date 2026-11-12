@@ -1607,8 +1607,8 @@ final class Chores {
 			}
 		}
 		int got = count(items) - had;
-		if (got >= want) {
-			finish("I got " + got + " " + what + "! Heading back up.");
+		if (got >= want || "diamonds".equals(what) && c.btb.on() && countItem("diamond") >= c.goals.diamondsWanted()) {   // (diamonds: all it still needs in its bag, whatever it made of the rest meanwhile)
+			finish("I got " + Math.max(got, countItem("diamond")) + " " + what + "! Heading back up.");
 			return null;
 		}
 		if (what.equals("iron") && c.crafter.pickTier() == 2 && count("raw_iron") + countItem("iron_ingot") >= 3 && dropToPickUp() == null) {

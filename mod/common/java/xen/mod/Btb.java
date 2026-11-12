@@ -104,7 +104,7 @@ final class Btb {
 		if (now() - goalAt < 20 * 60 * 3 && !goalDone(o)) return;
 		goalAt = now();
 		String was = goal;
-		boolean geared = o.tier >= 4 && c.goals.diamondsWanted() == 0;
+		boolean geared = o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted();   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
 		else if (!tabled || !enchantedGear()) goal = "enchant";                 // (its tools and its armor enchanted, both)
@@ -116,7 +116,7 @@ final class Btb {
 
 	private boolean goalDone(Obs o) {
 		return switch (goal) {
-			case "gear" -> o.tier >= 4 && c.goals.diamondsWanted() == 0;
+			case "gear" -> o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted();
 			case "enchant" -> enchantedGear();
 			case "nether" -> !netherNeeds();
 			case "home" -> c.goals.home != null;
