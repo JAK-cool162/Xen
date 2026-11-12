@@ -173,7 +173,8 @@ final class Btb {
 		List<Option> out = new ArrayList<>();
 		boolean diamondsToGet = goal.equals("gear") && o.tier >= 3 && o.diamonds < c.goals.diamondsWanted();   // (diamond gear still to get: the smelter and a home wait)
 		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
-		if (dusk && !o.sheltered) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
+		boolean digsIn = diamondsToGet && o.tier >= 3 && o.health >= 14 && o.meals > 0;   // (night, an iron pickaxe, well and fed: down its staircase is its roof, and the diamonds are down there; Cid hid in a hole ten minutes)
+		if (dusk && !o.sheltered && !digsIn) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
