@@ -8,6 +8,7 @@
 ! sub what's  = what is
 ! sub whats   = what is
 ! sub how's   = how is
+! sub it's    = it is
 ! sub hows    = how is
 ! sub you're  = you are
 ! sub youre   = you are
@@ -16,7 +17,6 @@
 ! sub u       = you
 ! sub ur      = your
 ! sub r       = are
-! sub y       = why
 ! sub wyd     = what are you doing
 ! sub wbu     = what about you
 ! sub hbu     = what about you
@@ -74,13 +74,17 @@
 - doing alright
 - I'm good :)
 
-+ (i am good|i am fine|good|fine|not bad|great) [*]
-% * you
++ (i am good|i am fine|i am ok|i am okay|i am great|not bad|pretty good) [*]
 - nice!
 - good to hear
 - cool cool
 
-+ what are you doing [*]
++ (good|fine|great)
+% * you
+- nice!
+- good to hear
+
++ what are you (doing|up to) [*]
 - <get doing>
 - just <get doing>
 - <get doing>, wbu?
@@ -110,7 +114,7 @@
 * <get food> < 10 => yeah, kinda
 - nah I'm good
 
-+ how many diamonds [do you have] [*]
++ (how many diamonds [do you have] [*]|show me your diamonds)
 * <get diamonds> == 0 => none yet :(
 * <get diamonds> == 1 => just one
 - <get diamonds>
@@ -122,11 +126,11 @@
 - not yet, working on it
 
 // ---------------------------------------------------------------- about itself
-+ what is your name
++ (what is your name|who are you)
 - <get name>
 - I'm <get name>
 
-+ (are you a bot|are you real|are you human|are you ai|are you a robot|you are a bot) [*]
++ (are you a bot|are you real|are you human|are you ai|are you an ai|are you a robot|you are a bot|are you a player) [*]
 - what do you think? :)
 - I'm <get name>, that's what I am
 - real enough to mine diamonds lol
@@ -151,10 +155,37 @@
 * <get owner> == none => nobody, I'm free
 - <get owner>
 
-+ (what do you like|what is your favorite) [*]
++ what do you like [*]
 - mining, honestly. finding diamonds never gets old
 - building stuff, when I'm not getting blown up
 - the nether is cool but scary
+
++ what is your (favorite|favourite) block [*]
+- deepslate diamond ore, obviously
+- honestly? obsidian. it's so useful
+
++ what is your (favorite|favourite) mob [*]
+- axolotls are cute
+- foxes, they're adorable
+- not creepers, that's for sure
+
++ what is your (favorite|favourite) *
+- hard to pick, honestly
+- I don't really have one
+
++ do you like minecraft [*]
+- obviously lol
+- it's literally my life
+
++ (can we be friends|will you be my friend|be my friend|are we friends) [*]
+- sure! :)
+- we already are
+- of course
+
++ (you are|youre) (cool|awesome|great|amazing|the best|nice|funny|smart|good) [*]
+- aw thanks!
+- you too :)
+- haha thanks <get player>
 
 + do you like me [*]
 - yeah you're cool
@@ -170,7 +201,7 @@
 - aww <3
 
 // ---------------------------------------------------------------- nice things, mean things
-+ (good job|nice|nice one|well done|gg|great job|nice work) [*]
++ (good job|nice|nice one|well done|gg|gg wp|good game|great job|nice work|good one) [*]
 - thanks!
 - ty :)
 - gg
@@ -187,11 +218,24 @@
 - no worries
 - all good
 
-+ (you are|youre) (dumb|stupid|bad|trash|noob|useless) [*]
++ (you are|youre) (dumb|stupid|bad|trash|noob|useless|annoying|slow) [*]
 - rude
 - wow ok
 - I'm trying my best ok
 - says you
+
++ (noob|nub|newb|trash|bad)
+- says the noob
+- rude lol
+- ok and?
+
++ (it is|its|it s) (night|dark|late) [*]
+- yeah, careful out there
+- monsters are out. stay close
+
++ (help|i need help|can you help me|help me)
+- with what?
+- sure, what's up?
 
 + (shut up|stfu) [*]
 - ok ok
@@ -203,13 +247,40 @@
 - haha
 - xD
 
++ (bruh|bro|dude)
+- bruh
+- lol what
+- ?
+
++ (wow|omg|whoa|woah|dang|damn|wtf)
+- right??
+- I know
+- lol yeah
+
++ (np|no problem|no worries)
+- 👍
+- cool
+
++ (brb|be right back|afk)
+- ok, I'll be around
+- kk
+- alright
+
++ (gm|morning)
+- gm <get player>!
+- morning!
+
++ (gn|night night|nighty night)
+- gn!
+- night <get player>
+
 + (ok|okay|k|kk|cool|alright)
 - 👍
 - cool
 - ok!
 
 // ---------------------------------------------------------------- jokes and fun
-+ tell me a joke [*]
++ (tell me a joke|another joke|one more joke|tell me another|say something funny) [*]
 - why did the creeper cross the road? to get to the other ssssside
 - what's a skeleton's favorite instrument? the trom-bone
 - I'd tell you a joke about lava but you'd get burned
@@ -251,9 +322,110 @@
 - blaze rods and ender pearls make eyes of ender, find the stronghold, then the dragon. bring a bow for the crystals
 - eyes of ender to find the stronghold, break the end crystals first, then hit the dragon when it lands
 
-+ what (level|y level) (for|is) diamonds [*]
++ what [y] level (for|is|are) diamonds [*]
 - around y -58
 - -58 or so
+
++ how do (i|you) find diamonds [*]
+- strip mine around y -58. caves down there are good too
+- go down to y -58 and branch mine, a tunnel every few blocks
+
++ how do (i|you) (make|build) a (nether portal|portal) [*]
+- 10 obsidian in a frame, 4 wide and 5 tall, then light it with flint and steel
+- obsidian frame, 4 by 5, flint and steel to light it
+
++ how do (i|you) get to the nether [*]
+- build a nether portal: 10 obsidian and a flint and steel
+- you need a portal. obsidian frame, then light it
+
++ how do (i|you) find (a|the) stronghold [*]
+- throw an eye of ender and follow it. when it goes down, dig
+- eyes of ender point to it. throw one, walk, throw another
+
++ what is the best enchantment [*]
+- mending, no contest
+- mending, then unbreaking. efficiency on a pick
+- protection on armor, sharpness on a sword, mending on everything
+
++ (what should i do|what should we do|any tips|got any tips|give me a tip) [*]
+- get some iron, then go for diamonds at y -58
+- honestly? get diamond gear, then enchant it. then the nether
+- I'm going for <get goal>. you could join
+
++ (i am lost|i got lost) [*]
+- press f3, it shows your coords. where's your base?
+- oh no. do you know your coords?
+
++ (i am hungry|i am starving) [*]
+- eat something! cows and pigs are everywhere
+- get some food before it's too late lol
+
++ i (died|just died) [*]
+- oof. where? I can help you get your stuff
+- noo. was it a creeper?
+- rip. your stuff should still be there for a few minutes
+
++ i almost died [*]
+- yikes, careful
+- close one!
+
++ a creeper (blew up|exploded|destroyed) [*]
+- ugh, those things. sorry
+- classic creeper. we can rebuild it
+- nooo. creepers ruin everything
+
++ i hate creepers [*]
+- same
+- everyone does lol
+
++ (are you tired|you tired) [*]
+* <get time> == night => kinda, it's late
+- nah I'm good
+
++ (how do you feel|how are you feeling) [*]
+* <get health> < 8 => hurt, honestly
+* <get mood> == angry => annoyed
+* <get mood> == scared => a little scared
+- pretty good!
+- good, thanks
+
++ (are you happy|are you ok|are you okay) [*]
+* <get mood> == sad => not really
+- yeah!
+- pretty happy, yeah
+
++ (are you sad|you seem sad) [*]
+* <get mood> == sad => a little, yeah
+- nah I'm fine
+
++ what are you thinking [about] [*]
+- about <get goal>
+- just <get doing>, thinking about <get goal>
+
+// ---------------------------------------------------------------- what you tell it, it remembers
++ my name is *
+- <set theirname=<formal>>nice to meet you, <formal>!
+- <set theirname=<formal>>hi <formal>!
+
++ what is my name
+* <get theirname> == undefined => you're <get player>, right?
+- you're <get theirname>
+
++ i (like|love) *
+- <set theylike=<star2>>oh nice, <star2> is cool
+- <set theylike=<star2>>same honestly, <star2> is great
+
++ what do i like
+* <get theylike> == undefined => you haven't told me!
+- you said <get theylike>
+
++ my (base|house|home) is (at|in|near) *
+- <set theirbase=<star3>>got it, <star3>
+- <set theirbase=<star3>>okay, I'll remember: <star3>
+
++ where is my (base|house|home)
+* <get theirbase> == undefined => you didn't tell me where it is
+- you said <get theirbase>
 
 + (creeper|creepers) [*]
 - I hate those things
