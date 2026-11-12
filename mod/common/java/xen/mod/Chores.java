@@ -1091,6 +1091,16 @@ final class Chores {
 			doing = "digging down for stone";                             // (none close: like a player, it digs down where it stands, stone is a few blocks under)
 			return stairsDown();
 		}
+		boolean forWood = false;
+		for (int k : cats) forWood |= k == Blocks.LOG;
+		if (known == null && forWood && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && !c.player.level().canSeeSky(c.player.blockPosition().above())) {
+			BlockPos feet = c.player.blockPosition();                    // trees grow up top: underground, the way up first (Bob looked for trees at y 29 for five minutes)
+			int top = c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+			if (top - feet.getY() > 6) {
+				doing = "heading up to the surface for trees";
+				return c.walkTo(new net.minecraft.world.phys.Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
+			}
+		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
 			if (!saidLooking) {                                         // (asked, and it just answered: once is enough)

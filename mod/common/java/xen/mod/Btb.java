@@ -61,6 +61,21 @@ final class Btb {
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
 	String goal = "gear";
 	private long goalAt = -100000;
+	/** When it last went for wood (logs for the trip down: not again for ten minutes, if there were none to be had). */
+	private long packedWoodAt = -100000;
+
+	/** Its wood, in planks: a log is four, a stick half. */
+	private int woodInBag() {
+		int n = 0;
+		var inv = c.player.getInventory();
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			var st = inv.getItem(i);
+			if (st.isEmpty()) continue;
+			String k = c.itemKey(st);
+			n += k.equals("log") ? 4 * st.getCount() : k.endsWith("_planks") ? st.getCount() : k.equals("stick") ? st.getCount() / 2 : 0;
+		}
+		return n;
+	}
 
 	Btb(Companion c) {
 		this.c = c;
@@ -159,15 +174,18 @@ final class Btb {
 		if (dusk && !o.sheltered) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
-		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
+		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
+		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, tabling ? 2 : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
 		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
 		if (!smelter && sideWork && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
+		else if (o.tier >= 2 && o.overworld && !o.under && goal.equals("gear") && woodInBag() < 8 && now() - packedWoodAt > 20 * 60 * 10)
+			out.add(new Option(Task.WOOD, 4.4f, "a few logs before it goes down (sticks for a new pickaxe, a table, fuel for its furnace)"));   // (like a player: Bob's pickaxe broke at the bottom of his mine, no wood on him, no way to make another)
 		if (o.tier == 1) out.add(new Option(Task.STONE, 4, "stone for stone tools and a furnace"));
-		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, 4, "iron and nothing to smelt it with"));
+		if (o.tier >= 1 && o.raw >= 3 && o.fuel == 0 && o.logs == 0) out.add(new Option(Task.COAL, tabling ? 1.9f : 4, "iron and nothing to smelt it with"));
 		if (o.tier == 2 && o.iron + o.raw < 3) out.add(new Option(Task.IRON, 3.8f, "iron for an iron pickaxe"));
 		if (diamondsToGet) {                                                      // the iron pickaxe: straight for diamonds (its armor is diamond, not iron first)
 			boolean spare = c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2;
@@ -309,7 +327,10 @@ final class Btb {
 	private String start(Task t, Obs o) {
 		Chores ch = c.chores;
 		return switch (t) {
-			case WOOD -> ch.gather("wood", o.tier == 0 ? 5 : 4);
+			case WOOD -> {
+				packedWoodAt = now();
+				ch.gather("wood", o.tier == 0 ? 5 : 4);
+			}
 			case STONE -> ch.gather("stone", 16);
 			case COAL -> ch.mine(c.lessons.depth("coal", 40), "coal", 8);
 			case IRON -> ch.mine(c.lessons.depth("iron", 16), "iron", o.tier == 2 ? 3 : 10);
