@@ -3358,12 +3358,12 @@ final class Chores {
 			return c.stepTo(drop.position());                             // pick up what it hunted
 		}
 		if (c.player.getY() < 40 && !c.player.level().canSeeSky(c.player.blockPosition())) {   // (down in the caves: no animals to find, only lava to walk into)
-			var level = c.player.level();
-			BlockPos feet = c.player.blockPosition();
-			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
-			if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && !level.isDarkOutside() && top - feet.getY() > 6) {   // (by day: up to where they are, as for trees; Ann, five health and nothing to eat, ten minutes down there "no animals down here")
+			var world = c.player.level();
+			BlockPos at = c.player.blockPosition();
+			int top = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ());
+			if (world.dimension() == net.minecraft.world.level.Level.OVERWORLD && !world.isDarkOutside() && top - at.getY() > 6) {   // (by day: up to where they are, as for trees; Ann, five health and nothing to eat, ten minutes down there "no animals down here")
 				doing = forWool ? "heading up to the surface for sheep" : "heading up to the surface for animals";
-				return c.walkTo(new net.minecraft.world.phys.Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
+				return c.walkTo(new net.minecraft.world.phys.Vec3(at.getX() + 0.5, top, at.getZ() + 0.5));
 			}
 			finish(forWool ? "No sheep down here." : "No animals down here.");
 			return null;
