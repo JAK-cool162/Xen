@@ -51,8 +51,8 @@ function draw(n,s){const k=cards[n]||card(n);k.c.style.display=only&&only!==n?'n
  const r2=el('div','row');r2.append(el('span','k','at'),el('span','',`${s.x}, ${s.y}, ${s.z} (${s.dimension}${s.night?', night':''})`));if(s.goal){r2.append(el('span','k','goal'),el('span','',s.goal))}
  const r3=el('div','row');r3.append(el('span','k','holding'),s.held?chip(s.held):el('span','k','nothing'),el('span','k','wearing'));(s.armor.length?s.armor:['nothing']).forEach(x=>r3.append(x==='nothing'?el('span','k','nothing'):chip(x)));
  const r4=el('div','row');r4.append(el('span','k','doing'),el('span','doing',s.doing));
- const r5=el('div','row');if(s.eyes){r5.append(el('span','k','eyes'),el('span','',s.eyes))}if(s.brain){r5.append(el('span','k','brain'),el('span','',s.brain))}
- k.hud.append(r4,r1,r2,r3,r5);const atEnd=k.log.scrollTop+k.log.clientHeight>=k.log.scrollHeight-4;k.log.textContent=s.journal.join('\n')||'(nothing in its journal yet)';if(atEnd)k.log.scrollTop=k.log.scrollHeight}
+ const r5=el('div','row');if(s.eyes){r5.append(el('span','k','eyes'),el('span','',s.eyes))}if(s.brain){r5.append(el('span','k','brain'),el('span','',s.brain))}const r6=el('div','row');if(s.plan){r6.append(el('span','k','plan'),el('span','',s.plan))}
+ k.hud.append(r4,r6,r1,r2,r3,r5);const atEnd=k.log.scrollTop+k.log.clientHeight>=k.log.scrollHeight-4;k.log.textContent=s.journal.join('\n')||'(nothing in its journal yet)';if(atEnd)k.log.scrollTop=k.log.scrollHeight}
 function setTabs(names){if(tabs.dataset.n===names.join())return;tabs.dataset.n=names.join();tabs.replaceChildren();
  for(const n of [null,...names]){const b=el('button',only===n?'on':'',n||'All');b.onclick=()=>{only=n;[...tabs.children].forEach(x=>x.classList.toggle('on',x===b));for(const m in cards)cards[m].c.style.display=only&&only!==m?'none':''};tabs.append(b)}}
 async function poll(){try{const r=await fetch('xens',{cache:'no-store'});const d=await r.json();const names=Object.keys(d);if(names.length){const e=grid.querySelector('.empty');if(e)e.remove()}

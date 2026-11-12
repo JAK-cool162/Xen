@@ -141,6 +141,27 @@ final class Visits {
 		return Math.hypot(q.getX() - feet.getX(), q.getZ() - feet.getZ()) < (k.equals("village") ? 256 : 160) ? q : null;
 	}
 
+	/** The nearest village or ruined portal ("village", "ruined portal") it could visit now, or null. */
+	BlockPos nearest(String kind) {
+		if (c.player == null) return null;
+		return placeOf(kind, c.player.blockPosition());
+	}
+
+	/** Off to that kind of place (for its planner): "You will...", or null if there's none to go to. */
+	String beginKind(String want) {
+		if (at != null) return "You will visit the " + kind + ".";
+		BlockPos feet = c.player.blockPosition();
+		BlockPos p = placeOf(want, feet);
+		if (p == null) return null;
+		forced = want;
+		pick();
+		forced = null;
+		return at == null ? null : "You will visit the " + kind + ".";
+	}
+
+	/** Only this kind, for this pick (its planner chose it). */
+	private String forced;
+
 	/** A place worth a visit it could go to now (for its brain: a village's chests, a ruined portal's, before digging for it). */
 	boolean candidate() {
 		if (c.player == null || at != null) return at != null;
@@ -169,6 +190,7 @@ final class Visits {
 		BlockPos best = null;
 		String bestKind = "";
 		for (String k : new String[] {"village", "ruined portal"}) {
+			if (forced != null && !forced.equals(k)) continue;
 			BlockPos p = placeOf(k, feet);
 			if (p == null) continue;
 			if (best == null || p.distSqr(feet) < best.distSqr(feet)) {

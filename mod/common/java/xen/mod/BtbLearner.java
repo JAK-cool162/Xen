@@ -116,6 +116,22 @@ final class BtbLearner {
 		dirty = true;
 	}
 
+	/** How a way of doing something went (Xenfish's "obsidian:lava", "obsidian:village"...): tries, worked, deaths, seconds. */
+	synchronized void record(String way, boolean worked, double seconds, boolean died) {
+		double[] m = memory.computeIfAbsent(way, k -> new double[4]);
+		m[0]++;
+		if (worked) m[1]++;
+		if (died) m[2]++;
+		m[3] += seconds;
+		dirty = true;
+	}
+
+	/** What it remembers of a way or a task: tries, worked, deaths, seconds in all (all naught if never). */
+	synchronized double[] stats(String way) {
+		double[] m = memory.get(way);
+		return m == null ? new double[4] : m.clone();
+	}
+
 	/** What it learned from a schematic (studying it twice doesn't count it twice: the latest look replaces the last). */
 	private final java.util.Set<String> studied = new java.util.HashSet<>();
 

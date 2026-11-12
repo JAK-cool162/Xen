@@ -118,6 +118,7 @@ final class LiveView {
 		}
 		o.add("armor", armor);
 		o.addProperty("goal", c.btb.on() ? c.btb.goal : "");
+		o.addProperty("plan", c.xenfish.show());
 		o.addProperty("brain", "mode " + c.mode.name().toLowerCase(java.util.Locale.ROOT) + ", task " + c.btb.task.name().toLowerCase(java.util.Locale.ROOT)   // (what has its body: why it stands about, when it does)
 				+ (c.chores.busy() ? ", a chore" : "") + (c.builder.busy() ? ", building" : "") + (c.nether.busy() ? ", a trip (" + c.nether.purposeName() + ")" : "") + (c.enchanter.on ? ", enchanting" : ""));
 		o.addProperty("doing", !c.chores.doing.isEmpty() ? c.chores.doing : c.goals.instant.isEmpty() ? "looking around" : c.goals.instant);

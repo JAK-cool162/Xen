@@ -213,8 +213,7 @@ final class Btb {
 				else if (o.iron >= 3) out.add(new Option(Task.TOOLS, 4.3f, "a new iron pickaxe (this one is nearly worn out)"));   // (the iron in its bag: made now, not after it breaks; raw iron: smelting's offered)
 			} else out.add(new Option(Task.DIAMONDS, 3.9f, "diamonds (a diamond pickaxe, a sword, armor)"));
 		}
-		boolean lootFor = goal.equals("enchant") && bag.getOrDefault("obsidian", 0) < 4 && c.enchanter.table() == null && bag.getOrDefault("enchanting_table", 0) == 0
-				|| goal.equals("gear") && o.tier < 3;
+		boolean lootFor = goal.equals("gear") && o.tier < 3;                     // (its obsidian for the table: its plan weighs the village and the portal against the lava, Xenfish)
 		if (lootFor && !o.night && o.overworld && now() - visitLookedAt > 20 * 30) {   // (a village's chests or a ruined portal's: obsidian, iron, before digging for it, as players do)
 			visitLookedAt = now();
 			visitThere = c.visits.candidate();
@@ -419,9 +418,23 @@ final class Btb {
 			String lapis = c.chores.mine(c.lessons.depth("lapis", 0), "lapis", 3);   // (a mining trip to the lapis it knows of: the fetch walked at one 128 blocks off, ten minutes, none)
 			if (lapis != null && lapis.startsWith("You will")) return lapis + " (lapis to enchant with)";
 		}
-		if (!tabled && it.getOrDefault("obsidian", 0) < 4) {
+		if (!tabled && it.getOrDefault("obsidian", 0) < 4) {                    // Xenfish: the cheapest way to it from here, by its own record of each
+			for (Xenfish.Way w : c.xenfish.obsidianWays()) {
+				String started = switch (w.key()) {
+					case "obsidian:village" -> c.visits.beginKind("village");
+					case "obsidian:portal" -> c.visits.beginKind("ruined portal");
+					default -> c.nether.go("table", 0);
+				};
+				if (started != null && started.startsWith("You will")) {
+					c.xenfish.trying(w.key());
+					return started + " (its plan: obsidian from " + w.says() + ")";
+				}
+			}
 			String obsidian = c.nether.go("table", 0);
-			if (obsidian.startsWith("You will")) return obsidian;
+			if (obsidian.startsWith("You will")) {
+				c.xenfish.trying("obsidian:lava");
+				return obsidian;
+			}
 		}
 		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
 		if (tabled && c.player.experienceLevel < 3) {                           // the table, no levels to pay with: coal ore gives them (and torches)
@@ -455,7 +468,7 @@ final class Btb {
 			return true;
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
-		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || task == Task.VISIT && c.visits.visiting());
+		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting());
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
@@ -493,6 +506,7 @@ final class Btb {
 				|| task == Task.TOOLS && c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2
 				|| task == Task.BLAZE && rods() > rodsAt || task == Task.PEARLS && pearls() > pearlsAt) && !dropped;
 		dropped = false;
+		if (task == Task.TABLE && c.xenfish.trying() != null) c.xenfish.settle();   // (the way it was on for its obsidian: how it went, to its book)
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
 				ok ? "worked" : "came to nothing", seconds, reward, died ? ", died" : ""));

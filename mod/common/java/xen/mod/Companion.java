@@ -1420,7 +1420,7 @@ public final class Companion {
 		payRent();
 		handOutNext();                                                    // (what it was asked to share out, its rent: handed over between tasks)
 		btb.nightfall();
-		if (btb.task == Btb.Task.VISIT && visits.visiting()) {                  // its brain sent it to a village or a ruined portal: that, its chests
+		if ((btb.task == Btb.Task.VISIT || btb.task == Btb.Task.TABLE) && visits.visiting()) {   // its brain (or its plan, for obsidian) sent it to a village or a ruined portal: that, its chests
 			Action v = visits.next();
 			if (!visits.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = visits.doing;
 			if (v != null || visits.visiting()) return v;
@@ -3743,6 +3743,8 @@ public final class Companion {
 	final Structures structures = new Structures(this);
 	/** Villages and ruined portals it found: in, and what they're good for (loot, a bed, hay, the golem's iron, a villager). */
 	final Visits visits = new Visits(this);
+	/** Xenfish: its plan for its goal, the cheapest way to each thing it needs, kept to (see {@link Xenfish}). */
+	final Xenfish xenfish = new Xenfish(this);
 	/** What happened the times it chose something (Xen 2.0's outcome memory: it decides with it). */
 	final Experience experience = new Experience(this);
 	/** G1X: the shape of what it has seen (depths, known open and solid space): gaps, ledges, ways, what it hasn't seen. */
