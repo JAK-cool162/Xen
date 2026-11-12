@@ -2616,6 +2616,12 @@ final class Chores {
 		int raw = toSmelt();
 		if (!menu.getSlot(0).hasItem() && raw > 0) moveInto(menu, 0, this::smeltable);
 		if (!menu.getSlot(1).hasItem() && (menu.getSlot(0).hasItem() || raw > 0)) {
+			boolean coal = count("coal") + countItem("charcoal") > 0;
+			if (!coal && countItem("stick") < 4 && (count("log") > 0 || countPlanks() >= 2) && !c.crafter.hasOrder()) {   // its wood into the fire: four sticks out of it first (the makings of its next two pickaxes; Bob burned all his, then stood with eight diamonds and no way to a pickaxe)
+				c.player.closeContainer();
+				c.crafter.request("stick", 4);
+				return Action.IDLE;
+			}
 			if (!moveInto(menu, 1, st -> isItem(st, "coal") || isItem(st, "charcoal"))) moveInto(menu, 1, st -> {
 				String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
 				return n.endsWith("_planks") || n.endsWith("_log");

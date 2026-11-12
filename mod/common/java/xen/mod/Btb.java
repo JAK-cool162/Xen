@@ -177,7 +177,9 @@ final class Btb {
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
-		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, tabling ? 2 : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
+		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.2;          // (a good pickaxe in hand: its diamonds before iron it doesn't need yet)
+		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter))
+			out.add(new Option(Task.SMELT, tabling ? 2 : goal.equals("gear") && pickFine ? 3.85f : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
 		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
 		if (!smelter && sideWork && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
