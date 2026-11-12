@@ -329,7 +329,7 @@ final class Btb {
 		return switch (t) {
 			case WOOD -> {
 				packedWoodAt = now();
-				ch.gather("wood", o.tier == 0 ? 5 : 4);
+				yield ch.gather("wood", o.tier == 0 ? 5 : 4);
 			}
 			case STONE -> ch.gather("stone", 16);
 			case COAL -> ch.mine(c.lessons.depth("coal", 40), "coal", 8);
