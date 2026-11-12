@@ -5155,6 +5155,11 @@ public final class Companion {
 			if (!joked.isEmpty()) say(joked);
 			return null;
 		}
+		String theirJoke = said == null ? null : jokes.theirs(from, said);  // a joke of theirs (a setup, its "idk, why?", the punchline): it laughs, and remembers it to tell others
+		if (theirJoke != null) {
+			say(theirJoke);
+			return null;
+		}
 		if (said != null && r.intent().equals("chat") && comeAnswered(from, said)) return null;   // (called over: "nothing, thanks": back to its own things)
 		if (!r.intent().equals("chat") && !r.intent().equals("follow") && comeFor != null) {   // called over and now asked for something: that's what it was for
 			comeFor = null;
@@ -5803,6 +5808,8 @@ public final class Companion {
 		f.put("madat", mad() ? madAt : "none");
 		String joke = from == null ? null : Incidents.joke(name, java.util.List.of(from.getGameProfile().name(), name), new java.util.HashSet<>());
 		f.put("joke", joke == null ? "none" : joke);
+		String learned = Jokes.learnedOne(random(), from == null ? "" : from.getGameProfile().name());   // (one a player taught it, now and then)
+		f.put("learnedjoke", learned == null ? "none" : learned);
 		if (player != null) {
 			f.put("health", String.valueOf((int) player.getHealth()));
 			f.put("food", String.valueOf(player.getFoodData().getFoodLevel()));

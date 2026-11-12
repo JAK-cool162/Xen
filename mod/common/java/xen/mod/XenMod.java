@@ -132,7 +132,8 @@ public class XenMod implements ModInitializer {
 		duels = new Duels(configDir.resolve("xen").resolve("duels"));
 		xen.mod.talk.Rive.folder(configDir.resolve("xen").resolve("rivescript"));   // its chat scripts: the mod's, and yours there
 		ModHabits.load(configDir.resolve("xen"));
-		Incidents.load(configDir.resolve("xen"));                              // what happened on the server that people still talk about (inside jokes)                                // habits players taught it for their mods (crouch when it mines logs...)
+		Incidents.load(configDir.resolve("xen"));
+		Jokes.loadLearned(configDir.resolve("xen"));                           // jokes players told Xens, to tell on                              // what happened on the server that people still talk about (inside jokes)                                // habits players taught it for their mods (crouch when it mines logs...)
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
 			xen.mod.talk.Banter.init(configDir.resolve("xen"));              // its talk model: what kind of line players say, and the answers (and which land)

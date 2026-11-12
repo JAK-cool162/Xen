@@ -292,6 +292,7 @@
 
 // ---------------------------------------------------------------- jokes and fun
 + (tell me a joke|another joke|one more joke|tell me another|say something funny) [*]
+* <get learnedjoke> != none => <get learnedjoke>
 - why did the creeper cross the road? to get to the other ssssside
 - what's a skeleton's favorite instrument? the trom-bone
 - I'd tell you a joke about lava but you'd get burned

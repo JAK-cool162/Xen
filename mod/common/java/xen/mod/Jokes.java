@@ -2,7 +2,9 @@ package xen.mod;
 
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -55,6 +57,98 @@ final class Jokes {
 
 	Jokes(Companion c) {
 		this.c = c;
+	}
+
+	// ------------------------------------------------------------------- jokes players tell it (it tells them on)
+	/** Every joke players told a Xen: the setup, the punchline, who told it (config/xen/jokes_learned.json, for every Xen). */
+	private static final List<String[]> LEARNED = new ArrayList<>();
+	private static java.nio.file.Path learnedFile;
+
+	static synchronized void loadLearned(java.nio.file.Path dir) {
+		learnedFile = dir.resolve("jokes_learned.json");
+		LEARNED.clear();
+		try {
+			if (!java.nio.file.Files.exists(learnedFile)) return;
+			for (var e : com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(learnedFile)).getAsJsonArray()) {
+				var a = e.getAsJsonArray();
+				LEARNED.add(new String[] {a.get(0).getAsString(), a.get(1).getAsString(), a.get(2).getAsString()});
+			}
+		} catch (java.io.IOException | RuntimeException e) {
+			XenMod.LOG.warn("Xen's learned jokes ({}) didn't load: {}", learnedFile, e.toString());
+		}
+	}
+
+	private static synchronized void learn(String setup, String punch, String who) {
+		LEARNED.removeIf(j -> j[0].equalsIgnoreCase(setup));
+		LEARNED.add(new String[] {setup, punch, who});
+		while (LEARNED.size() > 200) LEARNED.remove(0);
+		if (learnedFile == null) return;
+		var all = new com.google.gson.JsonArray();
+		for (String[] j : LEARNED) {
+			var a = new com.google.gson.JsonArray();
+			for (String x : j) a.add(x);
+			all.add(a);
+		}
+		try {
+			java.nio.file.Files.createDirectories(learnedFile.getParent());
+			java.nio.file.Files.writeString(learnedFile, all.toString());
+		} catch (java.io.IOException e) {
+			XenMod.LOG.warn("Xen's learned jokes ({}) weren't saved: {}", learnedFile, e.toString());
+		}
+	}
+
+	/** A joke someone taught a Xen, as it tells it on ("Steve told me this one: ..."); null if none (or by chance, its own). */
+	static synchronized String learnedOne(Random r, String notFrom) {
+		List<String[]> fit = new ArrayList<>();
+		for (String[] j : LEARNED) if (!j[2].equalsIgnoreCase(notFrom)) fit.add(j);   // (not the one who told it its own joke back)
+		if (fit.isEmpty() || r.nextFloat() < 0.4f) return null;
+		String[] j = fit.get(r.nextInt(fit.size()));
+		return j[2] + " told me this one: " + j[0] + " " + j[1];
+	}
+
+	/** A joke's setup: about something ("why did the creeper...?", "what do you call a..."), not a question to it ("why are you mining?"). */
+	private static final Pattern SETUP = Pattern.compile("^(why (did|does|do|was|is|are|can'?t|don'?t|couldn'?t|won'?t) (the|a|an) .+"
+			+ "|what (do you call|did the|has|goes|happens when you|is the difference between|kind of) .+|what'?s the difference between .+"
+			+ "|how (do|does|did) (a|an|the) .+|where (do|does|did) (the|a|an) .+)\\?$");
+	private static final Pattern TOLD = Pattern.compile("^(?:remember|learn|here'?s|heres|i got|i have) (?:this |a )?joke[:,]?\\s+(.+?\\?)\\s*(.+)$");
+	private UUID setupFrom;
+	private String setupSaid;
+	private long setupUntil;
+
+	/**
+	 * Someone tells it a joke: their setup, its "idk, why?", their punchline; it laughs, and remembers it, to tell
+	 * others ("remember this joke: ...? ..." in one line works too). Null: not a joke of theirs.
+	 */
+	String theirs(ServerPlayer from, String said) {
+		if (from == null || said == null || c.player == null) return null;
+		String t = said.toLowerCase(Locale.ROOT).replaceAll("(?i)\\b" + Pattern.quote(c.name.toLowerCase(Locale.ROOT)) + "\\b[,:]?", "").replaceAll("\\s+", " ").trim();
+		String who = from.getName().getString();
+		var told = TOLD.matcher(t);
+		if (told.find()) {
+			learn(capital(told.group(1)), told.group(2), who);
+			c.journal("learns", "a joke from " + who + ": " + told.group(1) + " / " + told.group(2));
+			return any("lol ok that's good", "haha I'm telling everyone", "💀 stealing that");
+		}
+		long now = now();
+		if (setupFrom != null && setupFrom.equals(from.getUUID()) && now < setupUntil && !SETUP.matcher(t).matches()) {   // their punchline
+			String setup = setupSaid;
+			setupFrom = null;
+			if (t.length() < 2 || t.length() > 160 || NO.matcher(t).find()) return null;
+			learn(setup, said.trim(), who);
+			c.journal("learns", "a joke from " + who + ": " + setup + " / " + said.trim());
+			return any("LMAO", "lol", "haha ok that's good", "💀 I'm stealing that one", "lol I'm telling everyone that");
+		}
+		if (SETUP.matcher(t).matches() && !(t.startsWith("why") && t.matches(".*\\b(you|your|u|ur|yours)\\b.*"))) {   // their setup: it plays along
+			setupFrom = from.getUUID();
+			setupSaid = capital(said.trim());
+			setupUntil = now + 20 * 40;
+			return t.startsWith("why") ? any("idk, why?", "why?", "I give up, why?") : any("idk, what?", "what?", "no idea, tell me");
+		}
+		return null;
+	}
+
+	private static String capital(String s) {
+		return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
 	}
 
 	private long now() {
@@ -197,7 +291,9 @@ final class Jokes {
 				}
 				stage = Stage.PUNCHED;
 				until = now + 400;
-				return bit.equals("guess") ? punchline() : SmallTalk.joke(random);
+				if (bit.equals("guess")) return punchline();
+				String learned = learnedOne(random, withName);                  // (one a player taught it, now and then: told on)
+				return learned != null ? learned : SmallTalk.joke(random);
 			}
 			case SETUP -> {
 				if (no && !t.contains("who")) return flop("wouldn't play along");
