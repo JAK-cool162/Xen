@@ -234,6 +234,7 @@ final class Guide {
 			if (!level.getFluidState(q).isEmpty() || level.getBlockState(q).is(net.minecraft.world.level.block.Blocks.BEDROCK)) return false;
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-2, -1, -2), feet.offset(2, 3, 2)))
 			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.LAVA)) return false;
+		if (level.getBlockState(feet.above(2)).getBlock() instanceof net.minecraft.world.level.block.FallingBlock) return false;   // (sand or gravel over its head: it comes down on it as it digs; Bob dug through a beach to coal and was buried, again and again)
 		return true;
 	}
 
