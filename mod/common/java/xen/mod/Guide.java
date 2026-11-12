@@ -74,7 +74,8 @@ final class Guide {
 				break;
 			}
 		}
-		leads.sort((a, b) -> a.need() != b.need() ? b.need() - a.need() : a.steps() - b.steps());   // the most necessary on top, the nearest of those
+		leads.sort((a, b) -> a.need() != b.need() ? b.need() - a.need() : a.kind().equals(what) != b.kind().equals(what) ? (a.kind().equals(what) ? -1 : 1)
+				: a.steps() - b.steps());                                         // the most necessary on top; as needed: what it came for, then the nearest
 		return next();
 	}
 
@@ -146,7 +147,7 @@ final class Guide {
 	private int need(String k) {
 		var items = c.items();
 		int tier = c.crafter.pickTier();
-		int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0);
+		int coal = items.getOrDefault("coal", 0) + items.getOrDefault("charcoal", 0) + 2 * items.getOrDefault("log", 0);   // (logs burn too: Ann carried five and went after coal instead of diamonds till her pickaxe wore out)
 		int iron = items.getOrDefault("raw_iron", 0) + items.getOrDefault("iron_ingot", 0);
 		return switch (k) {
 			case "coal" -> coal < 3 && items.getOrDefault("raw_iron", 0) > 0 ? 3 : coal < 3 && items.getOrDefault("torch", 0) < 8 ? 2 : coal < 8 ? 1 : 0;
