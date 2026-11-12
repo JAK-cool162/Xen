@@ -355,11 +355,15 @@ final class Btb {
 	private String tableStep() {
 		var it = c.items();
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
-		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
-		if (it.getOrDefault("lapis_lazuli", 0) < 3) {
+		if (it.getOrDefault("lapis_lazuli", 0) < 3) {                          // (down there after its diamonds: the lapis and the obsidian first, the book's up on the surface)
 			String lapis = planFor("lapis_lazuli", 3, "lapis to enchant with");
 			if (lapis.startsWith("You will")) return lapis;
 		}
+		if (!tabled && it.getOrDefault("obsidian", 0) < 4) {
+			String obsidian = c.nether.go("table", 0);
+			if (obsidian.startsWith("You will")) return obsidian;
+		}
+		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
 		if (tabled && c.player.experienceLevel < 3) {                           // the table, no levels to pay with: coal ore gives them (and torches)
 			String xp = c.chores.mine(c.lessons.depth("coal", 40), "coal", 16);
 			if (xp != null && xp.startsWith("You will")) return xp + " (levels to enchant with)";
