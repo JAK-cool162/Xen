@@ -2944,6 +2944,22 @@ final class Chores {
 			}
 		}
 		BlockPos nearest = known.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(feet))).get();
+		if (nearest.getY() < feet.getY() - 8 && !caveMode && toMine == null) {   // deep under it: down its staircase that way (a way-finder's way through seventy blocks of rock is mostly a walk over the land), its way-finder for the last of it
+			int dx = nearest.getX() - feet.getX(), dz = nearest.getZ() - feet.getZ();
+			if (mineBase == null && tunnelIn == null && mineDir.getStepX() * dx + mineDir.getStepZ() * dz <= 0) {   // (going away from it: round toward it, once, not back and forth)
+				net.minecraft.core.Direction d = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
+						: (dz > 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH);
+				if (!wet(feet, d, 4)) {
+					c.journal("thinks", "turns its staircase " + d.getName() + ", toward the " + kind + " it knows of at " + nearest.toShortString());
+					mineDir = d;
+					mineRecordDir = d;
+					stairHead = feet.immutable();
+				}
+			}
+			oreBest = Double.MAX_VALUE;                                         // (no clock on it while it digs down to it)
+			oreBestAt = now();
+			return null;
+		}
 		double gap = Math.sqrt(nearest.distSqr(feet));
 		if (gap < oreBest - 1 || !kind.equals(oreBestKind)) {
 			oreBest = gap;
