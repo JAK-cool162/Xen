@@ -342,7 +342,7 @@ final class Btb {
 			case STONE -> ch.gather("stone", 16);
 			case COAL -> {
 				coalForLightAt = now();
-				yield ch.mine(c.lessons.depth("coal", 40), "coal", 8);
+				yield ch.mine(c.lessons.depth("coal", 40), "coal", o.raw >= 3 ? 8 : 3);   // (for light, three is twelve torches: the eight took four minutes before its first diamond trip)
 			}
 			case IRON -> ch.mine(c.lessons.depth("iron", 16), "iron", o.tier == 2 ? 3 : 10);
 			case DIAMONDS -> ch.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, c.goals.diamondsWanted() - o.diamonds));
