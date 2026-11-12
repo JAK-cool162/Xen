@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -173,6 +173,7 @@ final class Btb {
 			boolean spare = c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2;
 			if (o.tier == 3 && c.crafter.pickWorn() < 0.2 && !spare) {         // (a pickaxe nearly gone and no spare: the iron for one first, not a trip it breaks on)
 				if (o.iron + o.raw < 3) out.add(new Option(Task.IRON, 4.1f, "iron for a new pickaxe (this one is nearly worn out)"));
+				else if (o.iron >= 3) out.add(new Option(Task.TOOLS, 4.3f, "a new iron pickaxe (this one is nearly worn out)"));   // (the iron in its bag: made now, not after it breaks; raw iron: smelting's offered)
 			} else out.add(new Option(Task.DIAMONDS, 3.9f, "diamonds (a diamond pickaxe, a sword, armor)"));
 		}
 		if (goal.equals("enchant")) {
@@ -207,7 +208,7 @@ final class Btb {
 		}
 		if ((o.night || c.goals.sunDown()) && o.overworld && !o.under) {        // the sun down: only what's done under a roof or under the ground
 			out.removeIf(op -> switch (op.task) {
-				case SHELTER, SMELT, ENCHANT, COAL, IRON, DIAMONDS -> false;
+				case SHELTER, SMELT, ENCHANT, COAL, IRON, DIAMONDS, TOOLS -> false;
 				case PEARLS -> false;                                            // (endermen are out at night: in its diamond armor, that's when)
 				case STONE -> !o.sheltered;
 				default -> true;
@@ -318,6 +319,7 @@ final class Btb {
 			case SHELTER -> shelterOrPlanB(o);
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> tableStep();
+			case TOOLS -> planFor("iron_pickaxe", 1, "a new pickaxe before this one breaks");
 			case HOME -> c.builder.start("home");
 			case SMELTER -> c.builder.start("smelter");
 			case BLAZE -> c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
@@ -399,7 +401,7 @@ final class Btb {
 	/** Is this what its goal is waiting on (diamonds for its gear, the table and enchanting, blaze rods and pearls)? */
 	private boolean forGoal(Task t) {
 		return switch (t) {
-			case DIAMONDS, IRON -> goal.equals("gear");
+			case DIAMONDS, IRON, TOOLS -> goal.equals("gear");
 			case TABLE, ENCHANT -> goal.equals("enchant");
 			case BLAZE, PEARLS -> goal.equals("nether");
 			default -> false;
@@ -417,6 +419,7 @@ final class Btb {
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null
 				|| task == Task.TABLE && (enchantStuff() > enchantStuffAt || c.player.experienceLevel > levelAt)
+				|| task == Task.TOOLS && c.crafter.count(n -> n.equals("iron_pickaxe") || n.equals("diamond_pickaxe")) >= 2
 				|| task == Task.BLAZE && rods() > rodsAt || task == Task.PEARLS && pearls() > pearlsAt) && !dropped;
 		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);

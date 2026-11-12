@@ -1124,6 +1124,10 @@ final class Walker {
 		return water(p) && !level.getFluidState(p).isSource() ? 20 : 0;
 	}
 
+	/** The block in its way it's digging, since when (the same one too long: another way). */
+	private BlockPos digTarget;
+	private long digSince;
+
 	/** Till when it plans no way with its head under water (it ran short of air there). */
 	long noDiveUntil;
 
@@ -1228,6 +1232,14 @@ final class Walker {
 			c.player.setSprinting(false);
 			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(b)) > c.player.blockInteractionRange()) break;   // closer first
 			doing = "digging through";
+			if (!b.equals(digTarget)) {                                       // (a new block: getting on; the same one twelve seconds and not broken: not through there)
+				digTarget = b.immutable();
+				digSince = now();
+			} else if (now() - digSince > 20 * 12) {
+				digTarget = null;
+				problem(m, "can't get through the " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(b).getBlock()).getPath() + " at " + b.toShortString());
+				return false;
+			}
 			c.hands.wayDig = b.immutable();                                   // (its way-finder already weighed this block: water, lava, gravel; no second no)
 			if (!c.hands.mine(b)) {
 				problem(m, "can't dig " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(b).getBlock()).getPath());
