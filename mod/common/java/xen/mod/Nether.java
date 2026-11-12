@@ -451,6 +451,9 @@ final class Nether {
 		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 96, 120, 12);
 		int dry = 0, open = 0;
 		for (BlockPos q : pools) {
+			boolean tried = false;
+			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
+			if (tried) continue;                                                     // (one it couldn't get to)
 			for (BlockPos r : BlockPos.betweenClosed(q.offset(-3, -2, -3), q.offset(3, 2, 3))) {
 				if (!level.isLoaded(r) || !level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA) || !level.getFluidState(r).isSource()) continue;
 				if (!level.getBlockState(r.above()).isAir()) continue;
@@ -615,7 +618,22 @@ final class Nether {
 		}
 		BlockPos top = lavaAt.above();
 		double d = c.player.getEyePosition().distanceTo(Vec3.atCenterOf(top));
-		if (d > 4) return c.walkTo(Vec3.atBottomCenterOf(top));
+		if (d > 4) {
+			if (!lavaAt.equals(lavaWalkAt) || d < lavaClosest - 1) {
+				if (!lavaAt.equals(lavaWalkAt)) lavaClosest = Double.MAX_VALUE;
+				lavaWalkAt = lavaAt.immutable();
+				lavaClosest = Math.min(lavaClosest, d);
+				lavaCloserAt = now();
+			} else if (now() - lavaCloserAt > 20 * 40) {                       // forty seconds no closer: the next pool it knows of (Bob stood two minutes over a way to one sixty blocks down, trip after trip)
+				badLava.add(lavaAt.immutable());
+				c.journal("thinks", "can't get to the lava at " + lavaAt.toShortString() + ": another pool");
+				lavaAt = null;
+				lavaWalkAt = null;
+				lavaLookedAt = -1000;
+				return null;
+			}
+			return c.walkTo(Vec3.atBottomCenterOf(top));
+		}
 		if (pouredAt < 0) {
 			c.goals.instant = "pouring water on the lava";
 			c.hands.pour(top, Direction.UP);
@@ -684,6 +702,10 @@ final class Nether {
 	}
 
 	private long visibleTriedAt = -1;
+	private final java.util.Set<BlockPos> badLava = new java.util.HashSet<>();
+	private BlockPos lavaWalkAt;
+	private double lavaClosest = Double.MAX_VALUE;
+	private long lavaCloserAt;
 	private BlockPos walkWaterAt;
 	private long walkWaterSince;
 	private BlockPos farWaterAt;
