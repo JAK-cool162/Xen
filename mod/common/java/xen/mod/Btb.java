@@ -175,7 +175,8 @@ final class Btb {
 		boolean dusk = c.goals.evening() && !o.under && o.overworld;           // (from the evening on: a roof before the dark, not in it)
 		boolean digsIn = diamondsToGet && o.tier >= 3 && o.health >= 14 && o.meals > 0;   // (night, an iron pickaxe, well and fed: down its staircase is its roof, and the diamonds are down there; Cid hid in a hole ten minutes)
 		if (dusk && !o.sheltered && !digsIn) out.add(new Option(Task.SHELTER, 5, "night, out in the open: a roof or a hole first"));
-		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
+		boolean hurtNoFood = o.meals == 0 && o.food < 18 && o.health <= 12;     // (hurt, under 18 it doesn't heal, nothing to eat: food comes first; Ann at five health went after diamonds, then coal, ten minutes)
+		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
