@@ -2937,10 +2937,13 @@ final class Chores {
 
 	/** Water within two blocks of it (it sits in or by an aquifer, a flooded cave): no way there but a swim. */
 	private static boolean byWater(ServerLevel level, BlockPos o) {
-		for (BlockPos q : BlockPos.betweenClosed(o.offset(-2, -1, -2), o.offset(2, 2, 2)))
+		for (BlockPos q : BlockPos.betweenClosed(o.offset(-3, -1, -3), o.offset(3, 3, 3)))
 			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
 		return false;
 	}
+
+	/** Since when it has been in the water on its way to ore it knows of (a while of that: the way there is a swim, the next one). */
+	private long oreWetSince = -1;
 
 	private Action knownOre(String kind, int got, int want) {
 		var p = c.player;
@@ -2964,6 +2967,17 @@ final class Chores {
 			}
 		}
 		BlockPos nearest = known.stream().min(java.util.Comparator.comparingDouble(o -> o.distSqr(feet))).get();
+		if (p.isInWater()) {                                                    // ten seconds swimming toward it: that one's a swim (an aquifer, a flooded cave), a drier one
+			if (oreWetSince < 0) oreWetSince = now();
+			else if (now() - oreWetSince > 200) {
+				c.journal("way", "lets the " + kind + " at " + nearest.toShortString() + " go: the way there is through water");
+				c.hunch.taken(nearest);
+				skip.add(Perception.Beliefs.key(nearest.getX(), nearest.getY(), nearest.getZ()));
+				known.remove(nearest);
+				oreWetSince = -1;
+				return null;
+			}
+		} else oreWetSince = -1;
 		if (c.guide.leadingTo(kind) || nearest.getY() < feet.getY() - 8 && !caveMode && toMine == null) {   // its guide has a dry way to one (it owns the way there), or they're deep under it (its staircase, then its way-finder for the last of it): not a second way over theirs
 			oreBest = Double.MAX_VALUE;                                         // (no clock on it meanwhile)
 			oreBestAt = now();
