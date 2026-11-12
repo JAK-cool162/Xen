@@ -517,9 +517,9 @@ final class Nether {
 		return pouredTop != null && now() - pouredTopAt < 20 * 60 * 5 && q.closerThan(pouredTop, 6);
 	}
 
-	/** Lava by some it couldn't get to (six blocks round): the same pool, not tried again. */
+	/** Lava by some it couldn't get to (ten blocks round): the same pool, not tried again (Cid: "can't get to the lava", then the same pool six blocks over). */
 	private boolean triedLava(BlockPos r) {
-		for (BlockPos b : badLava) if (b.closerThan(r, 6)) return true;
+		for (BlockPos b : badLava) if (b.closerThan(r, 10)) return true;
 		return false;
 	}
 
