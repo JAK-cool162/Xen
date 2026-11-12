@@ -68,6 +68,8 @@ final class Chores {
 	private UUID forWhom;
 	private String giveItem;
 	private final Set<Long> skip = new HashSet<>();
+	/** Blocks it gave up on (couldn't get at, no way there), and when: skipped by the chores after too, for ten minutes. */
+	private final java.util.Map<Long, Long> gaveUpAt = new java.util.HashMap<>();
 	/** The ores it's walking to (the quickest of them), and since when: kept a while so it's one goal, not a new one each step. */
 	private List<BlockPos> oreWay;
 	private long oreWayAt;
@@ -177,6 +179,8 @@ final class Chores {
 		progressFrom = c.player.position();
 		progressKnown = c.g1x.size();
 		skip.clear();
+		gaveUpAt.values().removeIf(t -> now() - t > 20 * 60 * 10);             // (blocks it gave up on these ten minutes: not straight back to them, chore after chore (Ann, the same obsidian six times))
+		skip.addAll(gaveUpAt.keySet());
 		saidLooking = false;
 		scans = 0;
 		wander = null;
@@ -2145,7 +2149,10 @@ final class Chores {
 				doing = String.format(java.util.Locale.ROOT, "getting %s (%d of %d)", fetchDrop.replace('_', ' '), countItem(fetchDrop) - had, fetchWant);
 				return reach(pickupAt);
 			}
-			if (noWay) pickupGoneAt = now() - 20;
+			if (noWay) {
+				pickupGoneAt = now() - 20;
+				gaveUpAt.put(Perception.Beliefs.key(pickupAt.getX(), pickupAt.getY(), pickupAt.getZ()), now());
+			}
 			if (pickupGoneAt < 0) pickupGoneAt = now();
 			if (now() - pickupGoneAt < 20) return Action.IDLE;                // (a moment for the drop to land)
 			skip.add(Perception.Beliefs.key(pickupAt.getX(), pickupAt.getY(), pickupAt.getZ()));
@@ -3195,6 +3202,7 @@ final class Chores {
 
 	private Action giveUp(BlockPos t) {
 		skip.add(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()));
+		gaveUpAt.put(Perception.Beliefs.key(t.getX(), t.getY(), t.getZ()), now());
 		target = null;
 		return null;
 	}

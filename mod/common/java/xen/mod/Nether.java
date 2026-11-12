@@ -449,14 +449,18 @@ final class Nether {
 		if (now() - lavaLookedAt < 100) return null;
 		lavaLookedAt = now();
 		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 128, 160, 16);
-		int dry = 0, open = 0;
+		int dry = 0, open = 0, far = 0;
 		BlockPos wetOne = null;                                                 // (by water: water's on it already, or soon; the next best)
 		BlockPos openDry = null, openAny = null;                               // (open to the air, nowhere level to stand: cave lava's a block or two below the floor; within reach is enough to pour)
 		for (BlockPos q : pools) {
 			boolean tried = false;
 			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
 			if (tried) continue;                                                     // (one it couldn't get to)
-			for (BlockPos r : BlockPos.betweenClosed(q.offset(-3, -2, -3), q.offset(3, 2, 3))) {
+			if (!level.isLoaded(q)) {
+				far++;                                                               // (too far off for the world to be there yet)
+				continue;
+			}
+			for (BlockPos r : BlockPos.betweenClosed(q.offset(-4, -2, -4), q.offset(4, 12, 4))) {   // (up to its top: what it knows of is a block of the pool, often deep in it; the lava lake's top, open to the cave over it, is up to a dozen blocks up)
 				if (!level.isLoaded(r) || !level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA) || !level.getFluidState(r).isSource()) continue;
 				if (!level.getBlockState(r.above()).isAir()) continue;
 				open++;
@@ -488,7 +492,7 @@ final class Nether {
 		}
 		if (now() - lavaSaidAt > 1200) {
 			lavaSaidAt = now();
-			c.journal("thinks", String.format(java.util.Locale.ROOT, "no lava pool it can stand by (%d pools known, %d open to the air, %d dry)", pools.size(), open, dry));
+			c.journal("thinks", String.format(java.util.Locale.ROOT, "no lava pool it can stand by (%d pools known, %d too far off to look at, %d open to the air, %d dry)", pools.size(), far, open, dry));
 		}
 		return null;
 	}
@@ -637,7 +641,7 @@ final class Nether {
 		}
 		BlockPos top = lavaAt.above();
 		double d = c.player.getEyePosition().distanceTo(Vec3.atCenterOf(top));
-		if (d > 4) {
+		if (d > 4.5) {                                                           // (a player's reach)
 			if (!lavaAt.equals(lavaWalkAt) || d < lavaClosest - 1) {
 				if (!lavaAt.equals(lavaWalkAt)) lavaClosest = Double.MAX_VALUE;
 				lavaWalkAt = lavaAt.immutable();
@@ -651,7 +655,7 @@ final class Nether {
 				lavaLookedAt = -1000;
 				return null;
 			}
-			return c.walkTo(Vec3.atBottomCenterOf(top));
+			return c.walkTo(Goal.near(top, 3));                                // (anywhere dry within three of it: over the lava itself is no place to walk to; Bob, forty seconds no closer, pool after pool)
 		}
 		if (pouredAt < 0) {
 			c.goals.instant = "pouring water on the lava";
