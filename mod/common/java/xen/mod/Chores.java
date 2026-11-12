@@ -1116,6 +1116,10 @@ final class Chores {
 				return c.walkTo(new net.minecraft.world.phys.Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
 			}
 		}
+		if (known == null && forWood && c.mod.config.luck >= 2 && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {   // knowing everything: the nearest tree (Bob looked round the plains for trees four minutes)
+			BlockPos tree = knownTree();
+			if (tree != null) known = new int[] {tree.getX(), tree.getY(), tree.getZ(), 1, Blocks.LOG};
+		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
 		if (known == null) {
 			if (!saidLooking) {                                         // (asked, and it just answered: once is enough)
@@ -2812,6 +2816,40 @@ final class Chores {
 			}
 		}
 		return best;
+	}
+
+	private BlockPos treeKnown;
+	private long treeLookedAt = -1000;
+
+	/**
+	 * Knowing everything: the nearest tree (within 96 blocks, the world as loaded), its lowest log, the one it can reach
+	 * from the ground; looked for every five seconds. Null: none.
+	 */
+	private BlockPos knownTree() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (treeKnown != null && level.isLoaded(treeKnown) && level.getBlockState(treeKnown).is(net.minecraft.tags.BlockTags.LOGS)
+				&& !skip.contains(Perception.Beliefs.key(treeKnown.getX(), treeKnown.getY(), treeKnown.getZ()))) return treeKnown;
+		if (now() - treeLookedAt < 100) return null;
+		treeLookedAt = now();
+		treeKnown = null;
+		BlockPos feet = c.player.blockPosition();
+		double best = Double.MAX_VALUE;
+		for (int dx = -96; dx <= 96; dx += 2)
+			for (int dz = -96; dz <= 96; dz += 2) {
+				double d = dx * dx + dz * dz;
+				if (d >= best || d > 96 * 96) continue;
+				int x = feet.getX() + dx, z = feet.getZ() + dz;
+				if (!level.isLoaded(new BlockPos(x, 0, z))) continue;
+				int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+				BlockPos log = new BlockPos(x, top - 1, z);
+				if (!level.getBlockState(log).is(net.minecraft.tags.BlockTags.LOGS)) continue;
+				while (level.getBlockState(log.below()).is(net.minecraft.tags.BlockTags.LOGS)) log = log.below();   // (down the trunk to the ground)
+				if (skip.contains(Perception.Beliefs.key(log.getX(), log.getY(), log.getZ())) || !WorldSenses.treeLog(level, log)) continue;
+				best = d;
+				treeKnown = log.immutable();
+			}
+		if (treeKnown != null) c.journal("thinks", "knows of a tree at " + treeKnown.toShortString() + " (" + (int) Math.sqrt(best) + " blocks)");
+		return treeKnown;
 	}
 
 	private int[] glance(int[] cats) {
