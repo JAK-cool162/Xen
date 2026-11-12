@@ -1253,7 +1253,7 @@ final class Chores {
 			return "You will go back to your mine for " + what + " (down the staircase at " + entrance.getX() + " " + entrance.getZ() + ", on with tunnel "
 					+ (mineLeg / 2 + 1) + ").";
 		}
-		Mine theirs = sharedMine(y, dark ? 32 : 160);                           // someone's mine close by: down their stairs, its own tunnels off the bottom
+		Mine theirs = c.btb.on() ? null : sharedMine(y, dark ? 32 : 160);       // someone's mine close by: down their stairs, its own tunnels off the bottom (Back to Basics: its own; two on one staircase a block wide stand in each other's way)
 		if (theirs != null) {
 			using = theirs;
 			theirs.users++;
