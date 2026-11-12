@@ -2471,6 +2471,19 @@ public final class Companion {
 	/** What killed it last ("skeleton", "lava"), for the sign it leaves there. */
 	String diedOf = "";
 
+	private long killerWaitSince = -1;
+
+	/** A monster by that spot it would walk into again (one that shoots, throws potions or blows up), or null. */
+	private net.minecraft.world.entity.Mob dangerAt(BlockPos at) {
+		for (net.minecraft.world.entity.Mob m : player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(at).inflate(12),
+				x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy)) {
+			String k = BuiltInRegistries.ENTITY_TYPE.getKey(m.getType()).getPath();
+			if (k.equals("witch") || k.endsWith("skeleton") || k.equals("stray") || k.equals("bogged") || k.equals("pillager") || k.equals("creeper")
+					|| k.equals("blaze") || k.equals("evoker") || k.equals("vindicator") || k.equals("ravager")) return m;
+		}
+		return null;
+	}
+
 	private Action backForMyThings() {
 		if (lostAt == null || player.level().dimension() != lostDimension || fighting) return null;
 		long now = player.level().getGameTime();
@@ -2502,6 +2515,23 @@ public final class Companion {
 						"no sword, night, its things out where it died" + (diedOf.isEmpty() ? "" : " (" + diedOf + ")"), 600)) {
 			goals.instant = "waiting for morning to go back for its things";
 			return null;
+		}
+		if (!vanishing) {                                                    // what killed it still there by its things (a witch, a skeleton): not straight back into it
+			net.minecraft.world.entity.Mob there = dangerAt(lostAt);
+			if (there != null && (killerWaitSince < 0 || now - killerWaitSince < 20 * 90)) {
+				String k = BuiltInRegistries.ENTITY_TYPE.getKey(there.getType()).getPath().replace('_', ' ');
+				if (killerWaitSince < 0) {
+					killerWaitSince = now;
+					journal("thinks", "a " + k + " by its things: keeps away till it's gone (Ann went straight back to the witch that killed her, and it killed her again)");
+				}
+				goals.instant = "waiting for the " + k + " by its things to go";
+				if (far < 20) {
+					Vec3 away = player.position().subtract(Vec3.atCenterOf(lostAt)).normalize().scale(24).add(Vec3.atCenterOf(lostAt));
+					return walkTo(away);
+				}
+				return null;                                                  // (its other work meanwhile)
+			}
+			if (there == null) killerWaitSince = -1;
 		}
 		if (!saidGoingBack) {
 			saidGoingBack = true;
