@@ -453,7 +453,7 @@ final class Nether {
 	private BlockPos knownLava(ServerLevel level) {
 		if (now() - lavaLookedAt < 100) return null;
 		lavaLookedAt = now();
-		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 128, 160, 16);
+		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 128, 160, 48);   // (forty-eight: the nearest sixteen were often all sealed in the rock, none open to a cave)
 		int dry = 0, open = 0, far = 0;
 		BlockPos wetOne = null;                                                 // (by water: water's on it already, or soon; the next best)
 		BlockPos openDry = null, openAny = null;                               // (open to the air, nowhere level to stand: cave lava's a block or two below the floor; within reach is enough to pour)
