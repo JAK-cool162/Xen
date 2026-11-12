@@ -1392,6 +1392,8 @@ public final class Companion {
 		}
 		Action hungry = starving();
 		if (hungry != null) return hungry;
+		payRent();
+		handOutNext();                                                    // (what it was asked to share out, its rent: handed over between tasks)
 		btb.nightfall();
 		if (chores.busy()) {
 			Action chore = chores.next();
@@ -1448,6 +1450,120 @@ public final class Companion {
 			bodyHolder = "";
 		}
 		return a;
+	}
+
+	// ------------------------------------------------------------------------- sharing out, rent (its sums: Sums)
+	/** What it's to hand over, one after the other: who, what, how many. */
+	private final java.util.ArrayDeque<Object[]> toHand = new java.util.ArrayDeque<>();
+
+	private static final java.util.regex.Pattern SHARE = java.util.regex.Pattern.compile(
+			"\\b(?:share|split|divide)\\s+(?:out\\s+)?(?:all\\s+)?(?:of\\s+)?(?:your|ur|the)\\s+([a-z_ ]+?)\\s+(?:with|between|among|amongst)\\s+(.+?)[.!?]*$");
+
+	/** "Iron" is its ingots, "diamonds" a diamond: the item someone means by a word. */
+	private static String itemWord(String w) {
+		w = w.trim().replace(' ', '_');
+		if (w.endsWith("ies")) w = w.substring(0, w.length() - 3) + "y";
+		else if (w.endsWith("s") && !w.endsWith("ss") && w.length() > 3) w = w.substring(0, w.length() - 1);
+		return switch (w) {
+			case "iron" -> "iron_ingot";
+			case "gold" -> "gold_ingot";
+			case "netherite" -> "netherite_ingot";
+			case "lapi" -> "lapis_lazuli";
+			default -> w;
+		};
+	}
+
+	/**
+	 * "Share your diamonds with Bob and me", "split the iron between us": a fair share each (whole items, the rest one
+	 * each to the first ones), it keeps a share too, and hands the others theirs, one after the other. Its owner's say
+	 * only (or anyone's, with no owner).
+	 */
+	String shareOut(ServerPlayer from, String words) {
+		var m = SHARE.matcher(words.toLowerCase(java.util.Locale.ROOT));
+		if (!m.find() || player == null) return null;
+		if (owner != null && !owner.equals(from.getUUID())) return "Only " + ownerName + " can tell me to share my things.";
+		String item = itemWord(m.group(1));
+		java.util.List<ServerPlayer> to = new java.util.ArrayList<>();
+		for (String n : m.group(2).split("\\s*(?:,|\\band\\b|&)\\s*")) {
+			n = n.trim();
+			if (n.isEmpty()) continue;
+			if (n.matches("me|myself|i")) to.add(from);
+			else if (n.matches("us|everyone|everybody|all of us|the team|you all|y'?all|all")) {
+				to.add(from);
+				for (ServerPlayer p : server.getPlayerList().getPlayers()) if (p.level() == from.level() && p.distanceTo(from) <= 32) to.add(p);
+			} else {
+				ServerPlayer p = server.getPlayerList().getPlayerByName(n);
+				if (p != null) to.add(p);
+			}
+		}
+		to.removeIf(p -> p == player);
+		java.util.List<ServerPlayer> once = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(to));
+		if (once.isEmpty()) return "Share with who?";
+		int have = items().getOrDefault(item, 0);
+		if (have == 0) return "I've got no " + item.replace('_', ' ') + " to share.";
+		int[] shares = Sums.split(have, once.size() + 1);
+		StringBuilder who = new StringBuilder();
+		for (int i = 0; i < once.size(); i++) {
+			if (shares[i] > 0) toHand.add(new Object[] {once.get(i), item, shares[i]});
+			who.append(i == 0 ? "" : i == once.size() - 1 ? " and " : ", ").append(shares[i]).append(" for ").append(once.get(i) == from ? "you" : once.get(i).getName().getString());
+		}
+		journal("does", "shares out " + have + " " + item + ": " + who + ", keeps " + shares[shares.length - 1]);
+		return have + " between " + (once.size() + 1) + ": " + who + ", and I keep " + shares[shares.length - 1] + ".";
+	}
+
+	/** The next of what it's to hand over (when it isn't on anything else). */
+	private void handOutNext() {
+		if (toHand.isEmpty() || chores.busy()) return;
+		Object[] g = toHand.poll();
+		ServerPlayer p = (ServerPlayer) g[0];
+		if (p.isAlive() && p.level() == player.level()) chores.give(p, (String) g[1], (Integer) g[2]);
+	}
+
+	private static final java.util.regex.Pattern RENT = java.util.regex.Pattern.compile(
+			"\\brent(?:\\s+is|\\s+will be|'s|:)?\\s+(\\d+)\\s+([a-z_ ]+?)\\s+(?:a|per|each|every)\\s+(day|week)\\b");
+	private static final java.util.regex.Pattern NO_RENT = java.util.regex.Pattern.compile("\\b(no (more )?rent|rent[- ]free|stop (paying|the) rent|forget the rent)\\b");
+	/** Its rent: to whom, what, how much, every how many days, and the day it last paid (or couldn't). */
+	private UUID rentTo;
+	private String rentItem;
+	private int rentAmount, rentEvery = 1;
+	private long rentDay = -1;
+
+	/** "Your rent is 2 iron a day" (or "5 emeralds a week"; "no more rent"): what it pays for its keep, each morning it's due. */
+	String rentAsked(ServerPlayer from, String words) {
+		String w = words.toLowerCase(java.util.Locale.ROOT);
+		if (NO_RENT.matcher(w).find() && from.getUUID().equals(rentTo)) {
+			rentTo = null;
+			return pick3("No more rent? Thanks!", "Rent-free, nice. Thank you.", "Oh, thanks! No rent then.");
+		}
+		var m = RENT.matcher(w);
+		if (!m.find()) return null;
+		if (owner != null && !owner.equals(from.getUUID())) return "I don't pay rent to you, only " + ownerName + " can set that.";
+		rentTo = from.getUUID();
+		rentAmount = Math.max(1, Integer.parseInt(m.group(1)));
+		rentItem = itemWord(m.group(2));
+		rentEvery = m.group(3).equals("week") ? 7 : 1;
+		rentDay = player.level().getGameTime() / 24000;                    // (from tomorrow)
+		journal("does", "agrees to pay " + from.getName().getString() + " " + rentAmount + " " + rentItem + " every " + (rentEvery == 1 ? "day" : "week"));
+		return "Okay, " + rentAmount + " " + rentItem.replace('_', ' ') + " every " + (rentEvery == 1 ? "day" : "week") + ". I'll pay you in the mornings.";
+	}
+
+	/** Each morning the rent is due: paid if it has it (handed over), said once if it can't. */
+	private void payRent() {
+		if (rentTo == null || player == null) return;
+		long day = player.level().getGameTime() / 24000;
+		if (day - rentDay < rentEvery) return;
+		ServerPlayer to = server.getPlayerList().getPlayer(rentTo);
+		if (to == null) return;                                             // (they're not on: when they are)
+		rentDay = day;
+		int have = items().getOrDefault(rentItem, 0);
+		if (have >= rentAmount) {
+			toHand.add(new Object[] {to, rentItem, rentAmount});
+			journal("does", "pays its rent: " + rentAmount + " " + rentItem);
+			chatter("Rent's coming, " + to.getName().getString() + ".", false);
+		} else {
+			journal("does", "can't pay its rent today (" + have + " of " + rentAmount + " " + rentItem + ")");
+			chatter("Sorry " + to.getName().getString() + ", I can't pay the rent today. I've only got " + have + " " + rentItem.replace('_', ' ') + ".", true);
+		}
 	}
 
 	/** Following someone (close up, then it waits) or staying put (back to where it was told to stay). */
@@ -5235,6 +5351,21 @@ public final class Companion {
 				return null;
 			}
 			if (trade) r = new xen.mod.talk.Chat.Request("chat", "", 0);
+		}
+		String sum = Sums.answer(words);                                    // a sum (15% of 64, 12*4, split 30 between 4): worked out, never guessed
+		if (sum != null) {
+			say(sum);
+			return null;
+		}
+		String shared = shareOut(from, words);                              // "split your diamonds with Bob and me": a fair share each, handed over
+		if (shared != null) {
+			say(shared);
+			return null;
+		}
+		String rent = rentAsked(from, words);                               // "your rent is 2 iron a day"
+		if (rent != null) {
+			say(rent);
+			return null;
 		}
 		if (r.intent().equals("peace")) {                                   // anyone may ask for peace (not only its owner)
 			Tribe t = tribe();

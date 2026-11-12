@@ -245,7 +245,7 @@ final class Laws {
 				if (m == leader || m.player == null || m.player.distanceTo(leader.player) > 32) continue;
 				int has = m.items().getOrDefault(money, 0);
 				if (has <= 0) continue;
-				int due = Math.max(1, Math.round(has * charter.tax / 100f));
+				int due = Sums.percent(has, charter.tax);                          // (its sums: one head for numbers)
 				float willing = m.personality.loyalty + m.trust(leader.player.getUUID()) + 0.3f * m.mod.society.feel(m);
 				if (willing > 0.6f) {
 					m.chores.give(leader.player, money, due);
