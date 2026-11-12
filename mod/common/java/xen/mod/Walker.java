@@ -397,15 +397,18 @@ final class Walker {
 	 * Planning takes time: all the Xens together think about at most this many blocks each server tick (with 50 Xens,
 	 * a few of them plan each tick and the rest walk the way they have), so the server never stutters.
 	 */
-	private static final int NODES_PER_TICK = 5000;
+	private static final int NODES_PER_TICK = 2500;                         // (on average, every Xen together: about a fifth of a tick's time)
 	private static int budgetTick = -1, budgetUsed;
+	/** Blocks thought about and not yet paid off (each tick pays NODES_PER_TICK of it): a plan only while there's none owing. */
+	private static double planDebt;
 
 	private static boolean budget(int tick) {
 		if (tick != budgetTick) {
+			planDebt = Math.max(0, planDebt - NODES_PER_TICK * (double) Math.max(1, tick - budgetTick));
 			budgetTick = tick;
 			budgetUsed = 0;
 		}
-		if (budgetUsed >= NODES_PER_TICK) return false;
+		if (budgetUsed >= NODES_PER_TICK || planDebt >= NODES_PER_TICK) return false;   // (what the plans really cost, not what they were meant to: a plan that kept on to four times its limit was counted as one, and the Xens took the whole tick)
 		budgetUsed += LIMIT;
 		return true;
 	}
@@ -676,6 +679,7 @@ final class Walker {
 			}
 		}
 		gridOn = false;                                                      // (what's next isn't planning)
+		planDebt += expanded;
 		Perf.count("plans", 1);
 		Perf.count("plan nodes", expanded);
 		if (best == first) Perf.count("plans none", 1);
