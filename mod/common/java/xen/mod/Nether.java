@@ -658,14 +658,16 @@ final class Nether {
 		if (now() - farWaterLooked < 20 * 30) return farWaterAt;
 		farWaterLooked = now();
 		ServerLevel level = (ServerLevel) c.player.level();
-		BlockPos feet = c.player.blockPosition(), best = null;
-		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-40, -12, -40), feet.offset(40, 12, 40))) {
+		BlockPos feet = c.player.blockPosition(), best = null, any = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-48, -20, -48), feet.offset(48, 20, 48))) {
 			if (!level.isLoaded(q)) continue;
 			var f = level.getFluidState(q);
 			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir() || badWater.contains(q)) continue;
+			if (any == null || q.distSqr(feet) < any.distSqr(feet)) any = q.immutable();
 			if (best != null && q.distSqr(feet) >= best.distSqr(feet) || shoreBy(level, q) == null) continue;   // (water with dry ground beside it to stand on: the edge of a pond, not the middle of the sea)
 			best = q.immutable();
 		}
+		if (best == null) best = any;                                            // (no pond edge: the nearest it can stand over; twenty seconds not up to it, it's let go)
 		farWaterAt = best;
 		if (best != null) c.journal("thinks", "water for its bucket at " + best.toShortString());
 		return best;
