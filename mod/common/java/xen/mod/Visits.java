@@ -90,6 +90,10 @@ final class Visits {
 			end("nothing more coming of it");
 			return null;
 		}
+		if (atGuessed && c.player.level().hasChunkAt(at)) {                   // (the ground there, now the world's there)
+			at = new BlockPos(at.getX(), c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()), at.getZ());
+			atGuessed = false;
+		}
 		int stuff = c.items().values().stream().mapToInt(Integer::intValue).sum() + been.size();
 		if (stuff != progressStuff) {
 			progressStuff = stuff;
@@ -100,16 +104,71 @@ final class Visits {
 		return kind.equals("village") ? village() : portal();
 	}
 
-	/** The nearest place worth a visit it knows of and hasn't been to (a village within 192, a ruined portal within 128). */
+	/** Knowing the world: the nearest village and ruined portal (where the server put them), looked up a minute at a time. */
+	private BlockPos knownVillage, knownPortal;
+	private long knownLookedAt = -100_000;
+	/** Its place's height is a guess (it knew of it, it hasn't seen it): the ground there, once it's loaded. */
+	private boolean atGuessed;
+
+	private void lookUp() {
+		if (c.mod.config.luck < 2 || c.minion || now() - knownLookedAt < 20 * 60) return;
+		knownLookedAt = now();
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		try {
+			knownVillage = level.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, feet, 16, false);
+		} catch (RuntimeException e) {
+			knownVillage = null;
+		}
+		try {
+			knownPortal = level.findNearestMapStructure(net.minecraft.tags.StructureTags.RUINED_PORTAL, feet, 10, false);
+		} catch (RuntimeException e) {
+			knownPortal = null;
+		}
+	}
+
+	/** Where it'd go: what it saw, or (knowing the world) what it knows of; null if none in range it hasn't been to. */
+	private BlockPos placeOf(String k, BlockPos feet) {
+		BlockPos p = c.structures.found.get(k);
+		if (p == null) p = c.places.get(k);
+		if (p == null && c.mod.config.luck >= 2) {
+			lookUp();
+			p = k.equals("village") ? knownVillage : knownPortal;
+		}
+		if (p == null || visited.contains(p) || visited.stream().anyMatch(v -> Math.abs(v.getX() - p.getX()) + Math.abs(v.getZ() - p.getZ()) < 48)) return null;
+		return Math.hypot(p.getX() - feet.getX(), p.getZ() - feet.getZ()) < (k.equals("village") ? 256 : 160) ? p : null;
+	}
+
+	/** A place worth a visit it could go to now (for its brain: a village's chests, a ruined portal's, before digging for it). */
+	boolean candidate() {
+		if (c.player == null || at != null) return at != null;
+		BlockPos feet = c.player.blockPosition();
+		return placeOf("village", feet) != null || placeOf("ruined portal", feet) != null;
+	}
+
+	/** Its brain sends it: off to the nearest (a "You will..." plan), or null if there's none. */
+	String begin() {
+		if (at == null) pick();
+		return at == null ? null : "You will visit the " + kind + ".";
+	}
+
+	boolean visiting() {
+		return at != null;
+	}
+
+	/** Called off (night coming, its brain on to something else). */
+	void stop(String why) {
+		if (at != null) end(why);
+	}
+
+	/** The nearest place worth a visit it knows of and hasn't been to (a village within 256, a ruined portal within 160). */
 	private void pick() {
 		BlockPos feet = c.player.blockPosition();
 		BlockPos best = null;
 		String bestKind = "";
 		for (String k : new String[] {"village", "ruined portal"}) {
-			BlockPos p = c.structures.found.get(k);
-			if (p == null) p = c.places.get(k);
-			if (p == null || visited.contains(p)) continue;
-			if (!p.closerThan(feet, k.equals("village") ? 192 : 128)) continue;
+			BlockPos p = placeOf(k, feet);
+			if (p == null) continue;
 			if (best == null || p.distSqr(feet) < best.distSqr(feet)) {
 				best = p;
 				bestKind = k;
@@ -123,7 +182,12 @@ final class Visits {
 		wantsFood = items.getOrDefault("food", 0) < 8;
 		wantsVillager = c.goals.home != null || c.personality.plan == xen.mod.core.Strategy.SETTLER || c.personality.plan == xen.mod.core.Strategy.BUILDER
 				|| c.mod.config.runner;                                          // (a runner: one in a pit, to trade with on the way)
-		at = best;
+		ServerLevel lv = (ServerLevel) c.player.level();
+		atGuessed = !lv.hasChunkAt(best) || best.getY() == 0;
+		at = lv.hasChunkAt(best) ? new BlockPos(best.getX(), lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, best.getX(), best.getZ()), best.getZ())
+				: new BlockPos(best.getX(), Math.max(64, feet.getY()), best.getZ());
+		if (lv.hasChunkAt(best)) atGuessed = false;
+		visited.add(best.immutable());                                       // (the place as it knew it: not picked again, whatever comes of it)
 		kind = bestKind;
 		until = now() + 20 * 60 * 4;                                         // (four minutes, then: as long as it's getting somewhere)
 		progressAt = now();

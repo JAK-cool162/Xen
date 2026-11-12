@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -58,6 +58,8 @@ final class Btb {
 	}
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
+	private long visitLookedAt = -100_000;
+	private boolean visitThere;
 	/** The longer goal (its DMM's call): "gear" (tools, iron, diamonds, armor), "home", "enchant", "world". */
 	String goal = "gear";
 	private long goalAt = -100000;
@@ -205,6 +207,14 @@ final class Btb {
 				else if (o.iron >= 3) out.add(new Option(Task.TOOLS, 4.3f, "a new iron pickaxe (this one is nearly worn out)"));   // (the iron in its bag: made now, not after it breaks; raw iron: smelting's offered)
 			} else out.add(new Option(Task.DIAMONDS, 3.9f, "diamonds (a diamond pickaxe, a sword, armor)"));
 		}
+		boolean lootFor = goal.equals("enchant") && bag.getOrDefault("obsidian", 0) < 4 && c.enchanter.table() == null && bag.getOrDefault("enchanting_table", 0) == 0
+				|| goal.equals("gear") && o.tier < 3;
+		if (lootFor && !o.night && o.overworld && now() - visitLookedAt > 20 * 30) {   // (a village's chests or a ruined portal's: obsidian, iron, before digging for it, as players do)
+			visitLookedAt = now();
+			visitThere = c.visits.candidate();
+		}
+		if (lootFor && !o.night && o.overworld && visitThere)
+			out.add(new Option(Task.VISIT, 3.5f, "a village's chests or a ruined portal's first (obsidian at the weaponsmith's, iron, the portal's own)"));
 		if (goal.equals("enchant")) {
 			if (c.enchanter.possible()) out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
@@ -266,7 +276,7 @@ final class Btb {
 	 * (Mining goes on: it's under the ground in a few steps.) True if it dropped its task.
 	 */
 	boolean nightfall() {
-		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD && task != Task.SMELT && task != Task.TABLE && task != Task.HOME && task != Task.TOOLS
+		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD && task != Task.SMELT && task != Task.TABLE && task != Task.HOME && task != Task.TOOLS && task != Task.VISIT
 				|| now() - nightCheckedAt < 40) return false;                           // (any errand up top: Bob went on to his furnace at night, three zombies, dead)
 		nightCheckedAt = now();
 		var p = c.player;
@@ -275,6 +285,7 @@ final class Btb {
 		if (c.chores.busy()) c.chores.cancel();
 		if (c.nether.busy()) c.nether.cancel();
 		if (c.builder.busy()) c.builder.cancel();
+		if (task == Task.VISIT) c.visits.stop("the sun's going down");
 		dropped = true;
 		return true;
 	}
@@ -364,6 +375,7 @@ final class Btb {
 			case BLAZE -> c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
 			case PEARLS -> c.chores.slay("enderman", "ender_pearl", 12 - pearls(), "ender pearls");
 			case EXPLORE -> "You will look around.";
+			case VISIT -> c.visits.begin();
 			case NONE -> null;
 		};
 	}
@@ -424,7 +436,7 @@ final class Btb {
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
 	boolean busy() {
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
-		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on);
+		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || task == Task.VISIT && c.visits.visiting());
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
@@ -442,6 +454,7 @@ final class Btb {
 		return switch (t) {
 			case DIAMONDS, IRON, TOOLS -> goal.equals("gear");
 			case TABLE, ENCHANT -> goal.equals("enchant");
+			case VISIT -> goal.equals("enchant") || goal.equals("gear");
 			case BLAZE, PEARLS -> goal.equals("nether");
 			default -> false;
 		};
