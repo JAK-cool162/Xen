@@ -21,7 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   better on the last few hundred new pictures do the Xens see with it; till then, with the one that came with the mod.
  *   Learning can't make their eyes worse.</li>
  *   <li><b>What it learns from</b>: this picture and seven it kept (the last 512 with something in them, the last 512
- *   with nothing: a monster's in few pictures, and it mustn't learn that nothing ever is).</li>
+ *   with nothing), drawn as often as each comes up in play (drawn half and half, it learned monsters are about far
+ *   more than they are, and got worse); small steps, and a pull back toward what the mod's knew.</li>
  *   <li><b>Light</b>: a millisecond or two a lesson, on a thread of its own, one lesson per whole view a Xen takes in
  *   (one every second or so); the pictures it keeps, a few hundred kilobytes.</li>
  *   <li><b>Kept</b>: config/xen/glance_learned.json (the same shape as the one that comes with the mod), learning on
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class GlanceLearner {
 	private static final int PICTURE = Glance.C * Glance.H * Glance.W, KEEP = 512, BATCH = 8, FAIR = 300;
-	private static final float LR = 3e-4f;
+	private static final float LR = 1e-4f, PULL = 0.05f;
 
 	private final Glance shipped;
 	private final Glance learning, grad, m, v;
@@ -39,7 +40,7 @@ public final class GlanceLearner {
 	private final Path file;
 	private final byte[][] pos = new byte[KEEP][], neg = new byte[KEEP][];
 	private final float[][] posY = new float[KEEP][], negY = new float[KEEP][];
-	private int posN, negN, posAt, negAt, steps, seen, learnedBefore;
+	private int posN, negN, posAt, negAt, steps, seen, posSeen, learnedBefore;
 	private volatile double lossShipped, lossLearned;
 	private final Random random = new Random();
 	private final AtomicInteger queued = new AtomicInteger();
@@ -113,6 +114,7 @@ public final class GlanceLearner {
 		lossLearned += a * (ll - lossLearned);
 		boolean something = false;
 		for (float t : y) something |= t > 0;
+		if (something) posSeen++;
 		if (something) {
 			pos[posAt] = px;
 			posY[posAt] = y;
@@ -127,13 +129,15 @@ public final class GlanceLearner {
 		grad.zero();
 		int n = 1;
 		learning.backprop(x, y, grad);
-		for (int b = 1; b < BATCH; b++) {                                       // (and some it kept: half with something in them, if it has them)
-			boolean fromPos = (b & 1) == 1 ? posN > 0 : negN == 0;
+		float posRate = (float) posSeen / seen;
+		for (int b = 1; b < BATCH; b++) {                                       // (and some it kept: as often with something in them as play has)
+			boolean fromPos = posN > 0 && (negN == 0 || random.nextFloat() < posRate);
 			if (fromPos && posN == 0 || !fromPos && negN == 0) continue;
 			int i = random.nextInt(fromPos ? posN : negN);
 			learning.backprop(unpack(fromPos ? pos[i] : neg[i]), fromPos ? posY[i] : negY[i], grad);
 			n++;
 		}
+		grad.pull(learning, shipped, PULL * n);                                  // (what the mod's knew: it strays from that only as far as the pictures pay for)
 		steps++;
 		learning.adam(grad, m, v, steps, LR, 1f / n);
 		if (steps % 25 == 0) {
@@ -141,7 +145,7 @@ public final class GlanceLearner {
 			usingLearned = better;
 			inUse = better ? learning.copy() : shipped;
 		}
-		if (steps % 100 == 0) save();
+		if (steps % 100 == 0 && seen >= FAIR && lossLearned <= lossShipped) save();   // (kept only if it's no worse than the mod's: never a worse start next time)
 	}
 
 	private void save() {

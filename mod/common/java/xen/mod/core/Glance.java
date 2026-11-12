@@ -247,6 +247,17 @@ public final class Glance {
 		return loss(out, y);
 	}
 
+	/** Adds to g (this) a pull of each of at's numbers back toward anchor's, k times how far it's gone (what it knew isn't lost). */
+	public void pull(Glance at, Glance anchor, float k) {
+		var G = arrays();
+		var P = at.arrays();
+		var A = anchor.arrays();
+		for (int a = 0; a < G.size(); a++) {
+			float[] g = G.get(a), p = P.get(a), an = A.get(a);
+			for (int i = 0; i < g.length; i++) g[i] += k * (p[i] - an[i]);
+		}
+	}
+
 	/** A step its numbers take, the way g says (Adam: m and v keep the running averages; t counts the steps, from 1). */
 	public void adam(Glance g, Glance m, Glance v, int t, float lr, float scale) {
 		var P = arrays();
