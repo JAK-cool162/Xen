@@ -327,6 +327,17 @@ final class Fighter {
 		if (swings && !foeSwung) foeSwungAt = now;                           // and sees it swing
 		foeSwung = swings;
 		double d = p.distanceTo(foe);
+		if (!(foe instanceof Player) && !c.inArena && c.chores.inItsHole()) {   // dug in for the night: it stays down there (Cid stepped out after a spider: tridents from the sea, five in eleven seconds, dead)
+			net.minecraft.core.BlockPos top = p.blockPosition().above(2);
+			if (p.level().getBlockState(top).canBeReplaced() && h.placeAt(top, c.personality.material)) {
+				c.journal("fight", "covers its hole: a roof over its head against the " + kind(foe).replace('_', ' '));
+				c.acted = true;
+				return Action.PLACE;
+			}
+			if (d <= p.entityInteractionRange() && p.getAttackStrengthScale(0.5f) >= 0.9f) return hit(foe);   // (what comes to the edge of it, it hits from in there)
+			c.goals.instant = "staying down in its hole (" + kind(foe).replace('_', ' ') + " about)";
+			return Action.IDLE;
+		}
 		boolean sprintable = p.getFoodData().getFoodLevel() > 6;             // like a player, it can't sprint when starving
 
 		if (hurtNow) {                                                         // hit again (and again): a combo on it

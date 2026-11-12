@@ -647,6 +647,17 @@ final class Chores {
 		return null;
 	}
 
+	/** Hiding for the night in a hole it dug: walls round its feet and its head (where it's safe as long as it stays). */
+	boolean inItsHole() {
+		if (!busy() || kind != Kind.HIDE || c.player == null) return false;
+		var level = c.player.level();
+		BlockPos feet = c.player.blockPosition();
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL)
+			for (BlockPos q : new BlockPos[] {feet.relative(d), feet.above().relative(d)})
+				if (level.getBlockState(q).getCollisionShape(level, q).isEmpty()) return false;
+		return true;
+	}
+
 	/** In a shelter, or making one, for the night. */
 	boolean sheltered() {
 		return kind == Kind.SHELTER || kind == Kind.HIDE;
