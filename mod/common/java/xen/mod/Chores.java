@@ -1581,12 +1581,25 @@ final class Chores {
 	private BlockPos caveTarget;
 	private long caveTargetAt;
 
+	private BlockPos toMineWas;
+	private long toMineSince;
+
 	private Action mineNext() {
 		if (caveLook > 0) {
 			Action a = lookForCave();
 			if (a != null) return a;
 		}
 		if (toMine != null && "lapis".equals(tripWhat) && c.mod.config.luck >= 2) toMine = null;   // (lapis it knows of: straight there, not to its mine first; Cid walked to his for three minutes and gave up)
+		if (toMine != null && !toMine.equals(toMineWas)) {
+			toMineWas = toMine;
+			toMineSince = now();
+		} else if (toMine != null && now() - toMineSince > 20 * 90) {            // a minute and a half and not there yet: it digs from here (Ann went to her mine for sixteen minutes, till the night got her)
+			c.journal("thinks", "can't get to " + (caveMode ? "the cave at " : "its mine at ") + toMine.toShortString() + ": digs from here instead");
+			if (caveMode) c.caves.done(toMine);
+			else c.places.forget("mine");
+			toMine = null;
+			toMineWas = null;
+		}
 		if (toMine != null) {                                                  // first to the mine's entrance
 			if (c.player.blockPosition().closerThan(toMine, 2.5)) {
 				if (!caveMode && (c.places.get("mine") == null || !c.places.get("mine").closerThan(toMine, 3))) c.places.remember("mine", toMine);
