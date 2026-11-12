@@ -178,7 +178,7 @@ final class Btb {
 		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 ? 4.5f : 2.5f, "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
-		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.2;          // (a good pickaxe in hand: its diamonds before iron it doesn't need yet)
+		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
 		var bag = c.items();
 		boolean tableOrWood = bag.getOrDefault("crafting_table", 0) > 0 || woodInBag() >= 4;
 		boolean canFurnace = bag.getOrDefault("furnace", 0) > 0 || tableOrWood && o.stone >= 8 || c.chores.furnaceNear();   // (Ann tried to make one with no table and no wood to make one: three minutes, twice)
