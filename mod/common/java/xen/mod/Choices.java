@@ -561,7 +561,7 @@ final class Choices {
 		w.doer = "hungry: " + p.getFoodData().getFoodLevel() + " of 20";
 		w.gut = p.getHealth() < 20 ? "a full belly heals me" : "a full belly";
 		int close = hostilesWithin(4);
-		if (close > 0 && p.getHealth() >= 10 && p.getFoodData().getFoodLevel() > 6) w.risk(1.5f, "a monster right on me: eating would leave me open", true, 20 * 5);
+		if (close > 0 && p.getFoodData().getFoodLevel() > 6) w.risk(1.5f, "a monster right on me: eating would leave me open", true, 20 * 5);   // (at any health: low is when it's worst; Cid ate at 8 with a zombie on him and never hit back)
 		return choose("eat", w, close > 0);
 	}
 
