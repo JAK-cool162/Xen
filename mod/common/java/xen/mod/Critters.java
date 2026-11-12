@@ -56,7 +56,7 @@ final class Critters {
 		// a bow drawn at it
 		for (Mob m : p.level().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(16), x -> x.isAlive() && x instanceof RangedAttackMob
 				&& x.getTarget() == p && x.isUsingItem())) {
-			if (!p.hasLineOfSight(m)) continue;
+			if (!p.hasLineOfSight(m) || m instanceof net.minecraft.world.entity.monster.Witch) continue;   // (a witch drinking: no arrows coming, and a shield doesn't stop its potions)
 			c.goals.instant = "blocking the " + id(m).replace('_', ' ') + "'s arrows";
 			c.hands.face(m.getEyePosition());
 			if (c.hands.raiseShield()) {
@@ -76,7 +76,10 @@ final class Critters {
 				&& x.getTarget() == p && !x.isUsingItem())) {
 			if (!p.hasLineOfSight(m)) continue;
 			boolean armed = c.hands.hotbar(Companion::isWeapon) >= 0;
-			if (armed && p.getHealth() >= 10 || p.getHealth() >= 16 && c.personality.bravery > 0.5f) {
+			boolean witch = m instanceof net.minecraft.world.entity.monster.Witch;
+			boolean crowd = !p.level().getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(6), x -> x.isAlive() && x != m && x instanceof net.minecraft.world.entity.monster.Enemy && x.getTarget() == p).isEmpty();
+			if (witch && (p.getHealth() < 14 || crowd)) {}                      // (a witch with others on it, or hurt: out of its sight, not a fight; Bob, a spider and a creeper too, turned from one to the other till its potions killed him)
+			else if (armed && p.getHealth() >= 10 || p.getHealth() >= 16 && c.personality.bravery > 0.5f) {
 				c.goals.instant = "going for the " + id(m).replace('_', ' ') + " between its shots";
 				if (p.distanceTo(m) <= p.entityInteractionRange()) {
 					if (p.getAttackStrengthScale(0.5f) < 0.9f) return Action.IDLE;
