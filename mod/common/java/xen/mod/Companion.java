@@ -2886,7 +2886,7 @@ public final class Companion {
 
 	private Action pickUpNearby() {
 		if (fighting || mode == Mode.STAY && chores.busy()) return null;
-		boolean stocked = btb.on() && (chores.busy() || nether.busy()) && walker.blocks() >= 32;   // (on its way with blocks enough: the stone it digs through stays lying, no stopping for every piece)
+		boolean stocked = btb.on() && (chores.busy() || nether.busy() || builder.busy()) && walker.blocks() >= 32;   // (on its way or building, with blocks enough: the stone it digs through stays lying, no stopping for every piece)
 		net.minecraft.world.entity.item.ItemEntity best = null, current = null;
 		double bestScore = 0, currentScore = 0;
 		for (var e : player.level().getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, player.getBoundingBox().inflate(8, 3, 8),
