@@ -22,9 +22,18 @@ main{padding:16px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,mi
 .doing{font-weight:600}.log{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#b9c0cc;max-height:190px;overflow:auto;border-top:1px solid var(--line);padding:8px 12px;white-space:pre-wrap;word-break:break-word}
 .empty{padding:40px 16px;color:var(--dim);text-align:center}
 .note{color:var(--dim);font-size:12px;padding:0 16px 16px}
+#exam{padding:0 16px 16px}#exam h2{font-size:15px;margin:8px 0 4px}#exam .sub{color:var(--dim);font-size:12px;margin-bottom:10px}
+.qs{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));margin-bottom:12px}
+.q{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}.q b{display:block;margin-bottom:4px}
+.q .n{font-variant-numeric:tabular-nums}.q .vs{color:var(--dim);font-size:12px}
+.pics{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr))}
+.pic{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}.pic img{width:100%;aspect-ratio:16/9;display:block;image-rendering:pixelated;background:#000}
+.pic ul{list-style:none;margin:0;padding:6px 8px;font-size:12px}.pic li{display:flex;justify-content:space-between;gap:6px}
+.right{color:var(--ok)}.wrong{color:var(--bad)}
 </style></head><body>
 <header><h1>Xen Live View</h1><span class="live"><span class="dot"></span>live, about 1 frame a second</span><div class="tabs" id="tabs"></div></header>
 <main id="grid"><div class="empty">Waiting for the server to send a view…</div></main>
+<section id="exam"></section>
 <div class="note">What each Xen sees, drawn on the server from the real blocks and mobs in front of its eyes: block colours, the game's shading and light, no textures. ✦ = enchanted.</div>
 <script>
 const grid=document.getElementById('grid'),tabs=document.getElementById('tabs');let only=null,cards={};
@@ -48,4 +57,17 @@ function setTabs(names){if(tabs.dataset.n===names.join())return;tabs.dataset.n=n
  for(const n of [null,...names]){const b=el('button',only===n?'on':'',n||'All');b.onclick=()=>{only=n;[...tabs.children].forEach(x=>x.classList.toggle('on',x===b));for(const m in cards)cards[m].c.style.display=only&&only!==m?'none':''};tabs.append(b)}}
 async function poll(){try{const r=await fetch('xens',{cache:'no-store'});const d=await r.json();const names=Object.keys(d);if(names.length){const e=grid.querySelector('.empty');if(e)e.remove()}
  setTabs(names);for(const n of names)draw(n,d[n])}catch(e){}setTimeout(poll,1000)}poll();
+const pct=(a,b)=>b?Math.round(a/b*100)+'%':'–';
+function exam(d){const x=document.getElementById('exam');if(!d||!d.heads){x.replaceChildren();return}x.replaceChildren();
+ x.append(el('h2','',"Its eyes' exam (Xen Glance)"),el('div','sub','Each new picture is a test before it learns from it: what it guessed against what was really there. '+(d.status||'')));
+ const qs=el('div','qs');for(const h of d.heads){const q=el('div','q');q.append(el('b','',h.question+'?'));
+  q.append(el('div','n',`caught ${h.caught} of ${h.there} (${pct(h.caught,h.there)})`),el('div','vs',`the mod's own: ${h.caughtMods} (${pct(h.caughtMods,h.there)})`),
+   el('div','n',`false alarms ${h.falseAlarms} of ${h.notThere} (${pct(h.falseAlarms,h.notThere)})`),el('div','vs',`the mod's own: ${h.falseAlarmsMods} (${pct(h.falseAlarmsMods,h.notThere)})`));qs.append(q)}
+ x.append(qs);const ps=el('div','pics');const names=d.heads.map(h=>h.question);
+ for(const p of [...(d.pictures||[])].reverse()){const c=el('div','pic'),im=new Image();im.src='data:image/png;base64,'+p.png;im.alt='what it saw';const ul=el('ul');
+  names.forEach((nm,i)=>{const said=p.learned[i]>0.5,was=p.truth[i];if(!said&&!was)return;const li=el('li',said===was?'right':'wrong');
+   li.append(el('span','',nm),el('span','',(was?'there':'not there')+', said '+Math.round(p.learned[i]*100)+'%'));ul.append(li)});
+  if(!ul.children.length)ul.append(el('li','right','nothing there, said nothing'));c.append(im,ul);ps.append(c)}
+ x.append(ps)}
+async function pollExam(){try{const r=await fetch('exam',{cache:'no-store'});exam(await r.json())}catch(e){}setTimeout(pollExam,10000)}pollExam();
 </script></body></html>

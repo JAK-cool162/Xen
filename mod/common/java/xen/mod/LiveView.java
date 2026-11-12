@@ -128,6 +128,10 @@ final class LiveView {
 		if (c.mod.glanceSchool != null) o.addProperty("eyes", c.mod.glanceSchool.status());
 		String json = o.toString(), name = c.name;
 		Path to = dir;
+		if (c.mod.glanceSchool != null && now - examWrittenAt > 10_000) {
+			examWrittenAt = now;
+			exam(c.mod.glanceSchool, to);
+		}
 
 		WRITING.incrementAndGet();
 		WRITER.execute(() -> {
@@ -142,6 +146,71 @@ final class LiveView {
 				Files.move(jtmp, js, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 			} catch (Exception e) {
 				// (the folder went away, or the disk's full: the next one)
+			} finally {
+				WRITING.decrementAndGet();
+			}
+		});
+	}
+
+	private static volatile long examWrittenAt;
+
+	/**
+	 * Its eyes' exam, every ten seconds, to _exam.json: for each question Xen Glance answers ("a monster close?"), how
+	 * often it caught it when it was there and said so when it wasn't, on the last few hundred new pictures (the Glance
+	 * learning as they play, and the one that came with the mod); and the latest pictures, what was there, what each said.
+	 */
+	private static void exam(xen.mod.core.GlanceLearner school, Path to) {
+		int[][] e = school.exam();
+		var pics = school.examples();
+		WRITING.incrementAndGet();
+		WRITER.execute(() -> {
+			try {
+				JsonObject o = new JsonObject();
+				o.addProperty("at", System.currentTimeMillis());
+				o.addProperty("status", school.status());
+				JsonArray heads = new JsonArray();
+				for (int i = 0; i < e.length; i++) {
+					JsonObject h = new JsonObject();
+					h.addProperty("question", xen.mod.core.Glance.HEADS[i]);
+					h.addProperty("there", e[i][0]);
+					h.addProperty("caught", e[i][1]);
+					h.addProperty("caughtMods", e[i][2]);
+					h.addProperty("notThere", e[i][3]);
+					h.addProperty("falseAlarms", e[i][4]);
+					h.addProperty("falseAlarmsMods", e[i][5]);
+					heads.add(h);
+				}
+				o.add("heads", heads);
+				JsonArray ex = new JsonArray();
+				int gw = xen.mod.core.Glance.W, gh = xen.mod.core.Glance.H, n = gw * gh;
+				for (var p : pics) {
+					BufferedImage img = new BufferedImage(gw, gh, BufferedImage.TYPE_INT_RGB);
+					for (int q = 0; q < n; q++) {
+						int r = Math.min(255, (p.picture()[q] & 255)), g = Math.min(255, (p.picture()[n + q] & 255)), b = Math.min(255, (p.picture()[2 * n + q] & 255));
+						img.setRGB(q % gw, q / gw, r << 16 | g << 8 | b);
+					}
+					var bytes = new java.io.ByteArrayOutputStream();
+					javax.imageio.ImageIO.write(img, "png", bytes);
+					JsonObject one = new JsonObject();
+					one.addProperty("png", java.util.Base64.getEncoder().encodeToString(bytes.toByteArray()));
+					one.addProperty("at", p.at());
+					JsonArray t = new JsonArray(), a = new JsonArray(), l = new JsonArray();
+					for (int i = 0; i < p.truth().length; i++) {
+						t.add(p.truth()[i] > 0.5f);
+						a.add(Math.round(p.shipped()[i] * 100) / 100.0);
+						l.add(Math.round(p.learned()[i] * 100) / 100.0);
+					}
+					one.add("truth", t);
+					one.add("mods", a);
+					one.add("learned", l);
+					ex.add(one);
+				}
+				o.add("pictures", ex);
+				Path js = to.resolve("_exam.json"), tmp = to.resolve("_exam.json.tmp");
+				Files.writeString(tmp, o.toString(), StandardCharsets.UTF_8);
+				Files.move(tmp, js, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (Exception ex) {
+				// (the next one)
 			} finally {
 				WRITING.decrementAndGet();
 			}

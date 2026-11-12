@@ -107,7 +107,9 @@ public final class GlanceLearner {
 
 	private void learnFrom(byte[] px, float[] y) {
 		float[][] x = unpack(px);
-		float ls = Glance.loss(shipped.run(x), y), ll = Glance.loss(learning.run(x), y);   // (the test: a picture neither has learned from)
+		float[] os = shipped.run(x), ol = learning.run(x);
+		float ls = Glance.loss(os, y), ll = Glance.loss(ol, y);                  // (the test: a picture neither has learned from)
+		mark(px, y, os, ol);
 		seen++;
 		double a = 1.0 / Math.min(seen, FAIR);
 		lossShipped += a * (ls - lossShipped);
@@ -157,6 +159,66 @@ public final class GlanceLearner {
 		} catch (Exception e) {
 			// (not kept this time: the next)
 		}
+	}
+
+	// ------------------------------------------------------------------------------------------------ its exam
+	/** The last few hundred new pictures, each a question per head: what was there, what each Glance said (yes over a half). */
+	private final boolean[][] examTruth = new boolean[FAIR][], examShipped = new boolean[FAIR][], examLearned = new boolean[FAIR][];
+	private int examAt, examN;
+	/** A few of the latest pictures (some with something in them, some with nothing) and what each said: for a page to show. */
+	private final java.util.ArrayDeque<Example> examples = new java.util.ArrayDeque<>(), emptyOnes = new java.util.ArrayDeque<>();
+
+	/** A picture (packed, [C][H*W] as bytes), what was there, and what each Glance made of it (0 to 1). */
+	public record Example(byte[] picture, float[] truth, float[] shipped, float[] learned, long at) {}
+
+	private synchronized void mark(byte[] px, float[] y, float[] os, float[] ol) {
+		boolean[] t = new boolean[y.length], a = new boolean[y.length], b = new boolean[y.length];
+		boolean something = false;
+		for (int i = 0; i < y.length; i++) {
+			t[i] = y[i] > 0.5f;
+			a[i] = os[i] > 0.5f;
+			b[i] = ol[i] > 0.5f;
+			something |= t[i] || a[i] || b[i];
+		}
+		examTruth[examAt] = t;
+		examShipped[examAt] = a;
+		examLearned[examAt] = b;
+		examAt = (examAt + 1) % FAIR;
+		examN = Math.min(FAIR, examN + 1);
+		var keep = something ? examples : emptyOnes;                          // (eight with something in them, said or there; four with nothing)
+		keep.addLast(new Example(px, y.clone(), os.clone(), ol.clone(), System.currentTimeMillis()));
+		while (keep.size() > (something ? 8 : 4)) keep.removeFirst();
+	}
+
+	/**
+	 * Its exam on the last few hundred pictures it hadn't learned from, each head a question ("a monster close?"): of the
+	 * times it was there, how many it caught; of the times it wasn't, how many it said it was (false alarms); for the
+	 * Glance that's learning and the one that came with the mod. [head][0 there, 1 caught learning, 2 caught mod's,
+	 * 3 not there, 4 false alarms learning, 5 false alarms mod's].
+	 */
+	public synchronized int[][] exam() {
+		int[][] out = new int[Glance.HEADS.length][6];
+		for (int k = 0; k < examN; k++)
+			for (int i = 0; i < out.length; i++) {
+				boolean t = examTruth[k][i];
+				if (t) {
+					out[i][0]++;
+					if (examLearned[k][i]) out[i][1]++;
+					if (examShipped[k][i]) out[i][2]++;
+				} else {
+					out[i][3]++;
+					if (examLearned[k][i]) out[i][4]++;
+					if (examShipped[k][i]) out[i][5]++;
+				}
+			}
+		return out;
+	}
+
+	/** The latest pictures it kept for showing (with something in them first), oldest first. */
+	public synchronized java.util.List<Example> examples() {
+		var out = new java.util.ArrayList<Example>(examples);
+		out.addAll(emptyOnes);
+		return out;
 	}
 
 	/** How its learning's going, in a line (for the log and the live view). */

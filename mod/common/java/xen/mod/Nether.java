@@ -462,7 +462,7 @@ final class Nether {
 			}
 			for (BlockPos r : BlockPos.betweenClosed(q.offset(-4, -2, -4), q.offset(4, 12, 4))) {   // (up to its top: what it knows of is a block of the pool, often deep in it; the lava lake's top, open to the cave over it, is up to a dozen blocks up)
 				if (!level.isLoaded(r) || !level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA) || !level.getFluidState(r).isSource()) continue;
-				if (!level.getBlockState(r.above()).isAir()) continue;
+				if (!level.getBlockState(r.above()).isAir() || triedLava(r)) continue;   // (the lava it couldn't get to, and that pool round it: Cid chose the same one every ten seconds, ten times)
 				open++;
 				boolean stand = false;
 				for (Direction d : Direction.Plane.HORIZONTAL) {
@@ -498,6 +498,12 @@ final class Nether {
 	}
 
 	private long lavaSaidAt = -10000;
+
+	/** Lava by some it couldn't get to (six blocks round): the same pool, not tried again. */
+	private boolean triedLava(BlockPos r) {
+		for (BlockPos b : badLava) if (b.closerThan(r, 6)) return true;
+		return false;
+	}
 
 	/** The chore it started to go down for lava (its serial number), so another of its own errands doesn't hold it up. */
 	private int lavaChore = -1;
@@ -809,7 +815,7 @@ final class Nether {
 		BlockPos feet = c.player.blockPosition(), best = null;
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-r, -8, -r), feet.offset(r, 4, r))) {
 			var f = level.getFluidState(q);
-			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.LAVA) || !level.getBlockState(q.above()).isAir() || !seen(level, q.above())) continue;
+			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.LAVA) || !level.getBlockState(q.above()).isAir() || !seen(level, q.above()) || triedLava(q)) continue;
 			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
 		}
 		return best;

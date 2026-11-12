@@ -44,13 +44,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
             out = {}
             if os.path.isdir(LIVE):
                 for f in sorted(os.listdir(LIVE)):
-                    if f.endswith('.json'):
+                    if f.endswith('.json') and not f.startswith('_'):
                         try:
                             with open(os.path.join(LIVE, f), encoding='utf-8') as fh:
                                 out[f[:-5]] = json.load(fh)
                         except (OSError, ValueError):
                             pass                                   # (being written right now: next second)
             return self.send(200, json.dumps(out).encode(), 'application/json')
+        if path == '/exam':                                        # its eyes' exam (Xen Glance: what it guessed, what was there)
+            try:
+                with open(os.path.join(LIVE, '_exam.json'), 'rb') as fh:
+                    return self.send(200, fh.read(), 'application/json')
+            except OSError:
+                return self.send(200, b'{}', 'application/json')
         name = os.path.basename(path)                              # (only the folder's own pictures)
         full = os.path.join(LIVE, name)
         if name.endswith('.png') and os.path.isfile(full):
