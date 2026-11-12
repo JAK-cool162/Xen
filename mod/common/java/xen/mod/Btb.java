@@ -39,8 +39,7 @@ final class Btb {
 	private long taskAt;
 	private String stateAt = "";
 	private float hurtSince;
-	private int deathsAt, tierAt, ironAt, enchantStuffAt;
-	private long enchantFrom, enchantSkipUntil, netherFrom, netherSkipUntil;
+	private int deathsAt, tierAt, ironAt, enchantStuffAt, levelAt;
 	private int rodsAt, pearlsAt;
 
 	/** Blaze rods (as powder for the eyes: one rod, two) and ender pearls for twelve eyes of ender, counting the eyes it has. */
@@ -108,33 +107,39 @@ final class Btb {
 		boolean geared = o.tier >= 4 && c.goals.diamondsWanted() == 0;
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
-		else if ((!tabled || !enchantedSomething()) && now() >= enchantSkipUntil) goal = "enchant";
-		else if (netherNeeds() && now() >= netherSkipUntil) goal = "nether";   // (blaze rods and ender pearls: the eyes for the End)
+		else if (!tabled || !enchantedGear()) goal = "enchant";                 // (its tools and its armor enchanted, both)
+		else if (netherNeeds()) goal = "nether";                                // (blaze rods and ender pearls: the eyes for the End; no giving up on a goal, it stays on it till it's done)
 		else if (c.goals.home == null && c.mod.config.wants) goal = "home";
 		else goal = "world";
-		if (goal.equals("enchant") && !was.equals("enchant")) enchantFrom = now();
-		if (goal.equals("enchant") && now() - enchantFrom > 20 * 60 * 15) {      // a quarter of an hour on it and nothing enchanted: on with the rest, again in twenty minutes
-			enchantSkipUntil = now() + 20 * 60 * 20;
-			goal = c.goals.home == null && c.mod.config.wants ? "home" : "world";
-			c.journal("thinks", "btb: no enchanting after a quarter of an hour: " + goal + " first, the enchanting again later");
-		}
-		if (goal.equals("nether") && !was.equals("nether")) netherFrom = now();
-		if (goal.equals("nether") && now() - netherFrom > 20 * 60 * 25) {        // (nearly half an hour of it: the rest first, again later)
-			netherSkipUntil = now() + 20 * 60 * 20;
-			goal = c.goals.home == null && c.mod.config.wants ? "home" : "world";
-			c.journal("thinks", "btb: no blaze rods and pearls after twenty-five minutes: " + goal + " first, the Nether again later");
-		}
 		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
 	}
 
 	private boolean goalDone(Obs o) {
 		return switch (goal) {
 			case "gear" -> o.tier >= 4 && c.goals.diamondsWanted() == 0;
-			case "enchant" -> enchantedSomething();
+			case "enchant" -> enchantedGear();
 			case "nether" -> !netherNeeds();
 			case "home" -> c.goals.home != null;
 			default -> false;
 		};
+	}
+
+	/** An enchanted tool or weapon and an enchanted piece of armor (on it or in its bag). */
+	private boolean enchantedGear() {
+		boolean tool = false, armor = false;
+		var p = c.player;
+		var inv = p.getInventory();
+		java.util.List<net.minecraft.world.item.ItemStack> all = new java.util.ArrayList<>();
+		for (int i = 0; i < inv.getContainerSize(); i++) all.add(inv.getItem(i));
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) all.add(p.getItemBySlot(slot));
+		for (net.minecraft.world.item.ItemStack s : all) {
+			if (s.isEmpty() || !s.isEnchanted()) continue;
+			String n = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			if (n.endsWith("_pickaxe") || n.endsWith("_sword") || n.endsWith("_axe") || n.endsWith("_shovel")) tool = true;
+			if (n.endsWith("_helmet") || n.endsWith("_chestplate") || n.endsWith("_leggings") || n.endsWith("_boots")) armor = true;
+		}
+		return tool && armor;
 	}
 
 	private boolean enchantedSomething() {
@@ -271,7 +276,7 @@ final class Btb {
 		String plan = start(best.task, o);
 		if (plan == null || !plan.startsWith("You will")) {                      // (it can't now: not again for a minute)
 			boolean shelter = best.task == Task.SHELTER;
-			notBefore.put(best.task, now() + (shelter ? 20 * 5 : 20 * 60));      // (a roof: again in a few steps, from other ground)
+			notBefore.put(best.task, now() + (shelter ? 20 * 5 : forGoal(best.task) ? 20 * 15 : 20 * 60));   // (a roof: again in a few steps, from other ground; what its goal needs: soon)
 			if (plan != null && (!shelter || now() - shelterSaidAt > 400)) {
 				c.journal("thinks", "can't " + best.task.name().toLowerCase(Locale.ROOT) + " now: " + plan + (shelter ? " (other ground, then again)" : ""));
 				if (shelter) shelterSaidAt = now();
@@ -290,6 +295,7 @@ final class Btb {
 		worthAt = worth();
 		ironAt = o.iron;
 		enchantStuffAt = enchantStuff();
+		levelAt = c.player.experienceLevel;
 		rodsAt = rods();
 		pearlsAt = pearls();
 		c.journal("thinks", String.format(Locale.ROOT, "btb: %s (%s; goal %s)", task.name().toLowerCase(Locale.ROOT), why, goal));
@@ -353,6 +359,10 @@ final class Btb {
 			String lapis = planFor("lapis_lazuli", 3, "lapis to enchant with");
 			if (lapis.startsWith("You will")) return lapis;
 		}
+		if (tabled && c.player.experienceLevel < 3) {                           // the table, no levels to pay with: coal ore gives them (and torches)
+			String xp = c.chores.mine(c.lessons.depth("coal", 40), "coal", 16);
+			if (xp != null && xp.startsWith("You will")) return xp + " (levels to enchant with)";
+		}
 		return c.nether.go("table", 0);
 	}
 
@@ -381,6 +391,16 @@ final class Btb {
 
 	private float lastHealth = 20;
 
+	/** Is this what its goal is waiting on (diamonds for its gear, the table and enchanting, blaze rods and pearls)? */
+	private boolean forGoal(Task t) {
+		return switch (t) {
+			case DIAMONDS, IRON -> goal.equals("gear");
+			case TABLE, ENCHANT -> goal.equals("enchant");
+			case BLAZE, PEARLS -> goal.equals("nether");
+			default -> false;
+		};
+	}
+
 	/** Its task is over: the outcome goes to its learning, and the next one is its to choose. */
 	private void finish(Obs o) {
 		if (busy()) return;
@@ -391,7 +411,7 @@ final class Btb {
 		boolean ok = !died && (gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null
-				|| task == Task.TABLE && enchantStuff() > enchantStuffAt
+				|| task == Task.TABLE && (enchantStuff() > enchantStuffAt || c.player.experienceLevel > levelAt)
 				|| task == Task.BLAZE && rods() > rodsAt || task == Task.PEARLS && pearls() > pearlsAt) && !dropped;
 		dropped = false;
 		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
@@ -406,7 +426,7 @@ final class Btb {
 			c.places.forget("mine head");
 			c.journal("thinks", "btb: its mine keeps coming to nothing: a new one next time");
 		}
-		if (!ok) notBefore.put(task, now() + 20 * 40);                            // (not the same thing again straight away)
+		if (!ok) notBefore.put(task, now() + (forGoal(task) ? 20 * 8 : 20 * 40));   // (not the same thing again straight away; what its goal needs, again in a few seconds: no giving up)
 		task = Task.NONE;
 		why = "";
 		state = State.REST;

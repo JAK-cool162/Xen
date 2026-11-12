@@ -221,6 +221,15 @@ final class Chores {
 		int minutes = "diamonds".equals(what) ? 8 : 4;                          // (diamonds are rare: a player strip-mines a while for them)
 		float patience = Math.max(kind == Kind.MINE ? 0.7f : 0.6f, c.personality.patience());   // (a trip down takes a while, even for a lazy one; and nobody gives up in under two and a half minutes)
 		if (now() - lastGain < (long) (20 * 60 * minutes * patience)) return false;   // (a lazy one gives up sooner, a hard worker later)
+		if (kind == Kind.MINE && "diamonds".equals(what) && c.btb.on() && !caveMode) {   // Back to Basics, diamonds for its gear: no giving up, new tunnels further out
+			lastGain = now();
+			if (mineBase != null) {
+				mineLeg += 4;
+				mineRecordLeg = mineLeg;
+				c.journal("does", "nothing in these tunnels: on with new ones further out (no giving up on diamonds)");
+			}
+			return false;
+		}
 		if (kind == Kind.MINE) {
 			if (!caveMode && mineBase != null) {                                // a mine that got down: these tunnels gave nothing, the next ones further out may (a player keeps their mine)
 				mineRecordLeg = mineLeg + 4;
