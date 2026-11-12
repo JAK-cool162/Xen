@@ -567,7 +567,20 @@ final class Nether {
 				say("I need water for my bucket.");
 				return c.goals.exploreStep();
 			}
-			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(water)) > 4) return c.walkTo(Vec3.atBottomCenterOf(water));
+			if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(water)) > 2.5) {   // (right by it: water it found by knowing, not by sight, may be behind a wall from four blocks off)
+				fillSince = -1;
+				return c.walkTo(Vec3.atBottomCenterOf(water));
+			}
+			if (fillSince < 0 || !water.equals(fillAt)) {
+				fillSince = now();
+				fillAt = water.immutable();
+			} else if (now() - fillSince > 60) {                                 // three seconds and still no water in it: not that water, other water
+				badWater.add(water.immutable());
+				farWaterLooked = -100_000;
+				fillSince = -1;
+				c.journal("thinks", "can't fill its bucket at " + water.toShortString() + ": other water");
+				return null;
+			}
 			c.hands.bucket(Vec3.atCenterOf(water).add(0, 0.4, 0), s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"));
 			c.acted = true;
 			return Action.PLACE;
@@ -637,7 +650,7 @@ final class Nether {
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-40, -12, -40), feet.offset(40, 12, 40))) {
 			if (!level.isLoaded(q)) continue;
 			var f = level.getFluidState(q);
-			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir()) continue;
+			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir() || badWater.contains(q)) continue;
 			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
 		}
 		farWaterAt = best;
@@ -647,13 +660,17 @@ final class Nether {
 
 	private BlockPos farWaterAt;
 	private long farWaterLooked = -100_000;
+	/** Water its bucket wouldn't fill at (behind something), where it's filling now, since when. */
+	private final java.util.Set<BlockPos> badWater = new java.util.HashSet<>();
+	private BlockPos fillAt;
+	private long fillSince = -1;
 
 	private BlockPos visibleWater(int r) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition(), best = null;
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-r, -4, -r), feet.offset(r, 4, r))) {
 			var f = level.getFluidState(q);
-			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir()) continue;
+			if (!f.isSource() || !f.is(net.minecraft.tags.FluidTags.WATER) || !level.getBlockState(q.above()).isAir() || badWater.contains(q)) continue;
 			if (best == null || q.distSqr(feet) < best.distSqr(feet)) best = q.immutable();
 		}
 		return best;
