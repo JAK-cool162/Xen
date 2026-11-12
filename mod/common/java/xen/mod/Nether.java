@@ -457,6 +457,9 @@ final class Nether {
 		int dry = 0, open = 0, far = 0;
 		BlockPos wetOne = null;                                                 // (by water: water's on it already, or soon; the next best)
 		BlockPos openDry = null, openAny = null;                               // (open to the air, nowhere level to stand: cave lava's a block or two below the floor; within reach is enough to pour)
+		BlockPos sealed = null;                                                 // (sealed in the rock: the nearest with plain stone over it, to open from beside and pour through)
+		double sealedD = Double.MAX_VALUE;
+		BlockPos me = c.player.blockPosition();
 		for (BlockPos q : pools) {
 			boolean tried = false;
 			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
@@ -467,7 +470,14 @@ final class Nether {
 			}
 			for (BlockPos r : BlockPos.betweenClosed(q.offset(-4, -2, -4), q.offset(4, 12, 4))) {   // (up to its top: what it knows of is a block of the pool, often deep in it; the lava lake's top, open to the cave over it, is up to a dozen blocks up)
 				if (!level.isLoaded(r) || !level.getFluidState(r).is(net.minecraft.tags.FluidTags.LAVA) || !level.getFluidState(r).isSource()) continue;
-				if (!level.getBlockState(r.above()).isAir() || triedLava(r)) continue;   // (the lava it couldn't get to, and that pool round it: Cid chose the same one every ten seconds, ten times)
+				if (triedLava(r)) continue;                                          // (the lava it couldn't get to, and that pool round it: Cid chose the same one every ten seconds, ten times)
+				if (!level.getBlockState(r.above()).isAir()) {
+					if (r.distSqr(me) < sealedD && sealable(level, r)) {
+						sealedD = r.distSqr(me);
+						sealed = r.immutable();
+					}
+					continue;
+				}
 				open++;
 				boolean stand = false;
 				for (Direction d : Direction.Plane.HORIZONTAL) {
@@ -495,6 +505,10 @@ final class Nether {
 			c.journal("thinks", "knows of lava open to the air at " + airy.toShortString() + ": close enough to pour on will do");
 			return airy;
 		}
+		if (sealed != null) {                                                    // (none open: lava under the rock, as a player finds it digging; the stone over it opened from beside, water poured in)
+			c.journal("thinks", "knows of lava sealed under the rock at " + sealed.toShortString() + ": opens the stone over it and pours water in");
+			return sealed;
+		}
 		if (now() - lavaSaidAt > 1200) {
 			lavaSaidAt = now();
 			c.journal("thinks", String.format(java.util.Locale.ROOT, "no lava pool it can stand by (%d pools known, %d too far off to look at, %d open to the air, %d dry)", pools.size(), far, open, dry));
@@ -503,6 +517,25 @@ final class Nether {
 	}
 
 	private long lavaSaidAt = -10000;
+
+	/**
+	 * Lava sealed under the rock it can open from beside and pour water into: plain stone over it (not obsidian, not
+	 * what someone built), no lava or water beside that stone to run in when it's opened (lava doesn't run up: under it
+	 * is fine), and dry round about.
+	 */
+	private static boolean sealable(ServerLevel level, BlockPos r) {
+		BlockPos lid = r.above();
+		var st = level.getBlockState(lid);
+		if (st.getDestroySpeed(level, lid) < 0 || st.getDestroySpeed(level, lid) > 5 || st.is(net.minecraft.world.level.block.Blocks.OBSIDIAN)
+				|| !WorldSenses.isNaturalStone(BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath())) return false;
+		for (Direction d : Direction.values()) {
+			if (d == Direction.DOWN) continue;
+			if (!level.getFluidState(lid.relative(d)).isEmpty()) return false;
+		}
+		for (BlockPos w : BlockPos.betweenClosed(r.offset(-2, -1, -2), r.offset(2, 3, 2)))
+			if (level.getFluidState(w).is(net.minecraft.tags.FluidTags.WATER)) return false;
+		return true;
+	}
 
 	/** Where it poured water on lava for obsidian, and when. */
 	private BlockPos pouredTop;
@@ -680,6 +713,29 @@ final class Nether {
 				return null;
 			}
 			return c.walkTo(Goal.near(top, 3));                                // (anywhere dry within three of it: over the lava itself is no place to walk to; Bob, forty seconds no closer, pool after pool)
+		}
+		if (pouredAt < 0 && !level.getBlockState(top).isAir() && level.getFluidState(top).isEmpty()) {   // sealed under the rock: the stone over it opened first, from beside (never from on top of it)
+			BlockPos feet = c.player.blockPosition();
+			if (feet.getX() == top.getX() && feet.getZ() == top.getZ()) {
+				for (Direction dir : Direction.Plane.HORIZONTAL) {                  // standing on it: a step aside first
+					BlockPos n = feet.relative(dir);
+					if (level.getBlockState(n).getCollisionShape(level, n).isEmpty() && level.getBlockState(n.above()).getCollisionShape(level, n.above()).isEmpty()
+							&& level.getBlockState(n.below()).isFaceSturdy(level, n.below(), Direction.UP) && level.getFluidState(n).isEmpty())
+						return c.walkTo(Vec3.atBottomCenterOf(n));
+				}
+			}
+			c.goals.instant = "opening the rock over the lava";
+			if (c.hands.digging(top)) return Action.MINE;
+			if (c.hands.mine(top)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			badLava.add(lavaAt.immutable());                                         // (it can't open it from here: another)
+			c.journal("thinks", "can't open the rock over the lava at " + lavaAt.toShortString() + ": another pool");
+			lavaAt = null;
+			lavaWalkAt = null;
+			lavaLookedAt = -1000;
+			return null;
 		}
 		if (pouredAt < 0) {
 			c.goals.instant = "pouring water on the lava";
