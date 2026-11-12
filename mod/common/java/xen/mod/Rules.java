@@ -311,6 +311,12 @@ final class Rules {
 			tried.clear();
 			if (o >= 0) tried.add(o);
 			c.journal("thinks", "notices it's stuck: two minutes in the same spot with nothing to show for it");
+			if (c.btb.on()) {                                                    // Back to Basics: the trip it was on, stuck in a loop, ends (its goal starts it fresh in seconds)
+				if (c.nether.busy()) c.nether.cancel();
+				if (c.chores.busy()) c.chores.cancel();
+				c.walker.stop();
+				c.journal("thinks", "ends what it was stuck on: a fresh start");
+			}
 		}
 		markAt = t;
 		markPos = p.blockPosition().immutable();
