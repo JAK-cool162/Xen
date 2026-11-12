@@ -5352,8 +5352,8 @@ public final class Companion {
 			}
 			if (trade) r = new xen.mod.talk.Chat.Request("chat", "", 0);
 		}
-		if (Habits.teaching(words)) {                                       // "when you mine logs, crouch": a habit for a mod, kept (its owner's say)
-			say(owner != null && !owner.equals(u) ? "Only " + ownerName + " can teach me habits." : Habits.heard(words));
+		if (ModHabits.teaching(words)) {                                       // "when you mine logs, crouch": a habit for a mod, kept (its owner's say)
+			say(owner != null && !owner.equals(u) ? "Only " + ownerName + " can teach me habits." : ModHabits.heard(words));
 			return null;
 		}
 		String taught = teachReply(u, words);                               // "when I say wassup, say not much": a reply, kept in its scripts
