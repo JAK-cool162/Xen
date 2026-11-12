@@ -255,12 +255,15 @@ final class Btb {
 	 * (Mining goes on: it's under the ground in a few steps.) True if it dropped its task.
 	 */
 	boolean nightfall() {
-		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD || now() - nightCheckedAt < 40) return false;
+		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD && task != Task.SMELT && task != Task.TABLE && task != Task.HOME && task != Task.TOOLS
+				|| now() - nightCheckedAt < 40) return false;                           // (any errand up top: Bob went on to his furnace at night, three zombies, dead)
 		nightCheckedAt = now();
 		var p = c.player;
 		if (p.level().dimension() != Level.OVERWORLD || !c.goals.sunDown() || MindSense.enclosed(p) || !p.level().canSeeSky(p.blockPosition().above())) return false;
 		c.journal("does", "btb: the sun's going down: drops " + task.name().toLowerCase(Locale.ROOT) + " for a roof");
-		c.chores.cancel();
+		if (c.chores.busy()) c.chores.cancel();
+		if (c.nether.busy()) c.nether.cancel();
+		if (c.builder.busy()) c.builder.cancel();
 		dropped = true;
 		return true;
 	}
