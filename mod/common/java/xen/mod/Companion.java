@@ -4586,10 +4586,20 @@ public final class Companion {
 	}
 
 	private final java.util.Random typing = new java.util.Random();
+	/** When it last swore (calm, once in two minutes at most: swearing for a reason, not as a habit). */
+	private long lastSwearMillis;
 
 	/** A line as this Xen types it (Xen 2.0: like a player: "gonna", "ngl", no full stop; never "2.7 blocks"). */
 	String typed(String text) {
-		if (mod.config.swearing && !minion) text = xen.mod.talk.Cursing.swear(text, rage.swearing(emotions.pain > 0.15f), rage.mad(), typing);   // (how foul its mouth is, how angry it is)
+		if (mod.config.swearing && !minion) {                              // (how foul its mouth is, how angry it is: with a reason, not every line)
+			boolean reason = rage.mad() >= 0.4f || emotions.pain > 0.15f || emotions.fear > 0.4f || mad();
+			long now = System.currentTimeMillis();
+			if (reason || now - lastSwearMillis > 120_000) {
+				String sworn = xen.mod.talk.Cursing.swear(text, rage.swearing(emotions.pain > 0.15f) * (reason ? 1f : 0.5f), rage.mad(), typing);
+				if (!sworn.equals(text)) lastSwearMillis = now;
+				text = sworn;
+			}
+		}
 		return xen.mod.talk.Texting.casual(text, casual(), typing);
 	}
 

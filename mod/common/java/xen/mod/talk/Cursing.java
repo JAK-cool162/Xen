@@ -35,8 +35,8 @@ public final class Cursing {
 			{"^(Ow|Ouch|Ugh|Argh|Agh)\\b", "$1, fuck|$1 shit|$1, damn"},
 			{"\\b[Ss]hut up\\b", "shut the fuck up|stfu"},
 			{"\\b[Gg]o away\\b", "fuck off|piss off"},
-			{"^[Yy](es|eah|ep)\\b", "hell yeah|fuck yeah|hell yes"},
-			{"^[Nn]o\\b(?!t)", "hell no|fuck no|nah fuck that"},
+			{"^[Yy](es|eah|ep)[.!]*$", "hell yeah|fuck yeah|hell yes"},       // (only a bare yes or no: "No luck here" isn't a no)
+			{"^[Nn]o[.!]*$", "hell no|fuck no|nah"},
 			{"^[Ww]hy\\b", "why the hell|why tf|why the fuck"},
 			{"^[Ww]here\\b", "where the hell|where tf"},
 			{"^[Ww]hat(?= (are|is|was|do|did|happened|the))\\b", "what the hell|wtf|what the fuck"},
@@ -50,6 +50,8 @@ public final class Cursing {
 	static {
 		for (int i = 0; i < SWAPS.length; i++) PATTERNS[i] = Pattern.compile(SWAPS[i][0]);
 	}
+	/** Good news (got, found, finally, thanks...): it may be said louder, never angrier. */
+	private static final Pattern HAPPY = Pattern.compile("(?i)\\b(got|found|finally|thanks|thank you|yay|nice|great|diamonds?|made it|done|we did it|rich|lets go|let's go)\\b");
 	/** Already swearing: left as it is. */
 	private static final Pattern SWEARING = Pattern.compile("(?i)\\b(fuck\\w*|shit\\w*|damn\\w*|hell|wtf|ffs|stfu|fml|crap|ass|piss\\w*|bastard)\\b");
 	/** A line it starts with, hurt or furious. */
@@ -67,7 +69,8 @@ public final class Cursing {
 	public static String swear(String text, float amount, float anger, Random r) {
 		if (text == null || text.isBlank() || amount <= 0.02f || SWEARING.matcher(text).find()) return text;
 		if (text.matches(".*-?\\d+ -?\\d+ -?\\d+.*")) return text;           // (coordinates: said straight)
-		int most = anger >= 0.7f ? 2 : 1, made = 0;
+		int most = 1, made = 0;                                                 // (one a line at most: swearing, not spam)
+		boolean happy = HAPPY.matcher(text).find();                             // (good news: no "ffs" stuck on it)
 		String s = text;
 		for (int i = 0; i < SWAPS.length && made < most; i++) {
 			Matcher m = PATTERNS[i].matcher(s);
@@ -83,14 +86,14 @@ public final class Cursing {
 			made++;
 		}
 		boolean heated = s.endsWith("!") || anger >= 0.4f;
-		float open = heated ? amount * (0.25f + 0.6f * anger) * (s.endsWith("!") ? 1f : 0.5f) : amount * 0.18f;   // (heated: often; just talking: now and then)
-		if (made == 0 && r.nextFloat() < open) {                                  // a word to start with ("shit, a creeper!", "damn, this is far")
+		float open = heated && anger >= 0.4f ? amount * (0.25f + 0.6f * anger) * (s.endsWith("!") ? 1f : 0.5f) : 0f;   // (heated: often; calm, never a word stuck on the front: "shit, got some food!")
+		if (made == 0 && !happy && r.nextFloat() < open) {                                  // a word to start with ("shit, a creeper!", "damn, this is far")
 			boolean keep = s.startsWith("I ") || s.startsWith("I'") || s.length() > 1 && Character.isUpperCase(s.charAt(1));
 			String[] from = heated ? OPENERS : CASUAL;
 			s = from[r.nextInt(from.length)] + (keep ? s : Character.toLowerCase(s.charAt(0)) + s.substring(1));
 			made++;
 		}
-		if (made < most && (s.endsWith("!") || anger >= 0.8f) && !s.endsWith("?") && r.nextFloat() < amount * anger * 0.6f) {   // furious: one to end with too
+		if (made < most && !happy && anger >= 0.6f && !s.endsWith("?") && r.nextFloat() < amount * anger * 0.6f) {   // furious: one to end with
 			String end = s.replaceAll("[.!]+$", "");
 			String t = TAILS[r.nextInt(TAILS.length)];
 			if (!end.toLowerCase(java.util.Locale.ROOT).contains(t.replaceAll("[^a-z ]", "").trim())) s = end + t + (s.endsWith("!") ? "!" : "");   // (not "ffs ... ffs")
