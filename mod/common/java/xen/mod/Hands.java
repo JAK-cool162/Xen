@@ -74,6 +74,10 @@ public final class Hands {
 		return ticks < limit || flyTarget != null;
 	}
 
+	/** When its digging of this block began (its ticks), and the block it last said why it gave up on. */
+	private int digStartTick;
+	private BlockPos cutLogged;
+
 	/** Creative: where it's flying to (forward to it, space to go up, shift to go down, like a player), and until when. */
 	private Vec3 flyTarget;
 	private int flyTicks;
@@ -494,6 +498,7 @@ public final class Hands {
 		digSlot = p.getInventory().getSelectedSlot();
 		digItem = p.getInventory().getItem(digSlot).getItem();
 		progress = 0;
+		digStartTick = ticks;
 		float dry = state.getDestroyProgress(p, level, pos) * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1);   // (as fast as it goes standing on dry ground)
 		limit = ticks + Math.max(200, Math.min(1200, (int) Math.ceil(1.3f / Math.max(dry, 1e-4f)) + 10));   // give up after ten seconds, or a third longer than the block takes: obsidian takes 9.4 s with a diamond pickaxe, and a tick or two off the ground went past ten every time (Cid dug at his obsidian four minutes, over and over from nothing)
 		habitCrouch = ModHabits.wants("mine", BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).getPath(), "crouch");   // (a habit it was taught for a mod: a tree feller, a vein miner)
@@ -569,7 +574,22 @@ public final class Hands {
 		}
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
-		if (ticks > 60 && progress < 0.15f) {                                // (swimming, in the air: getting nowhere) it stops, and tries again from better footing
+		if (ticks >= limit - 1 && progress < 1f) {                              // its time's up on this block: nearly there at this pace, on; else why, for its journal
+			float rate = progress / Math.max(1, ticks - digStartTick);
+			if (rate > 0 && (1f - progress) / rate < 600) limit = ticks + (int) ((1f - progress) / rate) + 10;
+			else if (p.companion != null && !digging.equals(cutLogged)) {
+				cutLogged = digging.immutable();
+				p.companion.journal("debug", String.format(java.util.Locale.ROOT, "gave up digging %s after %d ticks at %.0f%% (%.4f a tick; on the ground %s, in water %s, eyes in water %s, holding %s)",
+						BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(), ticks - digStartTick, progress * 100, rate, p.onGround(), p.isInWater(), p.isUnderWater(),
+						BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath()));
+			}
+		}
+		if (ticks - digStartTick > 60 && progress < 0.15f) {                    // (swimming, in the air: getting nowhere) it stops, and tries again from better footing
+			if (p.companion != null && !digging.equals(cutLogged)) {
+				cutLogged = digging.immutable();
+				p.companion.journal("debug", String.format(java.util.Locale.ROOT, "stops digging %s, getting nowhere: %.0f%% in %d ticks (on the ground %s, in water %s, eyes in water %s)",
+						BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(), progress * 100, ticks - digStartTick, p.onGround(), p.isInWater(), p.isUnderWater()));
+			}
 			cantMine = digging.immutable();
 			cantMineUnseen = true;                                           // (not from here: from somewhere else it could)
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP, level.getMaxY(), 0);
