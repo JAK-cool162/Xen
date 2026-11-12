@@ -704,7 +704,7 @@ final class Nether {
 				lavaWalkAt = lavaAt.immutable();
 				lavaClosest = Math.min(lavaClosest, d);
 				lavaCloserAt = now();
-			} else if (now() - lavaCloserAt > 20 * 40) {                       // forty seconds no closer: the next pool it knows of (Bob stood two minutes over a way to one sixty blocks down, trip after trip)
+			} else if (now() - lavaCloserAt > 20 * 90) {                       // ninety seconds no closer: the next pool it knows of (Bob stood two minutes over a way to one sixty blocks down, trip after trip; at forty, a pool seventy blocks off was let go while he picked up lapis on the way)
 				badLava.add(lavaAt.immutable());
 				c.journal("thinks", "can't get to the lava at " + lavaAt.toShortString() + ": another pool");
 				lavaAt = null;
