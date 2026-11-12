@@ -161,7 +161,8 @@ final class Btb {
 		boolean smelter = c.chores.smelterAt() != null;
 		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter)) out.add(new Option(Task.SMELT, 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
-		if (!smelter && !diamondsToGet && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
+		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
+		if (!smelter && sideWork && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
@@ -183,7 +184,7 @@ final class Btb {
 			if (rods() < 12) out.add(new Option(Task.BLAZE, 3.6f, "blaze rods: a fortress in the Nether"));
 			if (pearls() < 12) out.add(new Option(Task.PEARLS, rods() < 12 ? 3.3f : 3.7f, "ender pearls: endermen"));
 		}
-		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && !goal.equals("home") && !diamondsToGet)
+		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && goal.equals("world"))
 			out.add(new Option(Task.HOME, 0.9f, "nothing pressing: a home of its own (its mind's design)"));   // (its job has nothing on: its mind builds)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
 		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
