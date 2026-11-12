@@ -529,7 +529,8 @@ final class Nether {
 			return null;
 		}
 		ServerLevel level = (ServerLevel) c.player.level();
-		if (visible("obsidian", 16) != null) {
+		if (now() > visibleTriedAt && visible("obsidian", 16) != null) {
+			visibleTriedAt = now() + 20 * 60;                                    // (not straight back to it if it couldn't get at it: the lava and its bucket next)
 			c.chores.mineFor("obsidian", "obsidian", obsidianWanted() - obsidian(), "obsidian");
 			c.chores.own = true;
 			return null;
@@ -680,6 +681,7 @@ final class Nether {
 		return null;
 	}
 
+	private long visibleTriedAt = -1;
 	private BlockPos walkWaterAt;
 	private long walkWaterSince;
 	private BlockPos farWaterAt;

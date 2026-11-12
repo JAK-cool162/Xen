@@ -2175,6 +2175,7 @@ final class Chores {
 		BlockPos at = findVisible(block);
 		begin(Kind.BLOCKS);
 		until = now() + 20 * 60 * 4;
+		blocksLookingSince = -1;
 		blocksId = block;
 		blocksItem = item;
 		items = new String[] {item, block};
@@ -2185,6 +2186,8 @@ final class Chores {
 		return at == null ? "You will look around for " + lookFor + " to get " + what + "."
 				: String.format(java.util.Locale.ROOT, "You will mine the %s %.0f blocks away to get %s.", lookFor, Math.sqrt(at.distSqr(c.player.blockPosition())), what);
 	}
+
+	private long blocksLookingSince = -1;
 
 	private Action blocksNext() {
 		if (countItem(blocksItem) - had >= want) {
@@ -2205,10 +2208,25 @@ final class Chores {
 			closest = Double.MAX_VALUE;
 			lastCloser = now();
 		}
+		if (target == null) {                                                // none in sight: one it knows of (open on a side, close by; or knowing everything, further off)
+			BlockPos known = findBlock(n -> isKind(n, blocksId), blocksId);
+			if (known != null && !skip.contains(Perception.Beliefs.key(known.getX(), known.getY(), known.getZ()))) {
+				target = known;
+				closest = Double.MAX_VALUE;
+				lastCloser = now();
+			}
+		}
 		if (target == null) {
+			if (blocksLookingSince < 0) blocksLookingSince = now();
+			else if (now() - blocksLookingSince > 20 * 30) {                    // half a minute and none: not here (Ann looked up and down on the spot for five minutes for obsidian behind the stone)
+				blocksLookingSince = -1;
+				finish("I can't find any " + lookFor + " here.");
+				return null;
+			}
 			doing = "looking for " + lookFor;
 			return lookAround();
 		}
+		blocksLookingSince = -1;
 		double d = Math.sqrt(target.distSqr(c.player.blockPosition()));
 		if (d < closest - 0.5) {
 			closest = d;
