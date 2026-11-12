@@ -866,6 +866,20 @@ final class Fighter {
 			c.goals.instant = "a block over its head";
 			return Action.PLACE;
 		}
+		for (net.minecraft.core.BlockPos q : new net.minecraft.core.BlockPos[] {feet, feet.above()})   // its sides too, feet and head: a hole into a cave's wall is no hole (Cid, dug in, shot seventeen times by skeletons through its open side)
+			for (net.minecraft.core.Direction dir : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				net.minecraft.core.BlockPos side = q.relative(dir);
+				if (level.getBlockState(side).canBeReplaced() && level.getFluidState(side).isEmpty() && c.hands.placeAt(side, "any")) {
+					c.acted = true;
+					c.goals.instant = "walling itself in";
+					return Action.PLACE;
+				}
+			}
+		if (p.hurtTime > 0 && p.getLastDamageSource() != null && p.getLastDamageSource().is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE)) {
+			hole = null;                                                         // (still shot in there, nothing left to wall it with: not a hole to stay in)
+			c.journal("fight", "still being shot in its hole: out of it");
+			return null;
+		}
 		c.goals.instant = "dug in till they've gone";
 		if (c.mobsOnIt(12) > 0) quietSince = -1;
 		else if (quietSince < 0) quietSince = now();
