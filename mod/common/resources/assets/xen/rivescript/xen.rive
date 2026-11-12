@@ -214,6 +214,7 @@
 - yw
 
 + (sorry|my bad|oops) [*]
+* <get madat> == <get player> => fine. you still owe me diamonds though
 - it's fine
 - no worries
 - all good
@@ -278,6 +279,16 @@
 - 👍
 - cool
 - ok!
+
++ (are you mad|are you angry|why are you mad|why are you angry|you mad) [*]
+* <get madat> == <get player> => yeah, at you. you took all the diamonds
+* <get madat> != none => kinda. <get madat> took all the diamonds and didn't share
+- nah I'm good lol
+- mad? me? never
+
++ (remember when|do you remember|lol remember|remember that time) [*]
+* <get joke> == none => hmm, nothing comes to mind lol
+- <get joke>
 
 // ---------------------------------------------------------------- jokes and fun
 + (tell me a joke|another joke|one more joke|tell me another|say something funny) [*]

@@ -333,6 +333,7 @@ public final class Companion {
 		if (STATS) stats();
 		nether.tick();                                                  // portals: where it came from, gold in the Nether
 		if (player.tickCount % 20 == 7) noticeSheep();                  // (where the sheep were: for wool, for a bed)
+		if (player.tickCount % 2400 == 37) maybeJoke();                  // (every two minutes: maybe an inside joke, with someone who was there)
 		if (player.tickCount % 6000 == 11) {                            // every five minutes, old grudges fade a little (a kind one's faster, a wrathful one's slower)
 			float fade = 0.02f + 0.05f * personality.kindness - 0.02f * personality.sin(xen.mod.core.Sins.WRATH);
 			if (fade > 0) trust.replaceAll((k, v) -> v < 0 ? Math.min(0f, v + fade) : v);
@@ -525,6 +526,7 @@ public final class Companion {
 			lifeReward += reward;
 			genReward += reward;
 			if (items.getOrDefault("diamond", 0) > lastItems.getOrDefault("diamond", 0)) {
+				diamondsCame();                                                // (from the one it's mad at: settled)
 				chatter(personality.say("diamonds"), true);
 				antics.celebrate();
 				note("Diamonds here!");
@@ -5714,6 +5716,71 @@ public final class Companion {
 		return xen.mod.talk.Rive.teach(m.group(1), m.group(2)) ? pick3("Got it! I'll say that.", "Okay, noted.", "Sure, I'll remember that one.") : "Hm, I couldn't remember that one.";
 	}
 
+	// ------------------------------------------------------------------------- mad, and inside jokes (Incidents)
+	/** Who it's mad at (they took the diamonds and shared none), till when; how many it watched them take, since when. */
+	String madAt;
+	private long madUntil, hogSince, madSaidAt = -1_000_000, lastJokeAt;
+	private final Map<String, Integer> hogged = new HashMap<>();
+	private final java.util.Set<Long> jokesTold = new java.util.HashSet<>();
+
+	/** The diamonds it had on it a moment ago (for what's remembered when it dies). */
+	int diamondsCarried() {
+		return lastItems.getOrDefault("diamond", 0);
+	}
+
+	/**
+	 * Someone mined a diamond: a Xen close by that still needs diamonds counts it, and the third one in ten minutes with
+	 * none shared, it's mad at them (trusts them less, says so once, and the server remembers it).
+	 */
+	void sawDiamondTaken(net.minecraft.world.entity.player.Player by) {
+		if (player == null || by == player || by.level() != player.level() || player.distanceTo(by) > 24) return;
+		if (items().getOrDefault("diamond", 0) >= goals.diamondsWanted() || goals.diamondsWanted() == 0) return;   // (it has what it needs: nothing to mind)
+		long now = player.level().getGameTime();
+		if (now - hogSince > 20 * 60 * 10) {
+			hogged.clear();
+			hogSince = now;
+		}
+		String name = by.getGameProfile().name();
+		int n = hogged.merge(name, 1, Integer::sum);
+		if (n < 3 || now - madSaidAt < 20 * 60 * 10) return;
+		madAt = name;
+		madUntil = now + 20 * 60 * 10;
+		madSaidAt = now;
+		trust(by.getUUID(), -0.1f);
+		journal("feels", "mad at " + name + ": took " + n + " diamonds and shared none");
+		chatter(pick3("bro you took ALL the diamonds and didn't share??", "hey " + name + ", save some diamonds for me!", "wow " + name + ", not even one diamond for me?"), true);
+		Incidents.happened("hogged", name, n + " diamonds");
+	}
+
+	/** Mad at someone still? (Ten minutes, or till they hand it some diamonds.) */
+	boolean mad() {
+		if (madAt == null || player == null) return false;
+		if (player.level().getGameTime() > madUntil) madAt = null;
+		return madAt != null;
+	}
+
+	/** Diamonds handed to it by the one it's mad at: that settles it. */
+	private void diamondsCame() {
+		if (!mad() || player == null) return;
+		ServerPlayer them = server.getPlayerList().getPlayerByName(madAt);
+		if (them == null || them.level() != player.level() || them.distanceTo(player) > 8) return;
+		journal("feels", "not mad at " + madAt + " any more: they shared");
+		madAt = null;
+		chatter(pick3("ok ok, thanks. we're cool", "finally lol. thanks", "aw, thanks. ok I'm not mad anymore"), true);
+	}
+
+	/** Now and then, with someone who was in it close by: an incident the server remembers, as an inside joke (small talk). */
+	private void maybeJoke() {
+		if (player == null || fighting || player.level().getGameTime() - lastJokeAt < 20 * 60 * 8 || random().nextFloat() > 0.3f) return;
+		java.util.List<String> around = new java.util.ArrayList<>();
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) if (p != player && p.level() == player.level() && p.distanceTo(player) < 16) around.add(p.getGameProfile().name());
+		if (around.isEmpty()) return;
+		String joke = Incidents.joke(name, around, jokesTold);
+		if (joke == null) return;
+		lastJokeAt = player.level().getGameTime();
+		chatter(joke, false);
+	}
+
 	/** What its chat scripts may use: its name, who's talking, what it's doing, its health, its gear, its goal, the time, where it is. */
 	private Map<String, String> talkFacts(ServerPlayer from) {
 		Map<String, String> f = new HashMap<>();
@@ -5722,7 +5789,10 @@ public final class Companion {
 		f.put("player", from == null ? "you" : from.getName().getString());
 		f.put("doing", self.doing());
 		f.put("place", self.place());
-		f.put("mood", emotions.mood());
+		f.put("mood", mad() ? "angry" : emotions.mood());
+		f.put("madat", mad() ? madAt : "none");
+		String joke = from == null ? null : Incidents.joke(name, java.util.List.of(from.getGameProfile().name(), name), new java.util.HashSet<>());
+		f.put("joke", joke == null ? "none" : joke);
 		if (player != null) {
 			f.put("health", String.valueOf((int) player.getHealth()));
 			f.put("food", String.valueOf(player.getFoodData().getFoodLevel()));

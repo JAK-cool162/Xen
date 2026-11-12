@@ -131,7 +131,8 @@ public class XenMod implements ModInitializer {
 		gameplayLog = new GameplayLog(this, configDir.resolve("xen").resolve("gameplay_logs"));
 		duels = new Duels(configDir.resolve("xen").resolve("duels"));
 		xen.mod.talk.Rive.folder(configDir.resolve("xen").resolve("rivescript"));   // its chat scripts: the mod's, and yours there
-		ModHabits.load(configDir.resolve("xen"));                                // habits players taught it for their mods (crouch when it mines logs...)
+		ModHabits.load(configDir.resolve("xen"));
+		Incidents.load(configDir.resolve("xen"));                              // what happened on the server that people still talk about (inside jokes)                                // habits players taught it for their mods (crouch when it mines logs...)
 		try {
 			xen.mod.talk.Voice.init(configDir.resolve("xen"));               // its own words: the reply network (taught once, then it learns), the word library
 			xen.mod.talk.Banter.init(configDir.resolve("xen"));              // its talk model: what kind of line players say, and the answers (and which land)
@@ -170,6 +171,8 @@ public class XenMod implements ModInitializer {
 			gameplayLog.quietly(() -> gameplayLog.broke(player, pos, state));
 			watchedBreak(player, pos, state);
 			if (player instanceof XenPlayer xp && xp.companion != null) xp.companion.broke(pos, state.is(net.minecraft.tags.BlockTags.LOGS));   // (what it mines, it picks up)
+			if (net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath().contains("diamond_ore"))
+				for (Companion c : companions) c.sawDiamondTaken(player);         // (a Xen that needs diamonds, watching someone take them all: it minds)
 		});
 		net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
 			if (!level.isClientSide()) gameplayLog.quietly(() -> gameplayLog.swing(player, entity));
@@ -835,6 +838,9 @@ public class XenMod implements ModInitializer {
 			LOG.info("{} (local death message)", msg.getString());
 		}
 		var killer = source.getEntity();
+		Incidents.died(victim.getGameProfile().name(), source.getLocalizedDeathMessage(victim).getString(),
+				victim instanceof XenPlayer xv && xv.companion != null ? xv.companion.diamondsCarried() : 0,
+				killer instanceof ServerPlayer k && k != victim ? k.getGameProfile().name() : null);
 		for (Companion o : companions) {
 			if (o.player() == null || o.player() == victim) continue;
 			if (o.player() == killer || inRange(o.player(), victim)) o.rumors.witnessed(victim, killer);
