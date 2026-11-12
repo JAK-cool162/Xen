@@ -1365,21 +1365,21 @@ public final class Companion {
 	 * kept to until it's done; then its state machine picks the next task. No whims, no antics, no wandering off.
 	 */
 	private Action btbStep() {
-		Action pause = pace.next();
+		Action pause = mayCutIn("pace") ? held("pace", pace.next()) : null;
 		if (pause != null) return pause;
-		if (crafter.ready() && !farBehind()) {
-			Action craft = crafter.next();
+		if (crafter.ready() && !farBehind() && mayCutIn("craft")) {
+			Action craft = held("craft", crafter.next());
 			if (craft != null) return craft;
 		}
-		Action back = backForMyThings();
+		Action back = mayCutIn("its things") ? held("its things", backForMyThings()) : null;
 		if (back != null) return back;
-		Action pick = pickUpNearby();
+		Action pick = mayCutIn("pick up") ? held("pick up", pickUpNearby()) : null;
 		if (pick != null) return pick;
-		Action water = fillBucket();
+		Action water = mayCutIn("bucket") ? held("bucket", fillBucket()) : null;
 		if (water != null) return water;
 		Action bed = bedtime();
 		if (bed != null) return bed;
-		Action light = lightUp();
+		Action light = mayCutIn("torch") ? held("torch", lightUp()) : null;
 		if (light != null) return light;
 		if (mode == Mode.FOLLOW) watchLeaderMoving();
 		if (chores.busy() && chores.own && mode == Mode.FOLLOW && (!leaderWithin(LEASH) || leaderMoving())) {   // its friend is leaving: that comes first
@@ -1423,6 +1423,31 @@ public final class Companion {
 			if (chores.busy()) return chores.next();
 		}
 		return keepUp();
+	}
+
+	/**
+	 * Back to Basics' one say over its body: a habit that cuts into its task (crafting, a pickup, a torch, its bucket)
+	 * has it till that's done (every pickup lying about, not one each time), then waits five seconds before it cuts in
+	 * again. One thing at a time, no swapping every second; danger (its instinct, its gut, water, a fight) always comes
+	 * first, before any of this.
+	 */
+	private String bodyHolder = "";
+	private final Map<String, Integer> letGoAt = new HashMap<>();
+
+	private boolean mayCutIn(String habit) {
+		if (habit.equals(bodyHolder) || !(chores.busy() || builder.busy() || nether.busy() || enchanter.on)) return true;   // (at it already, or no task to cut into)
+		return player.tickCount - letGoAt.getOrDefault(habit, -100_000) >= 100;
+	}
+
+	private Action held(String habit, Action a) {
+		if (a != null && !habit.equals(bodyHolder)) {
+			if (!bodyHolder.isEmpty()) letGoAt.put(bodyHolder, player.tickCount);   // (another habit took over: that one waits too)
+			bodyHolder = habit;
+		} else if (a == null && habit.equals(bodyHolder)) {
+			letGoAt.put(habit, player.tickCount);
+			bodyHolder = "";
+		}
+		return a;
 	}
 
 	/** Following someone (close up, then it waits) or staying put (back to where it was told to stay). */
