@@ -185,7 +185,8 @@ final class Btb {
 		var bag = c.items();
 		boolean tableOrWood = bag.getOrDefault("crafting_table", 0) > 0 || woodInBag() >= 4;
 		boolean canFurnace = bag.getOrDefault("furnace", 0) > 0 || tableOrWood && o.stone >= 8 || c.chores.furnaceNear();   // (Ann tried to make one with no table and no wood to make one: three minutes, twice)
-		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter) && (canFurnace || smelter) && !tabling)   // (making its table: none at all; a lapis trip that came to nothing had it smelting thirty-one iron for minutes, its table waiting)
+		boolean ironUse = o.tier < 3 || !pickFine || goal.equals("home") || goal.equals("world");   // (an iron pickaxe in hand with life in it and diamond gear coming: its iron waits; Bob stood at a furnace with thirty-five raw iron, his diamonds waiting)
+		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter) && (canFurnace || smelter) && !tabling && ironUse)   // (making its table: none at all; a lapis trip that came to nothing had it smelting thirty-one iron for minutes, its table waiting)
 			out.add(new Option(Task.SMELT, goal.equals("gear") && pickFine ? 3.85f : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
 		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
