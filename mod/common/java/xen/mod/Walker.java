@@ -1249,6 +1249,14 @@ final class Walker {
 			return false;
 		}
 		if (now() - stepStarted > 60 + 20 * m.dig().size()) {              // three seconds on one move and nowhere: another way
+			if (m.kind() == Kind.ASCEND || m.kind() == Kind.PILLAR) {           // (why, for the journal: these got stuck the most, over and over)
+				var p = c.player;
+				BlockPos over = p.blockPosition().above(2);
+				c.journal("debug", String.format(java.util.Locale.ROOT, "%s stuck: at %.2f %.2f %.2f, from %s to %s, on ground %s, over its head %s, hands %s, held %s",
+						m.kind().name().toLowerCase(java.util.Locale.ROOT), p.getX(), p.getY(), p.getZ(), m.from().toShortString(), m.to().toShortString(), p.onGround(),
+						BuiltInRegistries.BLOCK.getKey(level.getBlockState(over).getBlock()).getPath(), c.hands.busy() ? "busy" : "free",
+						BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath()));
+			}
 			problem(m, "stuck on a " + m.kind().name().toLowerCase(java.util.Locale.ROOT) + " at " + m.from().toShortString());
 			return false;
 		}
