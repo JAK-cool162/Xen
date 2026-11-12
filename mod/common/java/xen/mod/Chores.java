@@ -3361,7 +3361,9 @@ final class Chores {
 			var world = c.player.level();
 			BlockPos at = c.player.blockPosition();
 			int top = world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ());
-			if (world.dimension() == net.minecraft.world.level.Level.OVERWORLD && !world.isDarkOutside() && top - at.getY() > 6) {   // (by day: up to where they are, as for trees; Ann, five health and nothing to eat, ten minutes down there "no animals down here")
+			var food = c.player.getFoodData();
+			boolean needs = !c.hands.canEat() && (food.getFoodLevel() <= 10 || c.player.getHealth() <= 12 && food.getFoodLevel() < 18);   // (nothing to eat, and hungry, or hurt and not healing: worth the climb; well fed, the mine comes first: Bob climbed out at twenty health for a sheep)
+			if (needs && world.dimension() == net.minecraft.world.level.Level.OVERWORLD && !world.isDarkOutside() && top - at.getY() > 6) {   // (by day: up to where they are, as for trees; Ann, five health and nothing to eat, ten minutes down there "no animals down here")
 				doing = forWool ? "heading up to the surface for sheep" : "heading up to the surface for animals";
 				return c.walkTo(new net.minecraft.world.phys.Vec3(at.getX() + 0.5, top, at.getZ() + 0.5));
 			}
