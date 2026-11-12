@@ -3415,6 +3415,11 @@ public final class Companion {
 			Vec3 stairs = g == null ? upItsStairs(goal) : null;               // (down in its mine, off up to the surface: up its own staircase first, dry and known, not through the caves)
 			Action w = g != null ? walker.go(g) : walker.go(stairs != null ? stairs : goal);
 			if (walker.stuck()) walker.stop();                                // (the same move failing: a new way from where it is now, next tick)
+			if (w != null && walker.stalled() && player.position().distanceTo(goal) > 6) {   // (a long dig: its way-finder's best a step off, every time; straight on, digging, as a player does: Ann stepped up and back by the lava twenty blocks off, pool after pool)
+				walker.stop();
+				Action d = digToward(goal);
+				if (d != null) return d;
+			}
 			if (w != null) return w;
 			return digToward(goal);                                          // (no way at all: straight there, digging through)
 		}

@@ -255,6 +255,13 @@ final class Walker {
 	private Goal want;
 	private String wantKey = "";
 	private boolean partial;
+	/** Its last way was only a piece, and that piece hardly any nearer (2,500 places thought about and the best a step off). */
+	private boolean stalled;
+
+	/** Its last way a piece that gets it hardly any nearer: thinking more won't do (a long dig through the rock); digging straight on will. */
+	boolean stalled() {
+		return stalled;
+	}
 
 	private Action go(Goal g, Vec3 to) {
 		touched = true;
@@ -609,6 +616,7 @@ final class Walker {
 		BlockPos target = BlockPos.containing(to);
 		Goal aim = want != null ? want : Goal.block(target);
 		partial = false;
+		stalled = false;
 		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
 		// (stone, with what's in its hand: a little over, so it keeps on down one staircase rather than start a dozen)
 		float stone = dig ? c.player.isCreative() ? 0.5f : c.hands.digSpeed(Blocks.STONE.defaultBlockState(), level, start) : 0;
@@ -695,6 +703,7 @@ final class Walker {
 			return null;
 		}
 		partial = !aim.isIn(best.pos) && !(want == null && h(aim, best.pos) < 0.01);   // (only part of the way: more later)
+		stalled = partial && first.f - bestH < 3;                            // (the best of it hardly nearer than where it stands)
 		if (WALK_DEBUG && partial) XenMod.LOG.info("[walk] {} partial: expanded {}, best {} h {} g {} (start h {}, rock {})", c.name, expanded,
 				best.pos.toShortString(), String.format("%.0f", bestH), String.format("%.0f", best.g), String.format("%.0f", first.f), String.format("%.0f", rock));
 		List<Move> out = new ArrayList<>();
