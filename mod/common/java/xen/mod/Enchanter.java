@@ -93,17 +93,21 @@ final class Enchanter {
 			BlockPos near = c.goals.home != null ? c.goals.home : c.player.blockPosition();
 			if (c.player.blockPosition().distSqr(near) > 36) return c.walkTo(Vec3.atBottomCenterOf(near));
 			BlockPos feet = c.player.blockPosition();
-			for (Direction d : Direction.Plane.HORIZONTAL) {
-				BlockPos at = feet.relative(d, 2);
-				if (!level().getBlockState(at).canBeReplaced() || level().getBlockState(at.below()).canBeReplaced()) continue;
-				if (c.hands.placeSeen(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("enchanting_table"), at.below(), Direction.UP, -1)) {
-					table = at.immutable();
-					c.places.remember("enchanting table", table);
-					c.acted = true;
-					return Action.PLACE;
+			for (int k = 1; k <= 2; k++) {                                       // (a block off, or two: in a tunnel a block wide, along it)
+				for (Direction d : Direction.Plane.HORIZONTAL) {
+					BlockPos at = feet.relative(d, k);
+					if (!level().getBlockState(at).canBeReplaced() || level().getBlockState(at.below()).canBeReplaced()) continue;
+					if (c.hands.placeSeen(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("enchanting_table"), at.below(), Direction.UP, -1)) {
+						table = at.immutable();
+						c.places.remember("enchanting table", table);
+						c.acted = true;
+						return Action.PLACE;
+					}
 				}
 			}
+			c.journal("does", "no spot to put its enchanting table down here: tries again somewhere else");
 			on = false;
+			retryAt = c.player.level().getGameTime() + 20 * 20;
 			return null;
 		}
 		if (!c.hands.canClick(t)) return c.walkTo(Vec3.atBottomCenterOf(t));
