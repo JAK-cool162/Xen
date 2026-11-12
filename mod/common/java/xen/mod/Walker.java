@@ -610,6 +610,7 @@ final class Walker {
 		// (stone, with what's in its hand: a little over, so it keeps on down one staircase rather than start a dozen)
 		float stone = dig ? c.player.isCreative() ? 0.5f : c.hands.digSpeed(Blocks.STONE.defaultBlockState(), level, start) : 0;
 		rock = stone > 1f / 200 ? Math.max(0, 1.2 * (WALK + 2 + 3 * (1 / stone + 12)) - 2 * Goal.PER_BLOCK) : 0;
+		hWeight = stone > 1f / 200 && !level.canSeeSky(start) ? 2.5 : 1.15;   // (in the rock, digging: straight for it, more or less, like a player tunnelling)
 		mobWay = false;
 		if (want == null && mobPaths() && now() >= noMobWayUntil && reachable(target)) {   // the mobs' way first (the setting): quick, sure, no digging
 			List<Move> m = mobPath.plan(c, level, start, to, 1600);
@@ -761,8 +762,16 @@ final class Walker {
 	 * cheapest it saw was a shaft straight down.
 	 */
 	private double h(Goal aim, BlockPos p) {
-		return aim.isIn(p) ? 0 : aim.heuristic(p) * 1.15 + aim.below(p) * rock;
+		return aim.isIn(p) ? 0 : aim.heuristic(p) * hWeight + aim.below(p) * rock;
 	}
+
+	/**
+	 * How much the way left counts against the way so far: a little over even, and under the ground, where every block
+	 * is two to dig, more (a block through rock costs ten times a block walked: counted evenly, its way-finder went
+	 * round in circles, two thousand blocks a plan, and came out a step further on, over and over, thirty plans a
+	 * second, the server falling behind).
+	 */
+	private double hWeight = 1.15;
 
 	/** A step of a staircase down through stone, over what the goal's own measure counts a level. */
 	private double rock;
