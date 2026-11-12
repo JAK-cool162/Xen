@@ -534,7 +534,8 @@ final class Nether {
 			c.chores.own = true;
 			return null;
 		}
-		if (c.mod.config.luck >= 2 && now() > fetchTriedAt) {                  // knowing everything: obsidian it knows of further off (by the lava, in a ruined portal)
+		boolean pourHere = has("water_bucket") && !inNether() && visibleLava(20) != null;   // (a lava pool right here and water on it: a minute's pouring beats a walk to obsidian further off)
+		if (c.mod.config.luck >= 2 && now() > fetchTriedAt && !pourHere) {   // knowing everything: obsidian it knows of further off (by the lava, in a ruined portal)
 			fetchTriedAt = now() + 20 * 60;
 			if (c.chores.fetch("obsidian", n -> n.equals("obsidian"), "obsidian", obsidianWanted() - obsidian()).startsWith("You will")) {
 				c.chores.own = true;
