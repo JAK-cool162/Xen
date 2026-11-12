@@ -251,6 +251,11 @@ final class Nether {
 		return purpose != null || lightAt != null;
 	}
 
+	/** What its trip's for ("table", "portal"...), or "" (for the live view). */
+	String purposeName() {
+		return purpose != null ? purpose : lightAt != null ? "lighting a portal" : "";
+	}
+
 	private boolean has(String id) {
 		return count(id) > 0;
 	}
