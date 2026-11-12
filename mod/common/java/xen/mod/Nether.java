@@ -451,6 +451,7 @@ final class Nether {
 		List<BlockPos> pools = c.hunch.oresNear("lava", c.player.blockPosition(), 128, 160, 16);
 		int dry = 0, open = 0;
 		BlockPos wetOne = null;                                                 // (by water: water's on it already, or soon; the next best)
+		BlockPos openDry = null, openAny = null;                               // (open to the air, nowhere level to stand: cave lava's a block or two below the floor; within reach is enough to pour)
 		for (BlockPos q : pools) {
 			boolean tried = false;
 			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
@@ -472,11 +473,18 @@ final class Nether {
 					return r.immutable();
 				}
 				if (stand && wetOne == null) wetOne = r.immutable();
+				if (!wet && openDry == null) openDry = r.immutable();
+				if (openAny == null) openAny = r.immutable();
 			}
 		}
 		if (wetOne != null) {
 			c.journal("thinks", "knows of a lava pool by water at " + wetOne.toShortString() + ": its obsidian's there or soon will be");
 			return wetOne;
+		}
+		BlockPos open = openDry != null ? openDry : openAny;                     // (72 open to the air, 46 dry, and "none it could stand by": Ann and Bob stood about)
+		if (open != null) {
+			c.journal("thinks", "knows of lava open to the air at " + open.toShortString() + ": close enough to pour on will do");
+			return open;
 		}
 		if (now() - lavaSaidAt > 1200) {
 			lavaSaidAt = now();
