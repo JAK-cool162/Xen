@@ -465,7 +465,7 @@ final class Btb {
 		if (best == null)                                                        // (out in the dark with nothing it can start: on to other ground, not standing there)
 			return (o.night || c.goals.sunDown()) && o.overworld && !o.under && !o.sheltered ? c.goals.exploreStep() : null;
 		String plan = start(best.task, o);
-		if (plan == null || !plan.startsWith("You will")) {                      // (it can't now: not again for a minute)
+		if (plan == null || !plan.startsWith("You will") && !plan.startsWith("You don't see any animals")) {   // (it can't now: not again for a minute; no animals in sight is a hunt that looks round, not a failure: Ann, Bob, Dee, Ivy stood still an hour, nothing to eat)
 			boolean shelter = best.task == Task.SHELTER;
 			notBefore.put(best.task, now() + (shelter ? 20 * 5 : forGoal(best.task) ? 20 * 15 : 20 * 60));   // (a roof: again in a few steps, from other ground; what its goal needs: soon)
 			if (plan != null && (!shelter || now() - shelterSaidAt > 400)) {
