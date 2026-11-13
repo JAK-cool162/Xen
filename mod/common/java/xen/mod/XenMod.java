@@ -549,6 +549,7 @@ public class XenMod implements ModInitializer {
 			}
 			try {
 				shareDiamonds();                                               // (a friend back on its feet: spare diamonds to one who lost its gear)
+				shareFood();                                                   // (a friend starving with nothing to eat: some of its food)
 			} catch (RuntimeException e) {
 				LOG.warn("Xen diamond sharing stumbled: {}", e.toString());
 			}
@@ -1831,6 +1832,84 @@ public class XenMod implements ModInitializer {
 			needy.journal("thinks", best.name + " is bringing it " + n + " diamonds");
 			needy.expectGift(best);
 			return;                                                           // (one gift a minute)
+		}
+	}
+
+	/** Food on its way to a starving one (who, from whom, how much food it had), and when one last got some. */
+	private final java.util.Map<String, Object[]> foodPending = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> fedAt = new java.util.HashMap<>(), foodFailed = new java.util.HashMap<>();
+
+	/**
+	 * A Xen hungry or hurt and not healing with nothing to eat, and another with food to spare not far off: it walks it
+	 * over (Ivy sat at half a heart, food 0, for most of an hour with no animals about, while Eve carried six bread and
+	 * Fin five cooked chicken). By day, one a minute, the nearest that can.
+	 */
+	private void shareFood() {
+		if (companions.size() < 2) return;
+		long now = server.overworld().getGameTime();
+		for (var it = foodPending.entrySet().iterator(); it.hasNext(); ) {
+			var e = it.next();
+			Companion needy = null, giver = (Companion) e.getValue()[0];
+			for (Companion x : companions) if (x.name.equals(e.getKey())) needy = x;
+			if (needy == null || needy.player() == null) {
+				it.remove();
+				continue;
+			}
+			if (needy.items().getOrDefault("food", 0) > (int) e.getValue()[1]) {
+				fedAt.put(needy.name, now);
+				it.remove();
+			} else if (giver.player() == null || giver.chores.kind != Chores.Kind.GIVE) {
+				it.remove();
+				foodFailed.put(needy.name + ">" + giver.name, now);
+			}
+		}
+		if (server.overworld().isDarkOutside()) return;
+		for (Companion needy : companions) {
+			var np = needy.player();
+			if (np == null || needy.minion || needy.inArena || np.tickCount < 20 * 60 || foodPending.containsKey(needy.name)) continue;
+			if (now - fedAt.getOrDefault(needy.name, -1_000_000L) < 20 * 60 * 5) continue;
+			int level = np.getFoodData().getFoodLevel();
+			boolean starving = level <= 6 || np.getHealth() <= 8 && level < 18;
+			if (!starving || needy.items().getOrDefault("food", 0) > 0) continue;
+			Companion best = null;
+			double bestD = 192;
+			for (Companion rich : companions) {
+				var rp = rich.player();
+				if (rich == needy || rp == null || rich.minion || rp.level() != np.level() || rp.tickCount < 20 * 60 || rp.getFoodData().getFoodLevel() < 10) continue;
+				if (rich.items().getOrDefault("food", 0) < 8 || rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rp.isInLava() || rp.isInWater() || rich.goals.evening()) continue;
+				if (now - foodFailed.getOrDefault(needy.name + ">" + rich.name, -1_000_000L) < 20 * 60 * 5) continue;
+				double d = rp.distanceTo(np);
+				if (d < bestD) {
+					bestD = d;
+					best = rich;
+				}
+			}
+			if (best == null) continue;
+			String food = null;                                                  // (its best to give: filling, not risky, not its golden apples; raw chicken can sicken)
+			int fill = 0;
+			var inv = best.player().getInventory();
+			for (int i = 0; i < 36; i++) {
+				var st = inv.getItem(i);
+				if (st.isEmpty() || !st.has(net.minecraft.core.component.DataComponents.FOOD) || st.getCount() < 2) continue;
+				String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+				if (Survival.keep(id) || Survival.risky(id) != null || id.equals("chicken")) continue;
+				int f = st.get(net.minecraft.core.component.DataComponents.FOOD).nutrition() * st.getCount();
+				if (f > fill) {
+					fill = f;
+					food = id;
+				}
+			}
+			if (food == null) continue;
+			if (best.chores.busy()) best.chores.cancel();
+			String plan = best.chores.give(np, food, 6);
+			if (!plan.startsWith("You will")) continue;
+			best.chores.own = false;
+			foodPending.put(needy.name, new Object[] {best, needy.items().getOrDefault("food", 0)});
+			best.chatter(needy.name + ", you're starving? Hold on, I've got " + food.replace('_', ' ') + " for you.", true);
+			best.journal("does", "brings food to " + needy.name + " (" + food + "; it's at " + Math.round(np.getHealth()) + " health, food " + level + ", " + Math.round(bestD) + " blocks off)");
+			needy.journal("thinks", best.name + " is bringing it food");
+			needy.expectGift(best);
+			return;
 		}
 	}
 
