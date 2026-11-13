@@ -930,6 +930,7 @@ final class Chores {
 	/** The next action for the chore, or null to let the brain (or following) decide this moment. */
 	Action next() {
 		if (kind == null) return null;
+		if (c.player.isInLava()) return null;                                  // (in the lava: out of it first, its instinct's keys, nothing of its chore's; Dee's obsidian dig stopped her escape every tick, fifteen health to none)
 		if (fruitless()) return null;
 		if (kind == Kind.MINE && "diamonds".equals(tripWhat) && c.crafter.pickTier() == 3 && c.crafter.pickWorn() < 0.08
 				&& c.crafter.count(n -> n.equals("iron_pickaxe")) <= 1) {       // (its pickaxe all but gone, no spare: up for iron, not on till it breaks down there)
@@ -2993,6 +2994,7 @@ final class Chores {
 	 * and broke none: the way to each block, turning and a step and looking again, never got as far as the pickaxe.
 	 */
 	private Action commitDig(BlockPos t) {
+		if (c.player.isInLava() || c.player.isOnFire()) return null;            // (burning: not now)
 		ServerLevel level = (ServerLevel) c.player.level();
 		net.minecraft.world.level.block.state.BlockState st = level.getBlockState(t);
 		if (!COMMIT.contains(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath())) return null;
