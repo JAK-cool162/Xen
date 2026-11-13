@@ -1082,6 +1082,72 @@ final class Architect {
 				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(-half, v0, yr)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(half, v0 + d - 1, yr + 3))));
 	}
 
+	/**
+	 * A first base dug into the ground, quick (what a player with a pickaxe digs the first night): a staircase down,
+	 * a door, a room w by d and 3 high in the rock as it is (no floor laid, no beams), two torches, a chest, a
+	 * crafting table and a furnace. A few planks and some cobblestone in all: the rock is its walls and roof.
+	 */
+	static Plan dugout(BlockPos origin, Direction front, int depth, int w, int d, Palette p) {
+		Layout L = new Layout(origin, front);
+		for (int k = 0; k < depth; k++) {
+			int v = k + 1, feet = -(k + 1);
+			for (int y = feet; y <= feet + 2; y++) L.dig(0, v, y);
+			if (k % 3 == 1) L.put(1, v, feet + 1, "wall_torch[facing={L}]", INSIDE, true);
+		}
+		int yr = -depth, v0 = depth + 2, half = w / 2;
+		L.dig(0, depth + 1, yr);
+		L.dig(0, depth + 1, yr + 1);
+		L.put(0, depth + 1, yr, p.door() + "[facing={B},half=lower,hinge=left]", DOORS, true);
+		for (int u = -half; u <= half; u++) for (int v = v0; v < v0 + d; v++) for (int y = yr; y <= yr + 2; y++) L.dig(u, v, y);
+		L.put(-half, v0 + d / 2, yr + 1, "wall_torch[facing={R}]", INSIDE, true);
+		L.put(half, v0 + d / 2, yr + 1, "wall_torch[facing={L}]", INSIDE, true);
+		int back = v0 + d - 1;
+		L.put(-half, back, yr, "chest[facing={F}]", INSIDE, true);
+		L.put(half, back, yr, "crafting_table", INSIDE, true);
+		L.put(half - 1, back, yr, "furnace[facing={F}]", INSIDE, true);
+		return new Plan("underground base", L.steps(), L.pos(0, depth + 1, yr), L.pos(0, v0 + d / 2, yr), front,
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(-half, v0, yr)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(half, v0 + d - 1, yr + 2))));
+	}
+
+	/**
+	 * A new room off an underground base (its room's middle at floor level, the room about seven across): a short way
+	 * through the rock toward `toward`, then a room five by five and three high, lit, with what it's for along the
+	 * far wall. way: "ahead" (straight on), "down" (a staircase to a room a level under), "diagonal" (on, then aside).
+	 */
+	static Plan baseRoom(BlockPos middle, Direction toward, String way, String purpose) {
+		Layout L = new Layout(middle, toward.getOpposite());                 // (v counts on toward it)
+		int du = 0, yr = 0, v0 = 6;
+		for (int v = 4; v <= 5; v++) for (int y = 0; y <= 1; y++) L.dig(0, v, y);   // through the wall
+		if (way.equals("down")) {
+			for (int k = 0; k < 4; k++) for (int y = -(k + 1); y <= -(k + 1) + 2; y++) L.dig(0, 6 + k, y);
+			yr = -4;
+			v0 = 10;
+		} else if (way.equals("diagonal")) {
+			for (int u = 1; u <= 3; u++) for (int y = 0; y <= 1; y++) L.dig(u, 5, y);
+			du = 5;
+		}
+		for (int u = du - 2; u <= du + 2; u++) for (int v = v0; v < v0 + 5; v++) for (int y = yr; y <= yr + 2; y++) L.dig(u, v, y);
+		L.put(du - 2, v0 + 2, yr + 1, "wall_torch[facing={R}]", INSIDE, true);
+		L.put(du + 2, v0 + 2, yr + 1, "wall_torch[facing={L}]", INSIDE, true);
+		int back = v0 + 4;
+		switch (purpose) {
+			case "workshop" -> {
+				L.put(du - 2, back, yr, "crafting_table", INSIDE, true);
+				L.put(du - 1, back, yr, "furnace[facing={F}]", INSIDE, true);
+				L.put(du, back, yr, "furnace[facing={F}]", INSIDE, true);
+				L.put(du + 2, back, yr, "chest[facing={F}]", INSIDE, true);
+			}
+			case "mine" -> L.dig(du, back + 1, yr);                            // (a way on into the rock, for later)
+			default -> {                                                        // storage
+				L.put(du - 2, back, yr, "chest[facing={F}]", INSIDE, true);
+				L.put(du, back, yr, "barrel[facing=up]", INSIDE, true);
+				L.put(du + 2, back, yr, "chest[facing={F}]", INSIDE, true);
+			}
+		}
+		return new Plan("base room", L.steps(), L.pos(0, 4, 0), L.pos(du, v0 + 2, yr), toward.getOpposite(),
+				new net.minecraft.world.phys.AABB(net.minecraft.world.phys.Vec3.atCenterOf(L.pos(du - 2, v0, yr)), net.minecraft.world.phys.Vec3.atCenterOf(L.pos(du + 2, v0 + 4, yr + 2))));
+	}
+
 	// ---------------------------------------------------------------------------------- farms
 	/**
 	 * A crop farm the way the wiki shows it: 9 by 9, one water block in the middle (it keeps every block of farmland

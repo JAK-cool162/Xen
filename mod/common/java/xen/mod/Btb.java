@@ -241,6 +241,8 @@ final class Btb {
 		}
 		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && goal.equals("world"))
 			out.add(new Option(Task.HOME, 0.9f, "nothing pressing: a home of its own (its mind's design)"));   // (its job has nothing on: its mind builds)
+		if (c.goals.home != null && !o.night && o.overworld && (c.builder.canUpgrade() || c.builder.canExtendBase()))
+			out.add(new Option(Task.HOME, goal.equals("world") ? 2.5f : 0.8f, "nothing pressing: its base better or bigger (a house's next stage, a new room under the ground)"));   // (a home once had, never touched again: no upgrade ever ran)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
 		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
 		// heals, eats, gets food first); none of the walking-about jobs with monsters round it; by water, a mine is the
@@ -392,6 +394,11 @@ final class Btb {
 					c.goals.home = mate;
 					c.journal("does", "moves into its team's base at " + mate.toShortString());
 					yield "You will share your team's base.";
+				}
+				if (c.goals.home != null) {                                    // a base it has: better (a house's next stage) or bigger (a new room under the ground)
+					if (c.builder.canUpgrade()) yield c.builder.upgrade();
+					if (c.builder.canExtendBase()) yield c.builder.extendBase();
+					yield "You can't make your base any better just now.";
 				}
 				yield c.builder.startStarterHome();
 			}

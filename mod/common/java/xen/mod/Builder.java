@@ -73,6 +73,62 @@ final class Builder {
 		return starter ? Math.min(stage, Architect.DEPTH) : stage;
 	}
 
+	private long extendAt;
+
+	/** Rooms it has dug off its base so far. */
+	private int baseRooms() {
+		int n = 0;
+		while (n < 8 && c.places.get("base room " + (n + 1)) != null) n++;
+		return n;
+	}
+
+	/** Its home is a base under the ground, room to grow (six rooms at most), and a while since the last? */
+	boolean canExtendBase() {
+		BlockPos h = c.goals.home;
+		if (h == null || plan != null || c.player == null || c.player.level().getGameTime() < extendAt || c.crafter.pickTier() < 2) return false;
+		if (!h.closerThan(c.player.blockPosition(), 96) || c.player.level().canSeeSky(h.above(2))) return false;
+		return baseRooms() < 6;
+	}
+
+	/** Another room dug off its base: a way and a direction chosen where the rock is whole (no cave, water or lava breaking in), and what it's for. */
+	String extendBase() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		extendAt = level.getGameTime() + 20 * 60 * 8;
+		BlockPos h = c.goals.home;
+		int n = baseRooms();
+		String purpose = n % 3 == 0 ? "storage" : n % 3 == 1 ? "workshop" : "mine";
+		List<Direction> dirs = new ArrayList<>(Direction.Plane.HORIZONTAL.stream().toList());
+		java.util.Collections.shuffle(dirs, random);
+		List<String> ways = new ArrayList<>(List.of("ahead", "ahead", "down", "diagonal"));
+		java.util.Collections.shuffle(ways, random);
+		for (String way : ways) {
+			for (Direction d : dirs) {
+				Architect.Plan room = Architect.baseRoom(h, d, way, purpose);
+				if (!wholeRock(level, room)) continue;
+				String planned = begin(room, " (a " + purpose + ", " + (way.equals("down") ? "a level down" : way.equals("diagonal") ? "off to the side" : "to the " + d.getName()) + ")", palette(level, h).name());
+				if (!planned.startsWith("You will")) continue;
+				c.places.remember("base room " + (n + 1), room.middle());
+				c.journal("build", "digs a new room off its base: a " + purpose + ", " + (way.equals("down") ? "a level down" : way.equals("diagonal") ? "off to the side" : "to the " + d.getName()));
+				return planned;
+			}
+		}
+		return "You can't: there's no whole rock round your base to dig a room into.";
+	}
+
+	/** Where a room is to be dug: mostly rock (not someone's tunnel or a cave), and no water or lava in it or beside it. */
+	private static boolean wholeRock(ServerLevel level, Architect.Plan room) {
+		int dig = 0, air = 0;
+		for (Architect.Step st : room.steps()) {
+			if (st.state() != null && st.phase() != Architect.DIG) continue;
+			BlockPos b = st.pos();
+			dig++;
+			if (level.getBlockState(b).isAir()) air++;
+			for (Direction d : Direction.values()) if (!level.getFluidState(b.relative(d)).isEmpty()) return false;
+			if (level.getBlockState(b).getDestroySpeed(level, b) < 0) return false;
+		}
+		return dig > 0 && air * 5 <= dig;
+	}
+
 	/** Can it make its home better (the next stage)? */
 	boolean canUpgrade() {
 		return home != null && home.stage() < Architect.POLISH && plan == null && c.player != null
@@ -452,7 +508,8 @@ final class Builder {
 		} else if (base) {
 			BlockPos top = Architect.ground(level, near != null ? near : feet);
 			if (top == null) return "You can't dig a base here: there's no solid ground.";
-			made = Architect.underground(top.above().relative(front.getOpposite(), 1), front, 7, 9, 7, p, creative);
+			made = !creative && c.goals.home == null ? Architect.dugout(top.above().relative(front.getOpposite(), 1), front, 6, 7, 7, p)   // its first: dug, not furnished (planks for a floor and logs for beams stopped bases before)
+					: Architect.underground(top.above().relative(front.getOpposite(), 1), front, 7, 9, 7, p, creative);
 		} else {
 			// No template: it designs the house itself, from what it has come to like (and what's worked before)
 			boolean starter = forceStarter || !creative && c.goals.home == null;   // its first house: what a few trees give
@@ -1123,6 +1180,7 @@ final class Builder {
 			case "nether portal" -> c.nether.built(plan.middle(), plan.front(), plan.inside());
 			case "highway" -> c.highway.built(plan.middle());
 			case "mine entrance" -> c.places.remember("mine hut", plan.middle());
+			case "base room" -> c.journal("build", "finished a new room in its base");
 			default -> {
 				if (!plan.name().startsWith("statue") && !extra && !shownThing) c.goals.home = plan.middle();   // a house or a base: home
 			}
