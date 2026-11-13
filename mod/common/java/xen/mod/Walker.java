@@ -216,9 +216,24 @@ final class Walker {
 	}
 
 	void stop() {
+		untouched = 0;
 		if (path == null) return;
 		path = null;
 		release();
+	}
+
+	/** Ticks in a row it wasn't asked to walk, with a way still in hand. */
+	private int untouched;
+
+	/**
+	 * Not asked to walk this tick: the keys let go, the way kept a second (one tick of something else, a word, a look,
+	 * is no reason to throw a way away; Ivy's was planned and thrown away every other tick for eight minutes at y -7 and
+	 * not one step walked). A second of nothing: let go of it.
+	 */
+	void idleTick() {
+		if (path == null) return;
+		release();
+		if (++untouched > 20) stop();
 	}
 
 	private void release() {
@@ -266,6 +281,7 @@ final class Walker {
 
 	private Action go(Goal g, Vec3 to) {
 		touched = true;
+		untouched = 0;
 		var p = c.player;
 		Vec3 finalTo = to;
 		if (g == null) to = viaLand(to);                                     // a long way over open land: its way over the land first
@@ -458,6 +474,7 @@ final class Walker {
 	/** One step of a staircase up that way (dig over its head, and the two above the step, then up). */
 	Action stairsUp(Direction d) {
 		touched = true;
+		untouched = 0;
 		var p = c.player;
 		BlockPos feet = p.blockPosition(), up = feet.relative(d).above();
 		if (path == null || path.size() != 1 || path.get(0).kind() != Kind.ASCEND || !path.get(0).from().equals(feet)) {

@@ -501,6 +501,9 @@ final class Btb {
 	}
 
 	private float lastHealth = 20;
+	/** The task it last dropped as soon as it began, and how many times straight. */
+	private Task blipTask;
+	private int blips;
 
 	/** Is this what its goal is waiting on (diamonds for its gear, the table and enchanting, blaze rods and pearls)? */
 	private boolean forGoal(Task t) {
@@ -530,6 +533,14 @@ final class Btb {
 		if (task == Task.TABLE && c.xenfish.trying() != null) c.xenfish.settle();   // (the way it was on for its obsidian: how it went, to its book)
 		boolean blip = seconds < 10 && !died && gained == 0 && o.tier == tierAt && hurtSince == 0;   // (on and off in a moment, nothing happened: no lesson; the enchanting loop wrote 849 of these, two seconds each, all "worked")
 		if (!blip) c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
+		blips = blip && task == blipTask ? blips + 1 : blip ? 1 : 0;
+		blipTask = blip ? task : null;
+		if (blips >= 2 && task != Task.SHELTER && task != Task.SLEEP && task != Task.FOOD) {   // (never a roof, a bed or food: done at once there is done, not dithering)                                                         // the same task begun and dropped twice straight, nothing done: not a third time this minute (it does, not reconsiders: Ann went table, look round, table every twenty seconds)
+			notBefore.put(task, now() + 20 * 60);
+			c.journal("thinks", "btb: " + task.name().toLowerCase(Locale.ROOT) + " twice begun and dropped at once: leaves it a minute");
+			blips = 0;
+			blipTask = null;
+		}
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
 				ok ? "worked" : "came to nothing", seconds, reward, died ? ", died" : ""));
 		boolean mining = task == Task.IRON || task == Task.COAL || task == Task.DIAMONDS;

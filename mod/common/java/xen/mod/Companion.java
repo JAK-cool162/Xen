@@ -614,7 +614,7 @@ public final class Companion {
 			if (w != null && w.level() == player.level()) hands.watching = w;
 		}
 		if (!fighting && action != Action.FORWARD.ordinal() && action != Action.JUMP.ordinal()) run(false);   // stopped: no more running
-		if (!walker.touched) walker.stop();                                // doing something else now: it lets go of the keys
+		if (!walker.touched) walker.idleTick();                            // doing something else now: it lets go of the keys (its way kept a moment)
 		if (!pillaring && !acted) hands.start(Action.values()[action]);
 		if (mod.config.killAura) killAura();
 		if (mod.config.journal) {
