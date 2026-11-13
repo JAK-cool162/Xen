@@ -1193,6 +1193,12 @@ public final class Companion {
 			airUp = player.tickCount + 5;                             // hold space to swim up, like a player (straight up: Instinct, last)
 			return Action.IDLE;
 		}
+		if (player.level().getGameTime() < typingUntil && player.onGround() && !player.isInWater() && !fightingNow() && danger() < 0.4f && player.hurtTime == 0) {   // typing in chat: a player stands still to type (and ten lines a minute aren't worth the walk lost)
+			goals.instant = "typing in chat";
+			hands.stop();
+			acted = true;
+			return Action.IDLE;
+		}
 		Action shore = backToShore();                                 // out in open water: back to land before anything else
 		if (shore != null) return shore;
 		Action come = comeOver();                                     // "come here": right over to them, then waits to see what they want
@@ -4811,6 +4817,7 @@ public final class Companion {
 	void chatter(String text, boolean always) {
 		long now = System.currentTimeMillis();
 		if (!mod.config.chat || inArena || (!always && now - lastChatter < talkGapMillis())) return;
+		if (!always && player != null && (fightingNow() || rushingForValuables() || danger() >= 0.4f)) return;   // (busy with something that matters: no small talk, no stopping to type it)
 		boolean talking = talkingWith != null && player != null && player.level().getGameTime() < talkingUntil;
 		if (always && !talking && now - lastChatter < 8_000) return;  // (Xen 2.0: two lines in a row only in a conversation)
 		if (!always && !fresh(text)) return;                           // someone just said that: no need to say it again
@@ -4930,8 +4937,12 @@ public final class Companion {
 	/** When it last said anything (a reply, a word on its own), by the clock. */
 	long saidMillis;
 
+	/** Until when it's typing what it said (game time): it stands still meanwhile, as a player does. */
+	private long typingUntil;
+
 	public void say(String text) {
 		saidMillis = System.currentTimeMillis();
+		if (player != null) typingUntil = player.level().getGameTime() + Math.max(20, Math.min(120, text.length() * 2));   // (a tenth of a second a letter: one to six seconds)
 		if (privateTo != null && player != null && privateTo.isAlive()) {   // answering a whisper: whispered back
 			whisper(privateTo, text);
 			return;
