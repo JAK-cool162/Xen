@@ -143,7 +143,9 @@ final class Imagination {
 		if (digs == 0 && moves != null) pros.add("no digging");
 		if (book != null && book[0] >= 2 && book[1] / book[0] >= 0.5) pros.add(String.format(Locale.ROOT, "%d of %d tries worked", (int) book[1], (int) book[0]));
 		float hp = c.player.getHealth();
-		double score = -seconds / 60.0 - 2.5 * lava - 1.5 * falls - 0.6 * monsters - (nightFalls ? 1.5 : 0) - (moves == null ? 50 : partial ? 1 : 0) - 0.3 * gaps - 0.15 * order
+		double total = Math.max(1, Math.sqrt(c.player.blockPosition().distSqr(o.to()))), thought = Math.sqrt(c.player.blockPosition().distSqr(at));
+		double unsure = moves == null ? 1 : partial ? Math.max(0, 1 - thought / total) : 0;   // (how much of the way is a guess: Ivy's "1 of 108 blocks thought through" counted no worse than nearly all of it)
+		double score = -seconds / 60.0 - 2.5 * lava - 1.5 * falls - 0.6 * monsters - (nightFalls ? 1.5 : 0) - (moves == null ? 50 : 3 * unsure) - 0.3 * gaps - 0.15 * order
 				- (hp < 12 ? 1.5 * (lava + falls + monsters) : 0);
 		if (book != null && book[0] >= 2) score += 2 * (book[1] / book[0]) - 5 * (book[2] / book[0]);
 		return new Played(o, seconds, pros, cons, score, way, trouble, moves != null && !partial);
