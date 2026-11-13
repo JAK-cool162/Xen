@@ -1054,11 +1054,12 @@ public final class Hands {
 			if (s.isEmpty() || !s.has(DataComponents.FOOD)) continue;
 			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
 			boolean risky = Survival.risky(n) != null, keep = Survival.keep(n);
-			if (risky && level > 6 || keep && level > 4) continue;
+			boolean dying = p.getHealth() <= 6 && level < 18 && n.equals("rotten_flesh");   // (a few hearts left and not healing: its hunger costs less than staying at one heart; Ann at 0.7 health, food 14, two rotten flesh in her bag)
+			if (risky && level > 6 && !dying || keep && level > 4) continue;
 			var food = s.get(DataComponents.FOOD);
 			int fills = food.nutrition();
 			float score = 2f * Math.min(fills, missing) - Math.max(0, fills - missing) + 0.15f * food.saturation()   // (saturation: how long till it's hungry again)
-					- (risky ? 40 : 0) - (keep ? 60 : 0) + (slot < 9 ? 0.5f : 0);
+					- (risky ? (dying ? 10 : 40) : 0) - (keep ? 60 : 0) + (slot < 9 ? 0.5f : 0);
 			if (score > bestScore) {
 				bestScore = score;
 				best = slot;
