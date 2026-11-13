@@ -2503,6 +2503,13 @@ public final class Companion {
 
 	/** Where it died, with its things lying there, and until when they're there. */
 	private BlockPos lostAt;
+	/** What lies there is worth a run (diamonds, its gear, obsidian, lapis): straight back, whatever the hour. */
+	boolean lostValuable;
+
+	/** On its way back for things worth the run, well enough to keep going (a monster far off is no reason to stop and dig in). */
+	boolean rushingForValuables() {
+		return lostAt != null && lostValuable && player != null && player.getHealth() >= 8;
+	}
 	private double lostBest;
 	private long lostProgressAt;
 	private net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> lostDimension;
@@ -2524,6 +2531,7 @@ public final class Companion {
 		o.addProperty("dim", lostDimension == net.minecraft.world.level.Level.NETHER ? "nether" : lostDimension == net.minecraft.world.level.Level.END ? "end" : "overworld");
 		o.addProperty("left", Math.max(0, lostUntil - player.level().getGameTime()));
 		o.addProperty("aged", lostAged);
+		o.addProperty("valuable", lostValuable);
 		return o;
 	}
 
@@ -2535,6 +2543,7 @@ public final class Companion {
 			lostDimension = d.equals("nether") ? net.minecraft.world.level.Level.NETHER : d.equals("end") ? net.minecraft.world.level.Level.END : net.minecraft.world.level.Level.OVERWORLD;
 			lostUntil = now + o.get("left").getAsLong();
 			lostAged = o.get("aged").getAsLong();
+			lostValuable = !o.has("valuable") || o.get("valuable").getAsBoolean();   // (kept from before this was written down: worth the run)
 			lostAgedAt = now;
 			lostBest = Double.MAX_VALUE;
 			lostProgressAt = now;
@@ -2583,7 +2592,8 @@ public final class Companion {
 		}
 		double far = Vec3.atCenterOf(lostAt).distanceTo(player.position());
 		long day = Compat.timeOfDay(player.level()) % 24000, toMorning = day < 23000 ? 23000 - day : 0;
-		boolean vanishing = lostThingsTicking() && 5800 - lostAged < toMorning && far <= 64 && player.getHealth() >= 10;   // (by morning they'd be gone: near enough, it runs for them now)
+		boolean vanishing = lostThingsTicking() && 5800 - lostAged < toMorning && far <= 64 && player.getHealth() >= 10   // (by morning they'd be gone: near enough, it runs for them now)
+				|| rushingForValuables();                                           // (diamonds and its gear there: it runs for them whatever the hour; on the way it carries nothing, a death costs it nothing more)
 		if (player.level().isDarkOutside() && player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && far > 12 && !hands.hasWeapon() && !vanishing) {   // night, nothing to fight with: dug in until morning, then back for them
 			goals.instant = "waiting for morning to go back for its things";
 			if (!chores.sheltered() && chores.digIn() != null) {
@@ -2708,6 +2718,12 @@ public final class Companion {
 	 */
 	private Action readyAlone(double far, long now) {
 		if (helper != null || aloneUntil < 0 || far < 16) return null;
+		if (lostValuable) {                                                     // what took hours to get: it runs for it now, no blocks and stone tools first (Ann, her enchanted diamonds 511 blocks off, gathered wood at spawn for minutes)
+			journal("thinks", String.format(java.util.Locale.ROOT, "its diamonds and gear lie there: straight back for them (%.0f blocks)", far));
+			chatter(pick3("My diamonds! Running back now.", "All my gear's back there. Going, now.", "Not losing that stuff. Running for it."), true);
+			aloneUntil = -1;
+			return null;
+		}
 		long day = Compat.timeOfDay(player.level()) % 24000;
 		var lvl = player.level();
 		boolean open = lvl.dimension() == net.minecraft.world.level.Level.OVERWORLD && lvl.isLoaded(lostAt)
@@ -5092,6 +5108,8 @@ public final class Companion {
 			journal("does", "gives up on its things (died there again)");
 		}
 		lostAt = gone || inArena || again ? null : here;              // its things are lying there: back for them after
+		lostValuable = lastItems.keySet().stream().anyMatch(k -> k.startsWith("diamond") || k.startsWith("netherite") || k.equals("obsidian")
+				|| k.equals("enchanting_table") || k.equals("lapis_lazuli")) || diamondsCarried() > 0;   // (what took hours to get lies there: it runs for it, no getting ready first)
 		saidGoingBack = false;
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
