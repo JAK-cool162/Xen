@@ -100,6 +100,7 @@ final class LiveView {
 
 		JsonObject o = new JsonObject();
 		o.addProperty("name", c.name);
+		o.addProperty("pronouns", c.personality.pronouns);
 		o.addProperty("at", now);
 		o.addProperty("x", p.getBlockX());
 		o.addProperty("y", p.getBlockY());

@@ -1305,6 +1305,38 @@ public class XenMod implements ModInitializer {
 							}
 							return each(ctx, c -> c.name + ": " + c.goTo(where));
 						})))
+				.then(Commands.literal("pronouns")                                   // "/xen pronouns Ann she/her" (any set: "they/them", "xe/xem/xyr"); "/xen pronouns" lists them
+						.executes(ctx -> {
+							StringBuilder sb = new StringBuilder();
+							for (Companion c : companions) sb.append(sb.length() > 0 ? ", " : "").append(c.name).append(" (").append(c.personality.pronouns).append(")");
+							String out = sb.length() == 0 ? "No Xens here." : sb.toString();
+							ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+							return 1;
+						})
+						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
+									for (Companion c : companions) b.suggest(c.name);
+									return b.buildFuture();
+								})
+								.then(Commands.argument("pronouns", StringArgumentType.greedyString()).suggests((ctx, b) -> {
+											for (String t : new String[] {"she/her", "he/him", "they/them", "she/they", "he/they"}) b.suggest(t);
+											return b.buildFuture();
+										})
+										.executes(ctx -> {
+											String who = StringArgumentType.getString(ctx, "xen"), set = StringArgumentType.getString(ctx, "pronouns").trim().toLowerCase(java.util.Locale.ROOT);
+											if (!set.matches("[a-z]{1,12}(/[a-z]{1,12}){0,2}")) {
+												ctx.getSource().sendFailure(Component.literal("Pronouns like she/her, they/them or xe/xem/xyr."));
+												return 0;
+											}
+											for (Companion c : companions) {
+												if (!c.name.equalsIgnoreCase(who)) continue;
+												c.personality.pronouns = set;
+												c.journal("is", "goes by " + set);
+												ctx.getSource().sendSuccess(() -> Component.literal(c.name + " goes by " + set + " now."), false);
+												return 1;
+											}
+											ctx.getSource().sendFailure(Component.literal("No Xen called " + who + "."));
+											return 0;
+										}))))
 				.then(Commands.literal("style")
 						.then(Commands.argument("xen", StringArgumentType.word()).suggests((ctx, b) -> {
 									for (Companion c : companions) b.suggest(c.name);
@@ -1993,7 +2025,7 @@ public class XenMod implements ModInitializer {
 		String n = name;
 		ctx.getSource().sendSuccess(() -> Component.literal(n + " is here (" + c.personality.describe() + "; " + c.personality.style() + "). Talk to it in chat with its name (\""
 				+ n + ", get some wood\", \"" + n + ", follow me\"). Right-click it for its bag. /xen status, /xen dismiss."), false);
-		c.say("Hi! I'm " + n + ". I only know what I can see, so show me around!");
+		c.say("Hi! I'm " + n + " (" + c.personality.pronouns + "). I only know what I can see, so show me around!");
 		return 1;
 	}
 

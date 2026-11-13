@@ -65,7 +65,7 @@ function drawDream(k,t){const d=k.d,cv=k.cv;if(!d)return;const g=cv.getContext('
 (function anim(t){for(const n in cards)if(cards[n].d&&cards[n].c.style.display!=='none')drawDream(cards[n],t);requestAnimationFrame(anim)})(0);
 function draw(n,s){const k=cards[n]||card(n);k.c.style.display=only&&only!==n?'none':'';
  if(!k.loading){k.loading=true;const im=new Image();im.onload=()=>{k.img.src=im.src;k.loading=false};im.onerror=()=>{k.loading=false};im.src=n+'.png?t='+s.at}
- const a=(Date.now()-s.at)/1000;k.age.textContent=a<3?'now':Math.round(a)+' s ago';
+ const a=(Date.now()-s.at)/1000;k.age.textContent=a<3?'now':Math.round(a)+' s ago';const tg=k.c.querySelector('.tag');if(tg)tg.textContent=n+(s.pronouns?' ('+s.pronouns+')':'');
  k.hud.replaceChildren();const r1=el('div','row');
  r1.append(el('span','k','health'),bar(s.health,20,s.health>10?'var(--ok)':s.health>5?'var(--warn)':'var(--bad)'),el('span','',s.health+' / 20'),
   el('span','k','food'),bar(s.food,20,'#d39a5f'),el('span','',String(s.food)),el('span','k','levels'),el('span','',String(s.levels)),el('span','k','diamonds'),el('span','',String(s.diamonds)));

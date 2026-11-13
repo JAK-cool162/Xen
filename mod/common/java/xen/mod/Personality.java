@@ -478,8 +478,41 @@ public final class Personality {
 		return null;
 	}
 
+	/** Its pronouns ("she/her", "he/him", "they/them", or any set it was given, "xe/xem/xyr"): picked when it's born, kept with the world, any of them settable. */
+	String pronouns = randomPronouns(java.util.concurrent.ThreadLocalRandom.current());
+
+	static String randomPronouns(java.util.Random r) {
+		float x = r.nextFloat();
+		return x < 0.45f ? "she/her" : x < 0.9f ? "he/him" : "they/them";
+	}
+
+	/** "she", "he", "they", "xe". */
+	String subject() {
+		return pronouns.split("/")[0];
+	}
+
+	/** "her", "him", "them", "xem". */
+	String object() {
+		String[] p = pronouns.split("/");
+		return p.length > 1 ? p[1] : p[0];
+	}
+
+	/** "her", "his", "their", "xyr". */
+	String possessive() {
+		String[] p = pronouns.split("/");
+		if (p.length > 2) return p[2];
+		return switch (p[0]) {
+			case "he" -> "his";
+			case "she" -> "her";
+			case "they" -> "their";
+			case "it" -> "its";
+			default -> p.length > 1 ? p[1] : p[0];
+		};
+	}
+
 	JsonObject toJson() {
 		JsonObject o = new JsonObject();
+		o.addProperty("pronouns", pronouns);
 		o.addProperty("bravery", bravery);
 		o.addProperty("curiosity", curiosity);
 		o.addProperty("chattiness", chattiness);
@@ -518,6 +551,7 @@ public final class Personality {
 
 	static Personality fromJson(JsonObject o) {
 		Personality p = plain();
+		if (o.has("pronouns")) p.pronouns = o.get("pronouns").getAsString();      // (none kept from before: picked now, and kept from here on)
 		if (o.has("bravery")) p.bravery = o.get("bravery").getAsFloat();
 		if (o.has("curiosity")) p.curiosity = o.get("curiosity").getAsFloat();
 		if (o.has("chattiness")) p.chattiness = o.get("chattiness").getAsFloat();
