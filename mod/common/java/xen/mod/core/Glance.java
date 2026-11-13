@@ -196,6 +196,14 @@ public final class Glance {
 	 * to g (the same layers backwards: the answers, the pooling, each layer of filters).
 	 */
 	public float backprop(float[][] x, float[] y, Glance g) {
+		return backprop(x, y, g, null);
+	}
+
+	/**
+	 * The same, with each question's yes counted w times over (null: once): a thing seen once in thirty pictures
+	 * otherwise teaches it that "no" is nearly always right, and it never says yes (4 of 23 drops caught).
+	 */
+	public float backprop(float[][] x, float[] y, Glance g, float[] w) {
 		int h2 = H / 2, w2 = W / 2, h3 = h2 / 2, w3 = w2 / 2;
 		float[][] z1 = convZ(x, H, W, conv[0], bias[0]), a1 = relu(z1);
 		int[][] i1 = new int[a1.length][h2 * w2];
@@ -226,7 +234,8 @@ public final class Glance {
 			double z = headBias[i];
 			for (int j = 0; j < f.length; j++) z += head[i][j] * f[j];
 			out[i] = (float) (1 / (1 + Math.exp(-z)));
-			float dz = out[i] - y[i];                                           // (the log loss through the sigmoid)
+			float wy = w != null ? w[i] * y[i] : y[i];
+			float dz = out[i] * (wy + 1 - y[i]) - wy;                            // (the log loss through the sigmoid, its yes weighted)
 			g.headBias[i] += dz;
 			for (int j = 0; j < f.length; j++) {
 				g.head[i][j] += dz * f[j];

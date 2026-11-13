@@ -382,10 +382,14 @@ final class Builder {
 
 	/** The house of its own it's building right now, not done (kept with the world as unfinished: a restart isn't a reason to design a new one; Bob, a fresh cottage after every restart). */
 	private Unfinished underWay() {
-		if (plan == null || helping != null || !plan.name().endsWith("house") || startedCorner == null || c.player == null || left.isEmpty()
-				|| building == null && copied == null) return null;
-		return new Unfinished(startedCorner, startedFront, Places.dim(c.player.level()), copied == null ? building : null, copied == null ? null : copied.id(), startedWood);
+		if (plan == null || helping != null || !plan.name().endsWith("house") || startedCorner == null || left.isEmpty()
+				|| building == null && copied == null) return null;              // (not its body: at the server's stop it's gone before the save, and the house it was on went unsaved; Cid, a new cottage after every restart)
+		String dim = c.player != null ? Places.dim(c.player.level()) : startedDim != null ? startedDim : "overworld";
+		return new Unfinished(startedCorner, startedFront, dim, copied == null ? building : null, copied == null ? null : copied.id(), startedWood);
 	}
+
+	/** The world it began its house in. */
+	private String startedDim;
 
 	void cancel() {
 		schematic = null;
@@ -683,6 +687,7 @@ final class Builder {
 		startedCorner = corner;
 		startedFront = front;
 		startedWood = wood;
+		startedDim = c.player != null ? Places.dim(c.player.level()) : null;
 		unfinished = null;                                                      // (this one is the house now)
 	}
 
@@ -693,7 +698,11 @@ final class Builder {
 	private String resume(ServerLevel level, BlockPos near) {
 		Unfinished u = unfinished;
 		boolean starter = u != null && u.home() != null && u.home().design().w() * u.home().design().d() <= 42;
-		if (u == null || !u.dimension().equals(Places.dim(level)) || !u.corner().closerThan(near, starter ? 512 : 96)) return null;   // (its first base begun: it goes back to it from further off, not a new one where it happens to be; Cid, 380 blocks off, a third cottage)
+		if (u == null || !u.dimension().equals(Places.dim(level)) || !u.corner().closerThan(near, starter ? 512 : 96)) {
+			if (u != null) c.journal("debug", "its unfinished house at " + u.corner().toShortString() + " (" + u.dimension() + ") isn't the one now: "
+					+ (!u.dimension().equals(Places.dim(level)) ? "another world" : (int) Math.sqrt(u.corner().distSqr(near)) + " blocks off"));
+			return null;
+		}   // (its first base begun: it goes back to it from further off, not a new one where it happens to be; Cid, 380 blocks off, a third cottage)
 		Architect.Plan made;
 		String of;
 		if (u.village() != null) {

@@ -41,6 +41,8 @@ public final class GlanceLearner {
 	private final byte[][] pos = new byte[KEEP][], neg = new byte[KEEP][];
 	private final float[][] posY = new float[KEEP][], negY = new float[KEEP][];
 	private int posN, negN, posAt, negAt, steps, seen, posSeen, learnedBefore;
+	/** How many pictures had each thing in them (for how much a yes counts). */
+	private final int[] headPos = new int[Glance.HEADS.length];
 	private volatile double lossShipped, lossLearned;
 	private final Random random = new Random();
 	private final AtomicInteger queued = new AtomicInteger();
@@ -115,8 +117,13 @@ public final class GlanceLearner {
 		lossShipped += a * (ls - lossShipped);
 		lossLearned += a * (ll - lossLearned);
 		boolean something = false;
-		for (float t : y) something |= t > 0;
+		for (int i = 0; i < y.length; i++) {
+			something |= y[i] > 0;
+			if (y[i] > 0) headPos[i]++;
+		}
 		if (something) posSeen++;
+		float[] w = new float[y.length];
+		for (int i = 0; i < w.length; i++) w[i] = (float) Math.max(1, Math.min(4, Math.sqrt((seen - headPos[i]) / (double) Math.max(1, headPos[i])))); // (a rare thing's yes counts for more: a monster in one picture in a hundred, a cave mouth in fifty)
 		if (something) {
 			pos[posAt] = px;
 			posY[posAt] = y;
@@ -130,24 +137,26 @@ public final class GlanceLearner {
 		}
 		grad.zero();
 		int n = 1;
-		learning.backprop(x, y, grad);
-		float posRate = (float) posSeen / seen;
+		learning.backprop(x, y, grad, w);
+		float posRate = Math.max(0.35f, (float) posSeen / seen);              // (a third of what it goes over again has something in it, at least: not one in ten as play has)
 		for (int b = 1; b < BATCH; b++) {                                       // (and some it kept: as often with something in them as play has)
 			boolean fromPos = posN > 0 && (negN == 0 || random.nextFloat() < posRate);
 			if (fromPos && posN == 0 || !fromPos && negN == 0) continue;
 			int i = random.nextInt(fromPos ? posN : negN);
-			learning.backprop(unpack(fromPos ? pos[i] : neg[i]), fromPos ? posY[i] : negY[i], grad);
+			learning.backprop(unpack(fromPos ? pos[i] : neg[i]), fromPos ? posY[i] : negY[i], grad, w);
 			n++;
 		}
 		grad.pull(learning, shipped, PULL * n);                                  // (what the mod's knew: it strays from that only as far as the pictures pay for)
 		steps++;
 		learning.adam(grad, m, v, steps, LR, 1f / n);
 		if (steps % 25 == 0) {
-			boolean better = seen >= FAIR && lossLearned < lossShipped * 0.97;   // (clearly better on pictures it hadn't learned from)
+			double bl = balanced(0), bs = balanced(1);
+			boolean fair = bl >= 0 && bs >= 0;                                  // (enough times something was there to judge by what it catches)
+			boolean better = seen >= FAIR && (fair ? bl < bs - 0.01 : lossLearned < lossShipped * 0.97);   // (judged by what it catches and its false alarms, not by its average error: saying "nothing there" every time had the lowest average and caught 4 of 23 drops)
 			usingLearned = better;
 			inUse = better ? learning.copy() : shipped;
 		}
-		if (steps % 100 == 0 && seen >= FAIR && lossLearned <= lossShipped) save();   // (kept only if it's no worse than the mod's: never a worse start next time)
+		if (steps % 100 == 0 && seen >= FAIR && (balanced(0) >= 0 && balanced(1) >= 0 ? balanced(0) <= balanced(1) : lossLearned <= lossShipped)) save();   // (kept only if it's no worse than the mod's: never a worse start next time)
 	}
 
 	private void save() {
@@ -208,6 +217,24 @@ public final class GlanceLearner {
 	 * the Glance that's learning and the one that came with the mod. [head][0 there, 1 caught learning, 2 caught mod's,
 	 * 3 not there, 4 false alarms learning, 5 false alarms mod's].
 	 */
+	/**
+	 * Its balanced error (0 none, 0.5 a coin's): for each question with at least five times it was there, half its
+	 * misses and half its false alarms, averaged; which: 0 the learning Glance, 1 the mod's. -1: not enough to judge yet.
+	 */
+	public synchronized double balanced(int which) {
+		double sum = 0;
+		int heads = 0;
+		for (int i = 0; i < Glance.HEADS.length; i++) {
+			if (thereN[i] < 5 || notN[i] < 50) continue;
+			int caught = 0, alarms = 0;
+			for (int k = 0; k < thereN[i]; k++) if (thereRing[i][k][which]) caught++;
+			for (int k = 0; k < notN[i]; k++) if (notRing[i][k][which]) alarms++;
+			sum += 0.5 * (1 - caught / (double) thereN[i]) + 0.5 * alarms / (double) notN[i];
+			heads++;
+		}
+		return heads == 0 ? -1 : sum / heads;
+	}
+
 	public synchronized int[][] exam() {
 		int[][] out = new int[Glance.HEADS.length][6];
 		for (int i = 0; i < out.length; i++) {
@@ -235,8 +262,10 @@ public final class GlanceLearner {
 	/** How its learning's going, in a line (for the log and the live view). */
 	public String status() {
 		if (seen == 0) return "learning: no pictures yet";
-		return String.format(Locale.ROOT, "learned from %d pictures (%d before); on the last %d new ones: %.3f wrong, the mod's own %.3f: %s", steps, learnedBefore,
-				Math.min(seen, FAIR), lossLearned, lossShipped, usingLearned ? "sees with what it learned" : seen < FAIR ? "still proving itself" : "the mod's is still better");
+		double bl = balanced(0), bs = balanced(1);
+		String fair = bl >= 0 && bs >= 0 ? String.format(Locale.ROOT, "; misses and false alarms (balanced, 0.5 a coin's): %.2f, the mod's %.2f", bl, bs) : "";
+		return String.format(Locale.ROOT, "learned from %d pictures (%d before); on the last %d new ones: %.3f wrong, the mod's own %.3f%s: %s", steps, learnedBefore,
+				Math.min(seen, FAIR), lossLearned, lossShipped, fair, usingLearned ? "sees with what it learned" : seen < FAIR ? "still proving itself" : "the mod's is still better");
 	}
 
 	/** True once it sees with what it learned. */
