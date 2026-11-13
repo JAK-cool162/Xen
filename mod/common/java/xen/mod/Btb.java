@@ -418,6 +418,11 @@ final class Btb {
 			String lapis = c.chores.mine(c.lessons.depth("lapis", 0), "lapis", 3);   // (a mining trip to the lapis it knows of: the fetch walked at one 128 blocks off, ten minutes, none)
 			if (lapis != null && lapis.startsWith("You will")) return lapis + " (lapis to enchant with)";
 		}
+		if (!tabled && it.getOrDefault("obsidian", 0) < 4 && it.getOrDefault("water_bucket", 0) + it.getOrDefault("bucket", 0) == 0
+				&& c.visits.nearest("village") == null && c.visits.nearest("ruined portal") == null) {   // lava the only way, and no bucket: the bucket first (and it puts out a fire; Ann lost hers in the lava, and her table trip ended as it began, thirty times)
+			String bucket = planFor("bucket", 1, "a bucket: water for the lava's obsidian, and for a fire");
+			if (bucket.startsWith("You will")) return bucket;
+		}
 		if (!tabled && it.getOrDefault("obsidian", 0) < 4) {                    // Xenfish: the cheapest way to it from here, by its own record of each
 			for (Xenfish.Way w : c.xenfish.obsidianWays()) {
 				String started = switch (w.key()) {
