@@ -561,9 +561,11 @@ final class Goals {
 						upSaidAt = upBestAt;
 						c.journal("way", "half a minute and no higher: digs its own staircase up");
 					}
-					c.walker.stop();
 					Action dig = c.digToward(up);
-					if (dig != null) return dig;
+					if (dig != null) {
+						c.walker.stop();                                              // (its legs' way let go of only for a dig of its own, not every tick for nothing)
+						return dig;
+					}
 				}
 				return c.walkTo(up);   // a staircase up
 			}

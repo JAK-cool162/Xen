@@ -132,6 +132,16 @@ public final class Hands {
 		return true;
 	}
 
+	/** A block a click opens or works (a chest, a furnace, a table, a door, a lever...): to put a block on it, a player sneaks. */
+	static boolean opensOnClick(BlockState st) {
+		var b = st.getBlock();
+		return b instanceof net.minecraft.world.level.block.EntityBlock || b instanceof net.minecraft.world.level.block.CraftingTableBlock
+				|| b instanceof net.minecraft.world.level.block.DoorBlock || b instanceof net.minecraft.world.level.block.TrapDoorBlock
+				|| b instanceof net.minecraft.world.level.block.FenceGateBlock || b instanceof net.minecraft.world.level.block.ButtonBlock
+				|| b instanceof net.minecraft.world.level.block.LeverBlock || b instanceof net.minecraft.world.level.block.DiodeBlock
+				|| b instanceof net.minecraft.world.level.block.AnvilBlock;
+	}
+
 	private void keepPillaring() {
 		p.setJumping(ticks < 4);
 		p.setXRot(Math.min(90f, p.getXRot() + 30f));                        // eyes down on the block it puts under itself
@@ -148,8 +158,11 @@ public final class Hands {
 		p.getInventory().setSelectedSlot(slot);
 		BlockPos ground = pillarFrom.below();
 		Vec3 hit = Vec3.atCenterOf(ground).add(0, 0.5, 0);
+		boolean sneak = opensOnClick(level.getBlockState(ground));               // (on its own furnace: the click opened it, no block went under; Ivy jumped on her furnace a quarter of an hour)
+		if (sneak) p.setShiftKeyDown(true);
 		p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND,
 				new BlockHitResult(hit, Direction.UP, ground, false));
+		if (sneak) p.setShiftKeyDown(false);
 		Compat.swing(p);
 		if (!level.getBlockState(pillarFrom).canBeReplaced() && p.companion != null) p.companion.tidy.placed(pillarFrom.immutable());   // (to take down again, once it's done up there)
 		pillar = false;
@@ -965,7 +978,10 @@ public final class Hands {
 			p.getInventory().setSelectedSlot(slot);
 			ItemStack stack = p.getInventory().getSelectedItem();
 			face(hit);
+			boolean sneak = opensOnClick(level.getBlockState(against));
+			if (sneak) p.setShiftKeyDown(true);
 			p.gameMode.useItemOn(p, level, stack, InteractionHand.MAIN_HAND, new BlockHitResult(hit, d.getOpposite(), against, false));
+			if (sneak) p.setShiftKeyDown(false);
 			Compat.swing(p);
 			holdLook(hit, 8);
 			return;
@@ -1222,12 +1238,7 @@ public final class Hands {
 			p.setYRot(YAW[facing]);
 			p.setYHeadRot(YAW[facing]);
 		}
-		var clicked = level.getBlockState(against).getBlock();                // a chest, a table, a door...: sneak, or the click opens it
-		boolean sneak = clicked instanceof net.minecraft.world.level.block.EntityBlock || clicked instanceof net.minecraft.world.level.block.CraftingTableBlock
-				|| clicked instanceof net.minecraft.world.level.block.DoorBlock || clicked instanceof net.minecraft.world.level.block.TrapDoorBlock
-				|| clicked instanceof net.minecraft.world.level.block.FenceGateBlock || clicked instanceof net.minecraft.world.level.block.ButtonBlock
-				|| clicked instanceof net.minecraft.world.level.block.LeverBlock || clicked instanceof net.minecraft.world.level.block.DiodeBlock
-				|| clicked instanceof net.minecraft.world.level.block.AnvilBlock;
+		boolean sneak = opensOnClick(level.getBlockState(against));             // a chest, a table, a door...: sneak, or the click opens it
 		if (!sneak) sneak = ModHabits.wants("place", BuiltInRegistries.ITEM.getKey(p.getInventory().getSelectedItem().getItem()).getPath(), "crouch");   // (a habit it was taught for a mod)
 		if (sneak) p.setShiftKeyDown(true);
 		var result = p.gameMode.useItemOn(p, level, p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND, new BlockHitResult(hit, side, against, false));
