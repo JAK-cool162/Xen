@@ -76,13 +76,13 @@ final class Enchanter {
 	}
 
 	/** Its other pieces worth enchanting (iron or diamond, not enchanted yet), up to three, past the one on the table. */
-	private java.util.List<Integer> others(int skip) {
+	private java.util.List<Integer> others(int skip, int tier) {
 		var inv = c.player.getInventory();
 		java.util.List<Integer> out = new java.util.ArrayList<>();
 		for (int i = 0; i < 36 && out.size() < 3; i++) {
 			ItemStack s = inv.getItem(i);
 			if (i == skip || s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
-			if (MindSense.tier(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()) > 2) out.add(i);
+			if (MindSense.tier(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()) >= Math.max(3, tier)) out.add(i);   // (as good as the one it took off: not an iron pickaxe for its diamond chestplate's turn; Jay and Gus, Efficiency on iron)
 		}
 		return out;
 	}
@@ -243,7 +243,8 @@ final class Enchanter {
 		}
 		int pick = choose(menu);
 		if (pick >= 0 && !wanted(menu, pick)) {                                 // none of what it wants on offer for this one: its other pieces first (enchanted at the table once, an item can't be again: a wrong one is for good)
-			for (int other : others(slot)) {
+			int firstTier = MindSense.tier(BuiltInRegistries.ITEM.getKey(menu.getSlot(0).getItem().getItem()).getPath());
+			for (int other : others(slot, firstTier)) {
 				Compat.click(menu, 0, true, c.player);                         // that one back out
 				Compat.click(menu, other < 9 ? 29 + other : 2 + other - 9, true, c.player);
 				int op = choose(menu);
