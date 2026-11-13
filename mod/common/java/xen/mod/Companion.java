@@ -2708,6 +2708,16 @@ public final class Companion {
 	 */
 	private Action readyAlone(double far, long now) {
 		if (helper != null || aloneUntil < 0 || far < 16) return null;
+		long day = Compat.timeOfDay(player.level()) % 24000;
+		var lvl = player.level();
+		boolean open = lvl.dimension() == net.minecraft.world.level.Level.OVERWORLD && lvl.isLoaded(lostAt)
+				? lostAt.getY() >= lvl.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, lostAt.getX(), lostAt.getZ()) - 3
+				: lostAt.getY() >= 60 && lvl.dimension() == net.minecraft.world.level.Level.OVERWORLD;   // (too far off to look: the surface's height is a good guess)
+		if (open && day < 11000 && 11000 - day > far * 5) {                     // its things out in the open, in daylight, time to get there before dusk: straight back, as a player runs for their stuff (Ann, her diamonds 511 blocks off on the grass, gathered wood for six minutes first)
+			if (aloneUntil >= 0) journal("thinks", String.format(java.util.Locale.ROOT, "its things lie out in the open, it's day: straight back for them (%.0f blocks)", far));
+			aloneUntil = -1;
+			return null;
+		}
 		int blocks = walker.blocks();
 		boolean pick = crafter.pickTier() >= 2, weapon = stoneWeapon();
 		long left = 5800 - lostAged - (long) (far * 5);                       // (its things' time, less the way there at a run)
