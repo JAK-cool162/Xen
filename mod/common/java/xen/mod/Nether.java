@@ -394,6 +394,13 @@ final class Nether {
 			portal = null;
 		}
 		if (portal != null && portal.distSqr(c.player.blockPosition()) < 3000 * 3000) {
+			if (!inNether() && portal.distSqr(c.player.blockPosition()) < 48 * 48) {   // (at its portal: its spawn by it first, if it has a bed)
+				Action bed = c.bedByPortal(portal);
+				if (bed != null) {
+					c.goals.instant = "setting its spawn by the portal";
+					return bed;
+				}
+			}
 			c.goals.instant = "going to the Nether portal";
 			return enter(portal);
 		}

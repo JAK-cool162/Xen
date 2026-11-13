@@ -2310,6 +2310,47 @@ public final class Companion {
 		return level.getBlockState(p).canBeReplaced() && level.getFluidState(p).isEmpty() && !level.getBlockState(p.below()).canBeReplaced();
 	}
 
+	/** The bed it put down by its Nether portal and clicked (its spawn there: dead over there, it's back by the portal), and whether it's clicked yet. */
+	private BlockPos portalBed;
+	private boolean portalBedSet;
+	private long portalBedSaidAt = -100_000;
+
+	/**
+	 * Before it goes through its portal: a bed down beside it and clicked, as players do (a click sets your spawn, day
+	 * or night): dead in the Nether, it wakes by the portal, not back at the world's spawn hundreds of blocks off. Null:
+	 * done, or no bed on it (on without), or no room by the portal.
+	 */
+	Action bedByPortal(BlockPos portal) {
+		var level = (ServerLevel) player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD || fighting) return null;
+		boolean bedThere = portalBed != null && level.getBlockState(portalBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock;
+		if (bedThere && portalBedSet && portalBed.closerThan(portal, 24)) return null;   // (done)
+		if (bedThere && !portalBedSet && portalBed.closerThan(portal, 24)) {
+			if (player.getEyePosition().distanceTo(Vec3.atCenterOf(portalBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(portalBed));
+			hands.use(portalBed);                                              // (its spawn: here; it's day, so no sleep, just the spawn)
+			portalBedSet = true;
+			journal("does", "sets its spawn by the Nether portal (its bed at " + portalBed.toShortString() + "): if it dies over there, it's back here");
+			chatter(pick3("Bed by the portal. Just in case.", "Spawn set. Now the Nether.", "If I don't come back... I'll be right here."), false);
+			acted = true;
+			return Action.PLACE;
+		}
+		java.util.function.Predicate<net.minecraft.world.item.ItemStack> bed = st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed");
+		if (hands.hotbar(bed) < 0) {
+			if (level.getGameTime() - portalBedSaidAt > 20 * 60 * 5) {
+				portalBedSaidAt = level.getGameTime();
+				journal("thinks", "no bed on it to set its spawn by the portal: goes through without");
+			}
+			return null;
+		}
+		if (player.blockPosition().distSqr(portal) > 5 * 5) return walkTo(Goal.near(portal, 4));
+		BedRoom room = bedRoom();
+		if (room == null || !hands.placeItem(room.foot(), bed, room.foot().below(), net.minecraft.core.Direction.UP, room.facing())) return null;
+		portalBed = room.foot();
+		portalBedSet = false;
+		acted = true;
+		return Action.PLACE;
+	}
+
 	/** A bed it put down out in the wild for the night (it takes it with it in the morning). */
 	private BlockPos campBed;
 
