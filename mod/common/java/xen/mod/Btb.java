@@ -189,7 +189,8 @@ final class Btb {
 		if ((dusk || o.night) && bed && o.overworld && !o.under && now() >= notBefore.getOrDefault(Task.SLEEP, 0L))
 			out.add(new Option(Task.SLEEP, 5.5f, "night, a bed in its bag: down in it (no night out in the open, and the night's over sooner)"));   // (most of its deaths were at night)
 		boolean hurtNoFood = o.meals == 0 && o.food < 18 && o.health <= 12;     // (hurt, under 18 it doesn't heal, nothing to eat: food comes first; Ann at five health went after diamonds, then coal, ten minutes)
-		if (o.meals < 2 && o.food < 18) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
+		boolean darkOut = (dusk || o.night) && o.overworld && !o.under;           // (out in the dark, a hunt is the night's monsters' hunt: Ann, food 6, after a chicken at night, a zombie; under 18 it doesn't heal, but it doesn't hurt either: a roof first, the hunt at dawn)
+		if (o.meals < 2 && o.food < 18 && (!darkOut || o.food <= 3)) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
