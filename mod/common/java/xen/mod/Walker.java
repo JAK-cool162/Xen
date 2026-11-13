@@ -1371,8 +1371,11 @@ final class Walker {
 			case PILLAR -> {                                                 // look down, jump, a block under its feet
 				doing = "towering up";
 				face(to.add(0, -1, 0));
-				p.zza = 0;
-				if (p.onGround() && !c.hands.busy() && !c.hands.startPillar()) problem(m, "no blocks to tower up with");
+				// to the middle of its block first: a body a quarter off it is in the next one too, and that one's roof stops the
+				// jump (Bob, 0.27 off, jumped into the rock over the next block for five minutes; his own roof was open)
+				boolean centred = Math.abs(dx) < 0.18 && Math.abs(dz) < 0.18;
+				p.zza = centred || !p.onGround() ? 0 : 0.3f;
+				if (centred && p.onGround() && !c.hands.busy() && !c.hands.startPillar()) problem(m, "no blocks to tower up with");
 				return;
 			}
 			case CLIMB_UP -> {
