@@ -377,7 +377,23 @@ final class Builder {
 	/** A small base, quick to put up (a starter house: what a few trees give), not a big house it started once and never finished. */
 	private boolean forceStarter;
 
+	/** Its kind of base, the same all its life: about six in ten dig one into the ground (no blocks to gather, the rock its walls and roof), the rest build a small one of their own. */
+	boolean digsItsBase() {
+		return (c.name.toLowerCase(java.util.Locale.ROOT).hashCode() & 0xff) < 154;
+	}
+
 	String startStarterHome() {
+		boolean hutBegun = unfinished != null && unfinished.home() != null && unfinished.home().design().w() * unfinished.home().design().d() <= 42;   // (a small one it began: that one first, Bob's and Ann's)
+		if (c.player != null && !c.player.isCreative() && c.crafter.pickTier() >= 2 && digsItsBase() && !hutBegun) {   // underground: a staircase down, a room in the stone (what a player with a pickaxe does first night)
+			BlockPos site = c.places.get("base site");
+			if (site != null && !site.closerThan(c.player.blockPosition(), 128)) site = null;   // (its spot from before, if it's still about: not a new hole each time the night stops it)
+			String dug = startNear("underground base", site);
+			if (dug.startsWith("You will")) {
+				if (site == null) c.places.remember("base site", c.player.blockPosition().immutable());
+				c.journal("build", "digs its base into the ground" + (site != null ? " (on with the one it began)" : ""));
+				return dug;
+			}
+		}
 		forceStarter = true;
 		try {
 			return startNear("home", null);
@@ -434,7 +450,7 @@ final class Builder {
 					: farm ? Architect.farm(corner.relative(right, 1).relative(back, 1), front, p, creative)
 					: Architect.pen(corner.relative(right, 1).relative(back, 1), front, p, creative);
 		} else if (base) {
-			BlockPos top = Architect.ground(level, feet);
+			BlockPos top = Architect.ground(level, near != null ? near : feet);
 			if (top == null) return "You can't dig a base here: there's no solid ground.";
 			made = Architect.underground(top.above().relative(front.getOpposite(), 1), front, 7, 9, 7, p, creative);
 		} else {
@@ -443,7 +459,7 @@ final class Builder {
 			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
 			Unfinished was = unfinished;
-			boolean small = was != null && was.home() != null && was.home().design().w() * was.home().design().d() <= 35;   // (a starter it began: that one, not a new one each time the night stops it; Bob designed three in a quarter of an hour)
+			boolean small = was != null && was.home() != null && was.home().design().w() * was.home().design().d() <= 42;   // (a starter it began: that one, not a new one each time the night stops it; Bob designed three in a quarter of an hour)
 			String resumed = forceStarter && !small ? null : resume(level, near != null ? near : feet);   // a house it started and didn't finish: that one first (not for a quick base: Bob's half-built house wanted 214 logs)
 			if (resumed != null) return resumed;
 			if (what.equals("home") && !starter && asked == null && near == null && wantsPlace()) {   // its own idea: a whole place, not just a house
@@ -470,9 +486,13 @@ final class Builder {
 				return planned;
 			}
 			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked, area(level, feet));
-			if (forceStarter && !creative) {                                         // a base before the Nether, quick: six by five of cobblestone, a flat roof, a door, nothing more (Bob's "simple" cottage wanted 160 logs and was never done)
-				ds = new Taste.Design(6, 5, 3, Taste.Roof.FLAT, false, false, false, false, false, false, false, false, false, false, false, Taste.Style.COTTAGE, false, false);
-				p = new Architect.Palette(p.name(), "cobblestone", "cobblestone", "cobblestone", p.roof(), "cobblestone", "air", p.door(), p.fence(), p.trapdoor(), p.light());
+			if (forceStarter && !creative) {                                         // a base before the Nether, quick, but its own: its taste's size (seven by six at most), roof and corners, the stone it has most of for walls (Bob's "simple" cottage wanted 160 logs; then all ten the same box)
+				int w = Math.max(5, Math.min(7, ds.w())), d = Math.max(5, Math.min(6, ds.d()));
+				ds = new Taste.Design(w, d, 3, ds.roof(), ds.ridgeAlongWidth(), false, ds.frame(), false, false, false, false, ds.bushes(), false, false, false, ds.style() == Taste.Style.COTTAGE || ds.style() == Taste.Style.MODERN ? ds.style() : Taste.Style.COTTAGE, false, false);
+				int cobble = count(x -> x.equals("cobblestone")), deep = count(x -> x.equals("cobbled_deepslate")), logs = count(x -> x.endsWith("_log"));
+				String wall = logs >= 24 && random.nextBoolean() ? p.wall() : deep > cobble ? "cobbled_deepslate" : "cobblestone";   // (planks if it has the logs and likes them, else its stone)
+				String floor = random.nextBoolean() ? wall : p.floor();
+				p = new Architect.Palette(p.name(), wall, ds.frame() ? p.frame() : wall, wall, p.roof(), floor, "air", p.door(), p.fence(), p.trapdoor(), p.light());
 			}
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, ds.w() + 1, ds.d() + 1);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
