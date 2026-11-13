@@ -541,7 +541,7 @@ public class XenMod implements ModInitializer {
 				LOG.warn("Xen's real skins stumbled: {}", e.toString());
 			}
 		}
-		if (s.getTickCount() % 6000 == 3000) {                                // every five minutes: its team, its rules
+		if (s.getTickCount() % 1200 == 600) {                                 // every minute: its team, its rules (five was too seldom: they met and were gone again)
 			try {
 				maybeFoundTeams();                                             // (a Xen may start a team of its own)
 			} catch (RuntimeException e) {
@@ -1702,12 +1702,34 @@ public class XenMod implements ModInitializer {
 		return b.toString();
 	}
 
+	/** A teammate's base (the nearest), or null: its team shares one. */
+	BlockPos teamHome(Companion c) {
+		String t = teamOf(c);
+		if (t == null || !ownTeam(t) || c.player() == null) return null;
+		BlockPos best = null;
+		for (Companion o : companions) {
+			if (o == c || o.goals.home == null || !t.equals(teamOf(o)) || o.player() == null || o.player().level() != c.player().level()) continue;
+			if (best == null || o.goals.home.distSqr(c.player().blockPosition()) < best.distSqr(c.player().blockPosition())) best = o.goals.home;
+		}
+		return best;
+	}
+
 	/** Now and then a Xen with a leader's nature and friends around starts a team of its own (an SMP thing). */
 	private void maybeFoundTeams() {
 		if (config.teams == 0 || companions.size() < 2) return;
 		for (Companion c : companions) {
 			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c)) || onPlayersTeam(c)) continue;
 			var p = c.personality;
+			if (c.goals.home != null) {                                           // a base of its own and others about: it asks them in (a team round its base)
+				boolean near = false;
+				for (Companion o : companions)
+					near |= o != c && o.player() != null && o.player().level() == c.player().level() && o.player().distanceTo(c.player()) < 48 && !ownTeam(teamOf(o)) && !o.personality.loner;
+				if (near && random.nextFloat() < 0.5f) {
+					c.journal("thinks", "has a base and others about: a team round it");
+					c.say(foundTeam(c, null, null));
+					return;
+				}
+			}
 			int friends = 0, kin = 0;
 			for (Companion o : companions) {
 				if (o == c || o.player() == null || o.player().level() != c.player().level() || o.player().distanceTo(c.player()) >= 32 || ownTeam(teamOf(o))

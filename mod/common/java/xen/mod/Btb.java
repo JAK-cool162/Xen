@@ -383,7 +383,15 @@ final class Btb {
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> tableStep();
 			case TOOLS -> planFor("iron_pickaxe", 1, "a new pickaxe before this one breaks");
-			case HOME -> c.builder.start("home");
+			case HOME -> {                                                    // a base: its team's if a teammate has one, else a small one of its own
+				BlockPos mate = c.mod.teamHome(c);
+				if (mate != null) {
+					c.goals.home = mate;
+					c.journal("does", "moves into its team's base at " + mate.toShortString());
+					yield "You will share your team's base.";
+				}
+				yield c.builder.startStarterHome();
+			}
 			case SMELTER -> c.builder.start("smelter");
 			case BLAZE -> c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
 			case PEARLS -> c.chores.slay("enderman", "ender_pearl", 12 - pearls(), "ender pearls");
