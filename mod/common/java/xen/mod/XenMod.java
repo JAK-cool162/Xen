@@ -1768,6 +1768,8 @@ public class XenMod implements ModInitializer {
 	}
 
 	private final java.util.Map<String, Long> giftedAt = new java.util.HashMap<>();
+	/** A gift on its way: for whom, the giver, and how many diamonds they had when it set off (it counts only once it's there). */
+	private final java.util.Map<String, Object[]> giftPending = new java.util.HashMap<>();
 
 	/**
 	 * Back on its feet with a friend's help (what players on a server do): a Xen with all its diamond gear and diamonds
@@ -1778,10 +1780,26 @@ public class XenMod implements ModInitializer {
 	private void shareDiamonds() {
 		if (companions.size() < 2) return;
 		long now = server.overworld().getGameTime();
+		for (var it = giftPending.entrySet().iterator(); it.hasNext(); ) {        // gifts on their way: there (the ten minutes count from now), or not (the next one can try)
+			var e = it.next();
+			Companion needy = null, giver = (Companion) e.getValue()[0];
+			for (Companion x : companions) if (x.name.equals(e.getKey())) needy = x;
+			if (needy == null || needy.player() == null) {
+				it.remove();
+				continue;
+			}
+			if (needy.items().getOrDefault("diamond", 0) > (int) e.getValue()[1] || diamondGear(needy) > (int) e.getValue()[2]) {
+				giftedAt.put(needy.name, now);
+				it.remove();
+			} else if (giver.player() == null || giver.chores.kind != Chores.Kind.GIVE) {
+				it.remove();                                                          // (it never got there: Ivy's five for Hal, the night came; Hal went out with nothing and a skeleton shot him)
+				giftedAt.remove(needy.name);
+			}
+		}
 		if (server.overworld().isDarkOutside()) return;                          // (by day: at night the one bringing them digs in before it gets there)
 		for (Companion needy : companions) {
 			if (needy.player() == null || needy.minion || needy.inArena || needy.player().tickCount < 20 * 60) continue;   // (a minute in: right after a restart where they stand isn't settled; Ann set off for Hal "80 blocks off", 450 really)
-			if (now - giftedAt.getOrDefault(needy.name, -1_000_000L) < 20 * 60 * 10) continue;
+			if (now - giftedAt.getOrDefault(needy.name, -1_000_000L) < 20 * 60 * 10 || giftPending.containsKey(needy.name) || needy.goals.evening()) continue;
 			int pieces = diamondGear(needy), has = needy.items().getOrDefault("diamond", 0);
 			if (pieces >= 6 || has >= 3) continue;
 			Companion best = null;
@@ -1789,7 +1807,7 @@ public class XenMod implements ModInitializer {
 			for (Companion rich : companions) {
 				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level() || rich.player().tickCount < 20 * 60) continue;
 				if (diamondGear(rich) < 6 || rich.items().getOrDefault("diamond", 0) < 6) continue;   // (its own gear first, three kept for a new pickaxe)
-				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava()) continue;
+				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava() || rich.goals.evening()) continue;
 				double d = rich.player().distanceTo(needy.player());
 				if (d < bestD) {
 					bestD = d;
@@ -1803,7 +1821,7 @@ public class XenMod implements ModInitializer {
 			String plan = best.chores.give(needy.player(), "diamond", n);
 			if (!plan.startsWith("You will")) continue;
 			best.chores.own = true;
-			giftedAt.put(needy.name, now);
+			giftPending.put(needy.name, new Object[] {best, has, pieces});
 			best.chatter(needy.name + ", you lost your gear? Hold on, I've got " + n + " diamonds for you.", true);
 			best.journal("does", "shares " + n + " diamonds with " + needy.name + " (" + pieces + " of 6 of its diamond gear, " + has + " diamonds; " + Math.round(bestD) + " blocks off)");
 			needy.journal("thinks", best.name + " is bringing it " + n + " diamonds");
