@@ -3055,6 +3055,10 @@ public final class Companion {
 	private long bucketLookAt;
 
 	/** An empty bucket and still water in reach, nothing else going on: it fills it, like a player keeping one for falls. */
+	/** Water it couldn't fill its bucket from (its head in a wall, something between), and till when it leaves it be. */
+	private BlockPos noFillAt;
+	private long noFillUntil;
+
 	private Action fillBucket() {
 		long now = player.level().getGameTime();
 		if (now - bucketLookAt < 40 || fighting || hands.busy() || player.isInWater()) return null;
@@ -3072,9 +3076,14 @@ public final class Companion {
 		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-3, -2, -3), feet.offset(3, 1, 3))) {
 			if (!level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER) || !level.getFluidState(q).isSource() || !level.getBlockState(q.above()).isAir()) continue;
 			if (nether.keepsWater(q)) continue;                                   // (its own water on the lava, making its obsidian: left there)
+			if (q.equals(noFillAt) && now < noFillUntil) continue;                // (it wouldn't fill from there a moment ago)
 			Vec3 at = Vec3.atCenterOf(q).add(0, 0.4, 0);
 			if (player.getEyePosition().distanceTo(at) > player.blockInteractionRange() - 0.5) continue;
-			if (!hands.fill(q) && !hands.bucket(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"))) return null;
+			if (!hands.fill(q) && !hands.bucket(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("bucket"))) {
+				noFillAt = q.immutable();
+				noFillUntil = now + 20 * 30;
+				return null;
+			}
 			goals.instant = "filling its bucket with water";
 			journal("does", "filled its bucket at " + q.toShortString() + " (water for a fall)");
 			acted = true;

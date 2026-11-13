@@ -1135,12 +1135,15 @@ public final class Hands {
 		stop();
 		p.getInventory().setSelectedSlot(slot);
 		face(lookAt);
+		var before = p.getInventory().getSelectedItem().getItem();
+		int had = p.getInventory().getSelectedItem().getCount();
 		p.gameMode.useItem(p, p.level(), p.getInventory().getSelectedItem(), InteractionHand.MAIN_HAND);
 		Compat.swing(p);
 		current = Action.PLACE;
 		ticks = 0;
 		limit = 4;
-		return true;
+		var now = p.getInventory().getSelectedItem();
+		return now.getItem() != before || now.getCount() != had;              // (it took: the bucket's full now, or empty; not "it went" when nothing happened (Cid "filled its bucket" twice a second for minutes, none of it in the bucket))
 	}
 
 	/**
