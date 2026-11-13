@@ -19,6 +19,8 @@ final class Enchanter {
 	private final Companion c;
 	private BlockPos table;
 	private int step, tries;
+	/** New offers dealt in a row (a cheap enchant for them), none it wanted yet. */
+	private int rerolls;
 	boolean on;
 	/** Not again before this (game time): after a go (its levels come back slowly), or after it couldn't. */
 	long retryAt;
@@ -42,6 +44,33 @@ final class Enchanter {
 	}
 
 	/** Something worth enchanting (iron or diamond tools, weapons, armor) that isn't yet. */
+	/** What's on the table back into its bag, and this from its bag onto the table. */
+	private void swapIn(EnchantmentMenu menu, int invSlot) {
+		Compat.click(menu, 0, true, c.player);
+		Compat.click(menu, invSlot < 9 ? 29 + invSlot : 2 + invSlot - 9, true, c.player);
+	}
+
+	/** The cheapest offer it can pay for (-1: none). */
+	private int cheapest(EnchantmentMenu menu) {
+		for (int i = 0; i < 3; i++)
+			if (menu.costs[i] > 0 && menu.costs[i] <= c.player.experienceLevel && c.player.experienceLevel >= i + 1) return i;
+		return -1;
+	}
+
+	/** Something cheap to enchant for new offers: a book, else its lesser tool or armor (iron or below), not enchanted yet (-1: none). */
+	private int fodder() {
+		var inv = c.player.getInventory();
+		int lesser = -1;
+		for (int i = 0; i < 36; i++) {
+			ItemStack s = inv.getItem(i);
+			if (s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
+			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
+			if (n.equals("book")) return i;
+			if (MindSense.tier(n) <= 3 && lesser < 0) lesser = i;
+		}
+		return lesser;
+	}
+
 	/** The strongest offer on the table it can pay for (-1: none). */
 	private int choose(EnchantmentMenu menu) {
 		for (int i = 2; i >= 0; i--)
@@ -242,17 +271,35 @@ final class Enchanter {
 			break;
 		}
 		int pick = choose(menu);
-		if (pick >= 0 && !wanted(menu, pick)) {                                 // none of what it wants on offer for this one: its other pieces first (enchanted at the table once, an item can't be again: a wrong one is for good)
-			int firstTier = MindSense.tier(BuiltInRegistries.ITEM.getKey(menu.getSlot(0).getItem().getItem()).getPath());
+		boolean reroll = false;
+		String meant = BuiltInRegistries.ITEM.getKey(menu.getSlot(0).getItem().getItem()).getPath();
+		if (pick >= 0 && !wanted(menu, pick)) {                                 // none of what it wants on offer for this one: its other pieces as good first (enchanted at the table once, an item can't be again: a wrong one is for good)
+			int firstTier = MindSense.tier(meant);
+			boolean found = false;
 			for (int other : others(slot, firstTier)) {
-				Compat.click(menu, 0, true, c.player);                         // that one back out
-				Compat.click(menu, other < 9 ? 29 + other : 2 + other - 9, true, c.player);
+				swapIn(menu, other);
 				int op = choose(menu);
 				if (op >= 0 && wanted(menu, op)) {
 					pick = op;
+					found = true;
 					break;
 				}
-				pick = op;                                                       // (none anywhere: the strongest on the last it tried)
+			}
+			if (!found) {                                                       // nothing it wants on any of them: the cheapest offer on a book or a lesser tool, for new offers next time (what players do: every enchanting deals the cards again; Jay's iron sword and Gus's diamond sword got Knockback)
+				int fodder = rerolls < 3 ? fodder() : -1;                      // (three goes at new offers, then the best it's offered: its levels aren't for dealing cards all day)
+				int cheap = -1;
+				if (fodder >= 0) {
+					swapIn(menu, fodder);
+					cheap = cheapest(menu);
+				}
+				if (cheap >= 0) {
+					pick = cheap;
+					reroll = true;
+				} else {
+					int best = worthSlot();
+					if (best >= 0) swapIn(menu, best);
+					pick = choose(menu);
+				}
 			}
 		}
 		String clue = pick >= 0 ? clue(menu, pick).replace("minecraft:", "") : "";
@@ -271,7 +318,11 @@ final class Enchanter {
 			c.journal("does", "takes its enchanting table along (no home to keep it at)");
 		}
 		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
-		if (done) {
+		if (done) rerolls = reroll ? rerolls + 1 : 0;
+		if (done && reroll) {
+			c.journal("does", "enchants its " + onIt.replace('_', ' ') + " (option " + (pick + 1) + ", " + clue.replace('_', ' ') + ") for new offers: none it wanted for its " + meant.replace('_', ' '));
+			retryAt = c.player.level().getGameTime() + 20 * 10;                  // (the new offers: straight back to them)
+		} else if (done) {
 			c.chatter(c.pick3("Enchanted! That glow...", "Ooh, shiny. Enchanted.", "The table liked that one."), false);
 			c.journal("does", "enchanted its gear (option " + (pick + 1) + ", its " + onIt.replace('_', ' ') + ": " + clue.replace('_', ' ') + (liked ? ", one it wanted" : ", none it wanted on offer") + ")");
 		} else {
