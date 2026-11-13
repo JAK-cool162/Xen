@@ -261,9 +261,14 @@ public final class Companion {
 				|| player.hasEffect(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE) || player.level().dimension() == net.minecraft.world.level.Level.NETHER) return false;
 		BlockPos feet = player.blockPosition();
 		var level = player.level();
-		if (!level.getBlockState(feet).canBeReplaced() || !level.getFluidState(feet).isEmpty()) return false;
+		BlockPos at = null;                                                // at its feet; or (its feet in the edge of the lava it just got out of) over its head, to run down on it
+		for (BlockPos q : new BlockPos[] {feet, feet.above()}) {
+			var f = level.getFluidState(q);
+			if (at == null && level.getBlockState(q).canBeReplaced() && (f.isEmpty() || f.is(net.minecraft.tags.FluidTags.LAVA) && !f.isSource())) at = q;
+		}
+		if (at == null) return false;                                   // (Ann, out of the lava at four health, a water bucket on her, burned to death: her feet were in its runoff)
 		dousedAt = player.tickCount;
-		if (!hands.pour(feet, net.minecraft.core.Direction.UP, s -> s.getItem() == net.minecraft.world.item.Items.WATER_BUCKET)) return false;
+		if (!hands.pour(at, net.minecraft.core.Direction.UP, s -> s.getItem() == net.minecraft.world.item.Items.WATER_BUCKET)) return false;
 		journal("does", "on fire: water at its feet");
 		acted = true;
 		return true;

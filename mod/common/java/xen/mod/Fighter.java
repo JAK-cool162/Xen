@@ -778,7 +778,7 @@ final class Fighter {
 		double nearest = Double.MAX_VALUE;
 		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
 				m -> m.isAlive() && m.getTarget() == p)) nearest = Math.min(nearest, p.distanceTo(m));
-		boolean climber = foe instanceof net.minecraft.world.entity.monster.Spider;   // (a spider climbs down into a hole after it: Bob dug in from one at seven health, never swung, and it killed him in there)
+		boolean climber = spider(foe);   // (a spider climbs down into a hole after it: Bob dug in from one at seven health, never swung, and it killed him in there)
 		if (nearest > 6 && now() - holeLostAt > 200 && !climber) {             // (knocked out of a hole: not another for ten seconds, it fights)
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
@@ -848,6 +848,11 @@ final class Fighter {
 		return digIn();
 	}
 
+	/** A spider or a cave spider (they climb: no hole keeps them out). By its name: the class moved between versions. */
+	private static boolean spider(LivingEntity e) {
+		return e != null && net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath().endsWith("spider");
+	}
+
 	/** Down the hole, then the roof, then it waits there till they've gone (kill aura or not, it hits what comes in reach). */
 	private Action digIn() {
 		XenPlayer p = c.player;
@@ -864,7 +869,7 @@ final class Fighter {
 			if (inReach == null || p.distanceTo(m) < p.distanceTo(inReach)) inReach = m;
 		}
 		if (inReach != null) {
-			if (inReach instanceof net.minecraft.world.entity.monster.Spider) {   // (a spider in the hole with it: no hole against that one)
+			if (spider(inReach)) {   // (a spider in the hole with it: no hole against that one)
 				hole = null;
 				holeLostAt = now();
 				c.journal("fight", "a spider's in its hole with it: out, and fights it");
