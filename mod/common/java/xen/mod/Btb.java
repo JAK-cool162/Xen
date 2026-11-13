@@ -225,7 +225,7 @@ final class Btb {
 			out.add(new Option(Task.FOOD, o.meals == 0 ? 3.9f : o.meals == 1 ? 3.4f : 2.6f, "food for later: its bag's nearly out"));
 		if (c.goals.home != null && c.farmer.middle == null && o.overworld && !o.night && !dusk && !o.under && o.health >= 10 && o.food >= 8 && o.tier >= 2
 				&& c.player.blockPosition().distSqr(c.goals.home) < 160 * 160 && now() >= notBefore.getOrDefault(Task.FARM, 0L))
-			out.add(new Option(Task.FARM, o.meals < 4 ? 4.2f : 3.6f, "a wheat farm at its base: bread that never runs out (most deaths were at low health with nothing to eat)"));
+			out.add(new Option(Task.FARM, o.meals < 4 ? 4.6f : 3.9f, "a wheat farm at its base: bread that never runs out (most deaths were at low health with nothing to eat)"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
@@ -578,6 +578,7 @@ final class Btb {
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
 				c.knowledge.learn("crops_water", Knowledge.How.SEEN);             // (farmland by water: known, not found out by the field drying up)
+				XenMod.LOG.info("{} btb: starts its wheat farm by its base", c.name);
 				yield c.farmer.start();
 			}
 			case STASH -> {

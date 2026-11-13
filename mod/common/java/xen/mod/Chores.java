@@ -3430,6 +3430,7 @@ final class Chores {
 							: random.nextDouble() * Math.PI * 2;
 					freshAt = now();
 					c.journal("thinks", "no animals within 128 blocks: heads one way to new land");
+					XenMod.LOG.info("{} hunts: no animals within 128 blocks, heads one way to new land", c.name);
 				}
 				a = freshWay;
 				leg = 48;
