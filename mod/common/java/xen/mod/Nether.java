@@ -719,7 +719,7 @@ final class Nether {
 		if (lavaAt == null && c.mod.config.luck >= 2 && !inNether()) lavaAt = knownLava(level);   // knowing everything: the nearest lava pool it can stand over
 		if (lavaAt == null) {
 			if (c.player.getY() > 10 && c.crafter.pickTier() >= 2 && !inNether()) {     // lava pools lie deep: down in the deepslate, where most are (diamonds too)
-				if (c.chores.busy() && c.chores.own && c.chores.serial != lavaChore) c.chores.cancel();   // (an errand of its own from before, the flint: done with)
+				if (c.chores.busy() && c.chores.own && c.chores.serial != lavaChore && c.chores.kind != Chores.Kind.GIVE) c.chores.cancel();   // (an errand of its own from before, the flint: done with)
 				if (!c.chores.busy()) {
 					say("Lava pools are deep down. Going down to find one.");
 					c.chores.mine(-40, "diamonds", 3);
