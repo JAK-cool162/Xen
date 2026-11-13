@@ -135,8 +135,13 @@ public final class Hands {
 	private void keepPillaring() {
 		p.setJumping(ticks < 4);
 		p.setXRot(Math.min(90f, p.getXRot() + 30f));                        // eyes down on the block it puts under itself
-		if (p.getY() < pillarFrom.getY() + 1.0) return;
 		ServerLevel level = (ServerLevel) p.level();
+		BlockState at = level.getBlockState(pillarFrom);
+		if (!at.canBeReplaced() && at.getCollisionShape(level, pillarFrom).isEmpty() && at.getDestroySpeed(level, pillarFrom) == 0) {
+			p.gameMode.destroyBlock(pillarFrom);                                 // a torch at its feet (its own, from mining in the dark): knocked off, as a player does, for the block to go there (Ann jumped on a torch for six minutes, no block ever under her)
+			Compat.swing(p);
+		}
+		if (p.getY() < pillarFrom.getY() + 1.0) return;
 		if (!level.getBlockState(pillarFrom).canBeReplaced()) return;
 		int slot = spareSlot();
 		if (slot < 0) return;
