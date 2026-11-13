@@ -220,11 +220,11 @@ final class Btb {
 			out.add(new Option(Task.SLEEP, 5.5f, "night, a bed in its bag: down in it (no night out in the open, and the night's over sooner)"));   // (most of its deaths were at night)
 		boolean hurtNoFood = o.meals == 0 && o.food < 18 && o.health <= 12;     // (hurt, under 18 it doesn't heal, nothing to eat: food comes first; Ann at five health went after diamonds, then coal, ten minutes)
 		boolean darkOut = (dusk || o.night) && o.overworld && !o.under;           // (out in the dark, a hunt is the night's monsters' hunt: Ann, food 6, after a chicken at night, a zombie; under 18 it doesn't heal, but it doesn't hurt either: a roof first, the hunt at dawn)
-		if (o.meals < 2 && o.food < 18 && (!darkOut || o.food <= 3)) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
+		if (o.meals < 2 && o.food < 18 && (!darkOut || o.food <= 3 && o.health > 6)) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
 		else if (o.meals < 4 && !o.night && !dusk && o.overworld && !o.under)   // (its bag nearly out of food, still fed: a hunt now, by day, up here, not once it's hungry at the bottom of a mine or after dark; 19 of 23 deaths came at three health or less, unhealed for want of food)
 			out.add(new Option(Task.FOOD, o.meals == 0 ? 3.9f : o.meals == 1 ? 3.4f : 2.6f, "food for later: its bag's nearly out"));
-		if (c.goals.home != null && c.farmer.middle == null && o.overworld && !o.night && !dusk && !o.under && o.health >= 12 && o.food >= 10 && o.tier >= 2
-				&& c.player.blockPosition().distSqr(c.goals.home) < 48 * 48 && now() >= notBefore.getOrDefault(Task.FARM, 0L))
+		if (c.goals.home != null && c.farmer.middle == null && o.overworld && !o.night && !dusk && !o.under && o.health >= 10 && o.food >= 8 && o.tier >= 2
+				&& c.player.blockPosition().distSqr(c.goals.home) < 160 * 160 && now() >= notBefore.getOrDefault(Task.FARM, 0L))
 			out.add(new Option(Task.FARM, o.meals < 4 ? 4.2f : 3.6f, "a wheat farm at its base: bread that never runs out (most deaths were at low health with nothing to eat)"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)

@@ -3390,6 +3390,9 @@ final class Chores {
 
 	/** Its wander is where it has a feeling the animals are (luck), not just somewhere new. */
 	private boolean herdHunch;
+	/** Hunted-out land: the one way it heads to new land, and since when. */
+	private double freshWay = Double.NaN;
+	private long freshAt;
 
 	/** Knows of nothing to go for: look all around (its view is only 90 degrees), then walk somewhere new. */
 	private Action lookAround() {
@@ -3419,8 +3422,20 @@ final class Chores {
 		if (wander == null || now() > wanderUntil || here.distanceTo(wander) < 2) {
 			double lucky = kind == Kind.HUNT && !forWool ? c.hunch.animalWay() : Double.NaN;   // (hungry: its feet happen to go the way the animals are, now and then)
 			double a = Double.isNaN(lucky) ? random.nextDouble() * Math.PI * 2 : lucky;
-			wander = here.add(Math.cos(a) * 24, 0, Math.sin(a) * 24);
-			wanderUntil = now() + 400;
+			double leg = 24;
+			if (kind == Kind.HUNT && c.mod.config.luck > 0 && c.hunch.animalsAt(forWool) == null) {   // (none within 128 blocks: the land round here is hunted out; Cid circled there two hours at one heart: one way, far, to new land, which has its animals)
+				if (Double.isNaN(freshWay) || now() - freshAt > 20 * 60 * 6) {
+					BlockPos home = c.goals.home;
+					freshWay = home != null && home.distSqr(c.player.blockPosition()) > 16 * 16 ? Math.atan2(here.z - home.getZ(), here.x - home.getX()) + (random.nextDouble() - 0.5) * 0.8
+							: random.nextDouble() * Math.PI * 2;
+					freshAt = now();
+					c.journal("thinks", "no animals within 128 blocks: heads one way to new land");
+				}
+				a = freshWay;
+				leg = 48;
+			}
+			wander = here.add(Math.cos(a) * leg, 0, Math.sin(a) * leg);
+			wanderUntil = now() + (leg > 24 ? 20 * 40 : 400);
 			herdHunch = false;
 			if (scans++ > 4) scans = 0;                                  // and look around again when it gets there
 		}
