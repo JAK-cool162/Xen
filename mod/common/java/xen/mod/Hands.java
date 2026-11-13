@@ -450,6 +450,7 @@ public final class Hands {
 		turning = false;
 		if (flyTarget != null) flyToward(null);
 		if (digging != null) {
+			cutShort("stopped", digging);
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP,
 					p.level().getMaxY(), 0);
 			digging = null;
@@ -457,6 +458,19 @@ public final class Hands {
 		p.xxa = p.zza = 0;
 		p.setJumping(false);
 		ticks = limit = 0;
+	}
+
+	/** A slow block (obsidian, ancient debris, a diamond) its digging stopped part way: who stopped it, for its journal (once in five seconds). */
+	private long cutShortSaidAt = -1000;
+
+	private void cutShort(String how, BlockPos at) {
+		if (p.companion == null || ticks - digStartTick < 10 || p.tickCount - cutShortSaidAt < 100) return;
+		BlockState st = p.level().getBlockState(at);
+		if (st.getDestroySpeed(p.level(), at) < 3) return;                        // (stone and the like: too quick to matter)
+		cutShortSaidAt = p.tickCount;
+		var from = StackWalker.getInstance().walk(f -> f.skip(2).limit(4).map(x -> x.getClassName().replace("xen.mod.", "") + "." + x.getMethodName() + ":" + x.getLineNumber()).toList());
+		p.companion.journal("debug", String.format(java.util.Locale.ROOT, "digging %s %s after %d ticks at %.0f%%: %s", BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath(),
+				how, ticks - digStartTick, progress * 100, String.join(" < ", from)));
 	}
 
 	// --------------------------------------------------------------------------------- mining
@@ -565,6 +579,7 @@ public final class Hands {
 		}
 		if (digSlot >= 0 && p.getInventory().getSelectedSlot() != digSlot) p.getInventory().setSelectedSlot(digSlot);   // (the tool it picked, to the end)
 		if (ticks % 4 == 0 && outOfSight(level, digging)) {                  // like a player: it digs what its crosshair is on, nothing behind a wall
+			cutShort("out of its sight", digging);
 			cantMine = digging.immutable();
 			cantMineUnseen = true;
 			p.gameMode.handleBlockBreakAction(digging, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.UP, level.getMaxY(), 0);
