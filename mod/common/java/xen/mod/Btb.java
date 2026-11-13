@@ -359,14 +359,18 @@ final class Btb {
 	Action next() {
 		if (c.player == null || !c.player.isAlive()) return null;
 		Obs o = observe();
-		if (task != Task.NONE && task != Task.FOOD && task != Task.SHELTER && task != Task.SLEEP && task != Task.STASH && o.health <= 8 && o.meals == 0 && o.food < 18
-				&& !c.fightingNow() && now() - hurtDropAt > 20 * 60 && busy()) {   // hurt, not healing, nothing to eat: whatever it's on waits (Fin built a smelter at four health with no food in his bag; 19 of 23 deaths came at three health or less)
+		String life = o.health <= 8 && o.meals == 0 && o.food < 18 ? "hurt (" + Math.round(o.health) + " health) and nothing to eat"
+				: o.health <= 8 && o.danger >= 2 ? "hurt (" + Math.round(o.health) + " health) with monsters about"
+				: o.health <= 8 && o.night && o.overworld && !o.under && !o.sheltered ? "hurt (" + Math.round(o.health) + " health) out under the night sky"
+				: c.player.getAirSupply() < 100 && c.player.isUnderWater() ? "out of air" : null;
+		if (life != null && task != Task.NONE && task != Task.FOOD && task != Task.SHELTER && task != Task.SLEEP && task != Task.STASH
+				&& !c.fightingNow() && now() - hurtDropAt > 20 * 30 && busy()) {   // its life first: whatever it's on waits, and it chooses again, safe things first (Fin built a smelter at four health with no food; 19 of 23 deaths came at three health or less; Dee drowned "swimming to air" in diamond)
 			hurtDropAt = now();
-			c.journal("does", "btb: hurt (" + Math.round(o.health) + " health) and nothing to eat: drops " + task.name().toLowerCase(Locale.ROOT) + " for food");
+			c.journal("does", "btb: life first, " + life + ": drops " + task.name().toLowerCase(Locale.ROOT));
 			if (c.chores.busy()) c.chores.cancel();
 			if (c.nether.busy()) c.nether.cancel();
 			if (c.builder.busy()) c.builder.cancel();
-			if (task == Task.VISIT) c.visits.stop("hurt and nothing to eat");
+			if (task == Task.VISIT) c.visits.stop(life);
 			dropped = true;
 		}
 		if (task != Task.NONE) {

@@ -559,6 +559,14 @@ final class Walker {
 		float h = p.getHealth();
 		maxFall = h >= 16 ? 4 : 3;                                             // (three blocks hurt nothing, four a half heart: a player doesn't jump off more than that on purpose)
 		maxGap = h < 10 || fear > 0.6f ? 0 : brave > 0.7f ? 3 : brave > 0.35f ? 2 : 1;
+		care = h <= 8 || p.isOnFire() || p.getAirSupply() < 100 ? 4 : h <= 12 ? 2 : 1;   // its life at stake: the long safe way, not the quick one (lava, the night sky, monsters weigh four times; no jumps, no falls that hurt)
+		if (care >= 4) {
+			maxFall = Math.min(maxFall, 2);
+			maxGap = 0;
+		}
+		foes.clear();
+		if (care > 1) for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class, p.getBoundingBox().inflate(24), net.minecraft.world.entity.LivingEntity::isAlive))
+			foes.add(m.blockPosition());
 		float risk = c.personality.risk();                                 // its beliefs: "fortune favors the bold", "look before you leap"
 		if (risk > 0.25f && h >= 14) {
 			maxGap = Math.min(3, maxGap + 1);
@@ -1226,8 +1234,20 @@ final class Walker {
 		double d = nightSky && level.canSeeSky(p.above()) ? 6 : 0;
 		for (Direction dir : Direction.values()) if (lava(p.relative(dir)) || lava(p.above().relative(dir))) d += 300;   // (lava by its way: well round it, like Baritone; a slip or a shove there is death)
 		if ((cell(p.below()) & K_SICK) != 0) d += 30;                       // sulfur gas makes you sick
-		return d;
+		if (care > 1) {
+			if (level.dimension() == net.minecraft.world.level.Level.OVERWORLD && level.isDarkOutside() && level.canSeeSky(p.above())) d += 8;   // (hurt: the open night is where the arrows come from)
+			for (BlockPos f : foes) {
+				double dd = f.distSqr(p);
+				if (dd < 64) d += (64 - dd) * 0.6;                            // (well round a monster, not past it)
+			}
+		}
+		return d * care;
 	}
+
+	/** How much its life weighs against time on this way (1: well; 4: its life at stake). */
+	private int care = 1;
+	/** The monsters about when it planned (hurt: it keeps away from them). */
+	private final List<BlockPos> foes = new ArrayList<>();
 
 	/**
 	 * How long to dig it out of the way (0: nothing there). Only the ground, never what people built; not next to lava

@@ -145,8 +145,9 @@ final class Imagination {
 		float hp = c.player.getHealth();
 		double total = Math.max(1, Math.sqrt(c.player.blockPosition().distSqr(o.to()))), thought = Math.sqrt(c.player.blockPosition().distSqr(at));
 		double unsure = moves == null ? 1 : partial ? Math.max(0, 1 - thought / total) : 0;   // (how much of the way is a guess: Ivy's "1 of 108 blocks thought through" counted no worse than nearly all of it)
-		double score = -seconds / 60.0 - 2.5 * lava - 1.5 * falls - 0.6 * monsters - (nightFalls ? 1.5 : 0) - (moves == null ? 50 : 3 * unsure) - 0.3 * gaps - 0.15 * order
-				- (hp < 12 ? 1.5 * (lava + falls + monsters) : 0);
+		double risk = hp <= 8 ? 4 : hp < 12 ? 2 : 1, hurry = hp <= 8 ? 0.3 : 1;  // its life at stake: the long safe way over the quick risky one (a minute more counts for little, a lava pool for four times as much)
+		double score = -hurry * seconds / 60.0 - risk * (2.5 * lava + 1.5 * falls + 0.6 * monsters + (nightFalls ? 1.5 : 0) + 0.3 * gaps) - (moves == null ? 50 : 3 * unsure) - 0.15 * order;
+		if (risk > 1 && (lava > 0 || falls > 0 || monsters > 0)) cons.add("risky for its health now");
 		if (book != null && book[0] >= 2) score += 2 * (book[1] / book[0]) - 5 * (book[2] / book[0]);
 		return new Played(o, seconds, pros, cons, score, way, trouble, moves != null && !partial);
 	}
