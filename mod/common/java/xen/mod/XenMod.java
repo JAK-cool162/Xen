@@ -1777,15 +1777,16 @@ public class XenMod implements ModInitializer {
 	private void shareDiamonds() {
 		if (companions.size() < 2) return;
 		long now = server.overworld().getGameTime();
+		if (server.overworld().isDarkOutside()) return;                          // (by day: at night the one bringing them digs in before it gets there)
 		for (Companion needy : companions) {
-			if (needy.player() == null || needy.minion || needy.inArena) continue;
+			if (needy.player() == null || needy.minion || needy.inArena || needy.player().tickCount < 20 * 60) continue;   // (a minute in: right after a restart where they stand isn't settled; Ann set off for Hal "80 blocks off", 450 really)
 			if (now - giftedAt.getOrDefault(needy.name, -1_000_000L) < 20 * 60 * 10) continue;
 			int pieces = diamondGear(needy), has = needy.items().getOrDefault("diamond", 0);
 			if (pieces >= 6 || has >= 3) continue;
 			Companion best = null;
 			double bestD = 96;
 			for (Companion rich : companions) {
-				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level()) continue;
+				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level() || rich.player().tickCount < 20 * 60) continue;
 				if (diamondGear(rich) < 6 || rich.items().getOrDefault("diamond", 0) < 6) continue;   // (its own gear first, three kept for a new pickaxe)
 				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava()) continue;
 				double d = rich.player().distanceTo(needy.player());
