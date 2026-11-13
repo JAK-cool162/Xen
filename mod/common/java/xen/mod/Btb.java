@@ -420,7 +420,18 @@ final class Btb {
 			case IRON -> ch.mine(c.lessons.depth("iron", 16), "iron", o.tier == 2 ? 3 : 10);
 			case DIAMONDS -> ch.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, c.goals.diamondsWanted() - o.diamonds));
 			case SMELT -> ch.smelt();
-			case FOOD -> ch.hunt(o.meals == 0 ? 5 : 3);
+			case FOOD -> {
+				var prey = ch.nearestAnimal();
+				boolean noAnimals = prey == null || prey.distanceTo(c.player) > 24;
+				if (noAnimals && !o.night && (c.fisher.hasRod() || c.items().getOrDefault("string", 0) >= 2) && c.fisher.waterNear() != null) {   // (no animals about, water close by: it fishes; Ivy looked for animals for most of an hour at half a heart)
+					String f = c.fisher.start();
+					if (f.startsWith("You will")) {
+						c.journal("thinks", "no animals about: fishes instead");
+						yield f;
+					}
+				}
+				yield ch.hunt(o.meals == 0 ? 5 : 3);
+			}
 			case SHELTER -> shelterOrPlanB(o);
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> tableStep();
@@ -552,7 +563,7 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy());
+				|| task == Task.STASH && c.storage.busy() || task == Task.FOOD && c.fisher.on);
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
