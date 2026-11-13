@@ -277,10 +277,17 @@ final class Crafter {
 		return wood() >= need + extra + (tableNearOrCarried() ? 0 : 4);
 	}
 
+	private final java.util.Map<String, Integer> failed = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> giveUpUntil = new java.util.HashMap<>();
+
 	/** Does it want to (and can it) make something now? */
 	boolean ready() {
 		if (c.player != null && c.player.isCreative() && order == null) return false;   // a creative player doesn't make tools
-		return c.player != null && (order != null || placedTable != null || c.player.level().getGameTime() >= nextTry && wanted() != null);
+		if (c.player == null) return false;
+		if (order != null || placedTable != null) return true;
+		if (c.player.level().getGameTime() < nextTry) return false;
+		String w = wanted();
+		return w != null && c.player.level().getGameTime() >= giveUpUntil.getOrDefault(w, 0L);
 	}
 
 	// ------------------------------------------------------------------------ "craft a boat"
@@ -606,6 +613,11 @@ final class Crafter {
 		c.acted = true;
 		if (!ok) {
 			XenMod.LOG.info("{} couldn't make {} (making {})", c.name, what, making);
+			if (goal != null && order == null && failed.merge(goal, 1, Integer::sum) >= 3) {   // (the same thing three times over: let be for ten minutes; Bob tried a stone shovel every 17 s for an hour at three health, no hunt)
+				failed.remove(goal);
+				giveUpUntil.put(goal, c.player.level().getGameTime() + 20 * 60 * 10);
+				XenMod.LOG.info("{} gives up on {} for now", c.name, goal);
+			}
 			nextTry = c.player.level().getGameTime() + 600;              // try again in half a minute
 			making = null;
 			order = null;
