@@ -157,6 +157,7 @@ final class Btb {
 			case "diamond", "diamond_block" -> done;
 			case "raw_iron", "raw_copper", "copper_ingot", "iron_ore", "deepslate_iron_ore", "copper_ore" -> count >= 8 && c.crafter.pickTier() >= 4;
 			case "iron_ingot" -> count >= 16;
+			case "cobblestone", "cobbled_deepslate" -> count >= 64 && c.items().getOrDefault(key, 0) > 96;   // (a stack for later: blocks waiting at home after a death)
 			case "book" -> c.enchanter.table() != null || c.crafter.has("enchanting_table");
 			case "gold_ingot", "raw_gold", "gold_ore", "deepslate_gold_ore", "emerald", "enchanted_book", "name_tag", "saddle", "diamond_ore", "deepslate_diamond_ore",
 					"redstone", "quartz", "amethyst_shard", "emerald_ore" -> true;
@@ -280,13 +281,19 @@ final class Btb {
 			out.add(new Option(Task.STASH, 3.3f, "its spares into its chest at home (a death costs it only what it carries)"));
 		if (chest != null && !o.night && o.overworld && o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0 && chest.closerThan(c.player.blockPosition(), 160))
 			out.add(new Option(Task.STASH, 4.1f, "its diamonds from its chest: for its gear"));
+		if (chest != null && !o.night && o.overworld && kitToTake(o) != null && chest.closerThan(c.player.blockPosition(), 160))
+			out.add(new Option(Task.STASH, 4.3f, "its kit from its chest (" + kitToTake(o) + "): not starting over from nothing"));
 		if (goal.equals("nether")) {
 			boolean inNether = c.nether.inNether();
 			boolean sword = c.items().keySet().stream().anyMatch(n -> n.equals("iron_sword") || n.equals("diamond_sword") || n.equals("netherite_sword"))
 					|| c.player.getMainHandItem().getItem().toString().matches(".*(iron|diamond|netherite)_sword.*");
-			boolean ready = inNether || o.meals >= 8 && o.health >= 16 && sword;   // (packed before the portal, as a player does: food for the trip, a sword, well; Cid went in with little food and came back at seven health, starving)
+			var bag = c.items();
+			int steak = bag.getOrDefault("cooked_beef", 0) + bag.getOrDefault("cooked_porkchop", 0), raw = bag.getOrDefault("beef", 0) + bag.getOrDefault("porkchop", 0);
+			boolean packed = steak >= 4 || o.meals >= 10;                       // (four steaks or chops, the best food there is: or plenty of anything)
+			boolean ready = inNether || packed && o.health >= c.player.getMaxHealth() - 0.5f && sword;   // (packed before the portal, as a player does: food for the trip, a sword, full health; Cid went in with little food and came back at seven health, starving)
 			if (!inNether && !ready && !o.night) {
-				if (o.meals < 8) out.add(new Option(Task.FOOD, 3.8f, "food packed for the Nether (" + o.meals + " of 8)"));
+				if (!packed && raw >= 2 && steak < 4) out.add(new Option(Task.SMELT, 3.9f, "its raw meat cooked for the Nether (" + steak + " cooked, " + raw + " raw)"));
+				else if (!packed) out.add(new Option(Task.FOOD, 3.8f, "food packed for the Nether (" + steak + " steaks or chops, " + o.meals + " meals)"));
 				if (!sword && o.iron >= 2 && !c.crafter.hasOrder()) c.crafter.orderRecipe(o.tier >= 4 && o.diamonds >= 2 ? "diamond_sword" : "iron_sword", 1);
 				if (!c.crafter.hasShield() && o.iron >= 1 && c.crafter.woodCount() >= 2 && !c.crafter.hasOrder()) c.crafter.orderRecipe("shield", 1);
 			}
@@ -542,13 +549,33 @@ final class Btb {
 				yield c.builder.startStarterHome();
 			}
 			case SMELTER -> c.builder.start("smelter");
-			case BLAZE -> c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
+			case BLAZE -> {
+				if (!c.nether.inNether() && c.tripBuddy == null) {               // a teammate along: someone at its back, and someone to keep its things if it falls
+					for (Companion mate : c.mod.companions) {
+						var mp = mate.player();
+						if (mate == c || mp == null || !mp.isAlive() || mp.level() != c.player.level() || !mp.isAlliedTo(c.player) || mp.distanceTo(c.player) > 200) continue;
+						if (mate.buddyOf != null || mate.tripBuddy != null || mate.nether.busy() || mate.fightingNow() || mp.getHealth() < 14 || mate.mode != Companion.Mode.FREE) continue;
+						mate.joinTrip(c);
+						c.chatter(mate.name + ", come to the Nether with me? Watch my back.", true);
+						break;
+					}
+				}
+				yield c.nether.go("blaze", Math.max(1, (12 - rods() + 1) / 2));
+			}
 			case PEARLS -> c.chores.slay("enderman", "ender_pearl", 12 - pearls(), "ender pearls");
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
 			case STASH -> {
 				stashAt = now();
+				String kit = kitToTake(o);
+				if (kit != null) {
+					String took = c.storage.take(kit, kit.endsWith("cobblestone") || kit.endsWith("deepslate") ? 64 : kit.startsWith("cooked") || kit.equals("bread") ? 8 : 1);
+					if (took != null) {
+						c.journal("does", "goes to its chest for its kit: " + kit);
+						yield took;
+					}
+				}
 				if (o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0) {
 					String took = c.storage.take("diamond", Math.min(64, c.storage.inChests("diamond")));
 					if (took != null) {
@@ -669,6 +696,18 @@ final class Btb {
 	/** The task it last dropped as soon as it began, and how many times straight. */
 	private Task blipTask;
 	private int blips;
+
+	/** The next thing of its kit its chest has and it lacks (after a death: a pickaxe, a sword, blocks, food), or null. */
+	private String kitToTake(Obs o) {
+		String[] picks = {"diamond_pickaxe", "iron_pickaxe", "stone_pickaxe"}, swords = {"diamond_sword", "iron_sword", "stone_sword"};
+		int[] tiers = {4, 3, 2};
+		for (int i = 0; i < picks.length; i++) if (o.tier < tiers[i] && c.storage.inChests(picks[i]) > 0) return picks[i];
+		boolean sword = c.items().keySet().stream().anyMatch(n -> n.endsWith("_sword"));
+		if (!sword) for (String s : swords) if (c.storage.inChests(s) > 0) return s;
+		if (o.stone < 16 && c.storage.inChests("cobblestone") >= 32) return "cobblestone";
+		if (o.meals < 2) for (String f : new String[] {"cooked_beef", "cooked_porkchop", "bread"}) if (c.storage.inChests(f) > 0) return f;
+		return null;
+	}
 
 	/** Something on it that goes in the chest. */
 	private boolean stashable() {

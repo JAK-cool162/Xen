@@ -91,6 +91,7 @@ final class Nether {
 		lastLevel = p.level();
 		lastPos = p.blockPosition();
 		if (p.tickCount % 40 == 10 && inNether() && c.knowledge.knows("piglin_gold")) wearGold();
+		if (p.tickCount % 40 == 20) c.tripCheck();
 		if (p.tickCount % 40 == 30 && inNether() && !"home".equals(purpose) && !c.fightingNow()) {   // hurt over there and not healing: back home through its portal to heal, then back (not on to a fortress at three hearts)
 			boolean noFood = c.items().getOrDefault("food", 0) == 0;
 			if (p.getHealth() <= 6 || p.getHealth() <= 10 && noFood && p.getFoodData().getFoodLevel() < 18) {

@@ -2897,6 +2897,51 @@ public final class Companion {
 	private Companion helper;
 	/** Helping a friend get their things back: whose, where they are, till when, and what of theirs it picked up (to hand back). */
 	private Companion escortFor;
+
+	/** A teammate's Nether trip it came along on (whose, its mode and leader before, since when); and on its own trip, who came along. */
+	Companion buddyOf, tripBuddy;
+	private Mode buddyWasMode;
+	private UUID buddyWasLeader;
+	private long buddyFrom;
+
+	/** Along on a teammate's trip: it follows them (through the portal too), watches their back, and keeps their things safe if they fall. */
+	void joinTrip(Companion lead) {
+		buddyOf = lead;
+		lead.tripBuddy = this;
+		buddyWasMode = mode;
+		buddyWasLeader = leader;
+		buddyFrom = player.level().getGameTime();
+		mode = Mode.FOLLOW;
+		leader = lead.player.getUUID();
+		chores.cancel();
+		journal("does", "goes along on " + lead.name + "'s Nether trip (its team): follows, watches its back, keeps its things safe");
+		chatter(pick3("I've got your back, " + lead.name + ".", "Coming with you, " + lead.name + ".", "Lead the way, " + lead.name + ". I'll watch your stuff."), true);
+	}
+
+	/** The trip it came along on is over (they're home, dead and gone, or twenty minutes): back to its own things. */
+	void tripCheck() {
+		if (buddyOf == null || player == null) return;
+		var lead = buddyOf.player;
+		boolean over = lead == null || !lead.isAlive() && escortFor == null || player.level().getGameTime() - buddyFrom > 20 * 60 * 20
+				|| buddyOf.nether.purpose == null && !buddyOf.nether.inNether() && !nether.inNether() && lead.level() == player.level();
+		if (!over) return;
+		if (buddyOf.tripBuddy == this) buddyOf.tripBuddy = null;
+		buddyOf = null;
+		mode = buddyWasMode != null ? buddyWasMode : Mode.FREE;
+		leader = buddyWasLeader;
+		journal("does", "the trip's over: back to its own things");
+	}
+
+	/** Its trip leader died close by: it picks up their things and hands them back, as when asked along for them. */
+	void keepThingsOf(Companion lead, BlockPos at) {
+		escortFor = lead;
+		escortSpot = at;
+		escortUntil = player.level().getGameTime() + 20 * 180;
+		escortGot.clear();
+		escortHad = rawItems();
+		journal("does", lead.name + " fell: picks up its things to hand back");
+		chatter(pick3("I've got your stuff, " + lead.name + "!", "Grabbing your things, " + lead.name + ". Come back for them.", "Don't worry, I'll hold your gear."), true);
+	}
 	private BlockPos escortSpot;
 	private long escortUntil;
 	final Map<String, Integer> escortGot = new HashMap<>();
@@ -5244,6 +5289,11 @@ public final class Companion {
 		helper = null;
 		lostAgedAt = player.level().getGameTime();
 		lostFoundAny = false;
+		if (lostAt != null && tripBuddy != null && tripBuddy.player != null && tripBuddy.player.isAlive() && tripBuddy.player.level() == player.level()
+				&& tripBuddy.player.distanceTo(player) < 48) {
+			tripBuddy.keepThingsOf(this, here);                               // (its teammate on the trip: picks them up and keeps them safe)
+			helper = tripBuddy;
+		}
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
 		if (hardcore() && !inArena) {                                 // one life: that was it
 			goneHow = source.getLocalizedDeathMessage(player).getString();
