@@ -1084,6 +1084,10 @@ public final class Companion {
 		var level = (ServerLevel) player.level();
 		BlockPos feet = player.blockPosition();
 		long now = level.getGameTime();
+		if (!level.canSeeSky(feet.above(2)) && feet.getY() < level.getHeight(net.minecraft.world.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ()) - 6) {
+			shoreTo = null;                                                    // (a pool under the ground is no sea: its way out is its own walk and dig, not a swim for land 64 blocks through the rock; Jay, a quarter of an hour in a lake at y 20)
+			return null;
+		}
 		if (shoreTo == null) {
 			if (!openWater(level, feet)) return null;
 			Vec3 going = walker.goal();
