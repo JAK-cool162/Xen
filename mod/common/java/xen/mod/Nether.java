@@ -582,6 +582,9 @@ final class Nether {
 		return pouredTop != null && now() - pouredTopAt < 20 * 60 * 5 && q.closerThan(pouredTop, 6);
 	}
 
+	/** Time on its way to the lava pool since it last got closer, and when it last was. */
+	private long lavaWalked, lavaWalkTick;
+
 	/** Lava by some it couldn't get to (ten blocks round): the same pool, not tried again (Cid: "can't get to the lava", then the same pool six blocks over). */
 	private boolean triedLava(BlockPos r) {
 		for (BlockPos b : badLava) if (b.closerThan(r, 10)) return true;
@@ -736,7 +739,12 @@ final class Nether {
 				lavaWalkAt = lavaAt.immutable();
 				lavaClosest = Math.min(lavaClosest, d);
 				lavaCloserAt = now();
-			} else if (now() - lavaCloserAt > 20 * 90) {                       // ninety seconds no closer: the next pool it knows of (Bob stood two minutes over a way to one sixty blocks down, trip after trip; at forty, a pool seventy blocks off was let go while he picked up lapis on the way)
+				lavaWalked = 0;
+			} else {
+				lavaWalked += Math.min(5, Math.max(0, now() - lavaWalkTick));    // (only the time it's on its way counts: a fight, a pick-up, a night dug in on the way aren't its way failing; Ivy and Gus let pool after pool go a minute in)
+			}
+			lavaWalkTick = now();
+			if (lavaWalked > 20 * 90) {                       // ninety seconds no closer: the next pool it knows of (Bob stood two minutes over a way to one sixty blocks down, trip after trip; at forty, a pool seventy blocks off was let go while he picked up lapis on the way)
 				badLava.add(lavaAt.immutable());
 				c.journal("thinks", "can't get to the lava at " + lavaAt.toShortString() + ": another pool");
 				lavaAt = null;
