@@ -2254,12 +2254,13 @@ final class Chores {
 		}
 		blocksLookingSince = -1;
 		double d = Math.sqrt(target.distSqr(c.player.blockPosition()));
-		if (d < closest - 0.5) {
-			closest = d;
+		boolean atIt = c.player.getEyePosition().distanceTo(Vec3.atCenterOf(target)) < 4.5;   // (in reach, mining it: no nearer to get; reach() gives it a minute there)
+		if (d < closest - 0.5 || atIt) {
+			closest = Math.min(closest, d);
 			lastCloser = now();
-		} else if (now() - lastCloser > 300) {
-			skip.add(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()));
-			target = null;
+		} else if (now() - lastCloser > 300) {                                 // (fifteen seconds walking and no nearer: not that one. It used to count the
+			skip.add(Perception.Beliefs.key(target.getX(), target.getY(), target.getZ()));   //  mining too: Ann on a floor of eleven obsidian for three minutes,
+			target = null;                                                     //  each given up a moment before it broke, none got)
 			return null;
 		}
 		doing = String.format(java.util.Locale.ROOT, "mining %s for %s (%d of %d)", lookFor, what, countItem(blocksItem) - had, want);

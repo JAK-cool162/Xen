@@ -425,6 +425,9 @@ final class Habits {
 			ItemStack s = inv.getItem(i);
 			have.merge(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath(), s.getCount(), Integer::sum);
 		}
+		// All it has too much of, at once (one stack a time freed one slot, the next block it mined filled it: Ann tossed a
+		// single tuff every two seconds, picked it up again, and her obsidian never got in her full bag)
+		java.util.Map<String, Integer> tossed = new java.util.LinkedHashMap<>();
 		for (int i = 35; i >= 0; i--) {
 			ItemStack s = inv.getItem(i);
 			String id = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
@@ -432,11 +435,16 @@ final class Habits {
 			int keep = KEEP.getOrDefault(id, 0);
 			if (have.get(id) - s.getCount() < keep) continue;                               // (what's left after this stack is still enough)
 			ItemStack out = inv.removeItemNoUpdate(i);
+			have.merge(id, -out.getCount(), Integer::sum);
+			tossed.merge(id, out.getCount(), Integer::sum);
 			c.hands.toss(out);
-			c.journal("does", "tossed " + out.getCount() + " " + id.replace('_', ' ') + " (bag full)");
-			c.chatter(c.pick3("Bag's full. Bye, " + id.replace('_', ' ') + ".", "Out with the junk.", "Too much stuff. Tossing some."), false);
-			return;
 		}
+		if (tossed.isEmpty()) return;
+		StringBuilder what = new StringBuilder();
+		tossed.forEach((id, n) -> what.append(what.length() > 0 ? ", " : "").append(n).append(' ').append(id.replace('_', ' ')));
+		c.journal("does", "tossed " + what + " (bag full)");
+		String first = tossed.keySet().iterator().next().replace('_', ' ');
+		c.chatter(c.pick3("Bag's full. Bye, " + first + ".", "Out with the junk.", "Too much stuff. Tossing some."), false);
 	}
 
 	// ------------------------------------------------------------------------------ kept with the world
