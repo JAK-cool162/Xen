@@ -289,6 +289,14 @@ final class Btb {
 		if (c.goals.home != null && !o.night && o.overworld && (c.builder.canUpgrade() || c.builder.canExtendBase()))
 			out.add(new Option(Task.HOME, goal.equals("world") ? 2.5f : 0.8f, "nothing pressing: its base better or bigger (a house's next stage, a new room under the ground)"));   // (a home once had, never touched again: no upgrade ever ran)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
+		if (resumeTask != null) {                                                // what it dropped for its life: back to it, now it's safe
+			if (now() - resumeFrom > 20 * 60 * 10) resumeTask = null;
+			else if (o.health >= 12 && o.danger < 2 && (o.meals > 0 || o.food >= 18) && !(o.night && o.overworld && !o.under && !o.sheltered)) {
+				Task back = resumeTask;
+				out.removeIf(op -> op.task == back);
+				out.add(new Option(back, 4.4f, "back to what it dropped for its life (" + back.name().toLowerCase(Locale.ROOT) + ")"));
+			}
+		}
 		// Danger first: hurt (under 14), nothing to eat in its bag, monsters about: nothing risky. No mining like that (it
 		// heals, eats, gets food first); none of the walking-about jobs with monsters round it; by water, a mine is the
 		// last thing (its holes fill, it swims off its staircase).
@@ -328,6 +336,10 @@ final class Btb {
 			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
 		return false;
 	}
+	/** What it dropped for its life, and when: once it's safe again (twelve health, no monsters on it), back to that first, within ten minutes. */
+	private Task resumeTask;
+	private long resumeFrom;
+
 	/** When it last dropped its task for food, hurt (not every tick: once a minute at most). */
 	private long hurtDropAt = -1_000_000;
 	/** Its task was dropped (the night): not done, whatever it picked up meanwhile. */
@@ -366,7 +378,9 @@ final class Btb {
 		if (life != null && task != Task.NONE && task != Task.FOOD && task != Task.SHELTER && task != Task.SLEEP && task != Task.STASH
 				&& !c.fightingNow() && now() - hurtDropAt > 20 * 30 && busy()) {   // its life first: whatever it's on waits, and it chooses again, safe things first (Fin built a smelter at four health with no food; 19 of 23 deaths came at three health or less; Dee drowned "swimming to air" in diamond)
 			hurtDropAt = now();
-			c.journal("does", "btb: life first, " + life + ": drops " + task.name().toLowerCase(Locale.ROOT));
+			c.journal("does", "btb: life first, " + life + ": drops " + task.name().toLowerCase(Locale.ROOT) + " (back to it once it's safe)");
+			resumeTask = task;
+			resumeFrom = now();
 			if (c.chores.busy()) c.chores.cancel();
 			if (c.nether.busy()) c.nether.cancel();
 			if (c.builder.busy()) c.builder.cancel();
@@ -410,6 +424,10 @@ final class Btb {
 		}
 		task = best.task;
 		why = best.why;
+		if (task == resumeTask) {
+			resumeTask = null;
+			c.journal("does", "btb: safe again: back to " + task.name().toLowerCase(Locale.ROOT));
+		}
 		state = best.task == Task.SHELTER || best.task == Task.FOOD ? State.SURVIVE : best.task == Task.EXPLORE ? State.EXPLORE : State.WORK;
 		taskAt = now();
 		stateAt = key;
