@@ -3039,7 +3039,7 @@ final class Chores {
 				return giveUp(t);
 			}
 		}
-		if (now() - reachSaidAt >= 60 && c.player.level().getBlockState(t).getDestroySpeed(c.player.level(), t) >= 3) {   // (a slow block: how it goes at it, for its journal)
+		if (now() - reachSaidAt >= 60 && c.player.level().getBlockState(t).getDestroySpeed(c.player.level(), t) >= 10) {   // (a slow block: how it goes at it, for its journal)
 			reachSaidAt = now();
 			c.journal("debug", String.format(java.util.Locale.ROOT, "at the %s at %s from %s: %.1f off, open %s, hands %s",
 					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(c.player.level().getBlockState(t).getBlock()).getPath(), t.toShortString(), feet.toShortString(),

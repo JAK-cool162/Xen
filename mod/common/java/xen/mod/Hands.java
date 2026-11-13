@@ -469,7 +469,7 @@ public final class Hands {
 	private void cutShort(String how, BlockPos at) {
 		if (p.companion == null || ticks - digStartTick < 10 || p.tickCount - cutShortSaidAt < 100) return;
 		BlockState st = p.level().getBlockState(at);
-		if (st.getDestroySpeed(p.level(), at) < 3) return;                        // (stone and the like: too quick to matter)
+		if (st.getDestroySpeed(p.level(), at) < 10) return;                       // (stone, deepslate, ores: too quick to matter)
 		cutShortSaidAt = p.tickCount;
 		var from = StackWalker.getInstance().walk(f -> f.skip(2).limit(4).map(x -> x.getClassName().replace("xen.mod.", "") + "." + x.getMethodName() + ":" + x.getLineNumber()).toList());
 		p.companion.journal("debug", String.format(java.util.Locale.ROOT, "digging %s %s after %d ticks at %.0f%%: %s", BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath(),
@@ -491,7 +491,7 @@ public final class Hands {
 		}
 		String unsafe = p.companion == null || pos.equals(wayDig) ? null : p.companion.choices.unsafeToBreak(pos);
 		if (unsafe != null) {                                         // Xen 2.0's doubter: a hard no (lava behind it, a drop under its feet)
-			if (!pos.equals(cantMine) || state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+			if (!pos.equals(cantMine) || state.getDestroySpeed(level, pos) >= 10 && p.tickCount - mineSaidAt >= 60) {
 				mineSaidAt = p.tickCount;
 				p.companion.journal("chooses", "mine " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + ": no | doubter: " + unsafe);
 			}
@@ -500,7 +500,7 @@ public final class Hands {
 			return;
 		}
 		if (holdsSomeone(level, pos, p)) {                             // someone's standing on it: a player never digs out the ground under a friend
-			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 10 && p.tickCount - mineSaidAt >= 60) {
 				mineSaidAt = p.tickCount;
 				p.companion.journal("debug", "won't dig the " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + " at " + pos.toShortString() + ": someone stands on it");
 			}
@@ -509,7 +509,7 @@ public final class Hands {
 			return;
 		}
 		if (outOfSight(level, pos)) {                                  // (it moved, or something came between: not through it)
-			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 10 && p.tickCount - mineSaidAt >= 60) {
 				mineSaidAt = p.tickCount;
 				p.companion.journal("debug", "can't see the " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + " at " + pos.toShortString() + " to dig it");
 			}
@@ -523,7 +523,7 @@ public final class Hands {
 		boolean worthTheWait = WAITS_FOR.contains(BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath()) && p.hasCorrectToolForDrops(state)
 				&& rate * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) >= 1f / 600;   // (obsidian: 9.4 s with a diamond pickaxe, a hair under the ten; a little slower and it was "too slow", every time)
 		if (tooSlow(rate) && !worthTheWait) {                          // more than 10 seconds with what it has: not worth it
-			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 10 && p.tickCount - mineSaidAt >= 60) {
 				mineSaidAt = p.tickCount;
 				p.companion.journal("debug", String.format(java.util.Locale.ROOT, "too slow: %s with %s, %.5f a tick (on the ground %s, eyes in water %s)",
 						BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(), BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath(), rate, p.onGround(), p.isUnderWater()));
@@ -820,7 +820,7 @@ public final class Hands {
 			cantMine = pos.immutable();
 			return false;
 		}
-		if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {   // (a slow block: what its hands were at when it was asked, and by whom)
+		if (p.companion != null && state.getDestroySpeed(level, pos) >= 10 && p.tickCount - mineSaidAt >= 60) {   // (a slow block: what its hands were at when it was asked, and by whom)
 			mineSaidAt = p.tickCount;
 			var from = StackWalker.getInstance().walk(f -> f.skip(1).limit(4).map(x -> x.getClassName().replace("xen.mod.", "") + "." + x.getMethodName() + ":" + x.getLineNumber()).toList());
 			p.companion.journal("debug", String.format(java.util.Locale.ROOT, "mine %s at %s: hands at %s%s%s, %d of %d ticks, sees it %s: %s", BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(),
