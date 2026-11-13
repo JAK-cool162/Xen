@@ -3002,10 +3002,26 @@ final class Chores {
 			if (d == net.minecraft.core.Direction.DOWN) continue;
 			if (level.getFluidState(t.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return null;   // (lava would run into the hole: the careful way, mine())
 		}
+		Hands hands = c.hands;
+		if (hands.seePoint(level, t) == null) {                                  // out of its sight from here: the obsidian in the way (the next block of the floor), or the one under its own feet, the one it sees, instead
+			BlockPos way = hands.firstInWay(level, t), under = c.player.blockPosition().below();
+			BlockPos instead = null;
+			for (BlockPos q : new BlockPos[] {way, under}) {
+				if (q == null || q.equals(t) || instead != null) continue;
+				if (!COMMIT.contains(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(q).getBlock()).getPath())) continue;
+				if (hands.seePoint(level, q) == null || c.player.getEyePosition().distanceTo(Vec3.atCenterOf(q)) > c.player.blockInteractionRange() - 0.3) continue;
+				boolean lavaBy = false;
+				for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values())
+					lavaBy |= d != net.minecraft.core.Direction.DOWN && level.getFluidState(q.relative(d)).is(net.minecraft.tags.FluidTags.LAVA);
+				if (lavaBy || q.equals(under) && dangerBelow(level, q)) continue;
+				instead = q;
+			}
+			if (instead == null) return null;                                    // (none it sees: its usual way round to it)
+			t = instead;
+		}
 		var box = c.player.getBoundingBox();
 		boolean onIt = t.getY() == c.player.blockPosition().getY() - 1 && box.maxX > t.getX() && box.minX < t.getX() + 1 && box.maxZ > t.getZ() && box.minZ < t.getZ() + 1;
 		if (onIt && dangerBelow(level, t)) return null;                        // (standing on it, lava or a drop under: not from up here)
-		Hands hands = c.hands;
 		if (hands.busy() && t.equals(hands.target())) {                        // at it already: on with it
 			c.acted = true;
 			return Action.IDLE;

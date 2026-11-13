@@ -253,6 +253,12 @@ public final class Hands {
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
 	}
 
+	/** The first block between its eyes and that one (for its chores: another of the same in the way is the one to take), or null. */
+	BlockPos firstInWay(ServerLevel level, BlockPos pos) {
+		BlockHitResult r = inTheWay(level, pos);
+		return r == null ? null : r.getBlockPos().immutable();
+	}
+
 	/** The first thing between its eyes and that block, or null. */
 	private BlockHitResult inTheWay(ServerLevel level, BlockPos pos) {
 		BlockHitResult r = level.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), Vec3.atCenterOf(pos),
