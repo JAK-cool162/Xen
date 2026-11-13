@@ -547,6 +547,11 @@ public class XenMod implements ModInitializer {
 			} catch (RuntimeException e) {
 				LOG.warn("Xen team founding stumbled: {}", e.toString());
 			}
+			try {
+				shareDiamonds();                                               // (a friend back on its feet: spare diamonds to one who lost its gear)
+			} catch (RuntimeException e) {
+				LOG.warn("Xen diamond sharing stumbled: {}", e.toString());
+			}
 			for (Companion c : companions) {
 				if (c.player == null || c.minion || c.inArena) continue;
 				try {
@@ -1713,6 +1718,63 @@ public class XenMod implements ModInitializer {
 			if (best == null || o.goals.home.distSqr(c.player().blockPosition()) < best.distSqr(c.player().blockPosition())) best = o.goals.home;
 		}
 		return best;
+	}
+
+	/** Diamond armor worn and diamond (or netherite) pickaxe and sword carried: of six. */
+	private static int diamondGear(Companion c) {
+		int n = 0;
+		for (var es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+			String k = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(c.player().getItemBySlot(es).getItem()).getPath();
+			if (k.startsWith("diamond_") || k.startsWith("netherite_")) n++;
+		}
+		var have = c.items();
+		if (have.containsKey("diamond_pickaxe") || have.containsKey("netherite_pickaxe")) n++;
+		if (have.containsKey("diamond_sword") || have.containsKey("netherite_sword")) n++;
+		return n;
+	}
+
+	private final java.util.Map<String, Long> giftedAt = new java.util.HashMap<>();
+
+	/**
+	 * Back on its feet with a friend's help (what players on a server do): a Xen with all its diamond gear and diamonds
+	 * to spare walks over to one that lost its gear (dying, a pickaxe worn out) and has few, and gives it some. Within a
+	 * walk (96 blocks), not in a fight or building, one gift a minute in all, and each Xen helped once in ten minutes.
+	 * (Dee, Eve, Fin and Hal mined back from wooden tools while Ann carried twelve diamonds and Ivy eight.)
+	 */
+	private void shareDiamonds() {
+		if (companions.size() < 2) return;
+		long now = server.overworld().getGameTime();
+		for (Companion needy : companions) {
+			if (needy.player() == null || needy.minion || needy.inArena) continue;
+			if (now - giftedAt.getOrDefault(needy.name, -1_000_000L) < 20 * 60 * 10) continue;
+			int pieces = diamondGear(needy), has = needy.items().getOrDefault("diamond", 0);
+			if (pieces >= 6 || has >= 3) continue;
+			Companion best = null;
+			double bestD = 96;
+			for (Companion rich : companions) {
+				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level()) continue;
+				if (diamondGear(rich) < 6 || rich.items().getOrDefault("diamond", 0) < 6) continue;   // (its own gear first, three kept for a new pickaxe)
+				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava()) continue;
+				double d = rich.player().distanceTo(needy.player());
+				if (d < bestD) {
+					bestD = d;
+					best = rich;
+				}
+			}
+			if (best == null) continue;
+			int n = Math.min(best.items().getOrDefault("diamond", 0) - 3, Math.max(3, 3 * (6 - pieces)));
+			if (n < 3) continue;
+			if (best.chores.busy()) best.chores.cancel();
+			String plan = best.chores.give(needy.player(), "diamond", n);
+			if (!plan.startsWith("You will")) continue;
+			best.chores.own = true;
+			giftedAt.put(needy.name, now);
+			best.chatter(needy.name + ", you lost your gear? Hold on, I've got " + n + " diamonds for you.", true);
+			best.journal("does", "shares " + n + " diamonds with " + needy.name + " (" + pieces + " of 6 of its diamond gear, " + has + " diamonds; " + Math.round(bestD) + " blocks off)");
+			needy.journal("thinks", best.name + " is bringing it " + n + " diamonds");
+			return;                                                           // (one gift a minute)
+		}
 	}
 
 	/** Now and then a Xen with a leader's nature and friends around starts a team of its own (an SMP thing). */
