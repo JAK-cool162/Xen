@@ -425,6 +425,8 @@ final class Goals {
 	// ------------------------------------------------------------------------------ exploring
 	private Vec3 exploreTo;
 	private long exploreSince, lookUntil, nextMineUnderground;
+	private long upBestAt, upAskedAt = -1000, upSaidAt = -1;
+	private int upBestY = Integer.MIN_VALUE;
 	private double heading = Double.NaN;
 
 	/**
@@ -548,7 +550,22 @@ final class Goals {
 					}
 				}
 				instant = "digging a way up to the surface";
-				return c.walkTo(new Vec3(feet.getX() + 0.5 + 3, top + 1, feet.getZ() + 0.5));   // a staircase up
+				Vec3 up = new Vec3(feet.getX() + 0.5 + 3, top + 1, feet.getZ() + 0.5);
+				if (now - upAskedAt > 100 || feet.getY() > upBestY) {                  // (higher than it's been: on its way)
+					upBestY = feet.getY();
+					upBestAt = now;
+				}
+				upAskedAt = now;
+				if (now - upBestAt > 20 * 30) {                                       // half a minute and not a block higher: its legs' way isn't working, the old way, straight at it digging a staircase (Ivy stood eight minutes at y -7, a new way planned every tick and none walked)
+					if (upSaidAt != upBestAt) {
+						upSaidAt = upBestAt;
+						c.journal("way", "half a minute and no higher: digs its own staircase up");
+					}
+					c.walker.stop();
+					Action dig = c.digToward(up);
+					if (dig != null) return dig;
+				}
+				return c.walkTo(up);   // a staircase up
 			}
 		}
 		if (now < lookUntil) {                                                  // a look around, like a player taking in the view
