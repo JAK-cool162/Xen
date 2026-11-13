@@ -1599,6 +1599,7 @@ public class XenMod implements ModInitializer {
 			});
 			part.accept("home", () -> { if (known.has("homeBuild")) c.builder.loadHome(known.getAsJsonObject("homeBuild")); });
 			part.accept("unfinished house", () -> { if (known.has("unfinishedBuild")) c.builder.loadUnfinished(known.getAsJsonObject("unfinishedBuild")); });
+			part.accept("what it was doing", () -> { if (known.has("btbDoing")) c.btb.load(known.getAsJsonObject("btbDoing")); });
 			part.accept("lost things", () -> { if (known.has("lostThings")) c.loadLost(known.getAsJsonObject("lostThings"), server.overworld().getGameTime()); });
 			part.accept("mine", () -> {
 				if (!known.has("mine")) return;

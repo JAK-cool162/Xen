@@ -289,7 +289,12 @@ final class Btb {
 		if (c.goals.home != null && !o.night && o.overworld && (c.builder.canUpgrade() || c.builder.canExtendBase()))
 			out.add(new Option(Task.HOME, goal.equals("world") ? 2.5f : 0.8f, "nothing pressing: its base better or bigger (a house's next stage, a new room under the ground)"));   // (a home once had, never touched again: no upgrade ever ran)
 		out.add(new Option(Task.EXPLORE, 0.5f, "nothing pressing: a look around"));
-		if (resumeTask != null) {                                                // what it dropped for its life: back to it, now it's safe
+		if (resumeTask != null) {                                                // what it dropped for its life (or was on at a restart): back to it, now it's safe
+			if (resumeAfterLoad) {
+				resumeAfterLoad = false;
+				resumeFrom = now();
+				c.journal("thinks", "remembers what it was on before: " + resumeTask.name().toLowerCase(Locale.ROOT) + " (goal " + goal + ")");
+			}
 			if (now() - resumeFrom > 20 * 60 * 10) resumeTask = null;
 			else if (o.health >= 12 && o.danger < 2 && (o.meals > 0 || o.food >= 18) && !(o.night && o.overworld && !o.under && !o.sheltered)) {
 				Task back = resumeTask;
@@ -339,6 +344,34 @@ final class Btb {
 	/** What it dropped for its life, and when: once it's safe again (twelve health, no monsters on it), back to that first, within ten minutes. */
 	private Task resumeTask;
 	private long resumeFrom;
+
+	/** What it was on (or had dropped for its life) and its goal, kept with the world: a restart isn't a reason to forget them. Null: nothing worth keeping. */
+	com.google.gson.JsonObject json() {
+		Task keep = resumeTask != null ? resumeTask : task;
+		if (keep == Task.NONE || keep == Task.FOOD || keep == Task.SHELTER || keep == Task.SLEEP || keep == Task.EXPLORE) keep = null;
+		if (keep == null && goal.isEmpty()) return null;
+		var o = new com.google.gson.JsonObject();
+		if (keep != null) o.addProperty("task", keep.name());
+		if (!goal.isEmpty()) o.addProperty("goal", goal);
+		return o;
+	}
+
+	/** Back from a restart: what it was on comes first again once it's safe (as after an interrupt), and its goal is the one it had. */
+	void load(com.google.gson.JsonObject o) {
+		try {
+			if (o.has("goal")) goal = o.get("goal").getAsString();
+			if (o.has("task")) {
+				resumeTask = Task.valueOf(o.get("task").getAsString());
+				resumeFrom = c.player != null ? c.player.level().getGameTime() : 0;
+				resumeAfterLoad = true;
+			}
+		} catch (RuntimeException e) {
+			resumeTask = null;
+		}
+	}
+
+	/** Its resume came from a restart: the clock starts when it first thinks (the game time isn't known at load). */
+	private boolean resumeAfterLoad;
 
 	/** When it last dropped its task for food, hurt (not every tick: once a minute at most). */
 	private long hurtDropAt = -1_000_000;
