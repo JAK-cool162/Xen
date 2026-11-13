@@ -281,12 +281,13 @@ final class Btb {
 	 * (Mining goes on: it's under the ground in a few steps.) True if it dropped its task.
 	 */
 	boolean nightfall() {
+		boolean ownErrand = task == Task.NONE && c.chores.busy() && (c.chores.kind == Chores.Kind.HUNT || c.chores.kind == Chores.Kind.GATHER);   // (a hunt its plans started, no task of its brain's: Cid hunted a sheep for a bed's wool in the dark, shot from eleven health to none)
 		if (task != Task.WOOD && task != Task.STONE && task != Task.FOOD && task != Task.SMELT && task != Task.TABLE && task != Task.HOME && task != Task.TOOLS && task != Task.VISIT
-				|| now() - nightCheckedAt < 40) return false;                           // (any errand up top: Bob went on to his furnace at night, three zombies, dead)
+				&& !ownErrand || now() - nightCheckedAt < 40) return false;             // (any errand up top: Bob went on to his furnace at night, three zombies, dead)
 		nightCheckedAt = now();
 		var p = c.player;
 		if (p.level().dimension() != Level.OVERWORLD || !c.goals.sunDown() || MindSense.enclosed(p) || !p.level().canSeeSky(p.blockPosition().above())) return false;
-		c.journal("does", "btb: the sun's going down: drops " + task.name().toLowerCase(Locale.ROOT) + " for a roof");
+		c.journal("does", "btb: the sun's going down: drops " + (ownErrand ? c.chores.kind.name().toLowerCase(Locale.ROOT) : task.name().toLowerCase(Locale.ROOT)) + " for a roof");
 		if (c.chores.busy()) c.chores.cancel();
 		if (c.nether.busy()) c.nether.cancel();
 		if (c.builder.busy()) c.builder.cancel();
