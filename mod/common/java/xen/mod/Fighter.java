@@ -752,7 +752,17 @@ final class Fighter {
 		}
 		LivingEntity shooter = shooterInSight();                                // one shooting at it: a hole is no cover from arrows (it was shot digging, every time)
 		if (shooter != null) {
-			if (h.hasWeapon() && p.getHealth() >= 6 && c.reachable(shooter)) {
+			boolean rush;                                                        // in at it, or out of its sight: chosen, then kept to three seconds (Cid turned between the two several times a second, in diamond armor, till a skeleton killed him)
+			int tick = p.tickCount;
+			if (shooter == tacticFoe && tick < tacticUntil) rush = tacticRush && p.getHealth() >= 4;
+			else {
+				float enough = p.getArmorValue() >= 15 ? 4 : 6;                    // (diamond armor: an arrow's a scratch)
+				rush = h.hasWeapon() && p.getHealth() >= enough && c.reachable(shooter);
+				tacticFoe = shooter;
+				tacticRush = rush;
+				tacticUntil = tick + 60;
+			}
+			if (rush) {
 				noRun = true;                                                    // (close in on it, shield up, side to side: its usual way with a skeleton)
 				return null;
 			}
@@ -1163,6 +1173,11 @@ final class Fighter {
 
 	/** Till when it keeps going for its cover with the shooter out of sight (no flip-flopping between cover and away). */
 	private int coverUntil;
+
+	/** Against a shooter: in at it or out of its sight, and till when it keeps to that. */
+	private LivingEntity tacticFoe;
+	private boolean tacticRush;
+	private int tacticUntil;
 
 	private Action takeCover(LivingEntity shooter) {
 		XenPlayer p = c.player;
