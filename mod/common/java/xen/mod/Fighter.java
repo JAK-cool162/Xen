@@ -1558,7 +1558,7 @@ final class Fighter {
 	/** The start of a swing: decide how to play this one. */
 	private void newSwing() {
 		goCrit = random.nextFloat() < gene(0);
-		useShield = random.nextFloat() < gene(9) || unsure();                   // (not sure what's coming: defense first, the shield up between hits)
+		useShield = random.nextFloat() < Math.max(0.7f, gene(9)) || unsure() || c.player != null && c.player.getHealth() < 14;   // (the shield up between hits, most swings, and every one once it's hurt: not sure what's coming, defense first)
 		selecting = random.nextFloat() < gene(7);
 		waited = 0;
 	}
