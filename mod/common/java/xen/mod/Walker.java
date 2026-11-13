@@ -855,7 +855,7 @@ final class Walker {
 					}
 				}
 				// or a block down to walk on (sneaking at the edge, placed against the side of the one it stands on)
-				if (blocks > 0 && passable(q.below()) && !water(q.below()) && (fullBlock(p.below()) || placedFloor) && !lava(q.below().below())) {
+				if (blocks > 0 && passable(q.below()) && !water(q.below()) && (fullBlock(p.below()) || placedFloor) && !lavaInDrop(q.below())) {   // (lava anywhere down the drop: a bridge block that doesn't take is a fall into it; Cid bridged over air over a lava pool, the block didn't take, dead in three seconds in diamond armor)
 					add(Kind.BRIDGE, p, q, SNEAK + PLACE + worth + danger, List.of());
 				}
 			}
@@ -1120,6 +1120,17 @@ final class Walker {
 
 	private boolean lava(BlockPos p) {
 		return (cell(p) & K_LAVA) != 0;
+	}
+
+	/** Lava down the drop under this (through the air, eight blocks at most, to what it would land on). */
+	private boolean lavaInDrop(BlockPos from) {
+		BlockPos q = from;
+		for (int k = 0; k < 8; k++) {
+			if (lava(q)) return true;
+			if (!passable(q)) return false;
+			q = q.below();
+		}
+		return false;
 	}
 
 	private boolean climbable(BlockPos p) {
