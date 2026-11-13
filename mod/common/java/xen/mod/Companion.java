@@ -2909,7 +2909,9 @@ public final class Companion {
 	private void askFriendAlong(double far) {
 		if (inArena || minion || lostAt == null || far < 6) return;
 		for (Companion o : mod.companions) {
-			if (o == this || o.player == null || !o.player.isAlive() || o.player.level() != player.level() || o.player.distanceTo(player) > 64) continue;
+			if (o == this || o.player == null || !o.player.isAlive() || o.player.level() != player.level()) continue;
+			boolean mate = o.player.isAlliedTo(player), byThings = o.player.blockPosition().closerThan(lostAt, 160);
+			if (o.player.distanceTo(player) > (mate ? 400 : 64) && !byThings) continue;   // (its team from anywhere close enough to come, anyone near where its things lie: it wakes at the world's spawn, far from all of them, and never asked one)
 			if (o.inArena || o.minion || o.lostAt != null || o.escortFor != null || o.fightingNow()) continue;
 			float t = o.trust(player.getUUID());
 			if (!o.player.isAlliedTo(player) && t < 0.4f) continue;
