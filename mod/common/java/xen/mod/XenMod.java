@@ -1807,6 +1807,7 @@ public class XenMod implements ModInitializer {
 			best.chatter(needy.name + ", you lost your gear? Hold on, I've got " + n + " diamonds for you.", true);
 			best.journal("does", "shares " + n + " diamonds with " + needy.name + " (" + pieces + " of 6 of its diamond gear, " + has + " diamonds; " + Math.round(bestD) + " blocks off)");
 			needy.journal("thinks", best.name + " is bringing it " + n + " diamonds");
+			needy.expectGift(best);
 			return;                                                           // (one gift a minute)
 		}
 	}

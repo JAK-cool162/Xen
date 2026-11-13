@@ -1257,6 +1257,8 @@ public final class Companion {
 		}
 		Action tidyUp = tidy.next();                                   // the pillar it climbed: down again, like most players
 		if (tidyUp != null) return tidyUp;
+		Action gift = awaitGift();                                     // someone's bringing it something: it stays put, or meets them
+		if (gift != null) return gift;
 		Action back = backForMyThings();                              // it died: its things are lying where it fell
 		if (back != null) return back;
 		Action spares = mode == Mode.FREE || builder.busy() ? prepared.next() : null;   // they're gone: its spares from the chest at home (building its own: then too)
@@ -2576,6 +2578,34 @@ public final class Companion {
 					|| k.equals("blaze") || k.equals("evoker") || k.equals("vindicator") || k.equals("ravager")) return m;
 		}
 		return null;
+	}
+
+	/** Who's bringing it a gift (its diamonds back on its feet), and until when it waits for them. */
+	private Companion giftFrom;
+	private long giftUntil;
+
+	void expectGift(Companion from) {
+		giftFrom = from;
+		giftUntil = player.level().getGameTime() + 20 * 90;
+	}
+
+	/** A gift on its way: it walks to meet them, and stands still once they're close (Hal wandered off from Ann's six diamonds; she never got within reach). */
+	private Action awaitGift() {
+		if (giftFrom == null) return null;
+		var from = giftFrom.player();
+		if (from == null || player.level().getGameTime() > giftUntil || giftFrom.chores.kind != Chores.Kind.GIVE || from.level() != player.level()) {
+			giftFrom = null;
+			return null;
+		}
+		double d = from.distanceTo(player);
+		if (d > 6) {
+			goals.instant = "meeting " + giftFrom.name + ", who's bringing it something";
+			return walkTo(from.position());
+		}
+		goals.instant = "waiting for " + giftFrom.name + "'s gift";
+		hands.face(from.getEyePosition());
+		acted = true;
+		return Action.IDLE;
 	}
 
 	private Action backForMyThings() {
