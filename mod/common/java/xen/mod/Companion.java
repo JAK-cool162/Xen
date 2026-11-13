@@ -458,6 +458,10 @@ public final class Companion {
 		}
 		if (hands.busy() && !((hurtNow || fighting) && hands.interruptible())) return;   // being hit cuts mining and walking short
 		if (player.tickCount % 40 == 0) watched = watchedByAPlayer();
+		if (player.tickCount % 200 == 0 && mode == Mode.STAY && btb.on() && !minion && noRealPlayers()) {   // told to stay (or it said it would) and nobody here to stay for: its own things again (Cid stayed by a hole for an hour, a stone pickaxe, no diamonds)
+			mode = Mode.FREE;
+			journal("thinks", "nobody here to stay for: back to its own things");
+		}
 		int every = Math.max(1, mod.config.decisionTicks / 5) * (watched || inArena || hurtNow ? 1 : 3);   // far from any player: it thinks less often
 		if (++decisions % every != 0 && !fighting) return;   // in a fight, every tick
 		t0 = Perf.now();
@@ -648,6 +652,12 @@ public final class Companion {
 	 */
 	/** Is a real player (not a Xen) within 96 blocks? If not, it lives a bit slower (less work for the server). */
 	boolean watched = true;
+
+	/** No real player (only Xens) on the server. */
+	private boolean noRealPlayers() {
+		for (ServerPlayer p : server.getPlayerList().getPlayers()) if (!(p instanceof XenPlayer)) return false;
+		return true;
+	}
 
 	private boolean watchedByAPlayer() {
 		for (ServerPlayer p : server.getPlayerList().getPlayers()) {
