@@ -84,6 +84,10 @@ final class Xenfish {
 		int got = c.items().getOrDefault("obsidian", 0) - obsidianThen;
 		boolean died = c.genDeaths > deathsThen;
 		boolean worked = got > 0 && !died;
+		if (seconds < 15 && !worked && !died) {                                  // (begun and dropped the same moment, its brain on to something else: no try at all, not one that failed; Ann's flips between her table and a look round counted thirty)
+			trying = null;
+			return;
+		}
 		c.mod.btbLearner.record(trying, worked, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "xenfish: obsidian by %s %s (%d got, %.0f s%s)", trying.substring(trying.indexOf(':') + 1),
 				worked ? "worked" : "came to nothing", Math.max(0, got), seconds, died ? ", died" : ""));
