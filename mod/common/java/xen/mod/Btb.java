@@ -328,6 +328,7 @@ final class Btb {
 		if (noFood) out.replaceAll(op -> op.task == Task.FOOD ? new Option(Task.FOOD, 4.8f, "nothing to eat in its bag") : op);
 		out.removeIf(op -> switch (op.task) {
 			case COAL, IRON, DIAMONDS -> hurt || noFood;
+			case PEARLS, BLAZE -> o.health < 16 || noFood;                         // (a fight it picks: well and fed only; Bob at three health, nothing to eat, after an enderman)
 			case EXPLORE, HOME, WOOD, STONE -> o.danger >= 1 && hurt;
 			default -> false;
 		});
