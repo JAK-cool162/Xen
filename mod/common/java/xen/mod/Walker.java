@@ -678,6 +678,9 @@ final class Walker {
 		partial = false;
 		stalled = false;
 		if (!passable(start) && passable(start.above())) start = start.above();   // on a slab, a path, mud: its feet are a little higher
+		else if (level.getFluidState(start).isEmpty() && level.getFluidState(start.below()).is(net.minecraft.tags.FluidTags.WATER)
+				&& level.getBlockState(start.below()).getCollisionShape(level, start.below()).isEmpty())
+			start = start.below();                                               // bobbing up at the top of the water: from the water it's in, not the air over it (Ann, two minutes at a lake's edge, "no way" every other tick, gave up on her things)
 		// (stone, with what's in its hand: a little over, so it keeps on down one staircase rather than start a dozen)
 		float stone = dig ? c.player.isCreative() ? 0.5f : c.hands.digSpeed(Blocks.STONE.defaultBlockState(), level, start) : 0;
 		rock = stone > 1f / 200 ? Math.max(0, 1.2 * (WALK + 2 + 3 * (1 / stone + 12)) - 2 * Goal.PER_BLOCK) : 0;
