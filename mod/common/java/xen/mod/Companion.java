@@ -5210,9 +5210,21 @@ public final class Companion {
 			String said = banter.event("died", java.util.Map.of("mob", new BanterSelf().death().isEmpty() ? "that" : new BanterSelf().death()));   // ("bruh", "i died to a skeleton lol")
 			if (said != null) chatter(said, false);
 		}
-		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
-				|| how.contains("drown") || player.isUnderWater();                   // (under water: not worth drowning again for)
+		boolean valuableNow = lastItems.keySet().stream().anyMatch(k -> k.startsWith("diamond") || k.startsWith("netherite") || k.equals("obsidian")
+				|| k.equals("enchanting_table") || k.equals("lapis_lazuli")) || diamondsCarried() > 0;
 		BlockPos here = player.blockPosition().immutable();
+		boolean shallow = player.isUnderWater() && player.level().canSeeSky(here) && !player.level().getFluidState(here.below(3)).is(net.minecraft.tags.FluidTags.WATER);   // (under a little water in the open: a dive for it, not a drowning)
+		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
+				|| how.contains("drown") && !(valuableNow && shallow) || player.isUnderWater() && !(valuableNow && shallow);   // (deep under water: not worth drowning again for; a diamond kit under a few blocks of it is: Jay's, by a drowned at the shore)
+		if (!inArena && !hardcore() && lostAt != null && lostValuable && !valuableNow && player.level().getGameTime() < lostUntil && lostDimension == player.level().dimension()) {
+			journal("thinks", "died with nothing on it: its diamonds and gear still lie at " + lostAt.toShortString() + ", those it goes back for");   // (a second death, naked, on the way: not the empty one over the full one; Jay lost his enchanted diamonds that way)
+			saidGoingBack = false;
+			aloneUntil = 0;
+			helper = null;
+			journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
+			respawnIn = 60;
+			return;
+		}
 		boolean again = lostAt != null && lostDimension == player.level().dimension() && lostAt.closerThan(here, 16)
 				&& player.level().getGameTime() < lostUntil && (source.getEntity() instanceof Enemy || how.contains("fall"));
 		if (again && !inArena) {                                      // killed going back to where it died: what's there wins (a player lets it go too)
@@ -5220,8 +5232,7 @@ public final class Companion {
 			journal("does", "gives up on its things (died there again)");
 		}
 		lostAt = gone || inArena || again ? null : here;              // its things are lying there: back for them after
-		lostValuable = lastItems.keySet().stream().anyMatch(k -> k.startsWith("diamond") || k.startsWith("netherite") || k.equals("obsidian")
-				|| k.equals("enchanting_table") || k.equals("lapis_lazuli")) || diamondsCarried() > 0;   // (what took hours to get lies there: it runs for it, no getting ready first)
+		lostValuable = valuableNow;                                   // (what took hours to get lies there: it runs for it, no getting ready first)
 		saidGoingBack = false;
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
