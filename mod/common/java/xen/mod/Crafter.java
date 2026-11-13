@@ -69,6 +69,16 @@ final class Crafter {
 		return best;
 	}
 
+	/** Diamond armor it has the diamonds for and isn't wearing yet. */
+	boolean armorToMake() {
+		return pickTier() >= 4 && diamondPiece(count(n -> n.equals("diamond")), 0) != null;
+	}
+
+	/** Planks' worth of wood it carries (a log is four). */
+	int woodCount() {
+		return wood();
+	}
+
 	/** The next diamond armor piece it isn't wearing yet that it has the diamonds for (keeping some back), or null. */
 	private String diamondPiece(int diamonds, int keep) {
 		String[] pieces = {"chestplate", "leggings", "helmet", "boots"};

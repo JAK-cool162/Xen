@@ -204,6 +204,8 @@ final class Btb {
 		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
 		if (!smelter && sideWork && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
+		if (o.tier >= 4 && !o.night && c.crafter.armorToMake() && !c.crafter.has("crafting_table") && c.crafter.woodCount() < 4)   // (Eve: thirty-four diamonds in her bag, iron on her back, not a log for a crafting table, for ten minutes)
+			out.add(new Option(Task.WOOD, 4.7f, "diamonds for armor in its bag, and no table or wood to make it on"));
 		if (o.tier == 0) out.add(new Option(Task.WOOD, 4, "wood for a table and a pickaxe"));
 		else if (c.crafter.shortOfWood()) out.add(new Option(Task.WOOD, 4.6f, "wood for sticks: the makings of its next pickaxe are in its bag"));
 		else if (o.tier >= 2 && o.overworld && !o.under && !o.night && goal.equals("gear") && woodInBag() < 8 && now() - packedWoodAt > 20 * 60 * 10)

@@ -458,7 +458,7 @@ final class Habits {
 		int free = 0;
 		for (int i = 0; i < 36; i++) if (inv.getItem(i).isEmpty()) free++;
 		if (free >= 3) return;                                                          // room left: nothing to do (a couple of slots kept free: a full bag can't take the crafting table it makes, the armor it takes off to enchant, the obsidian it mines; all ten Xens had 34 to 36 of 36)
-		if (c.personality.sin(xen.mod.core.Sins.GREED) > 0.7f) return;                    // (a hoarder keeps it all)
+		if (c.personality.sin(xen.mod.core.Sins.GREED) > 0.7f && free > 0) return;        // (a hoarder keeps it all, till there's no room at all: Eve, eight stacks of cobblestone and seven of deepslate, no room for a log for the table her diamond armor needed)
 		java.util.Map<String, Integer> have = new java.util.HashMap<>();
 		for (int i = 0; i < 36; i++) {
 			ItemStack s = inv.getItem(i);
