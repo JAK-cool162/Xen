@@ -296,7 +296,8 @@ final class Choices {
 	 */
 	String unsafeToBreak(BlockPos q) {
 		ServerLevel level = (ServerLevel) c.player.level();
-		if (Chores.lavaBehind(level, q)) return "lava behind it";
+		boolean quenched = level.getBlockState(q).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) && level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER);
+		if (Chores.lavaBehind(level, q) && !quenched) return "lava behind it";   // (obsidian under water: the water's in the hole first, far quicker than lava, and turns the lava by it to stone; its chore said yes and this said no, every three seconds)
 		if (!level.canSeeSky(q.above()) && waterBehind(level, q)) return "water behind it: it would flood the tunnel";   // (a flooded cave or an aquifer: mining into it drowns you)
 		BlockPos feet = c.player.blockPosition();
 		if (q.getX() == feet.getX() && q.getZ() == feet.getZ() && q.getY() == feet.getY() - 1) {

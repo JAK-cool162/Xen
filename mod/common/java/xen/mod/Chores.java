@@ -3297,6 +3297,11 @@ final class Chores {
 				return giveUp(b);
 			}
 		}
+		String no = c.choices.unsafeToBreak(b);
+		if (no != null) {                                               // its doubter says no to this one (lava behind it, a drop under it): another, not asking again and again
+			c.journal("does", "leaves the block at " + b.toShortString() + " (" + no + ")");
+			return giveUp(b);
+		}
 		if (!c.hands.mine(b)) {
 			if (b.equals(c.hands.cantMine)) giveUp(b);                    // it can't break that: another one, not waiting forever
 			return null;
