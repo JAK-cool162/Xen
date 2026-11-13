@@ -528,7 +528,8 @@ final class Btb {
 				|| task == Task.BLAZE && rods() > rodsAt || task == Task.PEARLS && pearls() > pearlsAt) && !dropped;
 		dropped = false;
 		if (task == Task.TABLE && c.xenfish.trying() != null) c.xenfish.settle();   // (the way it was on for its obsidian: how it went, to its book)
-		c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
+		boolean blip = seconds < 10 && !died && gained == 0 && o.tier == tierAt && hurtSince == 0;   // (on and off in a moment, nothing happened: no lesson; the enchanting loop wrote 849 of these, two seconds each, all "worked")
+		if (!blip) c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
 		c.journal("learns", String.format(Locale.ROOT, "btb: %s %s (%.0f s, reward %+.1f%s)", task.name().toLowerCase(Locale.ROOT),
 				ok ? "worked" : "came to nothing", seconds, reward, died ? ", died" : ""));
 		boolean mining = task == Task.IRON || task == Task.COAL || task == Task.DIAMONDS;
