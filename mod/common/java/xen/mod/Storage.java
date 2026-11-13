@@ -52,6 +52,7 @@ final class Storage {
 		job = null;
 		chest = null;
 		stashing = false;
+		stashWhat = null;
 		if (c.player != null && c.player.containerMenu != c.player.inventoryMenu) c.player.closeContainer();
 	}
 
@@ -107,6 +108,38 @@ final class Storage {
 			"gold_block", "iron_block", "heart_of_the_sea", "nautilus_shell", "trident", "elytra");
 	/** Stashing: the deposit leaves valuables and spare tools, and keeps the everyday things on it. */
 	private boolean stashing;
+	/** What it leaves, stashing (null: the valuables and spare tools); a stack's item and count. */
+	private java.util.function.BiPredicate<String, Integer> stashWhat;
+
+	/**
+	 * Its spares into the chest at home, if one is within this far and it carries any of what these say to leave
+	 * (whole stacks: a stack's item, its count). False: none to leave, or no chest.
+	 */
+	boolean stash(int far, java.util.function.BiPredicate<String, Integer> leave) {
+		if (c.player == null || busy()) return false;
+		BlockPos at = homeChest();
+		if (at == null || at.distSqr(c.player.blockPosition()) > (long) far * far) return false;
+		var inv = c.player.getInventory();
+		java.util.List<ItemStack> bag = new java.util.ArrayList<>();
+		for (int i = 0; i < 36; i++) bag.add(inv.getItem(i));
+		boolean any = !spares(bag).isEmpty();
+		for (int i = 0; i < 36 && !any; i++) {
+			ItemStack s = inv.getItem(i);
+			if (!s.isEmpty()) any = leave.test(c.itemKey(s), s.getCount());
+		}
+		if (!any) return false;
+		begin(Job.STORE);
+		chest = at;
+		until = now() + 20 * 90;
+		stashing = true;
+		stashWhat = leave;
+		return true;
+	}
+
+	/** The chest at home (its own or its team's), or null. */
+	BlockPos chestAtHome() {
+		return c.player == null ? null : homeChest();
+	}
 
 	/** Leave its valuables and spare tools in the chest at home (not far) before a risky trip. False: nothing to leave, or no chest. */
 	boolean stash() {
@@ -281,6 +314,7 @@ final class Storage {
 		job = null;
 		if (was == Job.STORE && !stashing) c.chatter(c.pick3("All put away.", "Stored my stuff in the chest.", "There, the chest has it."), false);
 		stashing = false;
+		stashWhat = null;
 		if (was == Job.TAKE) {
 			int got = c.items().getOrDefault(takeKey, 0) - had;
 			c.chatter(got > 0 ? "Got " + got + " " + takeKey.replace('_', ' ') + " from the chest." : "The chest didn't have it after all.", false);
@@ -299,7 +333,8 @@ final class Storage {
 			if (s.isEmpty()) continue;
 			String key = c.itemKey(s);
 			if (stashing) {                                                        // before a risky trip: the valuables and spares, nothing else
-				boolean leave = STASH.contains(key) || spare.contains(i - size) || key.equals("iron_ingot") && (iron += s.getCount()) > 10;
+				boolean leave = stashWhat != null ? stashWhat.test(key, s.getCount()) || spare.contains(i - size)
+						: STASH.contains(key) || spare.contains(i - size) || key.equals("iron_ingot") && (iron += s.getCount()) > 10;
 				if (!leave) continue;
 				Compat.click(menu, i, true, c.player);
 				if (menu.getSlot(i).getItem().isEmpty()) stored++;

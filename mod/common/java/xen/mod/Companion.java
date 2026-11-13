@@ -1279,6 +1279,8 @@ public final class Companion {
 		if (water != null) return water;
 		Action bed = bedtime();                                       // night, and a bed at home: it sleeps, like a player
 		if (bed != null) return bed;
+		Action spawnBed = spawnBedAtHome();                           // at home in the day: its bed there, clicked (dead anywhere near, it wakes at home, by its chest)
+		if (spawnBed != null) return spawnBed;
 		Action light = lightUp();                                     // in a dark cave or tunnel: a torch, like a player
 		if (light != null) return light;
 		if (mode == Mode.FOLLOW) watchLeaderMoving();
@@ -2341,6 +2343,7 @@ public final class Companion {
 			if (player.getEyePosition().distanceTo(Vec3.atCenterOf(portalBed)) > player.blockInteractionRange() - 0.5) return walkTo(Vec3.atBottomCenterOf(portalBed));
 			hands.use(portalBed);                                              // (its spawn: here; it's day, so no sleep, just the spawn)
 			portalBedSet = true;
+			homeBedSet = false;                                                // (its spawn is by the portal now: at home again, a click)
 			journal("does", "sets its spawn by the Nether portal (its bed at " + portalBed.toShortString() + "): if it dies over there, it's back here");
 			chatter(pick3("Bed by the portal. Just in case.", "Spawn set. Now the Nether.", "If I don't come back... I'll be right here."), false);
 			acted = true;
@@ -2359,6 +2362,63 @@ public final class Companion {
 		if (room == null || !hands.placeItem(room.foot(), bed, room.foot().below(), net.minecraft.core.Direction.UP, room.facing())) return null;
 		portalBed = room.foot();
 		portalBedSet = false;
+		acted = true;
+		return Action.PLACE;
+	}
+
+	/** Its bed at home, and whether it's its spawn now (a night in another bed moves its spawn there). */
+	private BlockPos homeBed;
+	private boolean homeBedSet;
+	private long homeBedTriedAt = -100_000;
+
+	/**
+	 * At home, by day: a bed in its base clicked (one there, or its own put down), as players do so a death costs a
+	 * short walk, not one from the world's spawn hundreds of blocks off (Ann woke 273 blocks from her things, Jay at night
+	 * with nothing, and died again within the minute). Null: nothing to do about it now.
+	 */
+	private Action spawnBedAtHome() {
+		var level = (ServerLevel) player.level();
+		BlockPos home = goals.home;
+		if (home == null || level.dimension() != net.minecraft.world.level.Level.OVERWORLD || fighting || player.isSleeping() || mode == Mode.FOLLOW
+				|| builder.busy() || storage.busy() || player.distanceToSqr(Vec3.atCenterOf(home)) > 20 * 20 || player.isInWater()) return null;
+		long now = level.getGameTime();
+		boolean bedThere = homeBed != null && level.getBlockState(homeBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock;
+		if (bedThere && homeBedSet) return null;
+		if (!bedThere) {
+			homeBed = null;
+			if (now - homeBedTriedAt < 20 * 30) return null;
+			for (BlockPos q : BlockPos.betweenClosed(home.offset(-7, -3, -7), home.offset(7, 3, 7)))
+				if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {
+					homeBed = q.immutable();
+					homeBedSet = false;
+					bedThere = true;
+					break;
+				}
+		}
+		if (bedThere) {
+			if (now - homeBedTriedAt < 20 * 10) return null;
+			if (!hands.canClick(homeBed)) return walkTo(Vec3.atBottomCenterOf(homeBed));
+			homeBedTriedAt = now;
+			hands.stop();
+			hands.use(homeBed);                                               // (by day a click sets the spawn; by night it lies down, which does too)
+			homeBedSet = true;
+			journal("does", "sets its spawn at home (its bed at " + homeBed.toShortString() + "): dead near here, it wakes here");
+			chatter(pick3("Spawn set at home.", "Bed's clicked. If I die, I'm back here.", "There. Home is where I respawn."), false);
+			acted = true;
+			return Action.PLACE;
+		}
+		java.util.function.Predicate<net.minecraft.world.item.ItemStack> bed = st -> BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().endsWith("_bed");
+		boolean has = false;
+		for (int i = 0; i < 36 && !has; i++) has = bed.test(player.getInventory().getItem(i));
+		if (!has || chores.busy() && !chores.own || now - homeBedTriedAt < 20 * 60) return null;
+		if (player.distanceToSqr(Vec3.atCenterOf(home)) > 4 * 4) return walkTo(Goal.near(home, 3));
+		homeBedTriedAt = now;
+		BedRoom room = bedRoom();
+		if (room == null || !hands.placeItem(room.foot(), bed, room.foot().below(), net.minecraft.core.Direction.UP, room.facing())) return null;
+		homeBed = room.foot();
+		homeBedSet = false;
+		homeBedTriedAt = now - 20 * 10;                                       // (clicked right after)
+		journal("does", "puts its bed down at home (" + homeBed.toShortString() + ") for its spawn");
 		acted = true;
 		return Action.PLACE;
 	}
@@ -2465,6 +2525,7 @@ public final class Companion {
 		acted = true;
 		if (player.isSleeping()) {
 			bedClicks = 0;
+			if (!bed.equals(homeBed)) homeBedSet = false;                    // (its spawn's here tonight: at home again tomorrow, a click)
 			chatter(pick3("Good night!", "Time to sleep. Night night.", "Zzz..."), false);
 			return Action.IDLE;
 		}

@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -127,12 +127,41 @@ final class Btb {
 		String was = goal;
 		boolean geared = o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted();   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
-		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
+		boolean early = !geared && c.goals.home == null && c.mod.config.wants && o.tier >= 3 && o.overworld && earlyBase();
+		if (early) goal = "home";                                                // an iron pickaxe: a base first, a small one (a chest for its diamonds and ore, a table, a furnace; its bed for a spawn): a death after costs it only what it carries, and it wakes by it
+		else if (!geared) goal = "gear";                                         // tools, iron, diamonds, armor: first, always
 		else if (!tabled || !enchantedGear()) goal = "enchant";                 // (its tools and its armor enchanted, both)
 		else if (c.goals.home == null && c.mod.config.wants) goal = "home";      // a base before the Nether: a chest for what it has (a death there costs it everything it carries), its bed for a spawn, its table set up
 		else if (netherNeeds()) goal = "nether";                                // (blaze rods and ender pearls: the eyes for the End; no giving up on a goal, it stays on it till it's done)
 		else goal = "world";
 		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
+	}
+
+	/** When it first went for an early base this time (ten minutes for it; then its gear, and another go in half an hour). */
+	private long earlyBaseFrom = -1_000_000;
+
+	private boolean earlyBase() {
+		long t = now();
+		if (t - earlyBaseFrom > 20 * 60 * 40) earlyBaseFrom = t;
+		return t - earlyBaseFrom < 20 * 60 * 10;
+	}
+
+	/** Its spares into its chest at home (not for days: once in ten minutes at most), and its diamonds back out after a death. */
+	private long stashAt = -1_000_000;
+	private boolean takingBack;
+
+	/** What it leaves in the chest: whole stacks of what it has no use for on it now. */
+	private boolean leaves(String key, int count) {
+		boolean done = c.goals.diamondsWanted() == 0;                              // (all its diamond gear and its table: diamonds are spares now)
+		return switch (key) {
+			case "diamond", "diamond_block" -> done;
+			case "raw_iron", "raw_copper", "copper_ingot", "iron_ore", "deepslate_iron_ore", "copper_ore" -> count >= 8 && c.crafter.pickTier() >= 4;
+			case "iron_ingot" -> count >= 16;
+			case "book" -> c.enchanter.table() != null || c.crafter.has("enchanting_table");
+			case "gold_ingot", "raw_gold", "gold_ore", "deepslate_gold_ore", "emerald", "enchanted_book", "name_tag", "saddle", "diamond_ore", "deepslate_diamond_ore",
+					"redstone", "quartz", "amethyst_shard", "emerald_ore" -> true;
+			default -> false;
+		};
 	}
 
 	private boolean goalDone(Obs o) {
@@ -201,7 +230,8 @@ final class Btb {
 		if (o.raw >= 3 && (o.fuel > 0 || o.logs > 0 || smelter) && (canFurnace || smelter) && !tabling && ironUse)   // (making its table: none at all; a lapis trip that came to nothing had it smelting thirty-one iron for minutes, its table waiting)
 			out.add(new Option(Task.SMELT, goal.equals("gear") && pickFine ? 3.85f : 4, smelter ? "raw iron to drop off at its smelter" : "raw iron to smelt"));
 		else if (smelter && c.chores.droppedRaw > 0 && now() - c.chores.droppedAt > 20 * 120) out.add(new Option(Task.SMELT, 3.7f, "its smelter's ingots to take out"));
-		boolean sideWork = goal.equals("home") || goal.equals("world");       // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
+		boolean earlyHome = goal.equals("home") && c.goals.home == null && !(o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted());   // (its first base, before its diamonds: that, not an auto-smelter)
+		boolean sideWork = !earlyHome && (goal.equals("home") || goal.equals("world"));   // (an auto-smelter, a house: once its gear, its enchanting and the Nether are done, not in the middle of them)
 		if (!smelter && sideWork && o.tier >= 2 && o.iron + o.raw >= 12 && o.stone >= 16 && !o.night)
 			out.add(new Option(Task.SMELTER, 3.6f, "an auto-smelter: its ore dropped off, no waiting at a furnace"));
 		if (o.tier >= 4 && !o.night && c.crafter.armorToMake() && !c.crafter.has("crafting_table") && c.crafter.woodCount() < 4)   // (Eve: thirty-four diamonds in her bag, iron on her back, not a log for a crafting table, for ten minutes)
@@ -234,7 +264,12 @@ final class Btb {
 				out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
-		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
+		if (goal.equals("home") && !o.night) out.add(earlyHome ? new Option(Task.HOME, 3.7f, "an early base: a chest for its diamonds and ore, its bed for a spawn") : new Option(Task.HOME, 3, "a home"));
+		BlockPos chest = c.storage.chestAtHome();
+		if (chest != null && !o.night && o.overworld && now() - stashAt > 20 * 60 * 10 && !c.storage.busy() && chest.closerThan(c.player.blockPosition(), 48) && stashable())
+			out.add(new Option(Task.STASH, 3.3f, "its spares into its chest at home (a death costs it only what it carries)"));
+		if (chest != null && !o.night && o.overworld && o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0 && chest.closerThan(c.player.blockPosition(), 160))
+			out.add(new Option(Task.STASH, 4.1f, "its diamonds from its chest: for its gear"));
 		if (goal.equals("nether")) {
 			if (rods() < 12) out.add(new Option(Task.BLAZE, 3.6f, "blaze rods: a fortress in the Nether"));
 			if (pearls() < 12) out.add(new Option(Task.PEARLS, rods() < 12 ? 3.3f : 3.7f, "ender pearls: endermen"));
@@ -408,6 +443,21 @@ final class Btb {
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
+			case STASH -> {
+				stashAt = now();
+				if (o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0) {
+					String took = c.storage.take("diamond", Math.min(64, c.storage.inChests("diamond")));
+					if (took != null) {
+						c.journal("does", "goes to its chest for its diamonds (" + c.storage.inChests("diamond") + " in it)");
+						yield took;
+					}
+				}
+				if (c.storage.stash(48, this::leaves)) {
+					c.journal("does", "takes its spares to its chest at home (in case the worst happens)");
+					yield "You will leave your spares in the chest at home.";
+				}
+				yield "You have nothing to leave in your chest.";
+			}
 			case NONE -> null;
 		};
 	}
@@ -499,7 +549,8 @@ final class Btb {
 			return true;
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
-		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting());
+		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
+				|| task == Task.STASH && c.storage.busy());
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
@@ -514,6 +565,16 @@ final class Btb {
 	/** The task it last dropped as soon as it began, and how many times straight. */
 	private Task blipTask;
 	private int blips;
+
+	/** Something on it that goes in the chest. */
+	private boolean stashable() {
+		var inv = c.player.getInventory();
+		for (int i = 0; i < 36; i++) {
+			var st = inv.getItem(i);
+			if (!st.isEmpty() && leaves(c.itemKey(st), st.getCount())) return true;
+		}
+		return false;
+	}
 
 	/** Is this what its goal is waiting on (diamonds for its gear, the table and enchanting, blaze rods and pearls)? */
 	private boolean forGoal(Task t) {

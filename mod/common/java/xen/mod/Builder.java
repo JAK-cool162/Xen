@@ -451,6 +451,15 @@ final class Builder {
 		if (c.player != null && !c.player.isCreative() && c.crafter.pickTier() >= 2 && digsItsBase() && !hutBegun) {   // underground: a staircase down, a room in the stone (what a player with a pickaxe does first night)
 			BlockPos site = c.places.get("base site");
 			if (site != null && !site.closerThan(c.player.blockPosition(), 128)) site = null;   // (its spot from before, if it's still about: not a new hole each time the night stops it)
+			BlockPos village = site == null ? c.places.nearest("village") : null;
+			if (village != null && village.closerThan(c.player.blockPosition(), 160) && Places.dim(c.player.level()).equals("overworld")) {   // a village close by: its base at the village's edge (its golem about, its beds, its fields, folk to trade with)
+				net.minecraft.world.phys.Vec3 out = net.minecraft.world.phys.Vec3.atCenterOf(c.player.blockPosition()).subtract(net.minecraft.world.phys.Vec3.atCenterOf(village)).multiply(1, 0, 1);
+				if (out.lengthSqr() < 1) out = new net.minecraft.world.phys.Vec3(1, 0, 0);
+				out = out.normalize().scale(28);                                   // (out past its houses: not under someone's floor)
+				net.minecraft.world.phys.Vec3 top = XenMod.surface((ServerLevel) c.player.level(), (int) Math.floor(village.getX() + out.x), (int) Math.floor(village.getZ() + out.z));
+				site = top == null ? null : BlockPos.containing(top);                                                        // (on the ground there, not in a cave under it)
+				if (site != null) c.journal("thinks", "a village at " + village.toShortString() + ": its base at the village's edge, " + site.toShortString());
+			}
 			String dug = startNear("underground base", site);
 			if (dug.startsWith("You will")) {
 				if (site == null) c.places.remember("base site", c.player.blockPosition().immutable());
