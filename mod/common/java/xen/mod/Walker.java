@@ -451,6 +451,10 @@ final class Walker {
 		daringUntil = now() + ticks;
 	}
 
+	/** Since when its hands have held up its way, standing where. */
+	private long handsBusySince = -1;
+	private BlockPos handsBusyAt;
+
 	/** One step of a staircase up that way (dig over its head, and the two above the step, then up). */
 	Action stairsUp(Direction d) {
 		touched = true;
@@ -1245,7 +1249,18 @@ final class Walker {
 		if (WALK_DEBUG) XenMod.LOG.info("[walk] {} #{} {} {}->{} feet={} pos={} ground={} yaw={} zza={} v={}", c.name, index, m.kind(), m.from().toShortString(),
 				m.to().toShortString(), c.player.blockPosition().toShortString(), String.format("%.2f,%.2f,%.2f", c.player.getX(), c.player.getY(), c.player.getZ()),
 				c.player.onGround(), Math.round(c.player.getYRot()), c.player.zza, String.format("%.2f,%.2f", c.player.getDeltaMovement().x, c.player.getDeltaMovement().z));
-		if (c.hands.busy()) return false;                                   // its hands are at it (digging, a block down, a jump up)
+		if (c.hands.busy()) {                                               // its hands are at it (digging, a block down, a jump up)
+			if (handsBusySince < 0 || !c.player.blockPosition().equals(handsBusyAt)) {
+				handsBusySince = now();
+				handsBusyAt = c.player.blockPosition().immutable();
+			} else if (now() - handsBusySince > 200 && !c.hands.diggingNow()) {                     // ten seconds of its hands holding up its way, not a step taken: what they're at, and let go (Bob stood twenty minutes under a pillar he never jumped)
+				c.journal("debug", "its hands held up its way ten seconds (" + c.hands.state() + "): lets go");
+				c.hands.stop();
+				handsBusySince = -1;
+			}
+			return false;
+		}
+		handsBusySince = -1;
 		// out of the way first: dig what's in it (its hands do that; the walking waits)
 		for (BlockPos b : m.dig()) {
 			if (level.getBlockState(b).getCollisionShape(level, b).isEmpty()) continue;

@@ -258,6 +258,17 @@ public final class Hands {
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
 	}
 
+	/** Breaking a block right now (its dig has its own limits). */
+	boolean diggingNow() {
+		return digging != null;
+	}
+
+	/** What its hands are at, for its journal: the action, where, how far through. */
+	String state() {
+		return current + (aim != null ? " at " + aim.toShortString() : "") + (digging != null ? " digging " + digging.toShortString() : "") + " " + ticks + "/" + limit
+				+ (pillar ? ", pillaring" : "") + (turning ? ", turning" : "") + (flyTarget != null ? ", flying" : "");
+	}
+
 	/** When its last helping hand was (its ticks). */
 	private long helpAt = -1_000_000;
 
