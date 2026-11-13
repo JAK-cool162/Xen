@@ -328,6 +328,8 @@ final class Btb {
 			if (level.getFluidState(q).is(net.minecraft.tags.FluidTags.WATER)) return true;
 		return false;
 	}
+	/** When it last dropped its task for food, hurt (not every tick: once a minute at most). */
+	private long hurtDropAt = -1_000_000;
 	/** Its task was dropped (the night): not done, whatever it picked up meanwhile. */
 	private boolean dropped;
 	/** Mining trips in a row that came to nothing within a minute and a half (its mine is no good: water, a ravine). */
@@ -357,6 +359,16 @@ final class Btb {
 	Action next() {
 		if (c.player == null || !c.player.isAlive()) return null;
 		Obs o = observe();
+		if (task != Task.NONE && task != Task.FOOD && task != Task.SHELTER && task != Task.SLEEP && task != Task.STASH && o.health <= 8 && o.meals == 0 && o.food < 18
+				&& !c.fightingNow() && now() - hurtDropAt > 20 * 60 && busy()) {   // hurt, not healing, nothing to eat: whatever it's on waits (Fin built a smelter at four health with no food in his bag; 19 of 23 deaths came at three health or less)
+			hurtDropAt = now();
+			c.journal("does", "btb: hurt (" + Math.round(o.health) + " health) and nothing to eat: drops " + task.name().toLowerCase(Locale.ROOT) + " for food");
+			if (c.chores.busy()) c.chores.cancel();
+			if (c.nether.busy()) c.nether.cancel();
+			if (c.builder.busy()) c.builder.cancel();
+			if (task == Task.VISIT) c.visits.stop("hurt and nothing to eat");
+			dropped = true;
+		}
 		if (task != Task.NONE) {
 			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
