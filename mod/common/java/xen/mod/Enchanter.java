@@ -138,7 +138,10 @@ final class Enchanter {
 		}
 		if (!c.hands.canClick(t)) return c.walkTo(Vec3.atBottomCenterOf(t));
 		int slot = worthSlot();
-		if (slot < 0 && takeOffForTable()) slot = worthSlot();                // (its tools done: the armor it wears next, a piece at a time)
+		int bagTier = slot < 0 ? 0 : MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getInventory().getItem(slot).getItem()).getPath());
+		var worn = wornWorth();
+		if (worn != null && bagTier < MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getItemBySlot(worn).getItem()).getPath()) && takeOffForTable())
+			slot = worthSlot();                                                // (the diamond armor it wears before a spare iron pickaxe in its bag: Ann's third enchant went on that, her armor bare)
 		if (slot < 0 || c.items().getOrDefault("lapis_lazuli", 0) == 0) {
 			on = false;
 			return null;
