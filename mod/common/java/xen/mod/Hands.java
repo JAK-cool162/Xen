@@ -463,6 +463,9 @@ public final class Hands {
 	/** A slow block (obsidian, ancient debris, a diamond) its digging stopped part way: who stopped it, for its journal (once in five seconds). */
 	private long cutShortSaidAt = -1000, mineSaidAt = -1000;
 
+	/** Slow blocks worth the wait, with a tool that drops them: up to thirty seconds, not ten (obsidian for its table and portal, ancient debris). */
+	private static final java.util.Set<String> WAITS_FOR = java.util.Set.of("obsidian", "crying_obsidian", "ancient_debris");
+
 	private void cutShort(String how, BlockPos at) {
 		if (p.companion == null || ticks - digStartTick < 10 || p.tickCount - cutShortSaidAt < 100) return;
 		BlockState st = p.level().getBlockState(at);
@@ -479,31 +482,52 @@ public final class Hands {
 		BlockPos pos = target();
 		BlockState state = level.getBlockState(pos);
 		int c = WorldSenses.category(level, pos, state);
-		if (state.isAir() || c == Blocks.AIR && state.getShape(level, pos).isEmpty() || c == Blocks.LAVA || c == Blocks.WATER || c == Blocks.BEDROCK
+		// (its eyes count obsidian with bedrock, a wall it can't get through; its hands go by what the block really is: obsidian
+		// breaks, in ten seconds with a diamond pickaxe. Every Xen's every try at obsidian ended here, two ticks in: none ever mined)
+		if (state.isAir() || c == Blocks.AIR && state.getShape(level, pos).isEmpty() || c == Blocks.LAVA || c == Blocks.WATER
 				|| state.getDestroySpeed(level, pos) < 0) {                   // (grass and flowers it can break: they have a shape)
 			limit = 2;                                                // nothing to mine there
 			return;
 		}
 		String unsafe = p.companion == null || pos.equals(wayDig) ? null : p.companion.choices.unsafeToBreak(pos);
 		if (unsafe != null) {                                         // Xen 2.0's doubter: a hard no (lava behind it, a drop under its feet)
-			if (!pos.equals(cantMine)) p.companion.journal("chooses", "mine " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + ": no | doubter: " + unsafe);
+			if (!pos.equals(cantMine) || state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+				mineSaidAt = p.tickCount;
+				p.companion.journal("chooses", "mine " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + ": no | doubter: " + unsafe);
+			}
 			cantMine = pos.immutable();
 			limit = 2;
 			return;
 		}
 		if (holdsSomeone(level, pos, p)) {                             // someone's standing on it: a player never digs out the ground under a friend
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+				mineSaidAt = p.tickCount;
+				p.companion.journal("debug", "won't dig the " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + " at " + pos.toShortString() + ": someone stands on it");
+			}
 			cantMine = pos.immutable();
 			limit = 2;
 			return;
 		}
 		if (outOfSight(level, pos)) {                                  // (it moved, or something came between: not through it)
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+				mineSaidAt = p.tickCount;
+				p.companion.journal("debug", "can't see the " + BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath() + " at " + pos.toShortString() + " to dig it");
+			}
 			cantMine = pos.immutable();
 			cantMineUnseen = true;
 			limit = 2;
 			return;
 		}
 		selectBestTool(state);
-		if (tooSlow(state.getDestroyProgress(p, level, pos))) {       // more than 10 seconds with what it has: not worth it
+		float rate = state.getDestroyProgress(p, level, pos);
+		boolean worthTheWait = WAITS_FOR.contains(BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath()) && p.hasCorrectToolForDrops(state)
+				&& rate * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) >= 1f / 600;   // (obsidian: 9.4 s with a diamond pickaxe, a hair under the ten; a little slower and it was "too slow", every time)
+		if (tooSlow(rate) && !worthTheWait) {                          // more than 10 seconds with what it has: not worth it
+			if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {
+				mineSaidAt = p.tickCount;
+				p.companion.journal("debug", String.format(java.util.Locale.ROOT, "too slow: %s with %s, %.5f a tick (on the ground %s, eyes in water %s)",
+						BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(), BuiltInRegistries.ITEM.getKey(p.getMainHandItem().getItem()).getPath(), rate, p.onGround(), p.isUnderWater()));
+			}
 			cantMine = pos.immutable();
 			limit = 2;
 			return;
