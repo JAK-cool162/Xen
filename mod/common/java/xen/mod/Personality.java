@@ -481,6 +481,17 @@ public final class Personality {
 	/** Its pronouns ("she/her", "he/him", "they/them", or any set it was given, "xe/xem/xyr"): picked when it's born, kept with the world, any of them settable. */
 	String pronouns = randomPronouns(java.util.concurrent.ThreadLocalRandom.current());
 
+	private static final java.util.Set<String> SHE = java.util.Set.of("ann", "anna", "amy", "dee", "eve", "ivy", "emma", "mia", "zoe", "lily", "ruby", "rose", "kate",
+			"lucy", "ella", "nina", "sara", "sarah", "jane", "mary", "lisa", "lena", "luna", "maya", "nora", "ava", "isla", "cleo", "tess", "beth", "fay", "may", "joy", "kim");
+	private static final java.util.Set<String> HE = java.util.Set.of("bob", "cid", "fin", "gus", "hal", "jay", "max", "tom", "ben", "leo", "joe", "dan", "ian", "ron",
+			"ted", "tim", "jim", "ned", "rex", "zack", "jack", "jake", "luke", "mark", "paul", "pete", "carl", "eric", "finn", "hugo", "otto", "ray", "roy", "guy", "sid");
+
+	/** For a new Xen: the pronouns its name usually goes with (Ann she/her, Bob he/him), else picked at random. */
+	static String pronounsFor(String name, java.util.Random r) {
+		String n = name.toLowerCase(java.util.Locale.ROOT);
+		return SHE.contains(n) ? "she/her" : HE.contains(n) ? "he/him" : randomPronouns(r);
+	}
+
 	static String randomPronouns(java.util.Random r) {
 		float x = r.nextFloat();
 		return x < 0.45f ? "she/her" : x < 0.9f ? "he/him" : "they/them";

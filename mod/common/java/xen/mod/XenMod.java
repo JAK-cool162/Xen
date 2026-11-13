@@ -1508,6 +1508,7 @@ public class XenMod implements ModInitializer {
 		Personality p = nature != null ? nature
 				: known != null && known.has("personality") ? Personality.fromJson(known.getAsJsonObject("personality")) : born;
 		p.bornWith(new Random(name.toLowerCase(Locale.ROOT).hashCode() * 31L + 7));   // (a Xen from before 1.5: its sins and beliefs from its name, always the same)
+		if (known == null || !known.has("personality") || !known.getAsJsonObject("personality").has("pronouns")) p.pronouns = Personality.pronounsFor(name, random);   // (new: what its name usually goes with; "Bob (she/her)" looked random)
 		if (nature == null && known == null && config.personalities) {           // born with an arena champion's fighting
 			float[] champion = Arena.championGenes(brainFile().getParent(), random);
 			if (champion != null) {
