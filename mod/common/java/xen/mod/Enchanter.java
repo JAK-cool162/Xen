@@ -22,6 +22,8 @@ final class Enchanter {
 	boolean on;
 	/** Not again before this (game time): after a go (its levels come back slowly), or after it couldn't. */
 	long retryAt;
+	/** Its enchanting done for now, the table to mine and carry (no home to keep it at). */
+	private boolean takeAlong;
 
 	Enchanter(Companion c) {
 		this.c = c;
@@ -110,6 +112,22 @@ final class Enchanter {
 			retryAt = c.player.level().getGameTime() + 20 * 60 * 20;
 			return null;
 		}
+		if (takeAlong) {                                                        // its enchanting done for now and no home to keep the table at: it mines it and takes it along, as players do
+			BlockPos tt = table();
+			if (tt == null) {
+				takeAlong = false;
+				on = false;
+				return null;
+			}
+			if (!c.hands.canClick(tt)) return c.walkTo(Vec3.atBottomCenterOf(tt));
+			if (c.hands.mine(tt)) {
+				c.acted = true;
+				return Action.MINE;
+			}
+			takeAlong = false;
+			on = false;
+			return null;
+		}
 		BlockPos t = table();
 		if (t == null) {
 			if (c.items().getOrDefault("enchanting_table", 0) == 0) {
@@ -174,6 +192,12 @@ final class Enchanter {
 		c.player.closeContainer();
 		c.acted = true;
 		on = false;
+		boolean moreNow = done && (worthSlot() >= 0 || wornWorth() != null) && c.items().getOrDefault("lapis_lazuli", 0) > 0;
+		if (!moreNow && (c.goals.home == null || !t.closerThan(c.goals.home, 24))) {   // (nothing more to enchant here now, and this isn't home: Ann left hers by a lava pool and was 330 blocks off when she next wanted it)
+			takeAlong = true;
+			on = true;
+			c.journal("does", "takes its enchanting table along (no home to keep it at)");
+		}
 		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
 		if (done) {
 			c.chatter(c.pick3("Enchanted! That glow...", "Ooh, shiny. Enchanted.", "The table liked that one."), false);

@@ -129,8 +129,8 @@ final class Btb {
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		if (!geared) goal = "gear";                                              // tools, iron, diamonds, armor: first, always
 		else if (!tabled || !enchantedGear()) goal = "enchant";                 // (its tools and its armor enchanted, both)
+		else if (c.goals.home == null && c.mod.config.wants) goal = "home";      // a base before the Nether: a chest for what it has (a death there costs it everything it carries), its bed for a spawn, its table set up
 		else if (netherNeeds()) goal = "nether";                                // (blaze rods and ender pearls: the eyes for the End; no giving up on a goal, it stays on it till it's done)
-		else if (c.goals.home == null && c.mod.config.wants) goal = "home";
 		else goal = "world";
 		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
 	}
