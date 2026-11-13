@@ -435,7 +435,9 @@ final class Builder {
 			boolean starter = forceStarter || !creative && c.goals.home == null;   // its first house: what a few trees give
 			Taste.Style asked = what.contains("modern") ? Taste.Style.MODERN : what.contains("stilt") ? Taste.Style.STILT
 					: what.contains("tower") ? Taste.Style.TOWER : what.contains("cottage") ? Taste.Style.COTTAGE : null;
-			String resumed = forceStarter ? null : resume(level, near != null ? near : feet);   // a house it started and didn't finish: that one first (not for a quick base: Bob's half-built house wanted 214 logs)
+			Unfinished was = unfinished;
+			boolean small = was != null && was.home() != null && was.home().design().w() * was.home().design().d() <= 35;   // (a starter it began: that one, not a new one each time the night stops it; Bob designed three in a quarter of an hour)
+			String resumed = forceStarter && !small ? null : resume(level, near != null ? near : feet);   // a house it started and didn't finish: that one first (not for a quick base: Bob's half-built house wanted 214 logs)
 			if (resumed != null) return resumed;
 			if (what.equals("home") && !starter && asked == null && near == null && wantsPlace()) {   // its own idea: a whole place, not just a house
 				String placed = place(level, null, feet, false);
