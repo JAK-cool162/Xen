@@ -746,7 +746,8 @@ final class Fighter {
 			}
 		}
 		int on = c.mobsOnIt(12);
-		if (h.hasWeapon() && p.getHealth() >= 12 && on <= 2) {
+		boolean armored = p.getArmorValue() >= 15;                             // (diamond armor: a zombie's or a spider's hit is under one health)
+		if (h.hasWeapon() && (p.getHealth() >= 12 || armored && p.getHealth() >= 6) && on <= 2) {
 			noRun = true;
 			return null;
 		}
@@ -777,7 +778,8 @@ final class Fighter {
 		double nearest = Double.MAX_VALUE;
 		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
 				m -> m.isAlive() && m.getTarget() == p)) nearest = Math.min(nearest, p.distanceTo(m));
-		if (nearest > 6 && now() - holeLostAt > 200) {                          // (knocked out of a hole: not another for ten seconds, it fights)
+		boolean climber = foe instanceof net.minecraft.world.entity.monster.Spider;   // (a spider climbs down into a hole after it: Bob dug in from one at seven health, never swung, and it killed him in there)
+		if (nearest > 6 && now() - holeLostAt > 200 && !climber) {             // (knocked out of a hole: not another for ten seconds, it fights)
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
 		}
@@ -855,6 +857,20 @@ final class Fighter {
 			if (now() - holeAt <= 20 * 120) holeLostAt = now();
 			hole = null;                                                         // (knocked out of it, or two minutes: done)
 			return null;
+		}
+		LivingEntity inReach = null;                                            // one on it in reach (it climbed in, or reached in): hit back, digging or dug in
+		for (net.minecraft.world.entity.Mob m : level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(4),
+				m -> m.isAlive() && m.getTarget() == p && p.distanceTo(m) <= p.entityInteractionRange())) {
+			if (inReach == null || p.distanceTo(m) < p.distanceTo(inReach)) inReach = m;
+		}
+		if (inReach != null) {
+			if (inReach instanceof net.minecraft.world.entity.monster.Spider) {   // (a spider in the hole with it: no hole against that one)
+				hole = null;
+				holeLostAt = now();
+				c.journal("fight", "a spider's in its hole with it: out, and fights it");
+				return null;
+			}
+			if (p.hurtTime > 0 && p.getAttackStrengthScale(0.5f) >= 0.9f) return hit(inReach);
 		}
 		if (feet.getY() > hole.getY() - 2) {
 			net.minecraft.core.BlockPos under = feet.below();
