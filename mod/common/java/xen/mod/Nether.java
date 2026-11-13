@@ -256,6 +256,8 @@ final class Nether {
 
 	private void start(String why) {
 		purpose = why;
+		fortressLooked = false;
+		fortressHint = null;
 		tripSince = now();
 		c.goals.drop();
 		c.chores.cancel();
@@ -1044,6 +1046,21 @@ final class Nether {
 
 	// ------------------------------------------------------------------------------ in the Nether
 	private BlockPos fortress;
+	/** Where the world says the nearest fortress is (its x and z; the bricks are seen on the way in), and whether it asked yet this trip. */
+	private BlockPos fortressHint;
+	private boolean fortressLooked;
+
+	/** The nearest Nether fortress, as the world knows it (what a locate does), at about the height they stand: null if none or it can't tell. */
+	private BlockPos locateFortress(ServerLevel level) {
+		try {
+			var reg = level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+			var holder = reg.getOrThrow(net.minecraft.world.level.levelgen.structure.BuiltinStructures.FORTRESS);
+			var found = level.getChunkSource().getGenerator().findNearestMapStructure(level, net.minecraft.core.HolderSet.direct(holder), c.player.blockPosition(), 64, false);
+			return found == null ? null : found.getFirst().atY(70);
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
 	private double heading = Double.NaN;
 	private Vec3 exploreTo;
 	private long exploreSince;
@@ -1080,6 +1097,16 @@ final class Nether {
 				c.places.remember("fortress", seen);
 				c.chatter("A Nether fortress! Blazes live there.", true);
 			}
+		}
+		if (fortress == null && fortressHint == null && !fortressLooked) {     // the world's own knowledge of where its fortresses are (allowed: it doesn't wander the Nether at random, Cid did for eleven minutes and never found one)
+			fortressLooked = true;
+			fortressHint = locateFortress(level);
+			if (fortressHint != null) c.journal("thinks", "knows the nearest Nether fortress is about " + fortressHint.getX() + " " + fortressHint.getZ() + " ("
+					+ Math.round(Math.sqrt(fortressHint.distSqr(c.player.blockPosition().atY(fortressHint.getY())))) + " blocks): goes straight there");
+		}
+		if (fortress == null && fortressHint != null && c.player.blockPosition().atY(fortressHint.getY()).distSqr(fortressHint) > 24 * 24) {
+			c.goals.instant = "going to the Nether fortress it knows of";
+			return c.walkTo(Vec3.atBottomCenterOf(fortressHint));
 		}
 		if (fortress == null) {
 			c.goals.instant = "looking for a Nether fortress";
