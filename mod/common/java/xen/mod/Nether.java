@@ -91,6 +91,14 @@ final class Nether {
 		lastLevel = p.level();
 		lastPos = p.blockPosition();
 		if (p.tickCount % 40 == 10 && inNether() && c.knowledge.knows("piglin_gold")) wearGold();
+		if (p.tickCount % 40 == 30 && inNether() && !"home".equals(purpose) && !c.fightingNow()) {   // hurt over there and not healing: back home through its portal to heal, then back (not on to a fortress at three hearts)
+			boolean noFood = c.items().getOrDefault("food", 0) == 0;
+			if (p.getHealth() <= 6 || p.getHealth() <= 10 && noFood && p.getFoodData().getFoodLevel() < 18) {
+				c.journal("does", "hurt in the Nether (" + Math.round(p.getHealth()) + " health" + (noFood ? ", nothing to eat" : "") + "): back home through the portal to heal");
+				c.chatter(c.pick3("Too hurt for this place. Back to the portal.", "Nope, going home to heal first.", "Retreat! Portal, now."), false);
+				start("home");
+			}
+		}
 	}
 
 	/** Through a portal: it remembers both ends, and says what it thinks of where it is. */
