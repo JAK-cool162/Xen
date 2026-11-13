@@ -439,6 +439,10 @@ final class Builder {
 	}
 
 	String startStarterHome() {
+		if (plan != null && helping == null && (building != null || plan.name().equals("underground base"))) {   // (on it already: on with it, not a new design over it; Cid's cottage, a second one four minutes in, two blocks over)
+			c.journal("build", "goes on with its base (" + left.size() + " steps to go)");
+			return "You will go on building your base.";
+		}
 		boolean hutBegun = unfinished != null && unfinished.home() != null && unfinished.home().design().w() * unfinished.home().design().d() <= 42;   // (a small one it began: that one first, Bob's and Ann's)
 		if (c.player != null && !c.player.isCreative() && c.crafter.pickTier() >= 2 && digsItsBase() && !hutBegun) {   // underground: a staircase down, a room in the stone (what a player with a pickaxe does first night)
 			BlockPos site = c.places.get("base site");
