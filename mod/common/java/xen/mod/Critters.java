@@ -31,7 +31,7 @@ import java.util.Random;
 final class Critters {
 	private final Companion c;
 	private final Random random = new Random();
-	private long nextChore, sideUntil;
+	private long nextChore, sideUntil, inlandSaidAt = -100_000;
 	private int side = 1;
 	/** How often it did each (for the journal and the tests). */
 	int blocked, bred, sheared, milked, cats;
@@ -108,6 +108,29 @@ final class Critters {
 				c.goals.instant = "getting out of the water (drowned)";
 				c.run(true);
 				return c.walkTo(shore);
+			}
+		}
+		// a drowned with a trident out in the water that can see it, and it on the shore: inland, out of its throw (it can't be reached
+		// out there; tridents from the sea killed Jay, Eve and Gus twice at the water's edge)
+		if (!p.isInWater() && p.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+			Mob thrower = null;
+			for (Mob m : sl.getEntitiesOfClass(Mob.class, p.getBoundingBox().inflate(28), x -> x.isAlive() && id(x).equals("drowned") && x.isInWater()
+					&& x.getMainHandItem().is(Items.TRIDENT) && x.hasLineOfSight(p)))
+				if (thrower == null || m.distanceTo(p) < thrower.distanceTo(p)) thrower = m;
+			if (thrower != null) {
+				Vec3 away = p.position().subtract(thrower.position()).multiply(1, 0, 1);
+				if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
+				away = away.normalize().scale(14);
+				Vec3 to = XenMod.surface(sl, (int) Math.floor(p.getX() + away.x), (int) Math.floor(p.getZ() + away.z));
+				if (to != null) {
+					if (now() - inlandSaidAt > 20 * 30) {
+						inlandSaidAt = now();
+						c.journal("does", "a drowned with a trident in the water " + Math.round(thrower.distanceTo(p)) + " blocks off: inland, out of its throw");
+					}
+					c.goals.instant = "inland, away from the drowned's trident";
+					c.run(true);
+					return c.walkTo(to);
+				}
 			}
 		}
 		// poisoned: milk cures it
