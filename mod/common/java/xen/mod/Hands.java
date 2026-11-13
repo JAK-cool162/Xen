@@ -461,7 +461,7 @@ public final class Hands {
 	}
 
 	/** A slow block (obsidian, ancient debris, a diamond) its digging stopped part way: who stopped it, for its journal (once in five seconds). */
-	private long cutShortSaidAt = -1000;
+	private long cutShortSaidAt = -1000, mineSaidAt = -1000;
 
 	private void cutShort(String how, BlockPos at) {
 		if (p.companion == null || ticks - digStartTick < 10 || p.tickCount - cutShortSaidAt < 100) return;
@@ -561,6 +561,9 @@ public final class Hands {
 			if (turnToward(aimPoint, 40f, 30f)) {
 				turning = false;
 				startMining();
+			} else if (ticks >= limit - 1 && p.companion != null && p.tickCount - mineSaidAt >= 60) {
+				mineSaidAt = p.tickCount;
+				p.companion.journal("debug", String.format(java.util.Locale.ROOT, "couldn't turn to %s in %d ticks (yaw %.0f, pitch %.0f)", aim.toShortString(), ticks, p.getYRot(), p.getXRot()));
 			}
 			return;
 		}
@@ -792,6 +795,13 @@ public final class Hands {
 		if (state.getDestroySpeed(level, pos) < 0 || tooSlow(bestSpeed(state, level, pos))) {   // bedrock, or far too slow
 			cantMine = pos.immutable();
 			return false;
+		}
+		if (p.companion != null && state.getDestroySpeed(level, pos) >= 3 && p.tickCount - mineSaidAt >= 60) {   // (a slow block: what its hands were at when it was asked, and by whom)
+			mineSaidAt = p.tickCount;
+			var from = StackWalker.getInstance().walk(f -> f.skip(1).limit(4).map(x -> x.getClassName().replace("xen.mod.", "") + "." + x.getMethodName() + ":" + x.getLineNumber()).toList());
+			p.companion.journal("debug", String.format(java.util.Locale.ROOT, "mine %s at %s: hands at %s%s%s, %d of %d ticks, sees it %s: %s", BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(),
+					pos.toShortString(), current, pos.equals(digging) ? ", digging it " + Math.round(progress * 100) + "%" : digging != null ? ", digging " + digging.toShortString() : "",
+					turning ? ", turning" : "", ticks, limit, seePoint(level, pos) != null, String.join(" < ", from)));
 		}
 		BlockPos target = pos;
 		Vec3 point = seePoint(level, pos);

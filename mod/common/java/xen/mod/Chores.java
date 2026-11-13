@@ -2980,6 +2980,8 @@ final class Chores {
 	}
 
 	/** Get to a block and mine it, the way a player would (dig down to it, climb one block to reach it). */
+	private long reachSaidAt = -1000;
+
 	private Action reach(BlockPos t) {
 		Hands hands = c.hands;
 		BlockPos feet = c.player.blockPosition();
@@ -2994,6 +2996,12 @@ final class Chores {
 				c.journal("does", "gives up on the block at " + t.toShortString() + " (can't get at it)");
 				return giveUp(t);
 			}
+		}
+		if (now() - reachSaidAt >= 60 && c.player.level().getBlockState(t).getDestroySpeed(c.player.level(), t) >= 3) {   // (a slow block: how it goes at it, for its journal)
+			reachSaidAt = now();
+			c.journal("debug", String.format(java.util.Locale.ROOT, "at the %s at %s from %s: %.1f off, open %s, hands %s",
+					net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(c.player.level().getBlockState(t).getBlock()).getPath(), t.toShortString(), feet.toShortString(),
+					c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)), open((ServerLevel) c.player.level(), t), hands.busy() ? "busy" : "free"));
 		}
 		BlockPos hit = t.getY() >= feet.getY() ? hitFromHere(t) : null;   // (below its feet: the staircase way, never straight down)
 		if (hit != null) {
