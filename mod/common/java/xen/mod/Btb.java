@@ -261,6 +261,14 @@ final class Btb {
 		}
 		if (lootFor && !o.night && o.overworld && visitThere)
 			out.add(new Option(Task.VISIT, 3.5f, "a village's chests or a ruined portal's first (obsidian at the weaponsmith's, iron, the portal's own)"));
+		boolean noBed = c.items().keySet().stream().noneMatch(n -> n.endsWith("_bed")) && !c.hasBed();
+		if (!lootFor && !o.night && !dusk && o.overworld && (o.meals < 4 || noBed)) {   // a village for food and a bed: its hay is bread (three a bale), its beds a spawn and a night (no sheep needed); not only for obsidian
+			if (now() - visitLookedAt > 20 * 30) {
+				visitLookedAt = now();
+				visitThere = c.visits.candidate();
+			}
+			if (visitThere) out.add(new Option(Task.VISIT, o.meals == 0 ? 4.6f : noBed ? 3.6f : 3.2f, "a village: hay for bread, a bed (no sheep needed)"));
+		}
 		if (goal.equals("enchant")) {
 			if (c.enchanter.possible() && c.player.level().getGameTime() > c.enchanter.retryAt)   // (not again the moment it couldn't: Ann tried every three seconds)
 				out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
@@ -423,6 +431,13 @@ final class Btb {
 			case FOOD -> {
 				var prey = ch.nearestAnimal();
 				boolean noAnimals = prey == null || prey.distanceTo(c.player) > 24;
+				if (noAnimals && !o.night && c.visits.candidate()) {               // (no animals about, a village it knows: its hay is bread)
+					String v = c.visits.begin();
+					if (v != null) {
+						c.journal("thinks", "no animals about: a village's hay for bread instead");
+						yield v;
+					}
+				}
 				if (noAnimals && !o.night && (c.fisher.hasRod() || c.items().getOrDefault("string", 0) >= 2) && c.fisher.waterNear() != null) {   // (no animals about, water close by: it fishes; Ivy looked for animals for most of an hour at half a heart)
 					String f = c.fisher.start();
 					if (f.startsWith("You will")) {
@@ -563,7 +578,7 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy() || task == Task.FOOD && c.fisher.on);
+				|| task == Task.STASH && c.storage.busy() || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
