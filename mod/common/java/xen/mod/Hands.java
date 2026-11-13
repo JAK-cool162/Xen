@@ -258,6 +258,33 @@ public final class Hands {
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
 	}
 
+	/** When its last helping hand was (its ticks). */
+	private long helpAt = -1_000_000;
+
+	/**
+	 * A helping hand, rarely (the help it's allowed, like knowing the world): a block its task needs that it has been
+	 * at a long while and can't get, broken for it at once, what its tool would drop. Once in five minutes at most, never
+	 * where its doubter says no (lava behind it, a tunnel it would flood, a drop under its feet), and always in its journal.
+	 */
+	boolean helpBreak(BlockPos pos, String why) {
+		if (p.companion == null || p.companion.mod.config.luck < 2 || p.tickCount - helpAt < 20 * 60 * 5) return false;
+		ServerLevel level = (ServerLevel) p.level();
+		BlockState st = level.getBlockState(pos);
+		if (st.isAir() || st.getDestroySpeed(level, pos) < 0 || !st.getFluidState().isEmpty() || holdsSomeone(level, pos, p)) return false;
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(pos)) > p.blockInteractionRange() + 1) return false;
+		if (p.companion.choices.unsafeToBreak(pos) != null) return false;
+		stop();
+		selectBestTool(st);
+		helpAt = p.tickCount;
+		String name = BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath().replace('_', ' ');
+		boolean ok = p.hasCorrectToolForDrops(st) ? p.gameMode.destroyBlock(pos) : level.destroyBlock(pos, true, p);
+		if (ok) {
+			Compat.swing(p);
+			p.companion.journal("does", "help: the " + name + " at " + pos.toShortString() + " breaks for it (" + why + ")");
+		}
+		return ok;
+	}
+
 	/** The first block between its eyes and that one (for its chores: another of the same in the way is the one to take), or null. */
 	BlockPos firstInWay(ServerLevel level, BlockPos pos) {
 		BlockHitResult r = inTheWay(level, pos);

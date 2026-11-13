@@ -1258,6 +1258,7 @@ final class Walker {
 				digSince = now();
 			} else if (now() - digSince > 20 * 12) {
 				digTarget = null;
+				if (c.hands.helpBreak(b, "twelve seconds digging its way through it")) return false;   // (its helping hand, now and then: on its way)
 				problem(m, "can't get through the " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(b).getBlock()).getPath() + " at " + b.toShortString());
 				return false;
 			}
