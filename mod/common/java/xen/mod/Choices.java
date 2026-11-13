@@ -298,7 +298,7 @@ final class Choices {
 		ServerLevel level = (ServerLevel) c.player.level();
 		boolean quenched = level.getBlockState(q).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) && level.getFluidState(q.above()).is(net.minecraft.tags.FluidTags.WATER);
 		if (Chores.lavaBehind(level, q) && !quenched) return "lava behind it";   // (obsidian under water: the water's in the hole first, far quicker than lava, and turns the lava by it to stone; its chore said yes and this said no, every three seconds)
-		if (!level.canSeeSky(q.above()) && waterBehind(level, q)) return "water behind it: it would flood the tunnel";   // (a flooded cave or an aquifer: mining into it drowns you)
+		if (!level.canSeeSky(q.above()) && waterBehind(level, q) && !openWater(level, q)) return "water behind it: it would flood the tunnel";   // (a flooded cave or an aquifer: mining into it drowns you; a pool under the sky is no tunnel: Ann at a lava pool's obsidian under a block of water, told no twice, her table trip lost)
 		BlockPos feet = c.player.blockPosition();
 		if (q.getX() == feet.getX() && q.getZ() == feet.getZ() && q.getY() == feet.getY() - 1) {
 			int air = 0;
@@ -311,6 +311,21 @@ final class Choices {
 			if (air >= 3) return "a drop under it: I'd fall in";
 		}
 		return null;
+	}
+
+	/** All the water by it is a pool or a lake under the open sky (up through the water to the air, and the sky over that): no tunnel to flood. */
+	static boolean openWater(ServerLevel level, BlockPos b) {
+		boolean any = false;
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (d == net.minecraft.core.Direction.DOWN) continue;
+			BlockPos w = b.relative(d);
+			if (!level.getFluidState(w).is(net.minecraft.tags.FluidTags.WATER)) continue;
+			any = true;
+			int k = 0;
+			while (k++ < 12 && level.getFluidState(w.above()).is(net.minecraft.tags.FluidTags.WATER)) w = w.above();
+			if (!level.getBlockState(w.above()).isAir() || !level.canSeeSky(w.above())) return false;
+		}
+		return any;
 	}
 
 	/** Water beside or above it (under the ground: open it and the water pours in). */
