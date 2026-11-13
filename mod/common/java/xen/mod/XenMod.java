@@ -1770,6 +1770,8 @@ public class XenMod implements ModInitializer {
 	private final java.util.Map<String, Long> giftedAt = new java.util.HashMap<>();
 	/** A gift on its way: for whom, the giver, and how many diamonds they had when it set off (it counts only once it's there). */
 	private final java.util.Map<String, Object[]> giftPending = new java.util.HashMap<>();
+	/** "Ann>Jay": when Jay's gift to Ann last came to nothing. */
+	private final java.util.Map<String, Long> giftFailed = new java.util.HashMap<>();
 
 	/**
 	 * Back on its feet with a friend's help (what players on a server do): a Xen with all its diamond gear and diamonds
@@ -1794,6 +1796,7 @@ public class XenMod implements ModInitializer {
 			} else if (giver.player() == null || giver.chores.kind != Chores.Kind.GIVE) {
 				it.remove();                                                          // (it never got there: Ivy's five for Hal, the night came; Hal went out with nothing and a skeleton shot him)
 				giftedAt.remove(needy.name);
+				giftFailed.put(needy.name + ">" + giver.name, now);                   // (and not that one again for a while: the next nearest; Jay, stuck in a lake under the ground, chosen for Ann every minute)
 			}
 		}
 		if (server.overworld().isDarkOutside()) return;                          // (by day: at night the one bringing them digs in before it gets there)
@@ -1807,7 +1810,8 @@ public class XenMod implements ModInitializer {
 			for (Companion rich : companions) {
 				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level() || rich.player().tickCount < 20 * 60) continue;
 				if (diamondGear(rich) < 6 || rich.items().getOrDefault("diamond", 0) < 6) continue;   // (its own gear first, three kept for a new pickaxe)
-				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava() || rich.goals.evening()) continue;
+				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava() || rich.player().isInWater() || rich.goals.evening()) continue;
+				if (now - giftFailed.getOrDefault(needy.name + ">" + rich.name, -1_000_000L) < 20 * 60 * 5) continue;
 				double d = rich.player().distanceTo(needy.player());
 				if (d < bestD) {
 					bestD = d;
