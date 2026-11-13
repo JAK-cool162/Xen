@@ -846,6 +846,11 @@ public final class Hands {
 			}
 			target = in.getBlockPos();
 			point = in.getLocation();
+			if (p.companion != null && !target.equals(wayDig) && p.companion.choices.unsafeToBreak(target) != null) {   // (what's in the way is no to break, lava behind it: not that one from here, its chore picks another; Ann asked her doubter about the same dirt every three seconds)
+				cantMine = pos.immutable();
+				cantMineUnseen = true;
+				return false;
+			}
 		}
 		if (point == null) point = Vec3.atCenterOf(pos);
 		stop();
