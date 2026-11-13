@@ -160,7 +160,7 @@ final class Btb {
 			if (n.endsWith("_pickaxe") || n.endsWith("_sword") || n.endsWith("_axe") || n.endsWith("_shovel")) tool = true;
 			if (n.endsWith("_helmet") || n.endsWith("_chestplate") || n.endsWith("_leggings") || n.endsWith("_boots")) armor = true;
 		}
-		if (tool && armor && p.experienceLevel >= 3 && c.items().getOrDefault("lapis_lazuli", 0) >= 1) {   // levels and lapis for more: every diamond piece first, then the Nether (Ann, one chestplate done, three pieces bare, was off)
+		if (tool && armor && p.experienceLevel >= 3) {                          // levels for more: every diamond piece first, then the Nether (Ann, one chestplate done, three pieces bare, was off); out of lapis, it gets lapis (its table step does: it knows where), not the Nether
 			for (net.minecraft.world.item.ItemStack s : all) {
 				if (s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
 				if (net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().startsWith("diamond_")) return false;
