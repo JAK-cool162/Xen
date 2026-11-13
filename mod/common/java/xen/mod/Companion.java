@@ -2511,6 +2511,9 @@ public final class Companion {
 
 	/** Where it died, with its things lying there, and until when they're there. */
 	private BlockPos lostAt;
+	/** Time on its way back since it last got closer, and when it last was. */
+	private long lostWalked, lostWalkTick;
+
 	/** What lies there is worth a run (diamonds, its gear, obsidian, lapis): straight back, whatever the hour. */
 	boolean lostValuable;
 
@@ -2555,6 +2558,7 @@ public final class Companion {
 			lostAgedAt = now;
 			lostBest = Double.MAX_VALUE;
 			lostProgressAt = now;
+			lostWalked = 0;
 			lostFoundAny = false;
 			saidGoingBack = false;
 		} catch (RuntimeException e) {
@@ -2733,8 +2737,10 @@ public final class Companion {
 		if (gap < lostBest - 0.5) {
 			lostBest = gap;
 			lostProgressAt = now;
-		}
-		if (now - lostProgressAt > 600) {                                    // half a minute and no closer: it lets it go, like a player
+			lostWalked = 0;
+		} else lostWalked += Math.min(5, Math.max(0, now - lostWalkTick));   // (only the time it's on its way counts: a fight, a line typed, a bite to eat aren't the way failing)
+		lostWalkTick = now;
+		if (lostWalked > (lostValuable ? 20 * 180 : 600)) {                 // half a minute and no closer (three for its diamonds and gear): it lets it go, like a player (Ann gave up on her enchanted diamonds 108 blocks off a minute in)
 			lostAt = null;
 			saidGoingBack = false;
 			walker.stop();
