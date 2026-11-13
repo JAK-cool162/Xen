@@ -1,6 +1,7 @@
 package xen.mod;
 
 import net.minecraft.core.BlockPos;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -467,7 +468,9 @@ final class Nether {
 		BlockPos sealed = null;                                                 // (sealed in the rock: the nearest with plain stone over it, to open from beside and pour through)
 		double sealedD = Double.MAX_VALUE;
 		BlockPos me = c.player.blockPosition();
+		List<BlockPos> standing = new ArrayList<>();                            // (dry, ground beside to stand on: the best kind)
 		for (BlockPos q : pools) {
+			if (standing.size() >= 3) break;
 			boolean tried = false;
 			for (BlockPos b : badLava) tried |= b.closerThan(q, 6);
 			if (tried) continue;                                                     // (one it couldn't get to)
@@ -495,13 +498,32 @@ final class Nether {
 				for (BlockPos w : BlockPos.betweenClosed(r.offset(-2, -1, -2), r.offset(2, 2, 2))) wet |= level.getFluidState(w).is(net.minecraft.tags.FluidTags.WATER);
 				if (!wet) dry++;
 				if (stand && !wet) {
-					c.journal("thinks", "knows of a lava pool at " + r.toShortString() + ": water on it makes obsidian");
-					return r.immutable();
+					boolean another = true;
+					for (BlockPos b : standing) another &= !b.closerThan(r, 8);
+					if (another) standing.add(r.immutable());                        // (a few to choose between, each played out in its head first)
+					if (standing.size() >= 3) break;
+					continue;
 				}
 				if (stand && wetOne == null) wetOne = r.immutable();
 				if (!wet && openDry == null) openDry = r.immutable();
 				if (openAny == null) openAny = r.immutable();
 			}
+		}
+		BlockPos airy0 = openDry != null ? openDry : openAny;
+		List<Imagination.Option> options = new ArrayList<>();                  // a choice of some size: which pool (a long way, lava at the end of it); each played out in its head first
+		for (BlockPos b : standing) options.add(new Imagination.Option("the dry pool at " + b.toShortString(), b, null));
+		if (wetOne != null) options.add(new Imagination.Option("the pool by water at " + wetOne.toShortString(), wetOne, null));
+		if (airy0 != null && options.size() < 3) options.add(new Imagination.Option("the open lava at " + airy0.toShortString(), airy0, null));
+		if (sealed != null && options.size() < 3) options.add(new Imagination.Option("the sealed lava at " + sealed.toShortString(), sealed, null));
+		if (options.size() >= 2) {
+			int i = c.imagination.choose("which lava pool for its obsidian", options);
+			BlockPos chosen = options.get(i).to();
+			c.journal("thinks", "knows of a lava pool at " + chosen.toShortString() + ": water on it makes obsidian (" + options.get(i).name() + ")");
+			return chosen;
+		}
+		if (!standing.isEmpty()) {
+			c.journal("thinks", "knows of a lava pool at " + standing.get(0).toShortString() + ": water on it makes obsidian");
+			return standing.get(0);
 		}
 		if (wetOne != null) {
 			c.journal("thinks", "knows of a lava pool by water at " + wetOne.toShortString() + ": its obsidian's there or soon will be");

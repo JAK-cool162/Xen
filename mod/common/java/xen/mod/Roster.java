@@ -86,7 +86,8 @@ final class Roster {
 			o.add("chronicle", chronicle);
 		}
 		if (c.builder.home != null) o.add("homeBuild", c.builder.homeJson());
-		if (c.builder.unfinished != null) o.add("unfinishedBuild", c.builder.unfinishedJson());
+		var building = c.builder.unfinishedJson();                                // (the one it stopped, or the one it's on now)
+		if (building != null) o.add("unfinishedBuild", building);
 		if (c.chores.mineRecordY != Integer.MIN_VALUE) {
 			JsonObject mine = new JsonObject();
 			mine.addProperty("y", c.chores.mineRecordY);

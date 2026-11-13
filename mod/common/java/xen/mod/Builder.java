@@ -324,6 +324,13 @@ final class Builder {
 		return false;
 	}
 
+	/** The house of its own it's building right now, not done (kept with the world as unfinished: a restart isn't a reason to design a new one; Bob, a fresh cottage after every restart). */
+	private Unfinished underWay() {
+		if (plan == null || helping != null || !plan.name().endsWith("house") || startedCorner == null || c.player == null || left.isEmpty()
+				|| building == null && copied == null) return null;
+		return new Unfinished(startedCorner, startedFront, Places.dim(c.player.level()), copied == null ? building : null, copied == null ? null : copied.id(), startedWood);
+	}
+
 	void cancel() {
 		schematic = null;
 		if (plan != null && helping == null && plan.name().endsWith("house") && startedCorner != null && c.player != null && !left.isEmpty()
@@ -636,7 +643,7 @@ final class Builder {
 
 	/** Kept with the world: the house it didn't finish (null: none). */
 	com.google.gson.JsonObject unfinishedJson() {
-		Unfinished u = unfinished;
+		Unfinished u = unfinished != null ? unfinished : underWay();
 		if (u == null) return null;
 		com.google.gson.JsonObject o = new com.google.gson.JsonObject();
 		o.addProperty("at", u.corner().getX() + "," + u.corner().getY() + "," + u.corner().getZ());

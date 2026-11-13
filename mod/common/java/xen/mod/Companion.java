@@ -3810,6 +3810,8 @@ public final class Companion {
 	final Visits visits = new Visits(this);
 	/** Xenfish: its plan for its goal, the cheapest way to each thing it needs, kept to (see {@link Xenfish}). */
 	final Xenfish xenfish = new Xenfish(this);
+	/** Before a choice of some size, each way played out in its head first (see {@link Imagination}). */
+	final Imagination imagination = new Imagination(this);
 	/** What happened the times it chose something (Xen 2.0's outcome memory: it decides with it). */
 	final Experience experience = new Experience(this);
 	/** G1X: the shape of what it has seen (depths, known open and solid space): gaps, ledges, ways, what it hasn't seen. */

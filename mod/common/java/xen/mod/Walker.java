@@ -215,6 +215,33 @@ final class Walker {
 		return k == Kind.PARKOUR || k == Kind.DIG_DOWN || k == Kind.CLIMB_DOWN ? 2 : -1;
 	}
 
+	/** Did its last imagined way only get part of the way there? */
+	boolean imaginedPartial;
+
+	/**
+	 * Its way to there thought through, not walked (its imagination: the same planner over the real blocks, nothing
+	 * moved, nothing dug, its own way kept as it was). Null: no way there it can think of.
+	 */
+	List<Move> imagine(BlockPos to) {
+		boolean wasPartial = partial, wasStalled = stalled, wasMob = mobWay, wasNight = nightSky;
+		ServerLevel wasLevel = level;
+		BlockPos wasEyes = eyes;
+		double wasRock = rock;
+		try {
+			List<Move> m = plan((ServerLevel) c.player.level(), c.player.blockPosition(), Vec3.atBottomCenterOf(to), Goal.near(to, 3));
+			imaginedPartial = partial;
+			return m;
+		} finally {
+			partial = wasPartial;
+			stalled = wasStalled;
+			mobWay = wasMob;
+			nightSky = wasNight;
+			level = wasLevel;
+			eyes = wasEyes;
+			rock = wasRock;
+		}
+	}
+
 	void stop() {
 		untouched = 0;
 		if (path == null) return;
