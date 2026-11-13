@@ -287,8 +287,8 @@ final class Btb {
 			boolean inNether = c.nether.inNether();
 			boolean sword = c.items().keySet().stream().anyMatch(n -> n.equals("iron_sword") || n.equals("diamond_sword") || n.equals("netherite_sword"))
 					|| c.player.getMainHandItem().getItem().toString().matches(".*(iron|diamond|netherite)_sword.*");
-			var bag = c.items();
-			int steak = bag.getOrDefault("cooked_beef", 0) + bag.getOrDefault("cooked_porkchop", 0), raw = bag.getOrDefault("beef", 0) + bag.getOrDefault("porkchop", 0);
+			var packs = c.items();
+			int steak = packs.getOrDefault("cooked_beef", 0) + packs.getOrDefault("cooked_porkchop", 0), raw = packs.getOrDefault("beef", 0) + packs.getOrDefault("porkchop", 0);
 			boolean packed = steak >= 4 || o.meals >= 10;                       // (four steaks or chops, the best food there is: or plenty of anything)
 			boolean ready = inNether || packed && o.health >= c.player.getMaxHealth() - 0.5f && sword;   // (packed before the portal, as a player does: food for the trip, a sword, full health; Cid went in with little food and came back at seven health, starving)
 			if (!inNether && !ready && !o.night) {
