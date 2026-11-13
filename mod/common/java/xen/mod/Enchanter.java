@@ -43,7 +43,7 @@ final class Enchanter {
 	private int worthSlot() {
 		var inv = c.player.getInventory();
 		int best = -1, bestTier = 2;
-		for (int i = 0; i < inv.getContainerSize(); i++) {
+		for (int i = 0; i < 36; i++) {                                         // (its bag and hotbar only: the slots past them are what it wears, and the menu has no place for those; Ann put her worn armor's slot in, the wrong thing went on the table, "not enough levels" every three seconds)
 			ItemStack s = inv.getItem(i);
 			if (s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
 			String n = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
@@ -56,11 +56,37 @@ final class Enchanter {
 		return best;
 	}
 
+	/** Armor it wears that's worth enchanting and isn't yet (iron or diamond), or null. */
+	private net.minecraft.world.entity.EquipmentSlot wornWorth() {
+		for (net.minecraft.world.entity.EquipmentSlot es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+			ItemStack s = c.player.getItemBySlot(es);
+			if (s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
+			if (MindSense.tier(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()) > 2) return es;
+		}
+		return null;
+	}
+
+	/** One piece of what it wears off into its bag, to go on the table (its armor habit puts it back on after). True if it did. */
+	private boolean takeOffForTable() {
+		var es = wornWorth();
+		if (es == null) return false;
+		var inv = c.player.getInventory();
+		for (int i = 9; i < 36; i++) {
+			if (!inv.getItem(i).isEmpty()) continue;
+			inv.setItem(i, c.player.getItemBySlot(es).copy());
+			c.player.setItemSlot(es, ItemStack.EMPTY);
+			c.journal("does", "takes off its " + BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath().replace('_', ' ') + " to enchant it");
+			return true;
+		}
+		return false;
+	}
+
 	/** Could it enchant something now (or make the table for it)? */
 	boolean possible() {
 		if (on) return true;
 		var items = c.items();
-		if (items.getOrDefault("lapis_lazuli", 0) < 1 || c.player.experienceLevel < 1 || worthSlot() < 0) return false;
+		if (items.getOrDefault("lapis_lazuli", 0) < 1 || c.player.experienceLevel < 1 || worthSlot() < 0 && wornWorth() == null) return false;
 		return table() != null || items.getOrDefault("enchanting_table", 0) > 0
 				|| items.getOrDefault("book", 0) >= 1 && items.getOrDefault("diamond", 0) >= 2 && items.getOrDefault("obsidian", 0) >= 4;
 	}
@@ -112,6 +138,7 @@ final class Enchanter {
 		}
 		if (!c.hands.canClick(t)) return c.walkTo(Vec3.atBottomCenterOf(t));
 		int slot = worthSlot();
+		if (slot < 0 && takeOffForTable()) slot = worthSlot();                // (its tools done: the armor it wears next, a piece at a time)
 		if (slot < 0 || c.items().getOrDefault("lapis_lazuli", 0) == 0) {
 			on = false;
 			return null;

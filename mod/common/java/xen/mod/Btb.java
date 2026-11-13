@@ -221,7 +221,8 @@ final class Btb {
 		if (lootFor && !o.night && o.overworld && visitThere)
 			out.add(new Option(Task.VISIT, 3.5f, "a village's chests or a ruined portal's first (obsidian at the weaponsmith's, iron, the portal's own)"));
 		if (goal.equals("enchant")) {
-			if (c.enchanter.possible()) out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
+			if (c.enchanter.possible() && c.player.level().getGameTime() > c.enchanter.retryAt)   // (not again the moment it couldn't: Ann tried every three seconds)
+				out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
 			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		if (goal.equals("home") && !o.night) out.add(new Option(Task.HOME, 3, "a home"));
