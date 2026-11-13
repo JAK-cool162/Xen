@@ -215,6 +215,24 @@ final class Nether {
 			start(why);
 			return "You will get four obsidian (mined, or made by pouring water on lava), make an enchanting table and enchant your gear.";
 		}
+		boolean goldOn = false;                                                 // a piece of gold armor before the Nether: piglins leave players in gold alone (Cid went in with none)
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
+			goldOn |= BuiltInRegistries.ITEM.getKey(c.player.getItemBySlot(slot).getItem()).getPath().startsWith("golden_");
+		for (int i = 0; i < 36 && !goldOn; i++) {
+			String n = BuiltInRegistries.ITEM.getKey(c.player.getInventory().getItem(i).getItem()).getPath();
+			goldOn = n.startsWith("golden_") && (n.endsWith("_boots") || n.endsWith("_helmet") || n.endsWith("_chestplate") || n.endsWith("_leggings"));
+		}
+		int gold = c.items().getOrDefault("gold_ingot", 0), rawGold = c.items().getOrDefault("raw_gold", 0);
+		if (!goldOn && gold >= 4 && !c.crafter.hasOrder()) {
+			c.crafter.orderRecipe("golden_boots", 1);
+			c.knowledge.known.putIfAbsent("piglin_gold", Knowledge.How.TAUGHT);
+			c.journal("does", "makes golden boots before the Nether (piglins leave players in gold alone)");
+		} else if (!goldOn && gold + rawGold >= 4 && rawGold > 0) {
+			c.journal("thinks", "smelts its raw gold first: golden boots before the Nether");
+			c.knowledge.known.putIfAbsent("piglin_gold", Knowledge.How.TAUGHT);
+			return c.chores.smelt();
+		}
 		BlockPos portal = c.places.nearest("portal");
 		boolean canBuild = obsidian() >= 10 && has("flint_and_steel");
 		boolean canGet = c.crafter.pickTier() >= 4 || has("water_bucket") || has("bucket") || iron() >= 3;
