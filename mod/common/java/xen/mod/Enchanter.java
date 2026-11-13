@@ -114,13 +114,30 @@ final class Enchanter {
 		return null;
 	}
 
+	private static final java.util.Set<String> CHEAP = java.util.Set.of("dirt", "cobblestone", "cobbled_deepslate", "gravel", "andesite", "diorite", "granite", "tuff",
+			"netherrack", "sand", "red_sand", "rotten_flesh", "wheat_seeds", "beetroot_seeds", "leaf_litter", "flint", "poisonous_potato", "spider_eye", "calcite", "dripstone_block");
+
 	/** One piece of what it wears off into its bag, to go on the table (its armor habit puts it back on after). True if it did. */
 	private boolean takeOffForTable() {
 		var es = wornWorth();
 		if (es == null) return false;
 		var inv = c.player.getInventory();
-		for (int i = 9; i < 36; i++) {
-			if (!inv.getItem(i).isEmpty()) continue;
+		int free = -1;
+		for (int i = 0; i < 36 && free < 0; i++) if (inv.getItem(i).isEmpty()) free = i;
+		if (free < 0) {                                                          // a full bag: the cheapest stack goes, as a player presses Q (Ann's full bag: her boots never came off, her enchanting begun and dropped every few seconds)
+			int cheapest = -1;
+			for (int i = 0; i < 36; i++) {
+				String id = BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath();
+				if (!CHEAP.contains(id) && !id.endsWith("_sapling")) continue;
+				if (cheapest < 0 || inv.getItem(i).getCount() < inv.getItem(cheapest).getCount()) cheapest = i;
+			}
+			if (cheapest < 0) return false;
+			ItemStack out = inv.removeItemNoUpdate(cheapest);
+			c.hands.toss(out);
+			c.journal("does", "tosses " + out.getCount() + " " + BuiltInRegistries.ITEM.getKey(out.getItem()).getPath().replace('_', ' ') + " to make room for its armor at the table");
+			free = cheapest;
+		}
+		for (int i = free; i <= free; i++) {
 			inv.setItem(i, c.player.getItemBySlot(es).copy());
 			c.player.setItemSlot(es, ItemStack.EMPTY);
 			c.journal("does", "takes off its " + BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath().replace('_', ' ') + " to enchant it");
