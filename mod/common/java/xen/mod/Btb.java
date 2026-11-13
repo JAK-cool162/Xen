@@ -281,7 +281,16 @@ final class Btb {
 		if (chest != null && !o.night && o.overworld && o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0 && chest.closerThan(c.player.blockPosition(), 160))
 			out.add(new Option(Task.STASH, 4.1f, "its diamonds from its chest: for its gear"));
 		if (goal.equals("nether")) {
-			if (rods() < 12) out.add(new Option(Task.BLAZE, 3.6f, "blaze rods: a fortress in the Nether"));
+			boolean inNether = c.nether.inNether();
+			boolean sword = c.items().keySet().stream().anyMatch(n -> n.equals("iron_sword") || n.equals("diamond_sword") || n.equals("netherite_sword"))
+					|| c.player.getMainHandItem().getItem().toString().matches(".*(iron|diamond|netherite)_sword.*");
+			boolean ready = inNether || o.meals >= 8 && o.health >= 16 && sword;   // (packed before the portal, as a player does: food for the trip, a sword, well; Cid went in with little food and came back at seven health, starving)
+			if (!inNether && !ready && !o.night) {
+				if (o.meals < 8) out.add(new Option(Task.FOOD, 3.8f, "food packed for the Nether (" + o.meals + " of 8)"));
+				if (!sword && o.iron >= 2 && !c.crafter.hasOrder()) c.crafter.orderRecipe(o.tier >= 4 && o.diamonds >= 2 ? "diamond_sword" : "iron_sword", 1);
+				if (!c.crafter.hasShield() && o.iron >= 1 && c.crafter.woodCount() >= 2 && !c.crafter.hasOrder()) c.crafter.orderRecipe("shield", 1);
+			}
+			if (rods() < 12 && ready) out.add(new Option(Task.BLAZE, 3.6f, "blaze rods: a fortress in the Nether"));
 			if (pearls() < 12) out.add(new Option(Task.PEARLS, rods() < 12 ? 3.3f : 3.7f, "ender pearls: endermen"));
 		}
 		if (c.goals.home == null && o.tier >= 2 && !o.night && c.mod.config.wants && goal.equals("world"))
