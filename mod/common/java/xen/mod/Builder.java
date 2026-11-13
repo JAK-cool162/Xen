@@ -692,7 +692,8 @@ final class Builder {
 	 */
 	private String resume(ServerLevel level, BlockPos near) {
 		Unfinished u = unfinished;
-		if (u == null || !u.dimension().equals(Places.dim(level)) || !u.corner().closerThan(near, 96)) return null;
+		boolean starter = u != null && u.home() != null && u.home().design().w() * u.home().design().d() <= 42;
+		if (u == null || !u.dimension().equals(Places.dim(level)) || !u.corner().closerThan(near, starter ? 512 : 96)) return null;   // (its first base begun: it goes back to it from further off, not a new one where it happens to be; Cid, 380 blocks off, a third cottage)
 		Architect.Plan made;
 		String of;
 		if (u.village() != null) {
