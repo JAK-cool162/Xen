@@ -220,6 +220,8 @@ final class Btb {
 		boolean hurtNoFood = o.meals == 0 && o.food < 18 && o.health <= 12;     // (hurt, under 18 it doesn't heal, nothing to eat: food comes first; Ann at five health went after diamonds, then coal, ten minutes)
 		boolean darkOut = (dusk || o.night) && o.overworld && !o.under;           // (out in the dark, a hunt is the night's monsters' hunt: Ann, food 6, after a chicken at night, a zombie; under 18 it doesn't heal, but it doesn't hurt either: a roof first, the hunt at dawn)
 		if (o.meals < 2 && o.food < 18 && (!darkOut || o.food <= 3)) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
+		else if (o.meals < 4 && !o.night && !dusk && o.overworld && !o.under)   // (its bag nearly out of food, still fed: a hunt now, by day, up here, not once it's hungry at the bottom of a mine or after dark; 19 of 23 deaths came at three health or less, unhealed for want of food)
+			out.add(new Option(Task.FOOD, o.meals == 0 ? 3.9f : o.meals == 1 ? 3.4f : 2.6f, "food for later: its bag's nearly out"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
@@ -418,7 +420,7 @@ final class Btb {
 			case IRON -> ch.mine(c.lessons.depth("iron", 16), "iron", o.tier == 2 ? 3 : 10);
 			case DIAMONDS -> ch.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, c.goals.diamondsWanted() - o.diamonds));
 			case SMELT -> ch.smelt();
-			case FOOD -> ch.hunt(3);
+			case FOOD -> ch.hunt(o.meals == 0 ? 5 : 3);
 			case SHELTER -> shelterOrPlanB(o);
 			case ENCHANT -> c.enchanter.start();
 			case TABLE -> tableStep();
