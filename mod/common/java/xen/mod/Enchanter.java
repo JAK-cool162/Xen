@@ -42,6 +42,51 @@ final class Enchanter {
 	}
 
 	/** Something worth enchanting (iron or diamond tools, weapons, armor) that isn't yet. */
+	/** The strongest offer on the table it can pay for (-1: none). */
+	private int choose(EnchantmentMenu menu) {
+		for (int i = 2; i >= 0; i--)
+			if (menu.costs[i] > 0 && menu.costs[i] <= c.player.experienceLevel && c.player.experienceLevel >= i + 1) return i;
+		return -1;
+	}
+
+	/** The enchantment an offer shows ("minecraft:sharpness"; "" if none or unknown). */
+	private String clue(EnchantmentMenu menu, int i) {
+		int id = menu.enchantClue[i];
+		if (id < 0) return "";
+		try {
+			var reg = c.player.level().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ENCHANTMENT);
+			var h = reg.asHolderIdMap().byId(id);
+			return h == null ? "" : h.getRegisteredName();
+		} catch (RuntimeException e) {
+			return "";
+		}
+	}
+
+	/** Is this offer what it wants on the item on the table (by default: Sharpness on a sword, Fortune or Efficiency on a tool, Protection on armor)? */
+	private boolean wanted(EnchantmentMenu menu, int i) {
+		return wants(BuiltInRegistries.ITEM.getKey(menu.getSlot(0).getItem().getItem()).getPath(), clue(menu, i));
+	}
+
+	static boolean wants(String item, String enchantment) {
+		String e = enchantment.replace("minecraft:", "");
+		if (item.endsWith("_sword")) return e.equals("sharpness");
+		if (item.endsWith("_pickaxe") || item.endsWith("_shovel") || item.endsWith("_axe") || item.endsWith("_hoe")) return e.equals("fortune") || e.equals("efficiency");
+		if (item.endsWith("_helmet") || item.endsWith("_chestplate") || item.endsWith("_leggings") || item.endsWith("_boots")) return e.equals("protection");
+		return false;
+	}
+
+	/** Its other pieces worth enchanting (iron or diamond, not enchanted yet), up to three, past the one on the table. */
+	private java.util.List<Integer> others(int skip) {
+		var inv = c.player.getInventory();
+		java.util.List<Integer> out = new java.util.ArrayList<>();
+		for (int i = 0; i < 36 && out.size() < 3; i++) {
+			ItemStack s = inv.getItem(i);
+			if (i == skip || s.isEmpty() || s.isEnchanted() || !s.isEnchantable()) continue;
+			if (MindSense.tier(BuiltInRegistries.ITEM.getKey(s.getItem()).getPath()) > 2) out.add(i);
+		}
+		return out;
+	}
+
 	private int worthSlot() {
 		var inv = c.player.getInventory();
 		int best = -1, bestTier = 2;
@@ -179,13 +224,22 @@ final class Enchanter {
 			Compat.click(menu, i < 9 ? 29 + i : 2 + i - 9, true, c.player);    // and the lapis
 			break;
 		}
-		int pick = -1;
-		for (int i = 2; i >= 0; i--) {                                          // the strongest it can pay for
-			if (menu.costs[i] > 0 && menu.costs[i] <= c.player.experienceLevel && c.player.experienceLevel >= i + 1) {
-				pick = i;
-				break;
+		int pick = choose(menu);
+		if (pick >= 0 && !wanted(menu, pick)) {                                 // none of what it wants on offer for this one: its other pieces first (enchanted at the table once, an item can't be again: a wrong one is for good)
+			for (int other : others(slot)) {
+				Compat.click(menu, 0, true, c.player);                         // that one back out
+				Compat.click(menu, other < 9 ? 29 + other : 2 + other - 9, true, c.player);
+				int op = choose(menu);
+				if (op >= 0 && wanted(menu, op)) {
+					pick = op;
+					break;
+				}
+				pick = op;                                                       // (none anywhere: the strongest on the last it tried)
 			}
 		}
+		String clue = pick >= 0 ? clue(menu, pick).replace("minecraft:", "") : "";
+		String onIt = BuiltInRegistries.ITEM.getKey(menu.getSlot(0).getItem().getItem()).getPath();
+		boolean liked = pick >= 0 && wanted(menu, pick);
 		boolean done = pick >= 0 && menu.clickMenuButton(c.player, pick);
 		Compat.click(menu, 0, true, c.player);                                 // the item back into its bag
 		Compat.click(menu, 1, true, c.player);                                 // and what lapis is left
@@ -201,7 +255,7 @@ final class Enchanter {
 		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
 		if (done) {
 			c.chatter(c.pick3("Enchanted! That glow...", "Ooh, shiny. Enchanted.", "The table liked that one."), false);
-			c.journal("does", "enchanted its gear (option " + (pick + 1) + ")");
+			c.journal("does", "enchanted its gear (option " + (pick + 1) + ", its " + onIt.replace('_', ' ') + ": " + clue.replace('_', ' ') + (liked ? ", one it wanted" : ", none it wanted on offer") + ")");
 		} else {
 			c.journal("does", "couldn't enchant yet (not enough levels)");
 		}

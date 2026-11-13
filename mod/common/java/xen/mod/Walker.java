@@ -228,7 +228,11 @@ final class Walker {
 		BlockPos wasEyes = eyes;
 		double wasRock = rock;
 		try {
-			List<Move> m = plan((ServerLevel) c.player.level(), c.player.blockPosition(), Vec3.atBottomCenterOf(to), Goal.near(to, 3));
+			ServerLevel lv = (ServerLevel) c.player.level();
+			BlockPos start = c.player.blockPosition();
+			for (int i = 0; i < 6 && !c.player.onGround() && !c.player.isInWater() && lv.getBlockState(start.below()).getCollisionShape(lv, start.below()).isEmpty(); i++)
+				start = start.below();                                               // (in the air, a jump or a fall: from the ground it comes down on; Eve, mid-jump, "no way" to all three pools)
+			List<Move> m = plan(lv, start, Vec3.atBottomCenterOf(to), Goal.near(to, 3));
 			imaginedPartial = partial;
 			return m;
 		} finally {

@@ -86,6 +86,8 @@ final class Roster {
 			o.add("chronicle", chronicle);
 		}
 		if (c.builder.home != null) o.add("homeBuild", c.builder.homeJson());
+		var lost = c.lostJson();                                                  // (its things lying where it died)
+		if (lost != null) o.add("lostThings", lost);
 		var building = c.builder.unfinishedJson();                                // (the one it stopped, or the one it's on now)
 		if (building != null) o.add("unfinishedBuild", building);
 		if (c.chores.mineRecordY != Integer.MIN_VALUE) {

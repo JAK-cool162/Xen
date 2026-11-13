@@ -2516,6 +2516,35 @@ public final class Companion {
 	/** It found some of its things there (or none: they were gone). */
 	private boolean lostFoundAny;
 
+	/** Where its things lie, kept with the world (a restart isn't a reason to forget them: Hal died in diamond, the server restarted a minute later, and he never went back). Null: nothing lying anywhere. */
+	com.google.gson.JsonObject lostJson() {
+		if (lostAt == null || player == null) return null;
+		var o = new com.google.gson.JsonObject();
+		o.addProperty("at", lostAt.getX() + "," + lostAt.getY() + "," + lostAt.getZ());
+		o.addProperty("dim", lostDimension == net.minecraft.world.level.Level.NETHER ? "nether" : lostDimension == net.minecraft.world.level.Level.END ? "end" : "overworld");
+		o.addProperty("left", Math.max(0, lostUntil - player.level().getGameTime()));
+		o.addProperty("aged", lostAged);
+		return o;
+	}
+
+	void loadLost(com.google.gson.JsonObject o, long now) {
+		try {
+			String[] at = o.get("at").getAsString().split(",");
+			lostAt = new BlockPos(Integer.parseInt(at[0]), Integer.parseInt(at[1]), Integer.parseInt(at[2]));
+			String d = o.get("dim").getAsString();
+			lostDimension = d.equals("nether") ? net.minecraft.world.level.Level.NETHER : d.equals("end") ? net.minecraft.world.level.Level.END : net.minecraft.world.level.Level.OVERWORLD;
+			lostUntil = now + o.get("left").getAsLong();
+			lostAged = o.get("aged").getAsLong();
+			lostAgedAt = now;
+			lostBest = Double.MAX_VALUE;
+			lostProgressAt = now;
+			lostFoundAny = false;
+			saidGoingBack = false;
+		} catch (RuntimeException e) {
+			lostAt = null;
+		}
+	}
+
 	/** Back for its things after dying, like a player (before they're gone, and not straight into what killed it). */
 	/** Going back for its things (they're lying where it died)? */
 	boolean lostThings() {

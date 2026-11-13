@@ -470,11 +470,15 @@ final class Builder {
 				return planned;
 			}
 			Taste.Design ds = c.taste.design(starter && asked == null, creative, asked, area(level, feet));
+			if (forceStarter && !creative) {                                         // a base before the Nether, quick: six by five of cobblestone, a flat roof, a door, nothing more (Bob's "simple" cottage wanted 160 logs and was never done)
+				ds = new Taste.Design(6, 5, 3, Taste.Roof.FLAT, false, false, false, false, false, false, false, false, false, false, false, Taste.Style.COTTAGE, false, false);
+				p = new Architect.Palette(p.name(), "cobblestone", "cobblestone", "cobblestone", p.roof(), "cobblestone", "air", p.door(), p.fence(), p.trapdoor(), p.light());
+			}
 			BlockPos corner = Architect.site(level, near != null ? near : feet.relative(front.getOpposite(), 3), front, ds.w() + 1, ds.d() + 1);
 			if (corner == null) return "You can't build a house here: it's all water or cliffs around. Somewhere with dry ground would work.";
 			if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
 				p = Architect.ofWood(p.name(), true, p.window().equals("glass_pane"));   // it wants stone at the bottom: it'll dig some
-			int stage = stageFor(starter);
+			int stage = forceStarter && !creative ? Architect.SHAPE : stageFor(starter);
 			made = Architect.designed(corner, front, ds, p, new Random(corner.asLong()), stage);
 			design = ds;
 			String of = creative ? "" : " out of " + p.name() + " wood" + (p.base().equals("cobblestone") ? " and cobblestone" : "");
