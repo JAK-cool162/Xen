@@ -258,6 +258,43 @@ public final class Hands {
 		return r.getType() == net.minecraft.world.phys.HitResult.Type.MISS || r.getBlockPos().equals(pos);
 	}
 
+	/** A few ticks of a small step sideways while it digs, and which way. */
+	private int swayTicks;
+
+	/**
+	 * Digging something slow (obsidian, ore with a weak pickaxe, by hand), it doesn't stand like a statue: now and then a
+	 * small step to one side or back, as players shuffle while they mine. Never on its way through (its walker's dig),
+	 * off the ground, in water, in a fight, nearly done, or where the step would be a drop, lava or a wall; the block
+	 * stays in reach and in sight (a few ticks at a third of a walk: a fifth of a block). Walking doesn't slow a dig.
+	 */
+	private void sway(ServerLevel level) {
+		if (swayTicks > 0) {
+			if (--swayTicks == 0) p.xxa = p.zza = 0;
+			return;
+		}
+		if (p.companion == null || digging == null || digging.equals(wayDig) || !p.onGround() || p.isInWater() || habitCrouch || p.isShiftKeyDown()
+				|| p.companion.fightingNow() || p.getRandom().nextInt(45) != 0) return;
+		float rate = progress / Math.max(1, ticks - digStartTick);
+		if (rate <= 0 || (1f - progress) / rate < 30) return;                  // (nearly through: it keeps still)
+		int way = p.getRandom().nextInt(3);                                   // 0 left, 1 right, 2 back
+		Direction facing = p.getDirection();
+		Direction side = way == 0 ? facing.getCounterClockWise() : way == 1 ? facing.getClockWise() : facing.getOpposite();
+		BlockPos to = p.blockPosition().relative(side);
+		for (BlockPos q : new BlockPos[] {to, to.above()})
+			if (!level.getBlockState(q).getCollisionShape(level, q).isEmpty() || !level.getFluidState(q).isEmpty()) return;   // (a wall, water, lava that way)
+		BlockPos under = to.below();
+		if (level.getBlockState(under).getCollisionShape(level, under).isEmpty() || !level.getFluidState(under).isEmpty()) return;   // (a drop, or lava, under the step)
+		for (Direction d : Direction.values()) if (level.getFluidState(to.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return;   // (lava by it: not that way)
+		if (p.getEyePosition().add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(0.25)).distanceTo(Vec3.atCenterOf(digging)) > p.blockInteractionRange() - 0.4) return;
+		swayTicks = 3 + p.getRandom().nextInt(4);
+		if (way == 2) p.zza = -0.3f;
+		else p.xxa = way == 0 ? 0.3f : -0.3f;
+		if (edgeAhead()) {                                                    // (its edge sense says a drop that way after all: still; an edge stop would end the dig)
+			p.xxa = p.zza = 0;
+			swayTicks = 0;
+		}
+	}
+
 	/** Breaking a block right now (its dig has its own limits). */
 	boolean diggingNow() {
 		return digging != null;
@@ -355,11 +392,9 @@ public final class Hands {
 				turnToward(watching.getEyePosition(), 30f, 25f);
 				return;
 			}
-			Vec3 d = watching.getEyePosition().subtract(p.getEyePosition());
-			float yRot = (float) Math.toDegrees(Math.atan2(-d.x, d.z));
-			p.setYRot(yRot);
-			p.setYHeadRot(yRot);
-			p.setXRot((float) -Math.toDegrees(Math.atan2(d.y, Math.hypot(d.x, d.z))));
+			// in a fight: its crosshair follows them fast but like a hand on a mouse (it speeds up, slows onto them), on the
+			// chest, not snapped to their eyes every tick (it looked like a bot)
+			turnToward(watching.position().add(0, watching.getBbHeight() * 0.65, 0), 55f, 40f);
 			return;
 		}
 		float yRot = YAW[yaw];
@@ -665,6 +700,8 @@ public final class Hands {
 		}
 		progress += state.getDestroyProgress(p, level, digging);
 		Compat.swing(p);
+		if (aimPoint != null) turnToward(aimPoint, 8f, 8f);                   // its crosshair stays on the block as it moves (small corrections, like a player's)
+		sway(level);
 		if (ticks >= limit - 1 && progress < 1f) {                              // its time's up on this block: nearly there at this pace, on; else why, for its journal
 			float rate = progress / Math.max(1, ticks - digStartTick);
 			if (rate > 0 && (1f - progress) / rate < 600) limit = ticks + (int) ((1f - progress) / rate) + 10;
