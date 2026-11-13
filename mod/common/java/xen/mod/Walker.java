@@ -841,7 +841,7 @@ final class Walker {
 					boolean clear = passable(p.above(2)) && floor(land) && passable(land) && passable(land.above()) && passable(land.above(2));
 					for (int i = 1; i <= g && clear; i++) {
 						BlockPos mid = p.relative(d, i);
-						clear = passable(mid) && passable(mid.above()) && passable(mid.above(2)) && !floor(mid);
+						clear = passable(mid) && passable(mid.above()) && passable(mid.above(2)) && !floor(mid) && !lavaInDrop(mid.below());   // (lava down the gap: a short jump is a fall into it)
 					}
 					if (clear && !farmland(land)) add(Kind.PARKOUR, p, land, (g + 1) * SPRINT + 4 + g * 6 * fear + danger(land), List.of());
 					if (!clear) break;
