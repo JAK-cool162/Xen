@@ -2428,13 +2428,12 @@ public final class Companion {
 	/** A bed it put down out in the wild for the night (it takes it with it in the morning). */
 	private BlockPos campBed;
 
-	private long respawnedAt = -1;
 
 	/** Just back from dying, at night: into the bed it woke by, at once (one asleep skips the night for all; Fin died three times in 45 s at his spawn, a skeleton there). */
 	private Action wakeBed() {
 		if (player.isSleeping()) return Action.IDLE;
 		var level = (ServerLevel) player.level();
-		if (respawnedAt < 0 || level.getGameTime() - respawnedAt > 20 * 30 || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		if (level.getGameTime() - respawnedAt > 20 * 30 || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
 		long time = Compat.timeOfDay(level) % 24000;
 		if (time < 12600 || time > 23400) return null;
 		BlockPos feet = player.blockPosition();
@@ -5410,7 +5409,6 @@ public final class Companion {
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
 		try {
 			join(spot.newLevel(), at, spot.yRot());
-			respawnedAt = server.overworld().getGameTime();
 		} finally {
 			XenMod.quietJoin = false;
 		}
