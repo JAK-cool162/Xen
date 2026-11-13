@@ -1228,6 +1228,7 @@ final class Fighter {
 						var under = s.below();
 						if (!free(level, s) || !free(level, s.above()) || level.getBlockState(under).getCollisionShape(level, under).isEmpty()
 								|| !level.getFluidState(under).isEmpty()) continue;
+						if (byDrop(level, s)) continue;                              // (not on the brink: an arrow's knock sends it over; Eve took cover by a ledge from a skeleton and fell twenty-three blocks, in diamond, from full health)
 						Vec3 eye = Vec3.atBottomCenterOf(s).add(0, 1.6, 0);
 						if (seen(shooter, eye) || seen(shooter, Vec3.atBottomCenterOf(s).add(0, 0.5, 0))) continue;
 						double score = Vec3.atBottomCenterOf(s).distanceTo(shooter.position());
@@ -1519,6 +1520,23 @@ final class Fighter {
 		var p = c.player;
 		return p.level().getEntitiesOfClass(LivingEntity.class, foe.getBoundingBox().inflate(1.0, 0.25, 1.0),
 				m -> m != foe && m != p && m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy && p.distanceToSqr(m) < 9).size();
+	}
+
+	/** A drop of four or more (or lava) right beside this spot: a knock from there sends it over. */
+	private static boolean byDrop(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos s) {
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+			net.minecraft.core.BlockPos n = s.relative(d);
+			if (!level.getBlockState(n).getCollisionShape(level, n).isEmpty()) continue;   // (a wall that side)
+			int down = 0;
+			for (int k = 1; k <= 4; k++) {
+				net.minecraft.core.BlockPos b = n.below(k);
+				if (level.getFluidState(b).is(net.minecraft.tags.FluidTags.LAVA)) return true;
+				if (!level.getBlockState(b).getCollisionShape(level, b).isEmpty() || !level.getFluidState(b).isEmpty()) break;
+				down++;
+			}
+			if (down >= 4) return true;
+		}
+		return false;
 	}
 
 	/** Lava or a drop of four or more just behind it (as seen from here): a knock back sends it there. */
