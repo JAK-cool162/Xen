@@ -466,6 +466,7 @@ final class Chores {
 				begin(Kind.SHELTER);
 				pit = hole;
 				nookTried = false;
+				downTried = false;
 				walls = List.of();
 				shape = "hole";
 				waited = 0;
@@ -508,6 +509,7 @@ final class Chores {
 				begin(Kind.SHELTER);
 				pit = hole;
 				nookTried = false;
+				downTried = false;
 				walls = List.of();
 				shape = "hole";
 				waited = 0;
@@ -637,7 +639,10 @@ final class Chores {
 					begin(Kind.SHELTER);
 					pit = hole;
 					nookTried = false;
+					downTried = false;
+				downTried = false;
 				nookTried = false;
+				downTried = false;
 					walls = List.of();
 					shape = "hole";
 					waited = 0;
@@ -695,7 +700,7 @@ final class Chores {
 
 	/** The hole it's digging for the night (the two blocks under it), or null; and whether it tried a pocket in its side already. */
 	private List<BlockPos> pit;
-	private boolean nookTried;
+	private boolean nookTried, downTried;
 
 	/** Beside the bottom of its hole: two blocks of earth or stone it can dig out, solid over them (a roof) and under them. Null: none. */
 	private BlockPos sidePocket(ServerLevel level, BlockPos bottom) {
@@ -711,6 +716,18 @@ final class Chores {
 			return side.immutable();
 		}
 		return null;
+	}
+
+	/** Two blocks straight down from here dug, it stands in them: earth or stone to dig (nothing it can't), no water or lava beside or under, ground under the bottom. */
+	private static boolean downHere(ServerLevel level, BlockPos f) {
+		for (int k = 1; k <= 2; k++) {
+			BlockPos b = f.below(k);
+			var st = level.getBlockState(b);
+			if (st.getDestroySpeed(level, b) < 0 || st.getDestroySpeed(level, b) > 3 || !level.getFluidState(b).isEmpty()) return false;
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) if (!level.getFluidState(b.relative(d)).isEmpty()) return false;
+		}
+		BlockPos under = f.below(3);
+		return !level.getBlockState(under).getCollisionShape(level, under).isEmpty() && level.getFluidState(under).isEmpty();
 	}
 
 	private Action pitNext() {
@@ -729,6 +746,14 @@ final class Chores {
 		BlockPos bottom = pit.get(1), cover = bottom.above(2);
 		if (!c.player.blockPosition().equals(bottom)) {                         // (falls in by itself; a step if it's beside it)
 			if (++waited > 80) {
+				BlockPos f = c.player.blockPosition();
+				if (!downTried && c.player.onGround() && downHere(level, f)) {     // it can't get into that one: straight down where it stands, as a player does (it drops in as it digs; Eve, nothing on her at night: "I couldn't get down into my hole", and a skeleton)
+					downTried = true;
+					pit = List.of(f.below(), f.below(2));
+					waited = 0;
+					c.journal("thinks", "can't get into its hole: digs straight down where it stands");
+					return Action.IDLE;
+				}
 				pit = null;
 				finish("I couldn't get down into my hole.");
 				return null;
@@ -3699,6 +3724,7 @@ final class Chores {
 				inside = null;
 				pit = hole;
 				nookTried = false;
+				downTried = false;
 				shape = "hole";
 				waited = 0;
 				return Action.IDLE;
