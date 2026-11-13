@@ -2982,9 +2982,51 @@ final class Chores {
 	/** Get to a block and mine it, the way a player would (dig down to it, climb one block to reach it). */
 	private long reachSaidAt = -1000;
 
+	/** The slow blocks it commits to once it can get at one safely: obsidian (ten seconds with a diamond pickaxe), ancient debris. */
+	private static final java.util.Set<String> COMMIT = java.util.Set.of("obsidian", "crying_obsidian", "ancient_debris");
+
+	/**
+	 * A block of obsidian in reach, and safe to break: it commits, as a player does, its best pickaxe out and its eyes
+	 * on it till it breaks, nothing else this while (a hit or a monster still comes first: its hands' own rule). Safe:
+	 * no lava by it but under it (lava doesn't run up), and not the block under its own feet with lava or a drop below
+	 * (then it steps aside first). Ann stood on a floor of eleven obsidian for half an hour, a stone shovel in her hand,
+	 * and broke none: the way to each block, turning and a step and looking again, never got as far as the pickaxe.
+	 */
+	private Action commitDig(BlockPos t) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		net.minecraft.world.level.block.state.BlockState st = level.getBlockState(t);
+		if (!COMMIT.contains(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath())) return null;
+		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) > c.player.blockInteractionRange() - 0.3) return null;
+		if (c.crafter.pickTier() < 4 && !net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath().equals("ancient_debris")) return null;   // (obsidian needs a diamond pickaxe or it drops nothing)
+		for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+			if (d == net.minecraft.core.Direction.DOWN) continue;
+			if (level.getFluidState(t.relative(d)).is(net.minecraft.tags.FluidTags.LAVA)) return null;   // (lava would run into the hole: the careful way, mine())
+		}
+		var box = c.player.getBoundingBox();
+		boolean onIt = t.getY() == c.player.blockPosition().getY() - 1 && box.maxX > t.getX() && box.minX < t.getX() + 1 && box.maxZ > t.getZ() && box.minZ < t.getZ() + 1;
+		if (onIt && dangerBelow(level, t)) return null;                        // (standing on it, lava or a drop under: not from up here)
+		Hands hands = c.hands;
+		if (hands.busy() && t.equals(hands.target())) {                        // at it already: on with it
+			c.acted = true;
+			return Action.IDLE;
+		}
+		if (!hands.mine(t)) return null;
+		if (!t.equals(committedTo)) {
+			committedTo = t.immutable();
+			c.journal("does", "gets at the " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).getPath().replace('_', ' ') + " at " + t.toShortString()
+					+ " (in reach, safe: on till it breaks)");
+		}
+		c.acted = true;
+		return Action.IDLE;
+	}
+
+	private BlockPos committedTo;
+
 	private Action reach(BlockPos t) {
 		Hands hands = c.hands;
 		BlockPos feet = c.player.blockPosition();
+		Action committed = commitDig(t);
+		if (committed != null) return committed;
 		if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(t)) < 4.5) {   // right by it: 15 seconds and still there, it can't get at it
 			if (!t.equals(working)) {
 				working = t.immutable();
