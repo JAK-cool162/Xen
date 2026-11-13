@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -223,6 +223,9 @@ final class Btb {
 		if (o.meals < 2 && o.food < 18 && (!darkOut || o.food <= 3)) out.add(new Option(Task.FOOD, o.food < 10 || hurtNoFood ? 4.5f : 2.5f, hurtNoFood ? "hurt and nothing to eat: food to heal" : "little to eat"));
 		else if (o.meals < 4 && !o.night && !dusk && o.overworld && !o.under)   // (its bag nearly out of food, still fed: a hunt now, by day, up here, not once it's hungry at the bottom of a mine or after dark; 19 of 23 deaths came at three health or less, unhealed for want of food)
 			out.add(new Option(Task.FOOD, o.meals == 0 ? 3.9f : o.meals == 1 ? 3.4f : 2.6f, "food for later: its bag's nearly out"));
+		if (c.goals.home != null && c.farmer.middle == null && o.overworld && !o.night && !dusk && !o.under && o.health >= 12 && o.food >= 10 && o.tier >= 2
+				&& c.player.blockPosition().distSqr(c.goals.home) < 48 * 48 && now() >= notBefore.getOrDefault(Task.FARM, 0L))
+			out.add(new Option(Task.FARM, o.meals < 4 ? 4.2f : 3.6f, "a wheat farm at its base: bread that never runs out (most deaths were at low health with nothing to eat)"));
 		boolean smelter = c.chores.smelterAt() != null;
 		boolean tabling = goal.equals("enchant");                               // (its table needs no iron: the iron in its bag waits till it's enchanted; Ann smelted for five minutes first)
 		boolean pickFine = o.tier >= 3 && c.crafter.pickWorn() >= 0.5;          // (a good pickaxe in hand, half of it left: its diamonds before iron it doesn't need yet; at a fifth there was no time to make a spare, Cid's broke and he dug with stone for diamonds)
@@ -433,6 +436,7 @@ final class Btb {
 			if (c.chores.busy()) c.chores.cancel();
 			if (c.nether.busy()) c.nether.cancel();
 			if (c.builder.busy()) c.builder.cancel();
+			if (c.farmer.on) c.farmer.cancel();
 			if (task == Task.VISIT) c.visits.stop(life);
 			dropped = true;
 		}
@@ -512,6 +516,11 @@ final class Btb {
 			case DIAMONDS -> ch.mine(c.lessons.depth("diamonds", -58), "diamonds", Math.max(3, c.goals.diamondsWanted() - o.diamonds));
 			case SMELT -> ch.smelt();
 			case FOOD -> {
+				int wheat = c.items().getOrDefault("wheat", 0);
+				if (wheat >= 3 && !c.crafter.hasOrder()) {                          // (its farm's wheat: bread at once, no hunt)
+					c.crafter.orderRecipe("bread", wheat / 3);
+					yield "You will bake bread from your wheat.";
+				}
 				var prey = ch.nearestAnimal();
 				boolean noAnimals = prey == null || prey.distanceTo(c.player) > 24;
 				if (noAnimals && !o.night && c.visits.candidate()) {               // (no animals about, a village it knows: its hay is bread)
@@ -566,6 +575,11 @@ final class Btb {
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
+			case FARM -> {
+				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
+				c.knowledge.learn("crops_water", Knowledge.How.SEEN);             // (farmland by water: known, not found out by the field drying up)
+				yield c.farmer.start();
+			}
 			case STASH -> {
 				stashAt = now();
 				String kit = kitToTake(o);
@@ -681,7 +695,7 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy() || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.STASH && c.storage.busy() || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
