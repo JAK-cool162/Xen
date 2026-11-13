@@ -416,9 +416,40 @@ final class Habits {
 			java.util.Map.entry("feather", 8), java.util.Map.entry("wheat_seeds", 8), java.util.Map.entry("gravel", 0));
 
 	/** No room left in its bag: the junk goes (a stack at a time, like pressing Q), keeping a little. */
+	private static final java.util.regex.Pattern OLD_TOOL = java.util.regex.Pattern.compile("^(wooden|stone|golden)_(pickaxe|axe|shovel|hoe|sword)$");
+	private static final java.util.regex.Pattern OLD_ARMOR = java.util.regex.Pattern.compile("^(leather|chainmail|golden|iron)_(helmet|chestplate|leggings|boots)$");
+	private static final Set<String> CLUTTER = Set.of("egg", "clay_ball", "phantom_membrane", "red_mushroom", "brown_mushroom", "dandelion", "poppy", "blue_orchid",
+			"allium", "azure_bluet", "oxeye_daisy", "cornflower", "lily_of_the_valley", "sunflower", "lilac", "rose_bush", "peony", "pink_petals", "dead_bush",
+			"short_grass", "fern", "wildflowers", "leaf_litter", "firefly_bush", "bush", "cactus_flower");
+
+	/** What a player with a full bag throws out first: a wooden or stone tool it has an iron or diamond one of, armor worse than what it wears, flowers and the like, arrows with no bow. */
+	private boolean clutter(String id, java.util.Map<String, Integer> have) {
+		if (CLUTTER.contains(id) || id.endsWith("_tulip")) return true;
+		if (id.equals("arrow")) return !have.containsKey("bow") && !have.containsKey("crossbow");
+		var t = OLD_TOOL.matcher(id);
+		if (t.matches()) {
+			String kind = t.group(2);
+			return have.containsKey("iron_" + kind) || have.containsKey("diamond_" + kind) || have.containsKey("netherite_" + kind);
+		}
+		var a = OLD_ARMOR.matcher(id);
+		if (a.matches()) {
+			var slot = switch (a.group(2)) {
+				case "helmet" -> net.minecraft.world.entity.EquipmentSlot.HEAD;
+				case "chestplate" -> net.minecraft.world.entity.EquipmentSlot.CHEST;
+				case "leggings" -> net.minecraft.world.entity.EquipmentSlot.LEGS;
+				default -> net.minecraft.world.entity.EquipmentSlot.FEET;
+			};
+			String worn = BuiltInRegistries.ITEM.getKey(c.player.getItemBySlot(slot).getItem()).getPath();
+			return worn.startsWith("diamond_") || worn.startsWith("netherite_");
+		}
+		return false;
+	}
+
 	private void tossJunk() {
 		var inv = c.player.getInventory();
-		for (int i = 0; i < 36; i++) if (inv.getItem(i).isEmpty()) return;             // room left: nothing to do
+		int free = 0;
+		for (int i = 0; i < 36; i++) if (inv.getItem(i).isEmpty()) free++;
+		if (free >= 3) return;                                                          // room left: nothing to do (a couple of slots kept free: a full bag can't take the crafting table it makes, the armor it takes off to enchant, the obsidian it mines; all ten Xens had 34 to 36 of 36)
 		if (c.personality.sin(xen.mod.core.Sins.GREED) > 0.7f) return;                    // (a hoarder keeps it all)
 		java.util.Map<String, Integer> have = new java.util.HashMap<>();
 		for (int i = 0; i < 36; i++) {
@@ -428,17 +459,30 @@ final class Habits {
 		// All it has too much of, at once (one stack a time freed one slot, the next block it mined filled it: Ann tossed a
 		// single tuff every two seconds, picked it up again, and her obsidian never got in her full bag)
 		java.util.Map<String, Integer> tossed = new java.util.LinkedHashMap<>();
+		float yaw = c.player.getYRot();
+		c.player.setYRot(yaw + 180);                                                    // (behind it, not where it's walking: else it walks over it and has it back)
 		for (int i = 35; i >= 0; i--) {
 			ItemStack s = inv.getItem(i);
+			if (s.isEmpty()) continue;
 			String id = BuiltInRegistries.ITEM.getKey(s.getItem()).getPath();
-			if (!JUNK.contains(id)) continue;
-			int keep = KEEP.getOrDefault(id, 0);
+			if (clutter(id, have)) {
+				ItemStack out = inv.removeItemNoUpdate(i);
+				have.merge(id, -out.getCount(), Integer::sum);
+				if (have.getOrDefault(id, 0) <= 0) have.remove(id);
+				tossed.merge(id, out.getCount(), Integer::sum);
+				c.hands.toss(out);
+				continue;
+			}
+			boolean sapling = id.endsWith("_sapling");
+			if (!JUNK.contains(id) && !sapling) continue;
+			int keep = sapling ? 4 : KEEP.getOrDefault(id, 0);
 			if (have.get(id) - s.getCount() < keep) continue;                               // (what's left after this stack is still enough)
 			ItemStack out = inv.removeItemNoUpdate(i);
 			have.merge(id, -out.getCount(), Integer::sum);
 			tossed.merge(id, out.getCount(), Integer::sum);
 			c.hands.toss(out);
 		}
+		c.player.setYRot(yaw);
 		if (tossed.isEmpty()) return;
 		StringBuilder what = new StringBuilder();
 		tossed.forEach((id, n) -> what.append(what.length() > 0 ? ", " : "").append(n).append(' ').append(id.replace('_', ' ')));
