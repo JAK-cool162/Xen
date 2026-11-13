@@ -445,6 +445,14 @@ final class Habits {
 		return false;
 	}
 
+	/** Would it throw this out of its bag (clutter, junk past what it keeps, saplings past four)? Then it doesn't stop to pick it up either. */
+	boolean wouldToss(String id) {
+		var have = c.items();
+		if (clutter(id, have)) return true;
+		if (id.endsWith("_sapling")) return have.getOrDefault(id, 0) >= 4;
+		return JUNK.contains(id) && KEEP.containsKey(id) && have.getOrDefault(id, 0) >= KEEP.get(id);
+	}
+
 	private void tossJunk() {
 		var inv = c.player.getInventory();
 		int free = 0;

@@ -2724,6 +2724,7 @@ final class Chores {
 			boolean mine = drop.distanceTo(c.player) < 5 && drop.getAge() < 20 * 30 && c.player.getInventory().getFreeSlot() >= 0;
 			if (!wanted && !mine && !k.endsWith("_sapling") && !k.equals("stick") && !k.equals("apple")) continue;
 			if (!wanted && JUNK.contains(k) && enoughBlocks()) continue;            // (dirt, granite...: it has plenty to build with; a player lets it lie)
+			if (!wanted && c.habits.wouldToss(k)) continue;                      // (what its bag throws out: not picked up again on the way; Gus off his trip to the lava for leaf litter)
 			if (!wanted && (c.guide.leading() || onOreWay()) && (JUNK.contains(k) || k.equals("cobblestone") || k.equals("cobbled_deepslate")) && count("cobblestone") + countItem("cobbled_deepslate") + countItem("dirt") >= 24) continue;   // (on its way to ore it knows of: the stone it digs lies where it falls, once it has enough to stop water)
 			if (drop.getUUID().equals(dropFor)) {                            // the one it's going for: it keeps to it (no dithering between two)
 				best = drop;
