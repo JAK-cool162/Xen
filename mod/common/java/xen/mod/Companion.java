@@ -5290,9 +5290,9 @@ public final class Companion {
 		emotions.reset();
 		String how = source.type().msgId();
 		if (mod.config.journal && mod.journal != null && !inArena) mod.journal.died(name, cause + " at " + player.blockPosition().toShortString());
-		if (!inArena) XenMod.LOG.info("{} died of {} at y {} ({}, pickaxe tier {}, {} health before, {}) while {}", name, cause, player.blockPosition().getY(),
+		if (!inArena) XenMod.LOG.info("{} died of {} at y {} ({}, pickaxe tier {}, {} health before, {}) while {} [task {} team {}]", name, cause, player.blockPosition().getY(),
 				player.level().isDarkOutside() ? "night" : "day", tierAlive, Math.round(lastHealthBefore), armedAlive ? "armed" : "no weapon",
-				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant);   // (for the test runs: what it was doing)
+				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant, btb.task, mod.teamOf(this));   // (for the test runs: what it was doing, what its brain was on, its team: the death script reads this)
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
 		if (!inArena && (how.contains("fall") || how.contains("drown") || how.contains("cactus") || how.contains("sweetBerry"))) jokes.embarrass(1800, "it died to " + how.replace("sweetBerryBush", "a berry bush"));   // (a silly death: embarrassing)
