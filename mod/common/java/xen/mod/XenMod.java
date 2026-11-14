@@ -1633,6 +1633,12 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
+	/** On the same side: both on the same team, or no teams to speak of (either on none). */
+	boolean sameSide(Companion a, Companion b) {
+		String ta = teamOf(a), tb = teamOf(b);
+		return ta == null || tb == null || ta.equals(tb);
+	}
+
 	private static final String[] TEAM_COLORS = {"red", "blue", "green", "yellow", "purple", "aqua"};
 	private static final net.minecraft.ChatFormatting[] TEAM_FORMATS = {net.minecraft.ChatFormatting.RED, net.minecraft.ChatFormatting.BLUE,
 			net.minecraft.ChatFormatting.GREEN, net.minecraft.ChatFormatting.YELLOW, net.minecraft.ChatFormatting.LIGHT_PURPLE,
@@ -1817,6 +1823,7 @@ public class XenMod implements ModInitializer {
 			Companion best = null;
 			double bestD = 96;
 			for (Companion rich : companions) {
+				if (!sameSide(rich, needy)) continue;                               // (its own team's, when there are teams: not the other side's)
 				if (rich == needy || rich.player() == null || rich.minion || rich.player().level() != needy.player().level() || rich.player().tickCount < 20 * 60) continue;
 				if (diamondGear(rich) < 6 || rich.items().getOrDefault("diamond", 0) < 6) continue;   // (its own gear first, three kept for a new pickaxe)
 				if (rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rich.player().isInLava() || rich.player().isInWater() || rich.goals.evening()) continue;
@@ -1884,6 +1891,7 @@ public class XenMod implements ModInitializer {
 			for (Companion rich : companions) {
 				var rp = rich.player();
 				if (rich == needy || rp == null || rich.minion || rp.level() != np.level() || rp.tickCount < 20 * 60 || rp.getFoodData().getFoodLevel() < 10) continue;
+				if (!sameSide(rich, needy)) continue;                               // (its own team's, when there are teams: not the other side's)
 				if (rich.items().getOrDefault("food", 0) < 8 || rich.fightingNow() || rich.builder.busy() || rich.chores.kind == Chores.Kind.GIVE || rp.isInLava() || rp.isInWater() || rich.goals.evening()) continue;
 				if (now - foodFailed.getOrDefault(needy.name + ">" + rich.name, -1_000_000L) < 20 * 60 * 5) continue;
 				double d = rp.distanceTo(np);
