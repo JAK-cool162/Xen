@@ -594,6 +594,7 @@ final class Btb {
 		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) n++;
 		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) n++;
 		if (invCount("shield") == 0) n++;
+		if (invCount("crafting_table") == 0) n++;                              // (one in its bag: diamonds found in a cave or a treeless savanna become armor on the spot)
 		return n;
 	}
 
@@ -608,6 +609,7 @@ final class Btb {
 			return ch.hunt(4);
 		}
 		if (invCount("shield") == 0) return planFor("shield", 1, "basic kit: a shield");
+		if (invCount("crafting_table") == 0) return planFor("crafting_table", 1, "basic kit: a crafting table to carry");
 		if (logs < 16) return ch.gather("wood", 16 - logs);                     // (the logs last: in a savanna it walked about for trees while its diamonds waited)
 		return "You have your basic kit.";
 	}

@@ -185,7 +185,7 @@ final class Leader {
 			Companion giver = null;
 			int spareBest = 0;
 			for (Companion m : members) {
-				if (m == needy || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(needy.player()) > 400) continue;
+				if (m == needy || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(needy.player()) > 96) continue;
 				int spare = m.btb.invCount("diamond") - Math.max(0, diamondsFor(m)) - 2;   // (two kept back: the team's enchanting table)
 				if (spare > spareBest) {
 					spareBest = spare;
@@ -201,6 +201,17 @@ final class Leader {
 				}
 			}
 		}
+		for (Companion m : members) {                                          // diamonds in its bag and nothing to make armor on: a teammate's logs (Ann carried 27 diamonds round a treeless savanna)
+			if (m.btb.invCount("diamond") < 5 || m.btb.invCount("crafting_table") > 0 || m.btb.invCount("*_log") >= 2 || m.btb.invCount("*_planks") >= 4) continue;
+			for (Companion g : members) {
+				if (g == m || g.btb.invCount("*_log") < 8 || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().distanceTo(m.player()) > 96) continue;
+				String r = g.chores.give(m.player(), "log", 4);
+				if (r != null && r.startsWith("You will")) {
+					XenMod.LOG.info("{} (leads {}): team share: {} gives 4 logs to {} (diamonds and nothing to craft armor on)", lead.name, team.replace("xen_", ""), g.name, m.name);
+					return;
+				}
+			}
+		}
 		if (members.stream().anyMatch(m -> m.enchanter.table() != null)) return;   // (the team has a table: no book needed)
 		Companion maker = null;
 		for (Companion m : members) if (m.btb.invCount("obsidian") >= 4 && m.btb.invCount("book") == 0) maker = m;
@@ -209,7 +220,7 @@ final class Leader {
 			int min = item.equals("book") ? 1 : item.equals("leather") ? 1 : 3;
 			if (maker.btb.invCount(item) >= min) continue;
 			for (Companion m : members) {
-				if (m == maker || m.btb.invCount(item) < min || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(maker.player()) > 400) continue;
+				if (m == maker || m.btb.invCount(item) < min || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(maker.player()) > 96) continue;
 				String r = m.chores.give(maker.player(), item, min);
 				if (r != null && r.startsWith("You will")) {
 					XenMod.LOG.info("{} (leads {}): team share: {} gives {} {} to {} (for the team's enchanting table)", lead.name, team.replace("xen_", ""), m.name, min, item, maker.name);
