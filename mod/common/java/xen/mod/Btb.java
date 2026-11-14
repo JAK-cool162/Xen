@@ -351,12 +351,12 @@ final class Btb {
 			});
 		}
 		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions (config/xen/instructions.txt): choices and scores from a file, no change to the mod
-			if (r.verb().equals("never") || !BtbRules.holds(r.conds(), o, goal)) continue;
+			if (r.verb().equals("never") || !BtbRules.holds(r.conds(), o, goal, this::invCount)) continue;
 			if (r.verb().equals("do")) out.add(new Option(r.task(), r.score(), r.why()));
 			else out.replaceAll(op -> op.task == r.task() ? new Option(op.task, op.base + r.score(), op.why) : op);
 		}
 		for (BtbRules.Rule r : c.mod.btbRules.rules())
-			if (r.verb().equals("never") && BtbRules.holds(r.conds(), o, goal)) out.removeIf(op -> op.task == r.task());
+			if (r.verb().equals("never") && BtbRules.holds(r.conds(), o, goal, this::invCount)) out.removeIf(op -> op.task == r.task());
 		return out;
 	}
 
@@ -520,6 +520,22 @@ final class Btb {
 	}
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
+	/** How many of an item it carries, by name (cooked_beef), or by a name's start (cooked_*): for its instructions. */
+	int invCount(String key) {
+		if (c.player == null) return 0;
+		boolean prefix = key.endsWith("*");
+		String k = prefix ? key.substring(0, key.length() - 1) : key;
+		var inv = c.player.getInventory();
+		int n = 0;
+		for (int i = 0; i < inv.getContainerSize(); i++) {
+			var st = inv.getItem(i);
+			if (st.isEmpty()) continue;
+			String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+			if (prefix ? id.startsWith(k) : id.equals(k)) n += st.getCount();
+		}
+		return n;
+	}
+
 	private Task loggedTask;
 	private long loggedAt;
 

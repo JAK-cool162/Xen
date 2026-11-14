@@ -93,7 +93,7 @@ final class BtbRules {
 	}
 
 	/** Does it hold, for this Xen now? */
-	static boolean holds(List<Cond> conds, Btb.Obs o, String goal) {
+	static boolean holds(List<Cond> conds, Btb.Obs o, String goal, java.util.function.ToIntFunction<String> has) {
 		for (Cond c : conds) {
 			if (c.field.equals("goal")) {
 				boolean eq = goal.equalsIgnoreCase(c.value);
@@ -118,9 +118,8 @@ final class BtbRules {
 				case "sheltered" -> o.sheltered() ? 1 : 0;
 				case "overworld" -> o.overworld() ? 1 : 0;
 				case "nether" -> o.overworld() ? 0 : 1;
-				default -> Double.NaN;
+				default -> has.applyAsInt(c.field);                                   // an item in its bag: cooked_beef>=4, cooked_*>0, raw_iron>=3
 			};
-			if (Double.isNaN(v)) return false;
 			boolean ok;
 			if (c.op.isEmpty()) ok = v > 0;
 			else if (c.op.equals("!")) ok = v <= 0;
@@ -151,10 +150,14 @@ final class BtbRules {
 			# TASKS: WOOD STONE COAL IRON SMELT FOOD SHELTER DIAMONDS ENCHANT TABLE HOME EXPLORE SMELTER
 			#        BLAZE PEARLS TOOLS VISIT SLEEP STASH FARM
 			# CONDITIONS (all must hold): health<10  food>=18  meals<4  tier>=3 (3 = iron pickaxe, 4 = diamond)
+			#        any item in its bag by name: cooked_beef>=4  cooked_*<4 (a * matches the rest)  bread>0  beef>0
 			#        diamonds>=3  iron>=3  danger>=1  night  day  !night  underground  sheltered  overworld  nether
 			#        goal=gear  goal=enchant  goal=home  goal=nether
 			# Scores: most of its own choices are between 2 and 5; a roof at night is 5, a bed 5.5.
 			#
+			# Raw meat in its bag and not much cooked: cook it (smelting does food too).
+			do SMELT 4.4 if cooked_*<4 beef>0 day "raw beef: cook it"
+			do SMELT 4.4 if cooked_*<4 porkchop>0 day "raw pork: cook it"
 			# Food first once it has an iron pickaxe: a bag of food (raw meat counts, rotten flesh doesn't).
 			do FOOD 4.7 if tier>=3 meals<2 day overworld "iron pickaxe: food before anything else"
 			# No fights it picks when it's hurt or has nothing to eat.
