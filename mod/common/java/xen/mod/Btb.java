@@ -491,7 +491,7 @@ final class Btb {
 		Task idea = c.mod.thinker.idea(c, opts.stream().filter(op -> now() >= notBefore.getOrDefault(op.task, 0L)).map(op -> op.task.name() + " (" + op.why + ")").toList(), o);
 		List<Option> live = new ArrayList<>();
 		List<Float> scores = new ArrayList<>();
-		java.util.Map<Task, float[]> weighed = weigh(opts);
+		java.util.Map<Task, float[]> weighed = weigh(opts, o);
 		for (Option op : opts) {
 			if (now() < notBefore.getOrDefault(op.task, 0L)) continue;           // (it just failed at that: something else for a bit)
 			float[] wt = weighed.get(op.task);
@@ -512,8 +512,9 @@ final class Btb {
 			StringBuilder sb = new StringBuilder();
 			live.stream().sorted((oa, ob) -> Float.compare(weighed.get(ob.task)[4], weighed.get(oa.task)[4])).limit(4).forEach(ow -> {
 				float[] ww = weighed.get(ow.task);
-				sb.append(String.format(Locale.ROOT, "%s%s %.1f (rules %.1f, learned %+.1f, quick %+.1f, race %+.1f%s)", sb.length() > 0 ? ", " : "", ow.task.name(), ww[4], ow.base, ww[2], ww[0], ww[1],
-						ww[3] > 0 ? ", its idea +0.7" : ""));
+				String saw = seen.get(ow.task);
+				sb.append(String.format(Locale.ROOT, "%s%s %.1f (rules %.1f, learned %+.1f, quick %+.1f%s, race %+.1f%s)", sb.length() > 0 ? ", " : "", ow.task.name(), ww[4], ow.base, ww[2], ww[0],
+						saw == null ? "" : ": " + saw, ww[1], ww[3] > 0 ? ", its idea +0.7" : ""));
 			});
 			XenMod.LOG.info("{} weighs: {}", c.name, sb);
 		}
@@ -632,6 +633,68 @@ final class Btb {
 
 	/** A job its team's leader gave it (and it took): a strong choice for three minutes, its own life and a roof still first. */
 	private long weighSaidAt = -100_000, behindAt = -100_000;
+	/** What it saw that it weighed each option by (for the log). */
+	private final java.util.Map<Task, String> seen = new java.util.EnumMap<>(Task.class);
+
+	/**
+	 * Xenfish looks: what it sees and has, the seconds a task would take from here (NaN: it can't tell from here, its
+	 * record says). The walk at four blocks a second (down at one and a half), the work after.
+	 */
+	private double lookHere(Task t, Obs o) {
+		if (c.player == null) return Double.NaN;
+		BlockPos feet = c.player.blockPosition();
+		switch (t) {
+			case ENCHANT -> {
+				BlockPos tb = c.enchanter.table();
+				if (invCount("enchanting_table") > 0 || tb != null && tb.closerThan(feet, 48)) {
+					seen.put(t, "its table here");
+					return 30;
+				}
+				if (tb == null) return Double.NaN;
+				seen.put(t, String.format(Locale.ROOT, "its table %.0f blocks off", Math.sqrt(tb.distSqr(feet))));
+				return Math.sqrt(tb.distSqr(feet)) / 4 + 30;
+			}
+			case DIAMONDS, IRON, COAL -> {
+				String kind = t == Task.DIAMONDS ? "diamond" : t == Task.IRON ? "iron" : "coal";
+				var near = c.hunch.oresNear(kind, feet, 128, 160, 1);
+				if (near.isEmpty()) return Double.NaN;
+				BlockPos q = near.get(0);
+				double flat = Math.hypot(q.getX() - feet.getX(), q.getZ() - feet.getZ()), down = Math.abs(feet.getY() - q.getY());
+				seen.put(t, String.format(Locale.ROOT, "%s ore %.0f blocks off, %.0f down", kind, flat, (double) (feet.getY() - q.getY())));
+				return flat / 4 + down / 1.5 + (t == Task.DIAMONDS ? 40 : 20);
+			}
+			case FOOD -> {
+				var animals = c.player.level().getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, c.player.getBoundingBox().inflate(48), a -> {
+					String n = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(a.getType()).getPath();
+					return a.isAlive() && (n.equals("cow") || n.equals("pig") || n.equals("sheep") || n.equals("chicken") || n.equals("rabbit"));
+				});
+				if (animals.isEmpty()) return Double.NaN;
+				double d = animals.stream().mapToDouble(a -> a.distanceTo(c.player)).min().orElse(48);
+				seen.put(t, String.format(Locale.ROOT, "%d animals in sight, the nearest %.0f blocks off", animals.size(), d));
+				return d / 4 + (animals.size() >= 4 ? 40 : 70);                     // (four close together: a quick hunt; one or two, more walking between)
+			}
+			case VISIT, TRADE -> {
+				BlockPos v = c.visits.nearest("village");
+				if (v == null) return Double.NaN;
+				double d = Math.hypot(v.getX() - feet.getX(), v.getZ() - feet.getZ());
+				seen.put(t, String.format(Locale.ROOT, "the village %.0f blocks off", d));
+				return d / 5 + (t == Task.TRADE ? 90 : 120);
+			}
+			case SMELT -> {
+				int raw = o.raw();
+				seen.put(t, raw + " raw things in its bag");
+				return 20 + 10.0 * raw;
+			}
+			case KIT -> {
+				int missing = kitMissing();
+				seen.put(t, missing + " kit pieces to get");
+				return 60.0 * missing;
+			}
+			default -> {
+				return Double.NaN;
+			}
+		}
+	}
 	private int behind;
 
 	/**
@@ -640,13 +703,21 @@ final class Btb {
 	 * dearer, less. And the race: what earns its team points now (an enchant, two a piece) keener, more so behind.
 	 * Per task: {quick, race, learned, idea, score} (the last three filled in by its choice).
 	 */
-	private java.util.Map<Task, float[]> weigh(List<Option> opts) {
+	private java.util.Map<Task, float[]> weigh(List<Option> opts, Obs o) {
 		java.util.Map<Task, float[]> out = new java.util.EnumMap<>(Task.class);
 		java.util.Map<Task, Double> price = new java.util.EnumMap<>(Task.class);
+		seen.clear();
+		String state = o.key();
 		for (Option op : opts) {
+			if (out.containsKey(op.task)) continue;
 			out.put(op.task, new float[5]);
-			double p = c.xenfish.price(op.task.name());
-			if (!Double.isNaN(p) && op.base < 50) price.put(op.task, Math.max(10, p));
+			if (op.base >= 50) continue;
+			double here = lookHere(op.task, o);
+			double p = c.xenfish.price(op.task.name(), state, here);
+			if (Double.isNaN(p)) continue;
+			boolean walks = switch (op.task) { case EXPLORE, WOOD, FOOD, VISIT, TRADE, DIAMONDS, IRON, COAL, STONE, KIT -> true; default -> false; };
+			if (walks && o.danger > 0) p *= 1 + 0.3 * o.danger;                    // (monsters about: a walk costs more, a death too)
+			price.put(op.task, Math.max(10, p));
 		}
 		if (price.size() >= 2) {
 			double[] ps = price.values().stream().mapToDouble(Double::doubleValue).sorted().toArray();

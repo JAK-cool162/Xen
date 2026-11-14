@@ -49,10 +49,22 @@ final class Xenfish {
 	 * how often it worked, a death five minutes lost. NaN: too few tries to say.
 	 */
 	double price(String task) {
-		double[] m = c.mod.btbLearner.stats(task);
-		if (m[0] < 5) return Double.NaN;
-		double p = (m[1] + 1) / (m[0] + 2);
-		return m[3] / m[0] / Math.max(0.1, p) + 300 * m[2] / m[0];
+		return price(task, null, Double.NaN);
+	}
+
+	/**
+	 * A task's price here: its time from where it is (what it sees and has: the walk to the ore it knows of, the animals
+	 * in sight, its table; NaN if it can't tell) and how long its tries took in this same spot (its record there, five
+	 * tries or more; else every try of it), half and half, over how often it worked; a death five minutes lost.
+	 */
+	double price(String task, String state, double here) {
+		double[] m = state == null ? new double[4] : c.mod.btbLearner.stats(task + "@" + state);
+		if (m[0] < 5) m = c.mod.btbLearner.stats(task);
+		if (m[0] < 5 && Double.isNaN(here)) return Double.NaN;
+		double p = (m[1] + 1) / (m[0] + 2), deaths = m[0] > 0 ? m[2] / m[0] : 0;
+		double took = m[0] > 0 ? m[3] / m[0] : here;
+		double t = Double.isNaN(here) ? took : m[0] >= 5 ? 0.5 * here + 0.5 * took : here;
+		return t / Math.max(0.1, p) + 300 * deaths;
 	}
 
 	private static double flat(BlockPos a, BlockPos b) {

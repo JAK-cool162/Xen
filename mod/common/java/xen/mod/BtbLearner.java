@@ -109,11 +109,13 @@ final class BtbLearner {
 		float best = 0;
 		if (after != null) for (float v : after.values()) best = Math.max(best, v);
 		row.put(task, old + ALPHA * (reward + GAMMA * best - old));
-		double[] m = memory.computeIfAbsent(task, k -> new double[4]);
-		m[0]++;
-		if (worked) m[1]++;
-		if (died) m[2]++;
-		m[3] += seconds;
+		for (String k : new String[] {task, task + "@" + state}) {                // (its record of the task, and of the task in this spot: Xenfish's prices)
+			double[] m = memory.computeIfAbsent(k, x -> new double[4]);
+			m[0]++;
+			if (worked) m[1]++;
+			if (died) m[2]++;
+			m[3] += seconds;
+		}
 		dirty = true;
 	}
 
