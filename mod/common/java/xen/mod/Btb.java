@@ -465,9 +465,19 @@ final class Btb {
 			Option other = opts.get(c.random().nextInt(opts.size()));
 			if (now() >= notBefore.getOrDefault(other.task, 0L)) best = other;
 		}
+		if (best == null && now() - loggedAt > 20 * 60) {
+			loggedAt = now();
+			loggedTask = null;
+			XenMod.LOG.info("{} btb: nothing to start ({} options, health {}, food {}, meals {}, night {})", c.name, opts.size(), (int) o.health, o.food, o.meals, o.night);
+		}
 		if (best == null)                                                        // (out in the dark with nothing it can start: on to other ground, not standing there)
 			return (o.night || c.goals.sunDown()) && o.overworld && !o.under && !o.sheltered ? c.goals.exploreStep() : null;
 		String plan = start(best.task, o);
+		if (best.task != loggedTask || now() - loggedAt > 20 * 60) {             // (what it picked and what came of it, once a minute: a Xen standing still shows why)
+			loggedTask = best.task;
+			loggedAt = now();
+			XenMod.LOG.info("{} btb: {} ({}) -> {}", c.name, best.task, best.why, plan);
+		}
 		if (plan == null || !plan.startsWith("You will") && !plan.startsWith("You don't see any animals")) {   // (it can't now: not again for a minute; no animals in sight is a hunt that looks round, not a failure: Ann, Bob, Dee, Ivy stood still an hour, nothing to eat)
 			boolean shelter = best.task == Task.SHELTER;
 			notBefore.put(best.task, now() + (shelter ? 20 * 5 : forGoal(best.task) ? 20 * 15 : 20 * 60));   // (a roof: again in a few steps, from other ground; what its goal needs: soon)
@@ -503,6 +513,9 @@ final class Btb {
 	}
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
+	private Task loggedTask;
+	private long loggedAt;
+
 	private String start(Task t, Obs o) {
 		Chores ch = c.chores;
 		return switch (t) {
