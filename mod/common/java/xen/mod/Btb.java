@@ -125,7 +125,7 @@ final class Btb {
 		if (now() - goalAt < 20 * 60 * 3 && !goalDone(o)) return;
 		goalAt = now();
 		String was = goal;
-		boolean geared = o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted();   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
+		boolean geared = o.tier >= 4 && (o.diamonds >= c.goals.diamondsWanted() || Companion.fullDiamond(c.player));   // (full diamond on and a diamond pickaxe: geared; the sword and the table's two diamonds wait, enchanting first: Ivy, Max, Rex in full diamond with 20+ levels went off to build a home)   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
 		boolean early = !geared && c.goals.home == null && c.mod.config.wants && o.tier >= 3 && o.overworld && earlyBase();
 		if (early) goal = "home";                                                // an iron pickaxe: a base first, a small one (a chest for its diamonds and ore, a table, a furnace; its bed for a spawn): a death after costs it only what it carries, and it wakes by it

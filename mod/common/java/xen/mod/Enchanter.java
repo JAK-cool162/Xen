@@ -132,13 +132,13 @@ final class Enchanter {
 		if (table != null && level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) return table;
 		table = c.places.get("enchanting table");
 		if (table != null && !level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) table = null;
-		if (table != null && !table.closerThan(c.player.blockPosition(), 200)) table = null;   // (one it knew of, far off: not a trip across the world for it; Bob, at three health, swimming toward one 200 blocks off)
+		if (table != null && !table.closerThan(c.player.blockPosition(), 400)) table = null;   // (one it knew of, far off: not a trip across the world for it; Bob, at three health, swimming toward one 200 blocks off)
 		if (table == null && c.mod.config.luck > 0) {                          // (knowing the world: a table another Xen made, near enough, does as well as its own; Cid had one, nine others dug obsidian for theirs)
 			BlockPos best = null;
 			for (Companion x : c.mod.companions) {
 				if (x == c || x.player() == null || x.player().level() != c.player.level() || !c.mod.sameSide(c, x)) continue;   // (its own team's: Bob, blue, walked to Cid's, red, 200 blocks off down Cid's mine)
 				BlockPos t = x.places.get("enchanting table");
-				if (t == null || t.distSqr(c.player.blockPosition()) > 150 * 150) continue;   // (near: a trip of more than a minute or two isn't worth it)
+				if (t == null || t.distSqr(c.player.blockPosition()) > 400 * 400) continue;   // (a walk of a minute or two beats four obsidian, a book and two diamonds for its own)   // (near: a trip of more than a minute or two isn't worth it)
 				if (level().isLoaded(t) && !level().getBlockState(t).is(Blocks.ENCHANTING_TABLE)) continue;
 				if (best == null || t.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = t;
 			}
