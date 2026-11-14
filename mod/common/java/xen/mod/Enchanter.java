@@ -24,6 +24,7 @@ final class Enchanter {
 	boolean on;
 	/** Not again before this (game time): after a go (its levels come back slowly), or after it couldn't. */
 	long retryAt;
+	private int budget = 2400;
 	/** Its enchanting done for now, the table to mine and carry (no home to keep it at). */
 	private boolean takeAlong;
 
@@ -45,7 +46,7 @@ final class Enchanter {
 			for (Companion x : c.mod.companions) {
 				if (x == c || x.player() == null || x.player().level() != c.player.level()) continue;
 				BlockPos t = x.places.get("enchanting table");
-				if (t == null || t.distSqr(c.player.blockPosition()) > 400 * 400) continue;
+				if (t == null || t.distSqr(c.player.blockPosition()) > 150 * 150) continue;   // (near: a trip of more than a minute or two isn't worth it)
 				if (level().isLoaded(t) && !level().getBlockState(t).is(Blocks.ENCHANTING_TABLE)) continue;
 				if (best == null || t.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = t;
 			}
@@ -204,6 +205,8 @@ final class Enchanter {
 		on = true;
 		step = 0;
 		tries = 0;
+		BlockPos t = table();
+		budget = 2400 + (t == null || c.items().getOrDefault("enchanting_table", 0) > 0 ? 0 : (int) Math.min(6000, 12 * Math.sqrt(t.distSqr(c.player.blockPosition()))));   // (a walk to its table: time for that too)
 		return "You will enchant your best gear at your enchanting table.";
 	}
 
@@ -213,9 +216,9 @@ final class Enchanter {
 
 	Action next() {
 		if (!on) return null;
-		if (++tries > 2400) {                                                  // (two minutes: something's wrong, it gives up)
+		if (++tries > budget) {                                                // (two minutes, more for a walk to its table: something's wrong, it gives up)
 			on = false;
-			retryAt = c.player.level().getGameTime() + 20 * 60 * 20;
+			retryAt = c.player.level().getGameTime() + 20 * 60 * 5;
 			return null;
 		}
 		if (takeAlong) {                                                        // its enchanting done for now and no home to keep the table at: it mines it and takes it along, as players do
@@ -235,12 +238,14 @@ final class Enchanter {
 			return null;
 		}
 		BlockPos t = table();
+		boolean carried = c.items().getOrDefault("enchanting_table", 0) > 0;
+		if (t != null && carried && !t.closerThan(c.player.blockPosition(), 48)) t = null;   // its own in its bag: down here, not a trip to the far one (Cid walked to his first, 716 blocks off, gave up, and waited twenty minutes, again and again)
 		if (t == null) {
-			if (c.items().getOrDefault("enchanting_table", 0) == 0) {
+			if (!carried) {
 				if (!c.crafter.hasOrder()) c.crafter.orderRecipe("enchanting_table", 1);
 				return null;
 			}
-			BlockPos near = c.goals.home != null ? c.goals.home : c.player.blockPosition();
+			BlockPos near = c.goals.home != null && c.goals.home.closerThan(c.player.blockPosition(), 48) ? c.goals.home : c.player.blockPosition();   // (home if it's near; a far home isn't worth the trip, it takes the table along after)
 			if (c.player.blockPosition().distSqr(near) > 36) return c.walkTo(Vec3.atBottomCenterOf(near));
 			BlockPos feet = c.player.blockPosition();
 			for (int k = 1; k <= 2; k++) {                                       // (a block off, or two: in a tunnel a block wide, along it)
