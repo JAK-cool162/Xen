@@ -313,6 +313,11 @@ final class Enchanter {
 			XenMod.LOG.info("{} enchanting: gives up after {} ticks (table {}, {} blocks off, can click {}, carried {}, bringing home {}, taking along {})", c.name, tries,
 					gt == null ? "none" : gt.toShortString(), gt == null ? -1 : (int) Math.sqrt(gt.distSqr(c.player.blockPosition())), gt != null && c.hands.canClick(gt),
 					c.items().getOrDefault("enchanting_table", 0), bringHome, takeAlong);
+			if (gt != null && !c.hands.canClick(gt) && gt.equals(c.places.get("enchanting table"))) {   // (one it couldn't get to: forgotten; another, or its own, next time: Bob, again and again, Cid's 82 blocks off down his mine)
+				c.places.forget("enchanting table");
+				table = null;
+				c.journal("thinks", "couldn't get to that enchanting table: forgets it");
+			}
 			on = false;
 			retryAt = c.player.level().getGameTime() + 20 * 60 * 5;
 			return null;
