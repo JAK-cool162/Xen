@@ -523,8 +523,10 @@ final class Btb {
 	/** How many of an item it carries, by name (cooked_beef), or by a name's start (cooked_*): for its instructions. */
 	int invCount(String key) {
 		if (c.player == null) return 0;
-		if (key.equals("diamond_ore_near"))                                   // (diamond ore it knows of close by: within 32 blocks)
-			return c.mod.config.luck > 0 ? c.hunch.oresNear("diamond", c.player.blockPosition(), 32, 24, 8).size() : 0;
+		if (key.endsWith("_in_range") || key.endsWith("_near")) {               // (ore it knows of close by, within 32 blocks: diamond_in_range, iron_ore_near, lapis_in_range)
+			String what = key.replace("_in_range", "").replace("_near", "").replace("_ore", "").replace("deepslate_", "");
+			return c.mod.config.luck > 0 ? c.hunch.oresNear(what, c.player.blockPosition(), 32, 24, 8).size() : 0;
+		}
 		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");
 		boolean prefix = key.endsWith("*");
 		String k = prefix ? key.substring(0, key.length() - 1) : key;
