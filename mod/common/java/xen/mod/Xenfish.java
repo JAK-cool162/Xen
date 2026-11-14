@@ -44,6 +44,17 @@ final class Xenfish {
 		return out;
 	}
 
+	/**
+	 * A task's price from its record (every Xen's tries of it, kept in its brain's book): the time its tries took over
+	 * how often it worked, a death five minutes lost. NaN: too few tries to say.
+	 */
+	double price(String task) {
+		double[] m = c.mod.btbLearner.stats(task);
+		if (m[0] < 5) return Double.NaN;
+		double p = (m[1] + 1) / (m[0] + 2);
+		return m[3] / m[0] / Math.max(0.1, p) + 300 * m[2] / m[0];
+	}
+
 	private static double flat(BlockPos a, BlockPos b) {
 		return Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ());
 	}

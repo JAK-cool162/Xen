@@ -491,15 +491,31 @@ final class Btb {
 		Task idea = c.mod.thinker.idea(c, opts.stream().filter(op -> now() >= notBefore.getOrDefault(op.task, 0L)).map(op -> op.task.name() + " (" + op.why + ")").toList(), o);
 		List<Option> live = new ArrayList<>();
 		List<Float> scores = new ArrayList<>();
+		java.util.Map<Task, float[]> weighed = weigh(opts);
 		for (Option op : opts) {
 			if (now() < notBefore.getOrDefault(op.task, 0L)) continue;           // (it just failed at that: something else for a bit)
-			float score = op.base + learn.bias(key, op.task.name()) + (op.task == idea ? 0.7f : 0f);   // (its own idea, thought through: a little more keen)
+			float[] wt = weighed.get(op.task);
+			float learned = learn.bias(key, op.task.name()), thought = op.task == idea ? 0.7f : 0f;   // (its own idea, thought through: a little more keen)
+			float score = op.base + learned + thought + wt[0] + wt[1];           // (Xenfish: its price, the race)
+			wt[2] = learned;
+			wt[3] = thought;
+			wt[4] = score;
 			live.add(op);
 			scores.add(score);
 			if (score > bestScore) {
 				bestScore = score;
 				best = op;
 			}
+		}
+		if (live.size() > 1 && now() - weighSaidAt > 20 * 120) {               // (how it weighed them, now and then: in the log, for whoever wants to know why)
+			weighSaidAt = now();
+			StringBuilder sb = new StringBuilder();
+			live.stream().sorted((oa, ob) -> Float.compare(weighed.get(ob.task)[4], weighed.get(oa.task)[4])).limit(4).forEach(ow -> {
+				float[] ww = weighed.get(ow.task);
+				sb.append(String.format(Locale.ROOT, "%s%s %.1f (rules %.1f, learned %+.1f, quick %+.1f, race %+.1f%s)", sb.length() > 0 ? ", " : "", ow.task.name(), ww[4], ow.base, ww[2], ww[0], ww[1],
+						ww[3] > 0 ? ", its idea +0.7" : ""));
+			});
+			XenMod.LOG.info("{} weighs: {}", c.name, sb);
 		}
 		boolean mustDo = best != null && (bestScore >= 50 || best.task == Task.SHELTER || best.task == Task.SLEEP || best.task == Task.RETREAT || best.task == Task.FOOD && o.meals == 0);
 		if (best != null && live.size() > 1 && !mustDo) {                           // its own choice among the good ones: the best most often, a near one now and then (the curious more often)
@@ -589,7 +605,7 @@ final class Btb {
 	/** Its basic kit (the player's list): 16 logs, a stone pickaxe, a stone axe, 4 cooked beef, pork or mutton, a shield. What's missing, how many. */
 	int kitMissing() {
 		int n = 0;
-		if (invCount("*_log") < 16) n++;
+		if (invCount("*_log") + invCount("*_planks") / 4 < 16) n++;            // (planks count: four to a log)
 		if (c.crafter.pickTier() < 2) n++;
 		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) n++;
 		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) n++;
@@ -601,7 +617,7 @@ final class Btb {
 	/** The next piece of its basic kit: the pickaxe, the axe, the food, the shield (the planner fetches the wood each needs), then the spare logs. */
 	private String kitStep(Obs o) {
 		Chores ch = c.chores;
-		int logs = invCount("*_log");
+		int logs = invCount("*_log") + invCount("*_planks") / 4;
 		if (c.crafter.pickTier() < 2) return planFor("stone_pickaxe", 1, "basic kit: a stone pickaxe");
 		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) return planFor("stone_axe", 1, "basic kit: a stone axe");
 		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) {
@@ -615,6 +631,43 @@ final class Btb {
 	}
 
 	/** A job its team's leader gave it (and it took): a strong choice for three minutes, its own life and a roof still first. */
+	private long weighSaidAt = -100_000, behindAt = -100_000;
+	private int behind;
+
+	/**
+	 * Xenfish weighs its options, its own record for each (no fixed numbers): its price, how long its tries took over how
+	 * often they worked, a death five minutes lost; cheaper than the middle of what it could do now, keener (up to 1.2),
+	 * dearer, less. And the race: what earns its team points now (an enchant, two a piece) keener, more so behind.
+	 * Per task: {quick, race, learned, idea, score} (the last three filled in by its choice).
+	 */
+	private java.util.Map<Task, float[]> weigh(List<Option> opts) {
+		java.util.Map<Task, float[]> out = new java.util.EnumMap<>(Task.class);
+		java.util.Map<Task, Double> price = new java.util.EnumMap<>(Task.class);
+		for (Option op : opts) {
+			out.put(op.task, new float[5]);
+			double p = c.xenfish.price(op.task.name());
+			if (!Double.isNaN(p) && op.base < 50) price.put(op.task, Math.max(10, p));
+		}
+		if (price.size() >= 2) {
+			double[] ps = price.values().stream().mapToDouble(Double::doubleValue).sorted().toArray();
+			double mid = ps.length % 2 == 1 ? ps[ps.length / 2] : Math.sqrt(ps[ps.length / 2 - 1] * ps[ps.length / 2]);
+			for (var e : price.entrySet()) out.get(e.getKey())[0] = (float) Math.max(-1.2, Math.min(1.2, 0.7 * Math.log(mid / e.getValue())));
+		}
+		if (now() - behindAt > 20 * 30) {
+			behindAt = now();
+			int mine = 0, theirs = 0;
+			for (Companion x : c.mod.companions) {
+				if (x.player() == null || c.mod.teamOf(x) == null) continue;
+				if (x == c || c.mod.sameSide(c, x)) mine += x.btb.raceScore();
+				else theirs += x.btb.raceScore();
+			}
+			behind = theirs - mine;
+		}
+		float[] e = out.get(Task.ENCHANT);
+		if (e != null) e[1] = 0.8f + 0.4f * Math.max(0, Math.min(1, behind / 8f));   // (two points a piece, in a minute: its team's race, more so behind)
+		return out;
+	}
+
 	private Task ordered;
 	private String orderedBy = "";
 	private float orderedWeight;
