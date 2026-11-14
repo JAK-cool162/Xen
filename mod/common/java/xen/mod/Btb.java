@@ -350,6 +350,13 @@ final class Btb {
 				default -> true;
 			});
 		}
+		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions (config/xen/instructions.txt): choices and scores from a file, no change to the mod
+			if (r.verb().equals("never") || !BtbRules.holds(r.conds(), o, goal)) continue;
+			if (r.verb().equals("do")) out.add(new Option(r.task(), r.score(), r.why()));
+			else out.replaceAll(op -> op.task == r.task() ? new Option(op.task, op.base + r.score(), op.why) : op);
+		}
+		for (BtbRules.Rule r : c.mod.btbRules.rules())
+			if (r.verb().equals("never") && BtbRules.holds(r.conds(), o, goal)) out.removeIf(op -> op.task == r.task());
 		return out;
 	}
 
