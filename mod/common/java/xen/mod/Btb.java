@@ -296,6 +296,8 @@ final class Btb {
 			out.add(new Option(Task.STASH, 3.3f, "its spares into its chest at home (a death costs it only what it carries)"));
 		if (chest != null && !o.night && o.overworld && o.diamonds < c.goals.diamondsWanted() && c.storage.inChests("diamond") > 0 && chest.closerThan(c.player.blockPosition(), 160))
 			out.add(new Option(Task.STASH, 4.1f, "its diamonds from its chest: for its gear"));
+		if (chest != null && !o.night && o.overworld && goal.equals("enchant") && invCount("lapis_lazuli") < 3 && c.storage.inChests("lapis_lazuli") > 0 && chest.closerThan(c.player.blockPosition(), 160))
+			out.add(new Option(Task.STASH, 4.4f, "its lapis from its chest: to enchant with"));
 		if (chest != null && !o.night && o.overworld && kitToTake(o) != null && chest.closerThan(c.player.blockPosition(), 160))
 			out.add(new Option(Task.STASH, 4.3f, "its kit from its chest (" + kitToTake(o) + "): not starting over from nothing"));
 		if (goal.equals("nether")) {
@@ -1309,6 +1311,13 @@ final class Btb {
 					String took = c.storage.take("diamond", Math.min(64, c.storage.inChests("diamond")));
 					if (took != null) {
 						c.journal("does", "goes to its chest for its diamonds (" + c.storage.inChests("diamond") + " in it)");
+						yield took;
+					}
+				}
+				if (goal.equals("enchant") && invCount("lapis_lazuli") < 3 && c.storage.inChests("lapis_lazuli") > 0) {   // (the lapis it put away, back for its enchanting: Lea's was all in her chest)
+					String took = c.storage.take("lapis_lazuli", Math.min(64, c.storage.inChests("lapis_lazuli")));
+					if (took != null) {
+						c.journal("does", "goes to its chest for its lapis");
 						yield took;
 					}
 				}

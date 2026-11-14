@@ -104,7 +104,7 @@ final class Storage {
 	// ------------------------------------------------------------------------------ in case the worst happens
 	/** What it leaves at home before a risky trip (what it can't afford to lose, and doesn't need down there). */
 	private static final Set<String> STASH = Set.of("diamond", "emerald", "gold_ingot", "raw_gold", "netherite_ingot", "netherite_scrap",
-			"ancient_debris", "enchanted_book", "lapis_lazuli", "name_tag", "saddle", "experience_bottle", "diamond_block", "emerald_block",
+			"ancient_debris", "enchanted_book", "name_tag", "saddle", "experience_bottle", "diamond_block", "emerald_block",
 			"gold_block", "iron_block", "heart_of_the_sea", "nautilus_shell", "trident", "elytra");
 	/** Stashing: the deposit leaves valuables and spare tools, and keeps the everyday things on it. */
 	private boolean stashing;
