@@ -382,7 +382,11 @@ final class Enchanter {
 			retryAt = c.player.level().getGameTime() + 20 * 20;
 			return null;
 		}
-		if (!c.hands.canClick(t)) return c.walkTo(nextTo(t));
+		if (!c.hands.canClick(t)) {
+			BlockPos f = c.player.blockPosition();
+			if (Math.hypot(t.getX() - f.getX(), t.getZ() - f.getZ()) > 40) return c.wanderTo(nextTo(t));   // (far: legs of a dozen or two blocks; one way 200 blocks through the rock its way-finder couldn't think of: Dee, full diamond, 208 off, gave up)
+			return c.walkTo(nextTo(t));
+		}
 		int slot = worthSlot();
 		int bagTier = slot < 0 ? 0 : MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getInventory().getItem(slot).getItem()).getPath());
 		var worn = wornWorth();
