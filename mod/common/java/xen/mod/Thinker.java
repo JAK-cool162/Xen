@@ -111,7 +111,8 @@ final class Thinker {
 		post(url, "You name villagers in a cozy Minecraft village. Answer with only a name and a title, like: Mira the Lantern-Keeper",
 				"Name this " + (job.equals("none") ? "villager" : job) + ".", 16, text -> mod.server.execute(() -> {
 					String name = text.split("\\n")[0].replaceAll("[\"*]", "").strip();
-					if (name.length() < 3 || name.length() > 32 || v.hasCustomName() || !v.isAlive()) return;
+					if (name.length() < 3 || name.length() > 32 || v.hasCustomName() || !v.isAlive()
+							|| !name.matches("[A-Z][A-Za-z'-]+ (the|of) [A-Z][A-Za-z' -]+")) return;   // (a name and a title, nothing else: "No name found for this farmer." is not one)
 					v.setCustomName(net.minecraft.network.chat.Component.literal(name));
 					XenMod.LOG.info("{} names a villager: {}", c.name, name);
 				}));
