@@ -298,7 +298,7 @@ final class Enchanter {
 		tries = 0;
 		startedAt = c.player.level().getGameTime();
 		BlockPos t = table();
-		budget = 2400 + (t == null || c.items().getOrDefault("enchanting_table", 0) > 0 ? 0 : (int) Math.min(6000, 12 * Math.sqrt(t.distSqr(c.player.blockPosition()))));   // (a walk to its table: time for that too)
+		budget = 2400 + (t == null || c.items().getOrDefault("enchanting_table", 0) > 0 ? 0 : (int) Math.min(12000, 30 * Math.sqrt(t.distSqr(c.player.blockPosition()))));   // (a walk to its table: time for that too)
 		return "You will enchant your best gear at your enchanting table.";
 	}
 
