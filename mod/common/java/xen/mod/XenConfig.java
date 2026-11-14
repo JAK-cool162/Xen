@@ -214,6 +214,8 @@ public final class XenConfig {
 	public int teams = -1;
 	/** The teams as they are, for good: no Xen starts a team of its own or goes over to another, and a new one joins the smallest (a red-against-blue training world). */
 	public boolean teamsLocked = false;
+	/** Building's helping hand: while it builds, a block within ten blocks goes in where the plan has it (it looks at it and swings; in survival it uses one from its bag), and stuck on its way to the next, it steps over to it. */
+	public boolean helpingHand = true;
 	/** Team leaders by name ("Cid,Bob"): each plans for its team and gives its teammates jobs, which each takes or not. */
 	public String leaders = "";
 	/** A small language model beside the server for its thoughts (an OpenAI-style chat URL, like llama.cpp's server: http://127.0.0.1:8090/v1/chat/completions); empty: off. */

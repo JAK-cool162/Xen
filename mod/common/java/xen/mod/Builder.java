@@ -1115,6 +1115,7 @@ final class Builder {
 		// the steps of this phase it can do from here, else the nearest one it can get to
 		Vec3 eye = c.player.getEyePosition();
 		double reach = c.player.blockInteractionRange() - 0.4;
+		if (c.mod.config.helpingHand) reach = Math.max(reach, 10);             // (the helping hand: ten blocks while it builds)
 		Architect.Step best = null, nearest = null;
 		double bestD = Double.MAX_VALUE, nearD = Double.MAX_VALUE;
 		int checked = 0;
@@ -1168,7 +1169,64 @@ final class Builder {
 			return Action.IDLE;
 		}
 		current = nearest;
+		if (c.mod.config.helpingHand) {                                        // the helping hand: stuck on its way to the next block, it steps over to it
+			if (nearest != moveFor) {
+				moveFor = nearest;
+				moveSince = now();
+				moveBest = nearD;
+			} else if (nearD < moveBest - 1) {
+				moveBest = nearD;
+				moveSince = now();
+			} else if (now() - moveSince > 100) {
+				BlockPos spot = standNear(level, nearest.pos());
+				if (spot != null) {
+					c.player.teleportTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+					moveSince = now();
+					XenMod.LOG.info("{} steps over to {} (helping hand: stuck on its way there)", c.name, spot.toShortString());
+					return Action.IDLE;
+				}
+			}
+		}
 		return goTo(level, nearest);
+	}
+
+	private Architect.Step moveFor;
+	private long moveSince;
+	private double moveBest;
+
+	/** A spot to stand near there: room for feet and head, ground under it, not in the plan's way. */
+	private BlockPos standNear(ServerLevel level, BlockPos at) {
+		for (int r = 1; r <= 4; r++)
+			for (int dy = -1; dy <= 2; dy++)
+				for (int dx = -r; dx <= r; dx++)
+					for (int dz = -r; dz <= r; dz++) {
+						if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+						BlockPos q = at.offset(dx, dy, dz);
+						if (level.getBlockState(q).canBeReplaced() && level.getBlockState(q.above()).canBeReplaced() && !level.getBlockState(q.below()).canBeReplaced()
+								&& level.getFluidState(q).isEmpty()) return q;
+					}
+		return null;
+	}
+
+	/**
+	 * The helping hand: the block goes in where the plan has it, as the plan has it (its facing, its half), within ten
+	 * blocks; it looks at it and swings its arm, and in survival one comes out of its bag.
+	 */
+	private Action helpingHand(ServerLevel level, Architect.Step s, Item item) {
+		if (!creative) {
+			var inv = c.player.getInventory();
+			int slot = -1;
+			for (int i = 0; i < inv.getContainerSize() && slot < 0; i++) if (inv.getItem(i).getItem() == item) slot = i;
+			if (slot < 0) return null;
+			inv.getItem(slot).shrink(1);
+		}
+		c.hands.face(Vec3.atCenterOf(s.pos()));
+		c.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
+		level.setBlock(s.pos(), s.state(), 3);
+		level.playSound(null, s.pos(), s.state().getSoundType().getPlaceSound(), net.minecraft.sounds.SoundSource.BLOCKS, 1f, 0.8f);
+		c.acted = true;
+		progress(false);
+		return Action.PLACE;
 	}
 
 	private Action finish(ServerLevel level) {
@@ -1454,6 +1512,11 @@ final class Builder {
 		int yaw = -1;
 		if (b instanceof DoorBlock || b instanceof BedBlock || n.endsWith("_stairs") || b instanceof net.minecraft.world.level.block.FenceGateBlock) yaw = yawIndex(f);
 		else if (n.equals("furnace") || n.equals("chest") || n.equals("barrel") || n.equals("smoker")) yaw = yawIndex(f.getOpposite());
+		if (c.mod.config.helpingHand && !(b instanceof DoorBlock) && !(b instanceof BedBlock) && !(b instanceof net.minecraft.world.level.block.DoublePlantBlock)
+				&& !(b instanceof net.minecraft.world.level.block.TallSeagrassBlock)) {
+			Action hh = helpingHand(level, s, item);                            // (the helping hand: as the plan has it, from where it stands)
+			if (hh != null) return hh;
+		}
 		c.hands.strictSight = tries.getOrDefault(s.pos(), 0) < 3;             // (one it can't see from anywhere, boxed in by what it built, goes in anyway)
 		c.hands.blindOk = !c.hands.strictSight;
 		boolean ok = c.hands.placeItem(s.pos(), st -> st.getItem() == item, wall, side, b instanceof DoorBlock || b instanceof BedBlock
