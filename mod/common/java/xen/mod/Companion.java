@@ -2478,6 +2478,15 @@ public final class Companion {
 		}
 		long time = Compat.timeOfDay(level) % 24000;
 		boolean night = time >= 12600 && time <= 23400;
+		BlockPos base = goals.home != null ? goals.home : mod.teamHome(this);
+		if (!night && !campBedBad && campBed != null && base != null && campBed.closerThan(base, 24)
+				&& level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock) {   // (at its base: the bed stays, and its spawn with it; packed up, it woke at the world's spawn after a death, its table 250 blocks off)
+			XenMod.LOG.info("{} keeps its bed at its base ({})", name, campBed.toShortString());
+			journal("thinks", "leaves its bed at its base: it wakes there after a death");
+			bedAt = campBed;
+			places.remember("bed", campBed);
+			campBed = null;
+		}
 		if ((!night || campBedBad) && campBed != null && !fighting) {         // morning (or a bad spot for it): the bed comes along
 			if (!(level.getBlockState(campBed).getBlock() instanceof net.minecraft.world.level.block.BedBlock)) {
 				campBed = null;
