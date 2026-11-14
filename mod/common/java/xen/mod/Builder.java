@@ -600,8 +600,12 @@ final class Builder {
 	/** Its team's fortress: a whole place with a high wall round it (a house, a garden, a road out through the gate). */
 	boolean fortress;
 
-	String startFortress(BlockPos near) {
+	/** Its team's fortress's seed: the same layout each time it's taken up (what's built already counts). */
+	private long fortSeed;
+
+	String startFortress(BlockPos near, long seed) {
 		if (c.player == null) return "no body";
+		fortSeed = seed;
 		ServerLevel level = (ServerLevel) c.player.level();
 		String r = place(level, near, c.player.blockPosition(), true, true);
 		fortress = r != null && r.startsWith("You will");
@@ -621,14 +625,14 @@ final class Builder {
 		if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
 			p = Architect.ofWood(p.name(), true, p.window().equals("glass_pane"));
 		String biome = VillageHouses.kindAt(level, feet);
-		Imagined.Layout l = Imagined.picture(c, level, near != null ? near : feet, creative, ds, p, stage, new Random(), biome, fort);
+		Imagined.Layout l = Imagined.picture(c, level, near != null ? near : feet, creative, ds, p, stage, fort && fortSeed != 0 ? new Random(fortSeed) : new Random(), biome, fort);
 		if (l == null) return asked ? "You can't lay out a place here: there isn't flat dry ground enough for a house. Somewhere more open would work." : null;
 		String wood = woodType();
 		Imagined.Part h = l.house();
 		Architect.Plan house = h.shown() != null ? VillageHouses.plan(Taught.vary(h.shown(), h.corner()), h.corner(), h.front(), creative, wood)
 				: Architect.designed(h.corner(), h.front(), ds, p, new Random(h.corner().asLong()), stage);
 		List<Queued> after = new ArrayList<>();                                // (after the house and its furniture: its road, pool, seats, wall)
-		for (Architect.Plan pl : Imagined.plans(l, Taught.style(biome), creative, wood, biome, new Random())) after.add(new Queued(pl, null, pl.name()));
+		for (Architect.Plan pl : Imagined.plans(l, Taught.style(biome), creative, wood, biome, fort && fortSeed != 0 ? new Random(fortSeed + 1) : new Random())) after.add(new Queued(pl, null, pl.name()));
 		int total = (int) house.steps().stream().filter(st -> !st.dig()).count();
 		for (Queued q : after) total += (int) q.plan().steps().stream().filter(st -> !st.dig()).count();
 		String said = l.describe();
@@ -1200,6 +1204,7 @@ final class Builder {
 		BlockPos at = plan.middle();
 		c.lore(c.name + " built " + ("aeiou".indexOf(what.charAt(0)) >= 0 ? "an " : "a ") + what + " at " + at.getX() + " " + at.getZ()
 				+ (helpers.isEmpty() ? "" : ", with help from " + String.join(" and ", helpers)));
+		if (fortress && (placeGoesOn || wasPart && layout != null)) c.mod.projectPart(c, placeGoesOn ? layoutLeft.size() : 0, helpers, !placeGoesOn);   // (its team's fortress: a part done, kept)
 		if (placeGoesOn) {
 			c.journal("build", "finished the " + what + " of its place; " + layoutLeft.size() + " parts to go");
 		} else if (wasPart && layout != null) {                                    // the last of its place: all done

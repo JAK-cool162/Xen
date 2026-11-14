@@ -281,6 +281,10 @@ final class Btb {
 			else if (c.enchanter.table() == null && invCount("enchanting_table") == 0)   // (a table it has: waiting on its levels or its next go, not another table; Cid, just enchanted, set off for four more obsidian)
 				out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
+		XenMod.Project proj = c.mod.project(c);
+		if (proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= 3 && o.health >= 12 && o.meals > 0
+				&& c.player.blockPosition().closerThan(proj.at(), 300))   // (its team's fortress, unfinished: taken up again by whoever's free; the further along, the keener: a finished one is worth more than another started)
+			out.add(new Option(Task.FORT, 3.2f + 1.6f * proj.progress(), String.format(Locale.ROOT, "the team's fortress, %.0f%% built: finishing it beats starting anew", 100 * proj.progress())));
 		if (goal.equals("home") && !o.night) out.add(earlyHome ? new Option(Task.HOME, 3.7f, "an early base: a chest for its diamonds and ore, its bed for a spawn") : new Option(Task.HOME, 3, "a home"));
 		BlockPos chest = c.storage.chestAtHome();
 		if (chest != null && !o.night && o.overworld && now() - stashAt > 20 * 60 * 10 && !c.storage.busy() && chest.closerThan(c.player.blockPosition(), 48) && stashable())
@@ -573,6 +577,8 @@ final class Btb {
 		tierAt = o.tier;
 		worthAt = worth();
 		raceAt = raceScore();
+		XenMod.Project projStart = c.mod.project(c);
+		projAt = projStart == null ? 0 : projStart.progress();
 		obsAt = o;
 		ironAt = o.iron;
 		fuelAt = o.fuel;
@@ -595,12 +601,20 @@ final class Btb {
 			if (r != null && r.startsWith("You will")) XenMod.LOG.info("{} btb: helps {} build the team's fortress", c.name, o.name);
 			return r;
 		}
-		BlockPos at = c.mod.teamHome(c);
-		if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
-		String r = c.builder.startFortress(at);
+		XenMod.Project pj = c.mod.project(c);
+		if (pj != null && pj.finished) return "The team's fortress is finished.";
+		boolean resume = pj != null;
+		if (pj == null) {                                                         // none yet: its team's, here or at its base (it stays the team's, whoever leaves it)
+			BlockPos at = c.mod.teamHome(c);
+			if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
+			pj = c.mod.newProject(c, at, c.random().nextLong() | 1);
+			if (pj == null) return "no team";
+		}
+		BlockPos at = pj.at();
+		String r = c.builder.startFortress(at, pj.seed);
 		if (r != null && r.startsWith("You will")) {
 			if (c.goals.home == null) c.goals.home = at;
-			XenMod.LOG.info("{} btb: starts its team's fortress at {}", c.name, at.toShortString());
+			XenMod.LOG.info("{} btb: {} its team's fortress at {} ({} of {} parts done)", c.name, resume ? "takes up" : "starts", at.toShortString(), pj.partsDone, Math.max(pj.parts, pj.partsDone));
 		}
 		return r;
 	}
@@ -754,6 +768,7 @@ final class Btb {
 	}
 
 	private long houseAt = -100_000;
+	private float projAt;
 	private long grindFrom = -1;
 	private BlockPos grindAt;
 
@@ -1299,6 +1314,8 @@ final class Btb {
 		double gained = worth() - worthAt;
 		int race = raceScore() - raceAt;                                           // (the race: diamond armor, enchantments, diamond tools gained)
 		double reward = gained * 0.05 + (o.tier - tierAt) * 20 + race * 15 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
+		XenMod.Project projNow = c.mod.project(c);
+		if (task == Task.FORT && projNow != null) reward += 12 * (projNow.progress() - projAt) + (projNow.finished && projAt < 1 ? 20 : 0);   // (its team's fortress further along; finished, a lot more)
 		boolean ok = !died && (task == Task.COAL ? o.fuel > fuelAt : gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null

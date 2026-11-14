@@ -234,6 +234,7 @@ public class XenMod implements ModInitializer {
 			LOG.warn("Xen's words couldn't take in the game's names: {}", e.toString());
 		}
 		roster.load(brainFile().resolveSibling("companions.json"));
+		loadProjects();
 		lore.load(brainFile().resolveSibling("lore.json"));
 		society.load(brainFile().resolveSibling("society.json"));
 		Rules.load(brainFile().resolveSibling("rules.tsv"));                  // the rules each Xen wrote itself
@@ -1757,6 +1758,86 @@ public class XenMod implements ModInitializer {
 	}
 
 	/** A teammate's base (the nearest), or null: its team shares one. */
+	/**
+	 * A team's building project (its fortress): where, its plan's seed (the same layout every time it's taken up again),
+	 * parts done of all, who built on it. Unfinished, it stays the team's project whoever left it; anyone on the team
+	 * takes it up again; finished is worth more than started.
+	 */
+	static final class Project {
+		int x, y, z, parts, partsDone;
+		long seed;
+		boolean finished;
+		java.util.List<String> by = new ArrayList<>();
+
+		BlockPos at() {
+			return new BlockPos(x, y, z);
+		}
+
+		float progress() {
+			return finished ? 1 : parts <= 0 ? 0 : Math.min(1f, partsDone / (float) parts);
+		}
+	}
+
+	final java.util.Map<String, Project> projects = new java.util.HashMap<>();
+
+	private Path projectsFile() {
+		return brainFile().resolveSibling("projects.json");
+	}
+
+	private void loadProjects() {
+		projects.clear();
+		try {
+			if (!Files.exists(projectsFile())) return;
+			java.util.Map<String, Project> m = new com.google.gson.Gson().fromJson(Files.readString(projectsFile()), new com.google.gson.reflect.TypeToken<java.util.Map<String, Project>>() {}.getType());
+			if (m != null) projects.putAll(m);
+		} catch (Exception e) {
+			LOG.warn("Xen: couldn't read the teams' projects: {}", e.toString());
+		}
+	}
+
+	void saveProjects() {
+		try {
+			Files.createDirectories(projectsFile().getParent());
+			Files.writeString(projectsFile(), new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(projects));
+		} catch (Exception e) {
+			LOG.warn("Xen: couldn't keep the teams' projects: {}", e.toString());
+		}
+	}
+
+	/** Its team's project (null: none, or no team). */
+	Project project(Companion c) {
+		String t = teamOf(c);
+		return t == null ? null : projects.get(t);
+	}
+
+	/** A new project for its team, here. */
+	Project newProject(Companion c, BlockPos at, long seed) {
+		String t = teamOf(c);
+		if (t == null) return null;
+		Project pj = new Project();
+		pj.x = at.getX();
+		pj.y = at.getY();
+		pj.z = at.getZ();
+		pj.seed = seed;
+		projects.put(t, pj);
+		saveProjects();
+		return pj;
+	}
+
+	/** A part of its team's fortress done (left: parts still to go), by it and its helpers. */
+	void projectPart(Companion c, int left, java.util.List<String> helpers, boolean last) {
+		Project pj = project(c);
+		if (pj == null || pj.finished) return;
+		pj.partsDone++;
+		pj.parts = Math.max(pj.parts, pj.partsDone + left);
+		for (String n : java.util.stream.Stream.concat(java.util.stream.Stream.of(c.name), helpers.stream()).toList()) if (!pj.by.contains(n)) pj.by.add(n);
+		if (last) {
+			pj.finished = true;
+			LOG.info("{} finishes {}'s fortress at {} (built by {})", c.name, teamOf(c), pj.at().toShortString(), String.join(", ", pj.by));
+		} else LOG.info("{} builds a part of {}'s fortress ({} of {} done)", c.name, teamOf(c), pj.partsDone, pj.parts);
+		saveProjects();
+	}
+
 	BlockPos teamHome(Companion c) {
 		String t = teamOf(c);
 		if (t == null || !ownTeam(t) && !config.teamsLocked || c.player() == null) return null;   // (a color team's base too, when the teams are fixed)
