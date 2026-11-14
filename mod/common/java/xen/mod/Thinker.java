@@ -74,7 +74,8 @@ final class Thinker {
 					m.player().getFoodData().getFoodLevel(), Companion.fullDiamond(m.player()) ? "full diamond" : "not full diamond"));
 		}
 		String teamName = String.valueOf(mod.teamOf(lead)).replace("xen_", "");
-		String sys = "You are " + lead.name + ", leader of the " + teamName + " team in Minecraft, racing the other team to full enchanted diamond armor. You think of your own plans. Be short.";
+		String sys = "You are " + lead.name + ", leader of the " + teamName + " team in Minecraft, racing the other team to full enchanted diamond armor. You think of your own plans,"
+				+ " only with what's really in vanilla Minecraft. Be short.";
 		String user = "What just happened: " + what + ". What you know: " + WorldBrief.of(lead) + " Your teammates: " + names + ". What do you do? Reply with exactly three lines:\nPLAN: your plan, one short sentence in your own words\n"
 				+ "WHO: the teammates who do it (names, or all)\nDO: one word from " + String.join(", ", DOS) + (enemy == null ? "" : " (REVENGE: go after " + enemy.getName().getString() + ", full diamond only)");
 		post(url, sys, user, 120, text -> mod.server.execute(() -> applyIdea(lead, team, text, enemy, what)));
@@ -93,7 +94,8 @@ final class Thinker {
 		String sys = String.format(Locale.ROOT, "You are %s, a Minecraft player%s: %s, %s, %s. You can do anything in Minecraft. You have your own ideas.", c.name,
 				team == null ? "" : " on the " + team.replace("xen_", "") + " team", p.bravery > 0.5f ? "brave" : "careful", p.curiosity > 0.5f ? "curious" : "steady",
 				p.kindness > 0.5f ? "kind" : "tough");
-		String user = "What you know: " + WorldBrief.of(c) + " Think of one new idea of your own: something to do or build next, using what you know (anything at all). Answer in one short sentence.";
+		String user = "What you know: " + WorldBrief.of(c) + " Think of one new idea of your own: something to do or build next, using what you know. Only real vanilla Minecraft:"
+				+ " its blocks, items, mobs and places (no electricity, machines, engines, solar panels or anything not in the game). Answer in one short sentence.";
 		post(url, sys, user, 60, text -> mod.server.execute(() -> {
 			waiting.put("dream:" + c.name, false);
 			String idea = text.replace('\n', ' ').strip();

@@ -18,8 +18,13 @@ final class Wishes {
 	private static final java.util.Set<String> BIG = java.util.Set.of("Cliff_Stair_Case", "Wizard_Tower", "Medieval_House_with_Bridge", "coal-farm", "enderman-xp-farm",
 			"mob-grinder", "potion-brewer");
 
+	/** Not in the game: an idea with these in it is a wish (its model's make-believe), never acted on. */
+	private static final String[] NOT_MINECRAFT = {"solar", "electric", "electricity", "energy", "power plant", "engine", "engines", "robot", "robots", "laser", "computer",
+			"internet", "phone", "car", "cars", "plane", "rocket", "nuclear", "battery", "batteries", "generator", "drone", "factory", "wifi", "panel", "panels", "siege engine", "gun", "guns"};
+
 	static Doing interpret(String idea) {
 		String t = " " + idea.toLowerCase(Locale.ROOT).replaceAll("[^a-z ]", " ") + " ";
+		for (String w : NOT_MINECRAFT) if (t.contains(" " + w + " ")) return null;     // (make-believe: a wish only)
 		for (String name : Schematic.list()) {                                    // the player's schematics, by a word of their name ("tower", "staircase", "wall")
 			for (String w : name.toLowerCase(Locale.ROOT).split("[_\\- ]+")) {
 				if (w.length() < 4 || w.equals("from") || w.equals("with") || w.equals("small") || w.equals("house")) continue;
@@ -35,7 +40,8 @@ final class Wishes {
 		if (has(t, "farm", "wheat", "crops", "garden", "carrots", "potatoes")) return new Doing("build", "farm", "build a farm");
 		if (has(t, "house", "home", "cottage", "cabin", "hut", "shelter")) return new Doing("build", "house", "build a house");
 		if (has(t, "base", "camp", "outpost")) return new Doing("build", "base", "build a base");
-		if (has(t, "diamond", "diamonds")) return new Doing("task", "DIAMONDS", "go for diamonds");
+		if (has(t, "mine diamonds", "get diamonds", "find diamonds", "more diamonds", "diamond ore", "dig for diamonds", "mine for diamonds", "look for diamonds"))
+			return new Doing("task", "DIAMONDS", "go for diamonds");                   // (going for them: "using my diamonds" isn't)
 		if (has(t, "enchant", "enchanting", "enchanted")) return new Doing("task", "ENCHANT", "enchant its gear");
 		if (has(t, "trade", "trading", "villager", "villagers", "emerald", "emeralds")) return new Doing("task", "TRADE", "trade with the villagers");
 		if (has(t, "village")) return new Doing("task", "VISIT", "visit the village");
