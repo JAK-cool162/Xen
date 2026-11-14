@@ -1,5 +1,6 @@
 package xen.mod;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.EquipmentSlot;
 
@@ -20,6 +21,10 @@ final class Leader {
 	private final java.util.Map<String, Long> nextRound = new java.util.HashMap<>();
 	private final java.util.Map<String, String> lastPlan = new java.util.HashMap<>();
 	private final java.util.Map<String, Long> nextTalk = new java.util.HashMap<>();
+	/** What each plan has paid each team (race points per round, averaged): the leaders learn which plans work. */
+	private final java.util.Map<String, Double> worth = new java.util.HashMap<>();
+	private final java.util.Map<String, Integer> raceAt = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> planSince = new java.util.HashMap<>();
 
 	Leader(XenMod mod) {
 		this.mod = mod;
@@ -72,13 +77,50 @@ final class Leader {
 		}
 		boolean fortStarted = false;
 		for (Companion c : members) fortStarted |= c.builder.fortress && c.builder.busy();
-		String plan = hungry + hurt > n / 2 ? "regroup: food and rest first"
-				: noKit > n / 3 ? "kit up: everyone's basic kit"
-				: noArmor <= n / 2 ? "fortress: a walled base for the team, the geared ones build it"
-				: noArmor > n / 3 ? "diamonds: full diamond armor for all"
-				: unenchanted > 0 ? "enchant: our diamond gear enchanted"
-				: "hold: guard the base, help the slow ones";
+		// the race so far: how much the team gained under the plan it was on (what it learns which plans pay)
+		int race = 0;
+		for (Companion c : members) race += c.btb.raceScore();
+		String was = lastPlan.get(lead.name);
+		if (was != null && raceAt.containsKey(lead.name)) {
+			String key = team + "|" + was.split(":")[0];
+			double gain = race - raceAt.get(lead.name);
+			worth.put(key, worth.getOrDefault(key, 0.0) * 0.8 + gain * 0.2);
+		}
+		raceAt.put(lead.name, race);
+		// every plan it could choose, each scored: what the team needs, its leader's nature, what each has paid so far
+		var p0 = lead.personality;
+		double geared = (n - noArmor) / (double) Math.max(1, n);
+		BlockPos village = lead.structures.found.get("village");
+		if (village == null) village = lead.places.get("village");
+		java.util.Map<String, Double> score = new java.util.LinkedHashMap<>();
+		score.put("regroup: food and rest first", 2.0 + 5.0 * (hungry + hurt) / Math.max(1, n));
+		score.put("kit up: everyone's basic kit", 1.5 + 4.0 * noKit / Math.max(1, n));
+		score.put("diamonds: full diamond armor for all", 1.5 + 4.0 * noArmor / Math.max(1, n));
+		score.put("enchant: our diamond gear enchanted", 1.0 + 4.0 * unenchanted / Math.max(1, n));
+		score.put("fortress: a walled base for the team", 0.5 + 2.5 * geared + 1.5 * p0.power + 0.8 * p0.bravery);
+		if (village != null) score.put("village: settle a village, build our houses in it", 0.5 + 2.5 * geared + 1.5 * p0.kindness + 0.5 * p0.curiosity);
+		score.put("farms: farms and a supply chest at our base", 0.5 + 2.0 * hungry / Math.max(1, n) + 1.0 * geared + 1.2 * p0.diligence);
+		String plan = null;
+		double best = -1e9;
+		StringBuilder why = new StringBuilder();
+		for (var e : score.entrySet()) {
+			double v = e.getValue() + 2.0 * worth.getOrDefault(team + "|" + e.getKey().split(":")[0], 0.0) + random.nextGaussian() * 0.15
+					+ (e.getKey().equals(was) && now - planSince.getOrDefault(lead.name, 0L) < 20 * 60 * 3 ? 1.0 : 0);   // (it sticks with a plan a few minutes)
+			why.append(why.length() > 0 ? ", " : "").append(e.getKey().split(":")[0]).append(String.format(Locale.ROOT, " %.1f", v));
+			if (v > best) {
+				best = v;
+				plan = e.getKey();
+			}
+		}
+		if (plan.startsWith("village") && village != null && (lead.goals.home == null || lead.goals.home.distSqr(village) > 48 * 48)) {
+			lead.goals.home = village;                                            // (its team's base: in the village now)
+			XenMod.LOG.info("{} (leads {}): our base is the village at {} now", lead.name, team.replace("xen_", ""), village.toShortString());
+		}
 		boolean changed = !plan.equals(lastPlan.put(lead.name, plan));
+		if (changed) {
+			planSince.put(lead.name, now);
+			XenMod.LOG.info("{} (leads {}) weighs its plans: {}", lead.name, team.replace("xen_", ""), why);
+		}
 		StringBuilder jobs = new StringBuilder();
 		int took = 0, refused = 0;
 		if (plan.startsWith("fortress") && !fortStarted && diamondArmor(lead) >= 4 && !lead.enchanter.possible()) lead.btb.order(Btb.Task.FORT, lead.name, 1.2f);   // (the leader lays it out itself)
@@ -86,7 +128,7 @@ final class Leader {
 		for (Companion c : members) {
 			if (c == lead) continue;
 			Btb.Task job = jobFor(c, plan);
-			if (job == Btb.Task.FORT && ++builders > 3) job = jobFor(c, "diamonds");   // (three build; the rest of the geared ones go on with the race)
+			if ((job == Btb.Task.FORT || job == Btb.Task.HOME || job == Btb.Task.FARM) && ++builders > 3) job = jobFor(c, "diamonds");   // (three on the team's work; the rest go on with the race)
 			if (job == null) continue;
 			var p = c.personality;
 			float trust = c.trust(lead.player().getUUID());
@@ -117,7 +159,10 @@ final class Leader {
 		if (meals < 2) return Btb.Task.FOOD;
 		if (c.btb.kitMissing() > 0) return Btb.Task.KIT;
 		int dia = diamondArmor(c);
-		if (plan.startsWith("fortress") && dia >= 4 && (allEnchanted(c) || !c.enchanter.possible())) return Btb.Task.FORT;   // (in diamond and nothing to enchant with yet: it builds the team's walls)
+		boolean free = dia >= 4 && (allEnchanted(c) || !c.enchanter.possible());   // (in diamond and nothing to enchant with yet: free for the team's work)
+		if (plan.startsWith("fortress") && free) return Btb.Task.FORT;
+		if (plan.startsWith("village") && free) return Btb.Task.HOME;
+		if (plan.startsWith("farms") && (free || dia >= 2)) return c.farmer.middle == null ? Btb.Task.FARM : Btb.Task.STASH;
 		if (dia < 4 && c.crafter.pickTier() >= 3) return Btb.Task.DIAMONDS;
 		if (dia < 4) return Btb.Task.IRON;
 		if (!allEnchanted(c)) return Btb.Task.ENCHANT;

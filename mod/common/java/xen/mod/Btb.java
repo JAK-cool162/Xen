@@ -617,6 +617,7 @@ final class Btb {
 		orderedAt = now();
 	}
 
+	private long houseAt = -100_000;
 	private long forcedAt = -100_000, retreatFrom;
 	private int raceAt;
 	private Obs obsAt;
@@ -777,6 +778,12 @@ final class Btb {
 			case TOOLS -> planFor("iron_pickaxe", 1, "a new pickaxe before this one breaks");
 			case HOME -> {                                                    // a base: its team's if a teammate has one, else a small one of its own
 				BlockPos mate = c.mod.teamHome(c);
+				if (mate != null && c.goals.home != null && c.goals.home.equals(mate) && now() - houseAt > 20 * 60 * 20 && !c.builder.busy()) {   // (moved in already: a house of its own there, the team's place grows)
+					houseAt = now();
+					String h = c.builder.startNear("house", mate);
+					if (h != null && h.startsWith("You will")) XenMod.LOG.info("{} btb: builds a house of its own at its team's base {}", c.name, mate.toShortString());
+					yield h;
+				}
 				if (mate != null) {
 					c.goals.home = mate;
 					c.journal("does", "moves into its team's base at " + mate.toShortString());
