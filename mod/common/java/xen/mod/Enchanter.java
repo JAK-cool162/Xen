@@ -42,6 +42,15 @@ final class Enchanter {
 				if (!level.getBlockState(n).canBeReplaced() || !level.getBlockState(n.above()).canBeReplaced() || level.getBlockState(n.below()).canBeReplaced()) continue;
 				if (best == null || n.distSqr(feet) < best.distSqr(feet)) best = n;
 			}
+		if (best == null)                                                      // (nothing right beside it, a table in a tunnel's wall: a spot two or three off still within reach; Dee and Max, five and six blocks off, gave up)
+			for (int dx = -3; dx <= 3; dx++)
+				for (int dz = -3; dz <= 3; dz++)
+					for (int dy = 1; dy >= -2; dy--) {
+						BlockPos n = t.offset(dx, dy, dz);
+						if (n.equals(t) || Vec3.atCenterOf(t).distanceTo(Vec3.atBottomCenterOf(n).add(0, 1.62, 0)) > 4.0) continue;
+						if (!level.getBlockState(n).canBeReplaced() || !level.getBlockState(n.above()).canBeReplaced() || level.getBlockState(n.below()).canBeReplaced()) continue;
+						if (best == null || n.distSqr(feet) < best.distSqr(feet)) best = n;
+					}
 		return Vec3.atBottomCenterOf(best != null ? best : t.above());
 	}
 
