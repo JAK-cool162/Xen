@@ -307,6 +307,10 @@ final class Enchanter {
 	Action next() {
 		if (!on) return null;
 		if (++tries > budget) {                                                // (two minutes, more for a walk to its table: something's wrong, it gives up)
+			BlockPos gt = table();
+			XenMod.LOG.info("{} enchanting: gives up after {} ticks (table {}, {} blocks off, can click {}, carried {}, bringing home {}, taking along {})", c.name, tries,
+					gt == null ? "none" : gt.toShortString(), gt == null ? -1 : (int) Math.sqrt(gt.distSqr(c.player.blockPosition())), gt != null && c.hands.canClick(gt),
+					c.items().getOrDefault("enchanting_table", 0), bringHome, takeAlong);
 			on = false;
 			retryAt = c.player.level().getGameTime() + 20 * 60 * 5;
 			return null;
@@ -383,6 +387,7 @@ final class Enchanter {
 		c.hands.stop();
 		c.hands.use(t);                                                        // right-click: the enchanting screen
 		if (!(c.player.containerMenu instanceof EnchantmentMenu menu)) {
+			XenMod.LOG.info("{} enchanting: the table at {} didn't open", c.name, t.toShortString());
 			on = false;
 			return null;
 		}
@@ -455,6 +460,8 @@ final class Enchanter {
 		} else {
 			c.journal("does", "couldn't enchant yet (not enough levels)");
 		}
+		XenMod.LOG.info("{} enchanting: {} its {} (option {}, {}{}), level now {}", c.name, done ? "enchanted" : "couldn't enchant", onIt, pick + 1, clue.isEmpty() ? "nothing offered" : clue,
+				reroll ? ", for new offers" : "", c.player.experienceLevel);
 		return Action.PLACE;
 	}
 }
