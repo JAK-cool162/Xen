@@ -70,6 +70,7 @@ final class Trader {
 			case "crossbow" -> 3f;
 			case "bell" -> 10f;
 			case "enchanted_book" -> 5f;
+			case "bookshelf" -> 3f;
 			default -> tool(n);
 		};
 	}
@@ -88,8 +89,15 @@ final class Trader {
 	}
 
 	/** How much more (or less) it wants a thing right now: food when hungry, tools it lacks, what its dream needs. */
+	/** Its team has no enchanting table and it has no book: a bookshelf (three books when broken) is what it's after. */
+	boolean wantsShelf() {
+		return c.enchanter.table() == null && countItem("book") == 0 && countItem("enchanting_table") == 0 && countItem("bookshelf") == 0;
+	}
+
 	private float need(String n, boolean food) {
 		var items = c.items();
+		if (n.equals("bookshelf") && wantsShelf()) return 12f;                   // (a librarian's bookshelf: three books, its team's enchanting table)
+		if (n.equals("emerald") && wantsShelf() && countItem("emerald") < 9) return 1.6f;   // (emeralds toward the bookshelf: its junk sells)
 		if (food && c.player.getFoodData().getFoodLevel() <= 14 && items.getOrDefault("food", 0) < 3) return 2f;
 		if (food && items.getOrDefault("food", 0) >= 10) return 0.4f;               // it has plenty: worth less to it
 		if (!food && countItem(n) >= 64) return 0.5f;

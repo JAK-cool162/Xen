@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -350,6 +350,12 @@ final class Btb {
 				default -> true;
 			});
 		}
+		if (!o.night && o.overworld && c.mod.config.trading && c.trader.hasSomethingToTrade() && (c.trader.villagerNear() != null || c.visits.nearest("village") != null)) {
+			boolean shelf = c.trader.wantsShelf() && o.tier >= 3;                  // (its team has no enchanting table: emeralds, then a librarian's bookshelf)
+			int em = invCount("emerald");
+			if (shelf || em >= 3 || o.meals < 2)
+				out.add(new Option(Task.TRADE, 3.0f + (shelf ? 0.8f : 0) + (shelf && em >= 9 ? 1.2f : 0), shelf ? "trade at the village: emeralds for a bookshelf (three books, our enchanting table)" : "trade at the village"));
+		}
 		if (c.roleTask != null)                                                    // its role on the team leans it (a Miner toward diamonds, a Cook toward food)
 			out.replaceAll(op -> op.task == c.roleTask ? new Option(op.task, op.base + 0.4f, op.why + " (its role: " + c.role + ")") : op);
 		if (ordered != null && now() - orderedAt < 20 * 60 * 3 && (!o.night || o.under))   // its leader's job for it
@@ -471,7 +477,7 @@ final class Btb {
 			break;
 		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.TABLE && shelfFrom >= 0 ? booksStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -618,6 +624,38 @@ final class Btb {
 	}
 
 	private long houseAt = -100_000;
+	private long shelfFrom = -1;
+	private BlockPos shelfAt;
+
+	/** Its bookshelf down beside it, then broken: three books (it picks them up on its way). */
+	private Action booksStep() {
+		var level = c.player.level();
+		if (shelfAt == null) {
+			BlockPos feet = c.player.blockPosition();
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				BlockPos q = feet.relative(d);
+				if (!level.getBlockState(q).canBeReplaced() || level.getBlockState(q.below()).canBeReplaced()) continue;
+				if (c.hands.placeItem(q, st -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals("bookshelf"), q.below(), net.minecraft.core.Direction.UP, 0)) {
+					shelfAt = q;
+					c.acted = true;
+					return Action.PLACE;
+				}
+			}
+			shelfFrom = -1;                                                      // (nowhere to put it here: another time)
+			return null;
+		}
+		if (!level.getBlockState(shelfAt).is(net.minecraft.world.level.block.Blocks.BOOKSHELF)) {   // (broken: its books on the ground, picked up)
+			XenMod.LOG.info("{} btb: breaks its bookshelf for books", c.name);
+			shelfAt = null;
+			shelfFrom = -1;
+			return null;
+		}
+		if (c.hands.mine(shelfAt)) {
+			c.acted = true;
+			return Action.MINE;
+		}
+		return null;
+	}
 	private long forcedAt = -100_000, retreatFrom;
 	private int raceAt;
 	private Obs obsAt;
@@ -816,6 +854,11 @@ final class Btb {
 			case SLEEP -> "You will sleep in your bed.";
 			case EAT -> c.chores.eat();
 			case KIT -> kitStep(o);
+			case TRADE -> {                                                     // a village's villagers: sell what it has plenty of, buy what it needs (a librarian's bookshelf)
+				if (c.trader.villagerNear() != null) yield c.trader.withVillager(null);
+				String go = c.visits.begin();
+				yield go != null ? go : "no village to trade at";
+			}
 			case FORT -> fortStep();
 			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
@@ -921,6 +964,11 @@ final class Btb {
 				return obsidian;
 			}
 		}
+		if (!tabled && it.getOrDefault("book", 0) < 1 && invCount("bookshelf") > 0) {   // (a bookshelf it bought: down and broken, three books)
+			shelfFrom = now();
+			shelfAt = null;
+			return "You will put your bookshelf down and break it for its three books.";
+		}
 		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
 		if (tabled && c.player.experienceLevel < 3) {                           // the table, no levels to pay with: coal ore gives them (and torches)
 			String xp = c.chores.mine(c.lessons.depth("coal", 40), "coal", 16);
@@ -954,7 +1002,8 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.TRADE && c.visits.visiting()
+				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */

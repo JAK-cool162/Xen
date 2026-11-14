@@ -147,9 +147,75 @@ final class Leader {
 			XenMod.LOG.info("{} (leads {}): plan \"{}\"{}; {} of {} take their jobs: {}", lead.name, team.replace("xen_", ""), plan, changed ? " (new plan)" : "",
 					took, took + refused, jobs);
 		if (changed) lead.journal("does", "as leader: the team's plan is " + plan);
+		share(lead, members, team);
 		if (now >= nextTalk.getOrDefault(lead.name, 0L)) {                       // its team's laws and everyone's role, in its own words (the language model), every ten minutes
 			nextTalk.put(lead.name, now + 20 * 60 * 10);
 			mod.thinker.teamTalk(lead, members);
+		}
+	}
+
+	/** Diamonds it still needs for its armor (what it isn't wearing yet) and a diamond pickaxe and sword. */
+	private static int diamondsFor(Companion c) {
+		int need = 0;
+		EquipmentSlot[] slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+		int[] cost = {5, 8, 7, 4};
+		for (int i = 0; i < 4; i++)
+			if (!BuiltInRegistries.ITEM.getKey(c.player().getItemBySlot(slots[i]).getItem()).getPath().startsWith("diamond_")) need += cost[i];
+		if (c.btb.invCount("diamond_pickaxe") == 0) need += 3;
+		if (c.btb.invCount("diamond_sword") == 0) need += 2;
+		return need;
+	}
+
+	/**
+	 * Its team's goods where they're needed (one hand-over a round): spare diamonds to the one closest to full armor,
+	 * and the makings of a book (a book, paper, sugar cane, leather) to whoever has the obsidian for the team's table.
+	 * Within a team nobody haggles: what's spare (by its worth to the one holding it) goes where it's needed.
+	 */
+	private void share(Companion lead, List<Companion> members, String team) {
+		Companion needy = null;
+		int short_ = Integer.MAX_VALUE;
+		for (Companion m : members) {
+			int want = diamondsFor(m) - m.btb.invCount("diamond");
+			if (want > 0 && want < short_) {
+				short_ = want;
+				needy = m;
+			}
+		}
+		if (needy != null) {
+			Companion giver = null;
+			int spareBest = 0;
+			for (Companion m : members) {
+				if (m == needy || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(needy.player()) > 400) continue;
+				int spare = m.btb.invCount("diamond") - Math.max(0, diamondsFor(m)) - 2;   // (two kept back: the team's enchanting table)
+				if (spare > spareBest) {
+					spareBest = spare;
+					giver = m;
+				}
+			}
+			if (giver != null) {
+				int n = Math.min(spareBest, short_);
+				String r = giver.chores.give(needy.player(), "diamond", n);
+				if (r != null && r.startsWith("You will")) {
+					XenMod.LOG.info("{} (leads {}): team share: {} gives {} diamonds to {} ({} short of full armor)", lead.name, team.replace("xen_", ""), giver.name, n, needy.name, short_);
+					return;
+				}
+			}
+		}
+		if (members.stream().anyMatch(m -> m.enchanter.table() != null)) return;   // (the team has a table: no book needed)
+		Companion maker = null;
+		for (Companion m : members) if (m.btb.invCount("obsidian") >= 4 && m.btb.invCount("book") == 0) maker = m;
+		if (maker == null) return;
+		for (String item : new String[] {"book", "paper", "sugar_cane", "leather"}) {
+			int min = item.equals("book") ? 1 : item.equals("leather") ? 1 : 3;
+			if (maker.btb.invCount(item) >= min) continue;
+			for (Companion m : members) {
+				if (m == maker || m.btb.invCount(item) < min || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(maker.player()) > 400) continue;
+				String r = m.chores.give(maker.player(), item, min);
+				if (r != null && r.startsWith("You will")) {
+					XenMod.LOG.info("{} (leads {}): team share: {} gives {} {} to {} (for the team's enchanting table)", lead.name, team.replace("xen_", ""), m.name, min, item, maker.name);
+					return;
+				}
+			}
 		}
 	}
 
