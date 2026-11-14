@@ -1261,6 +1261,7 @@ public class XenMod implements ModInitializer {
 								})
 								.then(Commands.argument("value", StringArgumentType.greedyString()).executes(ctx ->
 										set(ctx, StringArgumentType.getString(ctx, "setting"), StringArgumentType.getString(ctx, "value"))))))
+				.then(Commands.literal("teambase").requires(XenMod::mayRun).executes(ctx -> each(ctx, c -> c.name + ": " + c.btb.teamBase())))   // (each of them: its team's next base part, now)
 				.then(Commands.literal("build").then(Commands.argument("what", StringArgumentType.greedyString()).suggests((ctx, b) -> {
 									for (String w : new String[] {"house", "base", "farm", "pen", "mob farm"}) b.suggest(w);
 									for (String w : Schematic.list()) b.suggest(w);

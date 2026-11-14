@@ -593,6 +593,11 @@ final class Btb {
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
 	/** Its team's fortress: help a teammate already building it, or start it (at the team's base, or here, which becomes the base). */
+	/** /xen teambase: its team's next base part, started now (a test, or a nudge). */
+	String teamBase() {
+		return fortStep();
+	}
+
 	private String fortStep() {
 		for (Companion o : c.mod.companions) {
 			if (o == c || o.player() == null || !o.builder.fortress || !o.builder.busy() || !c.mod.sameSide(o, c) || c.mod.teamOf(c) == null) continue;
