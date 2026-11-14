@@ -1790,8 +1790,8 @@ final class Chores {
 					Action a = reach(t);
 					if (a != null) return a;
 				} else if (!caveMode && mineBase == null && tunnelIn == null && t.getY() < here.getY() - 3) {   // far and below: its staircase goes that way (as deep as it was going: it takes the ore as it passes)
-					net.minecraft.core.Direction d = c.guide.way();
-					if (!wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
+					net.minecraft.core.Direction d = c.guide.way(t);                   // (toward the ore it's after: its guide may have none of its own; Dee, a null every few seconds)
+					if (d != null && !wet(here, d, 4) && !opensUp(here, d)) mineDir = d;
 				}
 			}
 		}

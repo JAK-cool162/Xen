@@ -265,8 +265,14 @@ final class Guide {
 
 	/** Which way (of the four) its staircase goes toward it. */
 	net.minecraft.core.Direction way() {
+		return way(target);
+	}
+
+	/** Which way (of the four) a staircase goes toward there (null: nowhere to go). */
+	net.minecraft.core.Direction way(BlockPos to) {
+		if (to == null) return null;
 		BlockPos feet = c.player.blockPosition();
-		int dx = target.getX() - feet.getX(), dz = target.getZ() - feet.getZ();
+		int dx = to.getX() - feet.getX(), dz = to.getZ() - feet.getZ();
 		return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST)
 				: (dz > 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH);
 	}
