@@ -193,7 +193,7 @@ final class Thinker {
 			}
 		}
 		for (Companion m : members) {                                          // "Ann - Miner", "Ann: Cook - keeps us fed", anywhere in its words
-			if (m == lead) continue;
+			if (m == lead || m.roleTask == Btb.Task.FORT || m.roleTask == Btb.Task.FIND) continue;   // (its builders and its finder keep their jobs)
 			var hit = java.util.regex.Pattern.compile("\\b" + m.name + "\\b\\s*[:\\-\u2013(]\\s*([A-Za-z][A-Za-z' ]{2,40}?)(?=[,;.)\\n]|\\s+-|$)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
 			if (!hit.find()) continue;
 			String rest = hit.group(1).strip();
