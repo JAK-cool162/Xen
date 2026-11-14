@@ -127,18 +127,22 @@ final class Enchanter {
 		return (ServerLevel) c.player.level();
 	}
 
+	/** Tables it couldn't get to (its way-finder found no way): not walked to again. */
+	private final java.util.Set<Long> unreachable = new java.util.HashSet<>();
+
 	/** Its enchanting table: remembered, or one it sees around its home. */
 	BlockPos table() {
 		if (table != null && level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) return table;
 		table = c.places.get("enchanting table");
 		if (table != null && !level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) table = null;
-		if (table != null && !table.closerThan(c.player.blockPosition(), 400)) table = null;   // (one it knew of, far off: not a trip across the world for it; Bob, at three health, swimming toward one 200 blocks off)
+		if (table != null && !table.closerThan(c.player.blockPosition(), 400)) table = null;
+		if (table != null && unreachable.contains(table.asLong())) table = null;   // (one it knew of, far off: not a trip across the world for it; Bob, at three health, swimming toward one 200 blocks off)
 		if (table == null && c.mod.config.luck > 0) {                          // (knowing the world: a table another Xen made, near enough, does as well as its own; Cid had one, nine others dug obsidian for theirs)
 			BlockPos best = null;
 			for (Companion x : c.mod.companions) {
 				if (x == c || x.player() == null || x.player().level() != c.player.level() || !c.mod.sameSide(c, x)) continue;   // (its own team's: Bob, blue, walked to Cid's, red, 200 blocks off down Cid's mine)
 				BlockPos t = x.places.get("enchanting table");
-				if (t == null || t.distSqr(c.player.blockPosition()) > 400 * 400) continue;   // (a walk of a minute or two beats four obsidian, a book and two diamonds for its own)   // (near: a trip of more than a minute or two isn't worth it)
+				if (t == null || t.distSqr(c.player.blockPosition()) > 400 * 400 || unreachable.contains(t.asLong())) continue;   // (a walk of a minute or two beats four obsidian, a book and two diamonds for its own)   // (near: a trip of more than a minute or two isn't worth it)
 				if (level().isLoaded(t) && !level().getBlockState(t).is(Blocks.ENCHANTING_TABLE)) continue;
 				if (best == null || t.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = t;
 			}
@@ -313,6 +317,10 @@ final class Enchanter {
 			XenMod.LOG.info("{} enchanting: gives up after {} ticks (table {}, {} blocks off, can click {}, carried {}, bringing home {}, taking along {})", c.name, tries,
 					gt == null ? "none" : gt.toShortString(), gt == null ? -1 : (int) Math.sqrt(gt.distSqr(c.player.blockPosition())), gt != null && c.hands.canClick(gt),
 					c.items().getOrDefault("enchanting_table", 0), bringHome, takeAlong);
+			if (gt != null && !c.hands.canClick(gt)) {                         // (one it couldn't get to, its own or a teammate's: not that one again; Max, five times to the one 30 down under water)
+				unreachable.add(gt.asLong());
+				table = null;
+			}
 			if (gt != null && !c.hands.canClick(gt) && gt.equals(c.places.get("enchanting table"))) {   // (one it couldn't get to: forgotten; another, or its own, next time: Bob, again and again, Cid's 82 blocks off down his mine)
 				c.places.forget("enchanting table");
 				table = null;
