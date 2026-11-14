@@ -30,7 +30,7 @@ final class Leader {
 		this.mod = mod;
 	}
 
-	private final java.util.Map<String, Long> ideaAt = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> ideaAt = new java.util.HashMap<>(), lapisSent = new java.util.HashMap<>();
 
 	/** Its team's leader (null: none, or not about). */
 	Companion leaderOf(Companion c) {
@@ -249,10 +249,14 @@ final class Leader {
 		for (Companion m : members) {                                          // a table near and levels, but no lapis: a teammate's (Max, a table and 27 levels, no lapis; Fin carried 157)
 			if (m.btb.invCount("lapis_lazuli") >= 3 || m.player().experienceLevel < 1 || !m.enchanter.wantsTable()
 					|| m.enchanter.table() == null && m.btb.invCount("enchanting_table") == 0) continue;
+			long t = m.player().level().getGameTime();
+			if (t < lapisSent.getOrDefault(m.name, 0L)) continue;                 // (one on its way to it already)
 			for (Companion g : members) {
 				if (g == m || g.btb.invCount("lapis_lazuli") < 9 || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().distanceTo(m.player()) > 200) continue;
+				if (g.enchanter.on || g.btb.task == Btb.Task.ENCHANT || g.btb.goal.equals("enchant") && g.btb.invCount("lapis_lazuli") < 12) continue;   // (its own enchanting first: Bob and Dee left theirs to carry lapis to Jay)
 				String r = g.chores.give(m.player(), "lapis_lazuli", 6);
 				if (r != null && r.startsWith("You will")) {
+					lapisSent.put(m.name, t + 20 * 60 * 5);
 					XenMod.LOG.info("{} (leads {}): team share: {} gives 6 lapis to {} (a table, levels, no lapis)", lead.name, team.replace("xen_", ""), g.name, m.name);
 					return;
 				}
