@@ -1221,7 +1221,7 @@ final class Builder {
 			inv.getItem(slot).shrink(1);
 		}
 		c.hands.face(Vec3.atCenterOf(s.pos()));
-		c.player.swing(net.minecraft.world.InteractionHand.MAIN_HAND, true);
+		Compat.swing(c.player);
 		level.setBlock(s.pos(), s.state(), 3);
 		level.playSound(null, s.pos(), s.state().getSoundType().getPlaceSound(), net.minecraft.sounds.SoundSource.BLOCKS, 1f, 0.8f);
 		c.acted = true;
