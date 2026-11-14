@@ -472,7 +472,7 @@ final class Hunch {
 				|| c.mod.config.luck >= 2;                                         // (knowing everything: every ore it needs, wherever it is, and further round)
 		if (c.mod.config.luck >= 2) {                                          // (diamonds: further round, they're rare; iron and coal there's some close by)
 			boolean rare = kind.equals("diamond") || kind.equals("obsidian") || kind.equals("lapis") || kind.equals("sugar_cane") || kind.equals("lava");
-			flat = Math.max(flat, rare ? 128 : 48);
+			flat = Math.max(flat, kind.equals("sugar_cane") ? 320 : rare ? 128 : 48);   // (sugar cane for its book, further still: a savanna has little; one book makes its team's table)
 			deep = Math.max(deep, rare ? 160 : 72);
 		}
 		List<double[]> found = new ArrayList<>();
