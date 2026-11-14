@@ -34,6 +34,8 @@ final class Visits {
 	private int progressStuff;
 	String doing = "";
 	private final Set<BlockPos> visited = new HashSet<>();
+	/** When it was last at each: a village it's been to does again for food after a while (its hay grows back as bread, its beds stay). */
+	private final java.util.Map<BlockPos, Long> visitedAt = new java.util.HashMap<>();
 	/** The village's beds and hay, its doors (the houses to walk past), and the ones it has been to. */
 	private final java.util.List<BlockPos> beds = new java.util.ArrayList<>(), hay = new java.util.ArrayList<>(), doors = new java.util.ArrayList<>();
 	private final Set<BlockPos> been = new HashSet<>();
@@ -116,7 +118,7 @@ final class Visits {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
 		try {
-			knownVillage = level.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, feet, 16, false);
+			knownVillage = level.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, feet, 48, false);   // (like /locate: the nearest within 768 blocks; at 256 only 2 of 10 had one)
 		} catch (RuntimeException e) {
 			knownVillage = null;
 		}
@@ -135,10 +137,14 @@ final class Visits {
 			lookUp();
 			p = k.equals("village") ? knownVillage : knownPortal;
 		}
+		if (p != null && k.equals("village") && c.items().getOrDefault("food", 0) < 4) {   // (hungry again, twenty minutes on: back to the village it knows)
+			final BlockPos v0 = p;
+			visited.removeIf(v -> Math.abs(v.getX() - v0.getX()) + Math.abs(v.getZ() - v0.getZ()) < 48 && now() - visitedAt.getOrDefault(v, 0L) > 20 * 60 * 20);
+		}
 		if (p == null || visited.contains(p)) return null;
 		final BlockPos q = p;
 		if (visited.stream().anyMatch(v -> Math.abs(v.getX() - q.getX()) + Math.abs(v.getZ() - q.getZ()) < 48)) return null;
-		return Math.hypot(q.getX() - feet.getX(), q.getZ() - feet.getZ()) < (k.equals("village") ? 256 : 160) ? q : null;
+		return Math.hypot(q.getX() - feet.getX(), q.getZ() - feet.getZ()) < (k.equals("village") ? 768 : 160) ? q : null;
 	}
 
 	/** The nearest village or ruined portal ("village", "ruined portal") it could visit now, or null. */
@@ -166,26 +172,7 @@ final class Visits {
 	boolean candidate() {
 		if (c.player == null || at != null) return at != null;
 		BlockPos feet = c.player.blockPosition();
-		if (placeOf("village", feet) == null) locateVillage(feet);
 		return placeOf("village", feet) != null || placeOf("ruined portal", feet) != null;
-	}
-
-	private long villageLookedAt = -100_000;
-
-	/** Knowing the world: the nearest village within 256 blocks, as the game's own map knows it (food, beds, golems; only 2 of 10 Xens had found one, most deaths came hungry at night). */
-	private void locateVillage(BlockPos feet) {
-		if (c.mod.config.luck <= 0 || !(c.player.level() instanceof net.minecraft.server.level.ServerLevel level) || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
-		if (level.getGameTime() - villageLookedAt < 20 * 60 * 5) return;
-		villageLookedAt = level.getGameTime();
-		try {
-			BlockPos v = level.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, feet, 16, false);
-			if (v == null) return;
-			BlockPos at = new BlockPos(v.getX(), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, v.getX(), v.getZ()), v.getZ());
-			c.places.remember("village", at);
-			XenMod.LOG.info("{} knows of a village at {} ({} blocks)", c.name, at.toShortString(), (int) Math.sqrt(at.distSqr(feet)));
-		} catch (RuntimeException e) {
-			XenMod.LOG.info("{} couldn't look for a village: {}", c.name, e.toString());
-		}
 	}
 
 	/** Its brain sends it: off to the nearest (a "You will..." plan), or null if there's none. */
@@ -230,6 +217,7 @@ final class Visits {
 		at = lv.hasChunkAt(best) ? new BlockPos(best.getX(), lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, best.getX(), best.getZ()), best.getZ())
 				: new BlockPos(best.getX(), Math.max(64, feet.getY()), best.getZ());
 		if (lv.hasChunkAt(best)) atGuessed = false;
+		visitedAt.put(best.immutable(), now());
 		visited.add(best.immutable());                                       // (the place as it knew it: not picked again, whatever comes of it)
 		kind = bestKind;
 		until = now() + 20 * 60 * 4;                                         // (four minutes, then: as long as it's getting somewhere)
@@ -251,6 +239,7 @@ final class Visits {
 
 	private void end(String why) {
 		if (at != null) {
+			visitedAt.put(at, now());
 			visited.add(at);
 			c.journal("does", "done at the " + kind + " at " + at.toShortString() + ": " + why);
 		}
