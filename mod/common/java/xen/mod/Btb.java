@@ -478,17 +478,34 @@ final class Btb {
 		BtbLearner learn = c.mod.btbLearner;
 		Option best = null;
 		float bestScore = -1e9f;
+		Task idea = c.mod.thinker.idea(c, opts.stream().filter(op -> now() >= notBefore.getOrDefault(op.task, 0L)).map(op -> op.task.name() + " (" + op.why + ")").toList(), o);
+		List<Option> live = new ArrayList<>();
+		List<Float> scores = new ArrayList<>();
 		for (Option op : opts) {
 			if (now() < notBefore.getOrDefault(op.task, 0L)) continue;           // (it just failed at that: something else for a bit)
-			float score = op.base + learn.bias(key, op.task.name());
+			float score = op.base + learn.bias(key, op.task.name()) + (op.task == idea ? 0.7f : 0f);   // (its own idea, thought through: a little more keen)
+			live.add(op);
+			scores.add(score);
 			if (score > bestScore) {
 				bestScore = score;
 				best = op;
 			}
 		}
-		if (best != null && opts.size() > 1 && c.random().nextFloat() < learn.explore()) {   // now and then another of the sensible ones, to find out
-			Option other = opts.get(c.random().nextInt(opts.size()));
-			if (now() >= notBefore.getOrDefault(other.task, 0L)) best = other;
+		boolean life = best != null && (bestScore >= 50 || best.task == Task.SHELTER || best.task == Task.SLEEP || best.task == Task.RETREAT || best.task == Task.FOOD && o.meals == 0);
+		if (best != null && live.size() > 1 && !life) {                           // its own choice among the good ones: the best most often, a near one now and then (the curious more often)
+			float temp = 0.12f + 0.3f * c.personality.curiosity;
+			double sum = 0;
+			double[] w = new double[live.size()];
+			for (int i = 0; i < w.length; i++) sum += w[i] = Math.exp((scores.get(i) - bestScore) / temp);
+			double r = c.random().nextDouble() * sum;
+			for (int i = 0; i < w.length; i++) {
+				r -= w[i];
+				if (r <= 0) {
+					if (live.get(i) != best) c.journal("thinks", "btb: its own choice: " + live.get(i).task.name().toLowerCase(Locale.ROOT) + " over " + best.task.name().toLowerCase(Locale.ROOT));
+					best = live.get(i);
+					break;
+				}
+			}
 		}
 		if (best == null && now() - loggedAt > 20 * 60) {
 			loggedAt = now();
@@ -526,6 +543,8 @@ final class Btb {
 		deathsAt = c.genDeaths;
 		tierAt = o.tier;
 		worthAt = worth();
+		raceAt = raceScore();
+		obsAt = o;
 		ironAt = o.iron;
 		fuelAt = o.fuel;
 		enchantStuffAt = enchantStuff();
@@ -578,6 +597,33 @@ final class Btb {
 	}
 
 	private long forcedAt = -100_000, retreatFrom;
+	private int raceAt;
+	private Obs obsAt;
+
+	/** The race's points it holds: a diamond armor piece 1, an enchanted one 2 more, a diamond pickaxe or sword 1. */
+	int raceScore() {
+		if (c.player == null) return 0;
+		int n = 0;
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+			var st = c.player.getItemBySlot(slot);
+			if (net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().startsWith("diamond_")) n += st.isEnchanted() ? 3 : 1;
+		}
+		return n + Math.min(1, invCount("diamond_pickaxe")) + Math.min(1, invCount("diamond_sword"));
+	}
+
+	/** Every task it finished, the spot it was in and how it went: config/xen/decisions.csv, for the rule learner. */
+	private void logDecision(Obs s, Task t, boolean ok, boolean died, double seconds, double reward, int race) {
+		try {
+			var f = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("decisions.csv");
+			String row = String.format(Locale.ROOT, "%d,%s,%s,%d,%.0f,%d,%d,%d,%d,%d,%d,%s,%d,%d,%.0f,%.1f,%d%n", System.currentTimeMillis() / 1000, c.name, c.mod.teamOf(c),
+					s.tier(), s.health(), s.food(), s.meals(), s.night() ? 1 : 0, s.under() ? 1 : 0, s.danger(), s.diamonds(), t.name(), ok ? 1 : 0, died ? 1 : 0, seconds, reward, race);
+			if (!java.nio.file.Files.exists(f)) java.nio.file.Files.writeString(f, "time,name,team,tier,health,food,meals,night,under,danger,diamonds,task,worked,died,seconds,reward,race\n");
+			java.nio.file.Files.writeString(f, row, java.nio.file.StandardOpenOption.APPEND);
+		} catch (Exception e) {
+			// (no log this time: the game goes on)
+		}
+	}
 	private net.minecraft.world.phys.Vec3 retreatTo;
 
 	/** Its instructions' RUN: back to its base, or (none near) straight away from the nearest monster. */
@@ -935,7 +981,8 @@ final class Btb {
 		double seconds = (now() - taskAt) / 20.0;
 		boolean died = c.genDeaths > deathsAt;
 		double gained = worth() - worthAt;
-		double reward = gained * 0.05 + (o.tier - tierAt) * 20 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
+		int race = raceScore() - raceAt;                                           // (the race: diamond armor, enchantments, diamond tools gained)
+		double reward = gained * 0.05 + (o.tier - tierAt) * 20 + race * 15 - hurtSince - (died ? 40 : 0) - seconds / 120.0;
 		boolean ok = !died && (task == Task.COAL ? o.fuel > fuelAt : gained > 0 || o.tier > tierAt || task == Task.SHELTER || task == Task.EXPLORE || task == Task.ENCHANT && enchantedSomething()
 				|| task == Task.SMELT && (o.iron > ironAt || c.chores.droppedAt >= taskAt)
 				|| task == Task.SMELTER && c.chores.smelterAt() != null
@@ -946,6 +993,7 @@ final class Btb {
 		if (task == Task.TABLE && c.xenfish.trying() != null) c.xenfish.settle();   // (the way it was on for its obsidian: how it went, to its book)
 		boolean blip = seconds < 10 && !died && gained == 0 && o.tier == tierAt && hurtSince == 0;   // (on and off in a moment, nothing happened: no lesson; the enchanting loop wrote 849 of these, two seconds each, all "worked")
 		if (!blip) c.mod.btbLearner.learn(stateAt, task.name(), (float) reward, o.key(), ok, seconds, died);
+		if (!blip && obsAt != null) logDecision(obsAt, task, ok, died, seconds, reward, race);
 		blips = blip && task == blipTask ? blips + 1 : blip ? 1 : 0;
 		blipTask = blip ? task : null;
 		if (blips >= 2 && task != Task.SHELTER && task != Task.SLEEP && task != Task.FOOD) {   // (never a roof, a bed or food: done at once there is done, not dithering)                                                         // the same task begun and dropped twice straight, nothing done: not a third time this minute (it does, not reconsiders: Ann went table, look round, table every twenty seconds)

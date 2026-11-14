@@ -92,7 +92,8 @@ final class BtbLearner {
 		double[] m = memory.get(task);
 		float failing = 0;
 		if (m != null && m[0] >= 4) failing = (float) (0.5 - m[1] / m[0]);           // (a task that mostly comes to nothing: a little less keen)
-		return Math.max(-CAP, Math.min(CAP, v * SCALE - failing));
+		float cap = CAP + 1.5f * (float) Math.min(1.0, (m == null ? 0 : m[0]) / 40.0);   // (the more it has tried it, the more what it learned counts: up to three points)
+		return Math.max(-cap, Math.min(cap, v * SCALE * (1 + (float) Math.min(1.0, (m == null ? 0 : m[0]) / 40.0)) - failing));
 	}
 
 	/** How often it tries one of the other sensible tasks to find out (less, the more it knows). */

@@ -384,6 +384,8 @@ public class XenMod implements ModInitializer {
 	final BtbLearner btbLearner = new BtbLearner();
 	/** Team leaders (the "leaders" setting): a plan for the team, jobs for each. */
 	final Leader leader = new Leader(this);
+	/** Its thoughts in words (the "thinkUrl" setting: a small language model beside the server). */
+	final Thinker thinker = new Thinker(this);
 	/** The Xens' instructions: choices, scores and when, from config/xen/instructions.txt (edited while the game runs). */
 	final BtbRules btbRules = new BtbRules(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("instructions.txt"));
 	/** What Xens see, think, say and hear (for the Experimental tab's log). */

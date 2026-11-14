@@ -216,6 +216,10 @@ public final class XenConfig {
 	public boolean teamsLocked = false;
 	/** Team leaders by name ("Cid,Bob"): each plans for its team and gives its teammates jobs, which each takes or not. */
 	public String leaders = "";
+	/** A small language model beside the server for its thoughts (an OpenAI-style chat URL, like llama.cpp's server: http://127.0.0.1:8090/v1/chat/completions); empty: off. */
+	public String thinkUrl = "";
+	/** How often each Xen thinks it over with that model, in seconds. */
+	public int thinkEvery = 120;
 	/**
 	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
 	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",
