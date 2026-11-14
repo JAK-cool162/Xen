@@ -96,6 +96,15 @@ final class Visits {
 			at = new BlockPos(at.getX(), c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ()), at.getZ());
 			atGuessed = false;
 		}
+		double gap = c.player.position().distanceTo(Vec3.atBottomCenterOf(at));
+		if (!at.equals(closestFor)) {
+			closestFor = at;
+			closest = gap;
+			progressAt = now;
+		} else if (gap < closest - 4) {                                      // (getting closer is getting somewhere: a long way off, it's still on its way)
+			closest = gap;
+			progressAt = now;
+		}
 		int stuff = c.items().values().stream().mapToInt(Integer::intValue).sum() + been.size();
 		if (stuff != progressStuff) {
 			progressStuff = stuff;
@@ -252,13 +261,17 @@ final class Visits {
 	}
 
 	// ---------------------------------------------------------------------------------- a village
+	private BlockPos closestFor;
+	private double closest;
+
 	private Action village() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		Vec3 middle = Vec3.atBottomCenterOf(at);
 		if (c.player.position().distanceTo(middle) > 24 && golem == null) {
 			doing = "going to the village";
 			c.run(c.player.position().distanceTo(middle) > 40);
-			Action a = c.walkTo(middle);
+			Action a = c.player.position().distanceTo(middle) > 48 ? c.wanderTo(middle) : null;   // (far off: a leg at a time; Cid stood still, a whole way of 700 blocks no path)
+			if (a == null) a = c.walkTo(middle);
 			if (a == null && c.player.position().distanceTo(middle) > 24) end("no way there");
 			return a;
 		}
