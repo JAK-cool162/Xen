@@ -1004,7 +1004,7 @@ final class Builder {
 		return "";
 	}
 
-	private String woodType() {
+	String woodType() {
 		Map<String, Integer> woods = new HashMap<>();
 		var inv = c.player.getInventory();
 		for (int i = 0; i < inv.getContainerSize(); i++) {

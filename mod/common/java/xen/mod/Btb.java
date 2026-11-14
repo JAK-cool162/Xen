@@ -593,6 +593,54 @@ final class Btb {
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
 	/** Its team's fortress: help a teammate already building it, or start it (at the team's base, or here, which becomes the base). */
+	/**
+	 * /xen teambase now: its team's whole plan put in the world at once, as it would build it (each part adapted,
+	 * its wall shaded): a look at the plan, not building.
+	 */
+	String teamBaseNow() {
+		if (c.player == null) return "no body";
+		XenMod.Project pj = c.mod.project(c);
+		if (pj == null) {
+			BlockPos at = c.mod.teamHome(c);
+			if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
+			pj = c.mod.newProject(c, at, c.random().nextLong() | 1);
+			if (pj == null) return "no team";
+			for (String part : TEAM_PLAN) if (part.startsWith("#") || java.nio.file.Files.exists(Schematic.dir().resolve(part.split("\\|")[0] + ".litematic"))) pj.plan.add(part);
+			c.mod.saveProjects();
+		}
+		var level = (net.minecraft.server.level.ServerLevel) c.player.level();
+		if (pj.partY == null) pj.partY = new java.util.HashMap<>();
+		int n = 0;
+		for (int i = 0; i < pj.plan.size(); i++) {
+			String[] part = pj.plan.get(i).split("\\|");
+			Architect.Plan plan;
+			if (part[0].equals("#ring")) plan = Fortify.ring(level, pj.x - 6, pj.z - 8, pj.x + 50, pj.z + 32, 5, pj.seed);
+			else {
+				Schematic sc;
+				try {
+					sc = Schematic.load(part[0]);
+				} catch (java.io.IOException e) {
+					continue;
+				}
+				int x = pj.x + Integer.parseInt(part[1]), z = pj.z + Integer.parseInt(part[2]);
+				Integer y0 = pj.partY.get(String.valueOf(i));
+				if (y0 == null) {
+					int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+					y0 = sc.groundLayer() ? top - 1 : top;
+					pj.partY.put(String.valueOf(i), y0);
+				}
+				plan = sc.adapted(level, new BlockPos(x, y0, z), c.builder.woodType());
+			}
+			for (Architect.Step st : plan.steps()) {
+				level.setBlock(st.pos(), st.dig() ? net.minecraft.world.level.block.Blocks.AIR.defaultBlockState() : st.state(), 2);
+				n++;
+			}
+		}
+		c.mod.saveProjects();
+		XenMod.LOG.info("{} puts its team's whole plan down at once at {}: {} blocks ({})", c.name, pj.at().toShortString(), n, String.join(", ", pj.plan));
+		return "the team's whole plan put down at " + pj.at().toShortString() + ": " + n + " blocks";
+	}
+
 	/** /xen teambase: its team's next base part, started now (a test, or a nudge). */
 	String teamBase() {
 		return fortStep();
