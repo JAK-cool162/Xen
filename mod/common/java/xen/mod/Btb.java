@@ -527,6 +527,7 @@ final class Btb {
 			String what = key.replace("_in_range", "").replace("_near", "").replace("_ore", "").replace("deepslate_", "");
 			return c.mod.config.luck > 0 ? c.hunch.oresNear(what, c.player.blockPosition(), 32, 24, 8).size() : 0;
 		}
+		if (key.equals("diamonds_wanted")) return Math.max(0, c.goals.diamondsWanted() - invCount("diamond"));   // (diamonds its goals still want)
 		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");
 		boolean prefix = key.endsWith("*");
 		String k = prefix ? key.substring(0, key.length() - 1) : key;
