@@ -19,6 +19,7 @@ final class Leader {
 	private final Random random = new Random();
 	private final java.util.Map<String, Long> nextRound = new java.util.HashMap<>();
 	private final java.util.Map<String, String> lastPlan = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> nextTalk = new java.util.HashMap<>();
 
 	Leader(XenMod mod) {
 		this.mod = mod;
@@ -98,6 +99,10 @@ final class Leader {
 			XenMod.LOG.info("{} (leads {}): plan \"{}\"{}; {} of {} take their jobs: {}", lead.name, team.replace("xen_", ""), plan, changed ? " (new plan)" : "",
 					took, took + refused, jobs);
 		if (changed) lead.journal("does", "as leader: the team's plan is " + plan);
+		if (now >= nextTalk.getOrDefault(lead.name, 0L)) {                       // its team's laws and everyone's role, in its own words (the language model), every ten minutes
+			nextTalk.put(lead.name, now + 20 * 60 * 10);
+			mod.thinker.teamTalk(lead, members);
+		}
 	}
 
 	/** The job for this one: what it lacks most, or the team's plan. */

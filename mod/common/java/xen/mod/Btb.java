@@ -350,6 +350,8 @@ final class Btb {
 				default -> true;
 			});
 		}
+		if (c.roleTask != null)                                                    // its role on the team leans it (a Miner toward diamonds, a Cook toward food)
+			out.replaceAll(op -> op.task == c.roleTask ? new Option(op.task, op.base + 0.4f, op.why + " (its role: " + c.role + ")") : op);
 		if (ordered != null && now() - orderedAt < 20 * 60 * 3 && (!o.night || o.under))   // its leader's job for it
 			out.add(new Option(ordered, 4.0f + orderedWeight, "its leader " + orderedBy + " asked: " + ordered.name().toLowerCase(Locale.ROOT)));
 		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions (config/xen/instructions.txt): choices and scores from a file, no change to the mod

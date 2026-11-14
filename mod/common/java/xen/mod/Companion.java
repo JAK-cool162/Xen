@@ -4037,6 +4037,9 @@ public final class Companion {
 	final Tidy tidy = new Tidy(this);
 	/** Xen 2.0 Back to Basics: the state machine that picks its tasks (the "btb" brain). */
 	final Btb btb = new Btb(this);
+	/** Its role on its team (a title its leader gave it, in words) and what that leans it toward. */
+	String role = "";
+	Btb.Task roleTask;
 	/** What it's after: this moment, the next minutes, and its dream. */
 	final Goals goals = new Goals(this);
 	/** Trading with villagers and players. */

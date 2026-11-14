@@ -261,6 +261,7 @@ final class Visits {
 	}
 
 	// ---------------------------------------------------------------------------------- a village
+	private long nextNaming;
 	private BlockPos closestFor;
 	private double closest;
 
@@ -276,6 +277,13 @@ final class Visits {
 			return a;
 		}
 		if (now() >= nextScan) scan(level);
+		if (now() >= nextNaming) {                                            // a villager here without a name: it gives it one, and a role (the language model)
+			nextNaming = now() + 20 * 30;
+			for (var v : level.getEntitiesOfClass(Villager.class, c.player.getBoundingBox().inflate(16), x -> x.isAlive() && !x.hasCustomName())) {
+				c.mod.thinker.nameVillager(c, v);
+				break;
+			}
+		}
 		if (c.storage.busy() && c.storage.looting()) {                       // a chest it's at: that first
 			Action st = c.storage.next();
 			if (st != null || c.storage.busy()) return st;

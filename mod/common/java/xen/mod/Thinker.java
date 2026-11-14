@@ -48,6 +48,90 @@ final class Thinker {
 		}
 	}
 
+	/** A leader writes its team's laws and gives each teammate a role (a title and what it does), in words; the roles lean their choices. */
+	void teamTalk(Companion lead, List<Companion> members) {
+		String url = mod.config.thinkUrl;
+		if (url == null || url.isBlank() || lead.player == null) return;
+		StringBuilder names = new StringBuilder();
+		for (Companion m : members) if (m != lead) names.append(names.length() > 0 ? ", " : "").append(m.name).append(m.personality.bravery > 0.5f ? " (brave)" : m.personality.diligence > 0.5f ? " (hard-working)" : m.personality.curiosity > 0.5f ? " (curious)" : " (calm)");
+		String team = String.valueOf(mod.teamOf(lead)).replace("xen_", "");
+		String sys = "You are " + lead.name + ", leader of the " + team + " team in Minecraft, racing the other team to full enchanted diamond armor. Be short and playful.";
+		String user = "Write 3 team laws, one per line, each starting with LAW: . Then give each teammate a role, one per line, as NAME: ROLE - what they do. Roles: Miner, Cook, Hunter, Scout, Builder, Smith, Guard. Teammates: " + names + ".";
+		post(url, sys, user, 220, text -> mod.server.execute(() -> applyTeamTalk(lead, members, text)));
+	}
+
+	private void applyTeamTalk(Companion lead, List<Companion> members, String text) {
+		List<String> laws = new java.util.ArrayList<>();
+		int roles = 0;
+		for (String raw : text.split("\\n")) {
+			String line = raw.replaceAll("^[\\s*\\-\\d.)]+", "").strip();
+			if (line.toUpperCase(Locale.ROOT).startsWith("LAW")) {
+				String law = line.replaceFirst("(?i)^law\\s*\\d*\\s*[:.-]\\s*", "").strip();
+				if (law.length() > 3 && laws.size() < 3) laws.add(law.length() > 90 ? law.substring(0, 90) : law);
+				continue;
+			}
+			for (Companion m : members) {
+				if (m == lead || !line.toLowerCase(Locale.ROOT).startsWith(m.name.toLowerCase(Locale.ROOT))) continue;
+				String rest = line.substring(m.name.length()).replaceFirst("^\\s*[:\\-]\\s*", "").strip();
+				if (rest.isEmpty()) continue;
+				m.role = rest.length() > 60 ? rest.substring(0, 60) : rest;
+				m.roleTask = roleTask(rest);
+				roles++;
+			}
+		}
+		for (Companion m : members)                                           // (anyone it didn't name: a role that fits its nature)
+			if (m != lead && (m.role == null || m.role.isEmpty())) {
+				m.role = m.personality.bravery > 0.6f ? "Guard" : m.personality.diligence > 0.6f ? "Miner" : m.personality.curiosity > 0.6f ? "Scout" : "Cook";
+				m.roleTask = roleTask(m.role);
+			}
+		if (!laws.isEmpty()) lead.say("Team laws: " + String.join(" / ", laws));
+		StringBuilder rs = new StringBuilder();
+		for (Companion m : members) if (m != lead && m.role != null) rs.append(rs.length() > 0 ? "; " : "").append(m.name).append(": ").append(m.role);
+		XenMod.LOG.info("{} (leads {}) laws: {} | roles ({} from its words): {}", lead.name, String.valueOf(mod.teamOf(lead)).replace("xen_", ""), laws, roles, rs);
+	}
+
+	/** What a role leans it toward. */
+	static Btb.Task roleTask(String role) {
+		String r = role.toLowerCase(Locale.ROOT);
+		if (r.matches(".*\\b(miner|digger|mining|mine)\\b.*")) return Btb.Task.DIAMONDS;
+		if (r.matches(".*\\b(cook|chef|hunter|farmer|food|baker)\\b.*")) return Btb.Task.FOOD;
+		if (r.matches(".*\\b(scout|explorer|ranger|runner)\\b.*")) return Btb.Task.EXPLORE;
+		if (r.matches(".*\\b(builder|architect|mason)\\b.*")) return Btb.Task.HOME;
+		if (r.matches(".*\\b(smith|enchanter|crafter|blacksmith|wizard)\\b.*")) return Btb.Task.ENCHANT;
+		if (r.matches(".*\\b(gatherer|lumberjack|woodcutter)\\b.*")) return Btb.Task.WOOD;
+		return null;
+	}
+
+	/** A villager it meets gets a name and a role of its own, from the model (its name shows over its head). */
+	void nameVillager(Companion c, net.minecraft.world.entity.npc.villager.Villager v) {
+		String url = mod.config.thinkUrl;
+		if (url == null || url.isBlank() || v.hasCustomName()) return;
+		String job = net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(v.getVillagerData().profession().value()).getPath();
+		post(url, "You name villagers in a cozy Minecraft village. Answer with only a name and a title, like: Mira the Lantern-Keeper",
+				"Name this " + (job.equals("none") ? "villager" : job) + ".", 16, text -> mod.server.execute(() -> {
+					String name = text.split("\\n")[0].replaceAll("[\"*]", "").strip();
+					if (name.length() < 3 || name.length() > 32 || v.hasCustomName() || !v.isAlive()) return;
+					v.setCustomName(net.minecraft.network.chat.Component.literal(name));
+					XenMod.LOG.info("{} names a villager: {}", c.name, name);
+				}));
+	}
+
+	private void post(String url, String sys, String user, int tokens, java.util.function.Consumer<String> then) {
+		if (http == null) http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+		String body = "{\"messages\":[{\"role\":\"system\",\"content\":\"" + esc(sys) + "\"},{\"role\":\"user\",\"content\":\"" + esc(user) + "\"}],\"max_tokens\":" + tokens + ",\"temperature\":0.8}";
+		HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(body)).build();
+		http.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenComplete((res, err) -> {
+			if (err != null || res == null || res.statusCode() != 200) return;
+			try {
+				var json = com.google.gson.JsonParser.parseString(res.body()).getAsJsonObject();
+				then.accept(json.getAsJsonArray("choices").get(0).getAsJsonObject().getAsJsonObject("message").get("content").getAsString().strip());
+			} catch (RuntimeException e) {
+				// (nothing it could use)
+			}
+		});
+	}
+
 	private static String esc(String s) {
 		return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ");
 	}
