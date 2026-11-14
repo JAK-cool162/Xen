@@ -80,6 +80,51 @@ final class Thinker {
 		post(url, sys, user, 120, text -> mod.server.execute(() -> applyIdea(lead, team, text, enemy, what)));
 	}
 
+	/**
+	 * A Xen's own idea, about anything: what it wants to do or build next, in its words (the bigger model), then made into
+	 * something it can do (a build, a job) or kept as a wish.
+	 */
+	void dream(Companion c) {
+		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
+		if (url == null || url.isBlank() || c.player == null || Boolean.TRUE.equals(waiting.get("dream:" + c.name))) return;
+		waiting.put("dream:" + c.name, true);
+		var p = c.personality;
+		String team = mod.teamOf(c);
+		String sys = String.format(Locale.ROOT, "You are %s, a Minecraft player%s: %s, %s, %s. You can do anything in Minecraft. You have your own ideas.", c.name,
+				team == null ? "" : " on the " + team.replace("xen_", "") + " team", p.bravery > 0.5f ? "brave" : "careful", p.curiosity > 0.5f ? "curious" : "steady",
+				p.kindness > 0.5f ? "kind" : "tough");
+		var it = c.items();
+		String user = String.format(Locale.ROOT, "Health %.0f, food %d, %d diamonds, %s, %s. What is one new thing you want to do or build next? Anything at all. Answer in one short sentence.",
+				c.player.getHealth(), c.player.getFoodData().getFoodLevel(), it.getOrDefault("diamond", 0), Companion.fullDiamond(c.player) ? "full diamond armor" : "not in full diamond",
+				c.goals.home != null ? "you have a base" : "no base yet");
+		post(url, sys, user, 50, text -> mod.server.execute(() -> {
+			waiting.put("dream:" + c.name, false);
+			String idea = text.replace('\n', ' ').strip();
+			if (idea.length() > 140) idea = idea.substring(0, 140);
+			Ideas.Doing d = Ideas.interpret(idea);
+			if (d == null) {
+				XenMod.LOG.info("{} dreams: {} (a wish: nothing it can do with it yet)", c.name, idea);
+				c.journal("thinks", "a wish: " + idea);
+			} else {
+				XenMod.LOG.info("{} has an idea: {} -> {}", c.name, idea, d.label());
+				act(c, d, "its own idea", 0.7f);
+			}
+			c.chatter(idea, false);
+		}));
+	}
+
+	/** An idea made into what it does: a build (its wish) or a job (an order of its own). */
+	static void act(Companion c, Ideas.Doing d, String by, float weight) {
+		if (d.kind().equals("build")) c.btb.wishFor(d.arg(), by, weight);
+		else {
+			try {
+				c.btb.order(Btb.Task.valueOf(d.arg()), by, weight);
+			} catch (IllegalArgumentException e) {
+				// (no such job)
+			}
+		}
+	}
+
 	private void applyIdea(Companion lead, List<Companion> team, String text, net.minecraft.server.level.ServerPlayer enemy, String what) {
 		String plan = null, who = "all", doing = null;
 		for (String raw : text.split("\\n")) {
@@ -89,6 +134,8 @@ final class Thinker {
 			else if (up.startsWith("DO")) for (String d : DOS) if (up.contains(d)) doing = d;
 		}
 		if (doing == null) for (String d : DOS) if (text.toUpperCase(Locale.ROOT).contains(d)) doing = d;   // (its word anywhere)
+		Ideas.Doing free = plan == null ? null : Ideas.interpret(plan);              // (its plan in its own words: a house, a farm, the tower, anything it can do)
+		if (free != null && free.kind().equals("build")) doing = "BUILD";
 		if (plan == null || plan.length() < 4 || doing == null) {
 			XenMod.LOG.info("{} (leads {}) thought, but no plan came of it: {}", lead.name, mod.teamOf(lead), text.replace('\n', ' ').substring(0, Math.min(140, text.length())));
 			return;
@@ -102,6 +149,11 @@ final class Thinker {
 			if (m == lead) yes = 1;
 			if (m.random().nextFloat() >= yes) {
 				no.add(m.name);
+				continue;
+			}
+			if (doing.equals("BUILD")) {
+				act(m, free, lead.name, 0.9f);
+				took.add(m.name);
 				continue;
 			}
 			if (doing.equals("REVENGE")) {

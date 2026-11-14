@@ -843,6 +843,17 @@ final class Builder {
 		return plan;
 	}
 
+	/** One of the player's schematics it thought of building itself: adapted for survival, its own (not the team's project). */
+	String startOwnSchematic(Schematic s, BlockPos origin) {
+		creative = c.player.isCreative();
+		design = null;
+		copied = null;
+		String plan = begin(s.adapted((ServerLevel) c.player.level(), origin, woodType()), ", its own idea, from the schematic", "the schematic's");
+		schematic = s;
+		schematicAt = origin.immutable();
+		return plan;
+	}
+
 	String startSchematic(Schematic s, BlockPos origin) {
 		creative = c.player.isCreative();
 		design = null;

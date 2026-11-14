@@ -1474,6 +1474,10 @@ public final class Companion {
 			Action n = nether.next();
 			if (n != null) return n;
 		}
+		if (trials.on) {                                                   // a trial chamber it set off for (its own idea)
+			Action tr = trials.next();
+			if (tr != null) return tr;
+		}
 		if (enchanter.on) {
 			goals.instant = "enchanting";
 			Action e = enchanter.next();

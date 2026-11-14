@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE, GRIND }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE, GRIND, WISH, TRIALS }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -641,6 +641,36 @@ final class Btb {
 		return "the team's whole plan put down at " + pj.at().toShortString() + ": " + n + " blocks";
 	}
 
+	/** Its own idea of something to build (or one its leader had): what, and who thought of it. */
+	private String wish;
+
+	/** Something it (or its leader) thought of building: the builder's word ("house", "farm", "pen"...) or "schematic:Name". */
+	void wishFor(String what, String by, float weight) {
+		wish = what;
+		order(Task.WISH, by, weight);
+	}
+
+	private String wishStep() {
+		String w = wish;
+		wish = null;
+		if (w == null || c.player == null) return null;
+		if (w.startsWith("schematic:")) {                                         // one of the player's schematics, adapted, near its base (or here)
+			Schematic sc;
+			try {
+				sc = Schematic.load(w.substring(10));
+			} catch (java.io.IOException e) {
+				return null;
+			}
+			var level = (net.minecraft.server.level.ServerLevel) c.player.level();
+			BlockPos near = c.goals.home != null ? c.goals.home.offset(14 + c.random().nextInt(10), 0, -10 + c.random().nextInt(20)) : c.player.blockPosition().offset(5, 0, 5);
+			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, near.getX(), near.getZ());
+			XenMod.LOG.info("{} btb: builds its own idea, the {} at {}", c.name, sc.name.replace('_', ' '), near.toShortString());
+			return c.builder.startOwnSchematic(sc, new BlockPos(near.getX(), sc.groundLayer() ? top - 1 : top, near.getZ()));
+		}
+		XenMod.LOG.info("{} btb: builds its own idea: a {}", c.name, w);
+		return c.builder.start(w);
+	}
+
 	/** /xen teambase: its team's next base part, started now (a test, or a nudge). */
 	String teamBase() {
 		order(Task.FORT, "the player", 60f);                                    // (through its own choosing, as a leader's job: it keeps at it, its brain knows it's building)
@@ -1207,6 +1237,8 @@ final class Btb {
 				yield go != null ? go : "no village to trade at";
 			}
 			case FORT -> fortStep();
+			case WISH -> wishStep();
+			case TRIALS -> c.trials.start();                                       // (a trial chamber: its spawners, keys, vaults and loot)
 			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
@@ -1349,7 +1381,7 @@ final class Btb {
 			return true;
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
-		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
+		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || c.trials.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
 				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.TRADE && c.visits.visiting()
 				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.GRIND && grindFrom >= 0 && now() - grindFrom < 20 * 90 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}

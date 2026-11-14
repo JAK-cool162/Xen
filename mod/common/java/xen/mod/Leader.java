@@ -57,6 +57,11 @@ final class Leader {
 	}
 
 	void tick() {
+		for (Companion c : mod.companions) {                                         // ideas of their own, now and then (the curious more often): about anything
+			var p = c.player();
+			if (p == null || !p.isAlive() || p.getHealth() < 12 || p.level().dimension() != net.minecraft.world.level.Level.OVERWORLD || p.level().isDarkOutside()) continue;
+			if (c.random().nextFloat() < 0.04f + 0.1f * c.personality.curiosity) mod.thinker.dream(c);
+		}
 		if (mod.config.leaders == null || mod.config.leaders.isBlank()) return;
 		for (String name : mod.config.leaders.split("[, ]+")) {
 			Companion lead = null;
