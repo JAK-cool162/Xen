@@ -609,12 +609,19 @@ final class Btb {
 			if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
 			pj = c.mod.newProject(c, at, c.random().nextLong() | 1);
 			if (pj == null) return "no team";
-			for (String part : TEAM_PLAN) if (java.nio.file.Files.exists(Schematic.dir().resolve(part.split("\\|")[0] + ".litematic"))) pj.plan.add(part);
+			for (String part : TEAM_PLAN) if (part.startsWith("#") || java.nio.file.Files.exists(Schematic.dir().resolve(part.split("\\|")[0] + ".litematic"))) pj.plan.add(part);
 			if (pj.plan.size() < TEAM_PLAN.length) pj.plan.clear();                  // (all of them, or its own pictured place)
 			c.mod.saveProjects();
 		}
 		if (pj.plan != null && !pj.plan.isEmpty() && pj.partsDone < pj.plan.size()) {   // its team's plan from schematics: the next part, where it goes
 			String[] part = pj.plan.get(pj.partsDone).split("\\|");
+			if (part[0].equals("#ring")) {                                          // its wall: drawn round the house and the fortress, coloured from the schematics
+				var lv = (net.minecraft.server.level.ServerLevel) c.player.level();
+				String r = c.builder.startTeamPlan(Fortify.ring(lv, pj.x - 6, pj.z - 8, pj.x + 50, pj.z + 32, 5, pj.seed));
+				if (r != null && r.startsWith("You will"))
+					XenMod.LOG.info("{} btb: {} its team's wall with towers round {} (part {} of {})", c.name, resume ? "takes up" : "starts", pj.at().toShortString(), pj.partsDone + 1, pj.plan.size());
+				return r;
+			}
 			Schematic sc;
 			try {
 				sc = Schematic.load(part[0]);
@@ -672,7 +679,7 @@ final class Btb {
 
 	/** A job its team's leader gave it (and it took): a strong choice for three minutes, its own life and a roof still first. */
 	/** A team's base from the player's schematics, in order: its house, a wall on its front, the stone fortress beside. */
-	private static final String[] TEAM_PLAN = {"Hardcore_House|0|0", "Medieval_Wall|-5|-12", "Medieval_Wall|24|-12", "Small_Stone_Fortress|26|0"};
+	private static final String[] TEAM_PLAN = {"Hardcore_House|0|0", "#ring|0|0", "Small_Stone_Fortress|26|0"};   // (the house, the wall with its corner towers round both, the fortress inside)
 
 	private long weighSaidAt = -100_000, behindAt = -100_000;
 	/** What it saw that it weighed each option by (for the log). */

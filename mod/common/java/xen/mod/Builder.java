@@ -832,6 +832,17 @@ final class Builder {
 		return plan;
 	}
 
+	/** A part of its team's project it drew itself (its wall and towers): built like any plan, the project told when it's done. */
+	String startTeamPlan(Architect.Plan made) {
+		creative = c.player.isCreative();
+		design = null;
+		copied = null;
+		String plan = begin(made, " for the team", "its own");
+		fortress = true;
+		teamPart = true;
+		return plan;
+	}
+
 	String startSchematic(Schematic s, BlockPos origin) {
 		creative = c.player.isCreative();
 		design = null;
