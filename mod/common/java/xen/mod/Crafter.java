@@ -486,6 +486,8 @@ final class Crafter {
 		boolean small = fitsSmallGrid(r);
 		BlockPos at = small ? null : nearbyTable();
 		if (!small && at == null) {                                       // a table first (each step its own moment)
+			Action go = toRememberedTable();                                 // (none on it and no wood: the one it remembers, at its base)
+			if (go != null) return go;
 			if (count(n -> n.equals("crafting_table")) == 0) {
 				if (count(n -> n.endsWith("_planks")) < 4 && count(Crafter::isLog) > 0) return step(() -> craftSmall(planksRecipe()), "planks");
 				return step(() -> craftSmall("crafting_table"), "a crafting table");
@@ -545,7 +547,9 @@ final class Crafter {
 		int planksNeeded = (wooden ? heads : goal.endsWith("_bed") ? 3 : planksIn(goal)) + (count(n -> n.equals("stick")) >= sticks ? 0 : 2)   // (a bed: 3 planks, no sticks)
 				+ (tableNearOrCarried() ? 0 : 4);
 		if (count(n -> n.endsWith("_planks")) < planksNeeded) {
-			if (count(Crafter::isLog) == 0) {                                          // (no log to make them from: later)
+			if (count(Crafter::isLog) == 0) {                                          // (no log to make them from: the table it remembers, or later)
+				Action go = toRememberedTable();
+				if (go != null) return go;
 				nextTry = c.player.level().getGameTime() + 600;
 				making = null;
 				return null;
@@ -555,6 +559,8 @@ final class Crafter {
 		if (count(n -> n.equals("stick")) < sticks) return step(() -> craftSmall("stick"), "sticks");
 		BlockPos at = nearbyTable();
 		if (at == null) {
+			Action go = toRememberedTable();
+			if (go != null) return go;
 			if (count(n -> n.equals("crafting_table")) == 0) return step(() -> craftSmall("crafting_table"), "a crafting table");
 			Action out = roomForTable();
 			if (out != null) return out;
@@ -692,9 +698,39 @@ final class Crafter {
 		tableSeen = null;
 		BlockPos feet = c.player.blockPosition();
 		for (BlockPos p : BlockPos.betweenClosed(feet.offset(-4, -2, -4), feet.offset(4, 3, 4))) {
-			if (isTable(level, p) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) <= reach && c.hands.canClick(p)) return tableSeen = table = p.immutable();   // (one it sees: not behind a wall)
+			if (isTable(level, p) && c.player.getEyePosition().distanceTo(Vec3.atCenterOf(p)) <= reach && c.hands.canClick(p)) {   // (one it sees: not behind a wall)
+				tableSeen = table = p.immutable();
+				if (!table.equals(c.places.get("crafting table"))) c.places.remember("crafting table", table);   // (remembered: it comes back to it)
+				return table;
+			}
 		}
 		return null;
+	}
+
+	/** A crafting table it remembers (its own, or a teammate's), for when it has none on it and no wood to make one. */
+	BlockPos rememberedTable() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		BlockPos feet = c.player.blockPosition(), best = c.places.get("crafting table");
+		if (best != null && level.isLoaded(best) && !isTable(level, best)) {
+			c.places.forget("crafting table");
+			best = null;
+		}
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.player() == null || o.player().level() != c.player.level() || !c.mod.sameSide(o, c)) continue;
+			BlockPos t = o.places.get("crafting table");
+			if (t == null || level.isLoaded(t) && !isTable(level, t)) continue;
+			if (best == null || t.distSqr(feet) < best.distSqr(feet)) best = t;
+		}
+		return best != null && best.distSqr(feet) < 200 * 200 ? best : null;
+	}
+
+	/** No table on it, no wood for one: off to one it remembers (null: none, or it's there). */
+	private Action toRememberedTable() {
+		if (count(n -> n.equals("crafting_table")) > 0 || count(n -> n.endsWith("_planks")) >= 4 || count(Crafter::isLog) > 0) return null;
+		BlockPos t = rememberedTable();
+		if (t == null) return null;
+		c.goals.instant = "going to the crafting table it remembers";
+		return c.walkTo(Vec3.atBottomCenterOf(t));
 	}
 
 	private static boolean isTable(ServerLevel level, BlockPos p) {

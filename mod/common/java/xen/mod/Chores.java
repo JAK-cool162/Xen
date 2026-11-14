@@ -1148,6 +1148,15 @@ final class Chores {
 			if (tree != null) known = new int[] {tree.getX(), tree.getY(), tree.getZ(), 1, Blocks.LOG};
 		}
 		doing = known == null ? "looking for " + lookFor : String.format(java.util.Locale.ROOT, "getting %s, %d of %d so far", what, got, want);
+		if (known == null && forWood && c.mod.config.luck >= 2) {             // knowing the world: no tree near, the nearest forest on its map (a savanna's trees are far apart)
+			BlockPos forest = knownForest();
+			if (forest != null) {
+				double far = Math.sqrt(forest.distSqr(c.player.blockPosition()));
+				doing = String.format(java.util.Locale.ROOT, "heading to the forest it knows of (%.0f blocks)", far);
+				c.run(far > 40);
+				return c.wanderTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(forest));
+			}
+		}
 		if (known == null) {
 			if (!saidLooking) {                                         // (asked, and it just answered: once is enough)
 				if (own || System.currentTimeMillis() - c.saidMillis > 5000) c.chatter("I haven't seen any " + lookFor + " yet, I'll look around.", !own);
@@ -2854,6 +2863,30 @@ final class Chores {
 	 * Knowing everything: the nearest tree (within 96 blocks, the world as loaded), its lowest log, the one it can reach
 	 * from the ground; looked for every five seconds. Null: none.
 	 */
+	private BlockPos forestKnown;
+	private long forestLookedAt = -100_000;
+
+	/** The nearest forest, taiga or jungle within 800 blocks, as the world's own map has it (like /locate biome); looked up once a minute. */
+	private BlockPos knownForest() {
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		if (forestKnown != null && now() - forestLookedAt < 20 * 60) return forestKnown.distSqr(c.player.blockPosition()) < 12 * 12 ? null : forestKnown;
+		forestLookedAt = now();
+		try {
+			var found = level.findClosestBiome3d(h -> h.is(net.minecraft.tags.BiomeTags.IS_FOREST) || h.is(net.minecraft.tags.BiomeTags.IS_TAIGA) || h.is(net.minecraft.tags.BiomeTags.IS_JUNGLE),
+					c.player.blockPosition(), 800, 32, 64);
+			BlockPos at = found == null ? null : found.getFirst();
+			if (at != null && (forestKnown == null || forestKnown.distSqr(at) > 64 * 64)) {
+				XenMod.LOG.info("{} knows of a forest at {} ({} blocks)", c.name, at.toShortString(), (int) Math.sqrt(at.distSqr(c.player.blockPosition())));
+				c.journal("thinks", "no tree near: knows of a forest at " + at.toShortString());
+			}
+			forestKnown = at == null ? null : new BlockPos(at.getX(), c.player.getBlockY(), at.getZ());
+		} catch (RuntimeException e) {
+			forestKnown = null;
+		}
+		return forestKnown;
+	}
+
 	private BlockPos knownTree() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		if (treeKnown != null && level.isLoaded(treeKnown) && level.getBlockState(treeKnown).is(net.minecraft.tags.BlockTags.LOGS)
