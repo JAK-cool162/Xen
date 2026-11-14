@@ -31,6 +31,19 @@ final class Enchanter {
 	private boolean bringHome;
 	private long baseLookAt;
 
+	/** A spot to stand by the table (beside it, room for its feet and head, ground under): the table itself is solid, no way to it (Cid, four blocks off, seven minutes). */
+	private Vec3 nextTo(BlockPos t) {
+		var level = level();
+		BlockPos feet = c.player.blockPosition(), best = null;
+		for (int dy = 0; dy >= -1; dy--)
+			for (Direction d : Direction.Plane.HORIZONTAL) {
+				BlockPos n = t.relative(d).above(dy);
+				if (!level.getBlockState(n).canBeReplaced() || !level.getBlockState(n.above()).canBeReplaced() || level.getBlockState(n.below()).canBeReplaced()) continue;
+				if (best == null || n.distSqr(feet) < best.distSqr(feet)) best = n;
+			}
+		return Vec3.atBottomCenterOf(best != null ? best : t.above());
+	}
+
 	/** Its base: its home, or its team's. */
 	private BlockPos base() {
 		return c.goals.home != null ? c.goals.home : c.mod.teamHome(c);
@@ -330,7 +343,7 @@ final class Enchanter {
 				}
 				return null;
 			}
-			if (!c.hands.canClick(tt)) return c.walkTo(Vec3.atBottomCenterOf(tt));
+			if (!c.hands.canClick(tt)) return c.walkTo(nextTo(tt));
 			if (c.hands.mine(tt)) {
 				c.acted = true;
 				return Action.MINE;
@@ -357,7 +370,7 @@ final class Enchanter {
 			retryAt = c.player.level().getGameTime() + 20 * 20;
 			return null;
 		}
-		if (!c.hands.canClick(t)) return c.walkTo(Vec3.atBottomCenterOf(t));
+		if (!c.hands.canClick(t)) return c.walkTo(nextTo(t));
 		int slot = worthSlot();
 		int bagTier = slot < 0 ? 0 : MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getInventory().getItem(slot).getItem()).getPath());
 		var worn = wornWorth();
