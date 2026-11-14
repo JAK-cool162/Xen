@@ -207,7 +207,7 @@ final class Enchanter {
 		String e = enchantment.replace("minecraft:", "");
 		if (item.endsWith("_sword")) return e.equals("sharpness");
 		if (item.endsWith("_pickaxe") || item.endsWith("_shovel") || item.endsWith("_axe") || item.endsWith("_hoe")) return e.equals("fortune") || e.equals("efficiency");
-		if (item.endsWith("_helmet") || item.endsWith("_chestplate") || item.endsWith("_leggings") || item.endsWith("_boots")) return e.equals("protection");
+		if (item.endsWith("_helmet") || item.endsWith("_chestplate") || item.endsWith("_leggings") || item.endsWith("_boots")) return !e.equals("thorns");   // (any of the table's armor ones: Protection of each kind, Unbreaking, Feather Falling, Respiration; only Protection had Dee rerolling on stone shovels, her armor bare)
 		return false;
 	}
 
