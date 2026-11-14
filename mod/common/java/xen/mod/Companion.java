@@ -5432,11 +5432,21 @@ public final class Companion {
 		Vec3 at = dryNear(spot.newLevel(), spot.position());          // (the world's spawn out in the sea: on the nearest dry land, as the game does for players)
 		long deadAt = server.overworld().getGameTime();
 		boolean camped = deadAt - respawnedAt < 20 * 60 * 3 && Compat.timeOfDay(server.overworld()) % 24000 >= 12600;   // (dead again soon after waking, at night: something's waiting at its bed; Ann died four times in two minutes, zombies at a village bed)
-		if (camped && spot.newLevel() == server.overworld()) {
-			BlockPos ws = server.overworld().getRespawnData().pos();
-			if (ws.distSqr(BlockPos.containing(at)) > 48 * 48) {
-				at = dryNear(server.overworld(), Vec3.atBottomCenterOf(ws));
-				XenMod.LOG.info("{} died again soon after waking at night: wakes at the world's spawn this time", name);
+		if (camped && spot.newLevel() == server.overworld()) {             // somewhere 48 to 96 blocks off with no monster within 24 (Bob died three times in thirty seconds at the world's spawn)
+			ServerLevel ow = server.overworld();
+			Vec3 from = at;
+			for (int k = 0; k < 8; k++) {
+				double a = random.nextDouble() * Math.PI * 2, r = 48 + random.nextDouble() * 48;
+				int x = (int) Math.floor(from.x + Math.cos(a) * r), z = (int) Math.floor(from.z + Math.sin(a) * r);
+				Vec3 cand = dryNear(ow, new Vec3(x + 0.5, ow.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z + 0.5));
+				if (cand == null) continue;
+				boolean clear = ow.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(cand, cand).inflate(24),
+						m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty();
+				if (clear || k == 7) {
+					at = cand;
+					XenMod.LOG.info("{} died again soon after waking at night: wakes {} blocks off this time{}", name, (int) cand.distanceTo(from), clear ? ", no monsters there" : "");
+					break;
+				}
 			}
 		}
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
