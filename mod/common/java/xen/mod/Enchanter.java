@@ -431,7 +431,7 @@ final class Enchanter {
 			on = true;
 			c.journal("does", atBase ? "takes its enchanting table along (no teammate needs it here now)" : "takes its enchanting table along (no home to keep it at)");
 		} else if (!moreNow && atBase) c.journal("does", "leaves its enchanting table at the base for its team");
-		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
+		retryAt = c.player.level().getGameTime() + (done && moreNow ? 20 * 5 : done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done and more to enchant: the next piece straight away, as a player does them one after another; not enough levels: a good while)
 		if (done) rerolls = reroll ? rerolls + 1 : 0;
 		if (done && reroll) {
 			c.journal("does", "enchants its " + onIt.replace('_', ' ') + " (option " + (pick + 1) + ", " + clue.replace('_', ' ') + ") for new offers: none it wanted for its " + meant.replace('_', ' '));

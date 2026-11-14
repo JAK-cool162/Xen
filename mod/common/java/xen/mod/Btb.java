@@ -278,7 +278,8 @@ final class Btb {
 		if (goal.equals("enchant")) {
 			if (c.enchanter.possible() && c.player.level().getGameTime() > c.enchanter.retryAt)   // (not again the moment it couldn't: Ann tried every three seconds)
 				out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
-			else out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
+			else if (c.enchanter.table() == null && invCount("enchanting_table") == 0)   // (a table it has: waiting on its levels or its next go, not another table; Cid, just enchanted, set off for four more obsidian)
+				out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		if (goal.equals("home") && !o.night) out.add(earlyHome ? new Option(Task.HOME, 3.7f, "an early base: a chest for its diamonds and ore, its bed for a spawn") : new Option(Task.HOME, 3, "a home"));
 		BlockPos chest = c.storage.chestAtHome();
@@ -510,7 +511,8 @@ final class Btb {
 		if (live.size() > 1 && now() - weighSaidAt > 20 * 120) {               // (how it weighed them, now and then: in the log, for whoever wants to know why)
 			weighSaidAt = now();
 			StringBuilder sb = new StringBuilder();
-			live.stream().sorted((oa, ob) -> Float.compare(weighed.get(ob.task)[4], weighed.get(oa.task)[4])).limit(4).forEach(ow -> {
+			java.util.Set<Task> shown = new java.util.HashSet<>();
+			live.stream().filter(ox -> shown.add(ox.task)).sorted((oa, ob) -> Float.compare(weighed.get(ob.task)[4], weighed.get(oa.task)[4])).limit(4).forEach(ow -> {
 				float[] ww = weighed.get(ow.task);
 				String saw = seen.get(ow.task);
 				sb.append(String.format(Locale.ROOT, "%s%s %.1f (rules %.1f, learned %+.1f, quick %+.1f%s, race %+.1f%s)", sb.length() > 0 ? ", " : "", ow.task.name(), ww[4], ow.base, ww[2], ww[0],
@@ -681,9 +683,9 @@ final class Btb {
 				return d / 5 + (t == Task.TRADE ? 90 : 120);
 			}
 			case SMELT -> {
-				int raw = o.raw();
+				int raw = invCount("raw_*") + invCount("raw_meat");
 				seen.put(t, raw + " raw things in its bag");
-				return 20 + 10.0 * raw;
+				return raw == 0 ? Double.NaN : 20 + 10.0 * raw;
 			}
 			case KIT -> {
 				int missing = kitMissing();
