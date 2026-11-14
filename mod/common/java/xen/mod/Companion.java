@@ -5406,6 +5406,15 @@ public final class Companion {
 					new net.minecraft.world.phys.AABB(lostAt).inflate(5), e -> e.isAlive()).isEmpty()) lostAt = null;
 		}
 		Vec3 at = dryNear(spot.newLevel(), spot.position());          // (the world's spawn out in the sea: on the nearest dry land, as the game does for players)
+		long deadAt = server.overworld().getGameTime();
+		boolean camped = deadAt - respawnedAt < 20 * 60 * 3 && Compat.timeOfDay(server.overworld()) % 24000 >= 12600;   // (dead again soon after waking, at night: something's waiting at its bed; Ann died four times in two minutes, zombies at a village bed)
+		if (camped && spot.newLevel() == server.overworld()) {
+			BlockPos ws = server.overworld().getRespawnData().pos();
+			if (ws.distSqr(BlockPos.containing(at)) > 48 * 48) {
+				at = dryNear(server.overworld(), Vec3.atBottomCenterOf(ws));
+				XenMod.LOG.info("{} died again soon after waking at night: wakes at the world's spawn this time", name);
+			}
+		}
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
 		try {
 			join(spot.newLevel(), at, spot.yRot());
