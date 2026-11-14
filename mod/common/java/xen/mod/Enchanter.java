@@ -25,6 +25,7 @@ final class Enchanter {
 	/** Not again before this (game time): after a go (its levels come back slowly), or after it couldn't. */
 	long retryAt;
 	private int budget = 2400;
+	private long startedAt;
 	/** Its enchanting done for now, the table to mine and carry (no home to keep it at). */
 	private boolean takeAlong;
 	/** The table mined and in its bag: back to its base with it, to put it down there (the team's, for all of them). */
@@ -131,18 +132,18 @@ final class Enchanter {
 		if (table != null && level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) return table;
 		table = c.places.get("enchanting table");
 		if (table != null && !level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) table = null;
+		if (table != null && !table.closerThan(c.player.blockPosition(), 200)) table = null;   // (one it knew of, far off: not a trip across the world for it; Bob, at three health, swimming toward one 200 blocks off)
 		if (table == null && c.mod.config.luck > 0) {                          // (knowing the world: a table another Xen made, near enough, does as well as its own; Cid had one, nine others dug obsidian for theirs)
 			BlockPos best = null;
 			for (Companion x : c.mod.companions) {
-				if (x == c || x.player() == null || x.player().level() != c.player.level()) continue;
+				if (x == c || x.player() == null || x.player().level() != c.player.level() || !c.mod.sameSide(c, x)) continue;   // (its own team's: Bob, blue, walked to Cid's, red, 200 blocks off down Cid's mine)
 				BlockPos t = x.places.get("enchanting table");
 				if (t == null || t.distSqr(c.player.blockPosition()) > 150 * 150) continue;   // (near: a trip of more than a minute or two isn't worth it)
 				if (level().isLoaded(t) && !level().getBlockState(t).is(Blocks.ENCHANTING_TABLE)) continue;
 				if (best == null || t.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = t;
 			}
 			if (best != null) {
-				table = best;
-				c.places.remember("enchanting table", best);
+				table = best;                                                    // (a teammate's: used, not taken for its own: its own memory stays its own)
 				XenMod.LOG.info("{} knows of an enchanting table another Xen made at {}", c.name, best.toShortString());
 			}
 		}
@@ -295,6 +296,7 @@ final class Enchanter {
 		on = true;
 		step = 0;
 		tries = 0;
+		startedAt = c.player.level().getGameTime();
 		BlockPos t = table();
 		budget = 2400 + (t == null || c.items().getOrDefault("enchanting_table", 0) > 0 ? 0 : (int) Math.min(6000, 12 * Math.sqrt(t.distSqr(c.player.blockPosition()))));   // (a walk to its table: time for that too)
 		return "You will enchant your best gear at your enchanting table.";
@@ -306,7 +308,7 @@ final class Enchanter {
 
 	Action next() {
 		if (!on) return null;
-		if (++tries > budget) {                                                // (two minutes, more for a walk to its table: something's wrong, it gives up)
+		if (++tries > budget || c.player.level().getGameTime() - startedAt > budget) {   // (two minutes, more for a walk to its table, by the clock: something's wrong, it gives up)
 			BlockPos gt = table();
 			XenMod.LOG.info("{} enchanting: gives up after {} ticks (table {}, {} blocks off, can click {}, carried {}, bringing home {}, taking along {})", c.name, tries,
 					gt == null ? "none" : gt.toShortString(), gt == null ? -1 : (int) Math.sqrt(gt.distSqr(c.player.blockPosition())), gt != null && c.hands.canClick(gt),
@@ -342,6 +344,7 @@ final class Enchanter {
 					bringHome = true;
 					on = true;
 					tries = 0;
+					startedAt = c.player.level().getGameTime();
 					budget = 2400 + (int) (12 * Math.sqrt(base.distSqr(c.player.blockPosition())));
 					c.journal("does", "brings its enchanting table back to its base");
 				}
