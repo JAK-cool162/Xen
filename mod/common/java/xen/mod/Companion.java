@@ -1451,7 +1451,7 @@ public final class Companion {
 		payRent();
 		handOutNext();                                                    // (what it was asked to share out, its rent: handed over between tasks)
 		btb.nightfall();
-		if ((btb.task == Btb.Task.VISIT || btb.task == Btb.Task.TABLE) && visits.visiting()) {   // its brain (or its plan, for obsidian) sent it to a village or a ruined portal: that, its chests
+		if ((btb.task == Btb.Task.VISIT || btb.task == Btb.Task.TABLE || btb.task == Btb.Task.FOOD) && visits.visiting()) {   // (food too: a village's hay; Cid stood still an hour, the visit never walked)   // its brain (or its plan, for obsidian) sent it to a village or a ruined portal: that, its chests
 			Action v = visits.next();
 			if (!visits.doing.isEmpty() && goals.instant.isEmpty()) goals.instant = visits.doing;
 			if (v != null || visits.visiting()) return v;
