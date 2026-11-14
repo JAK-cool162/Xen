@@ -986,7 +986,7 @@ final class Chores {
 			case SMELT -> smeltNext();
 			case HIDE -> {                                               // stays in its shelter until morning (or a minute)
 				if (!c.player.level().isDarkOutside() && now() > until) {
-					if (hutFilled != null && !"fort".equals(shape) && (c.goals.home == null || !c.goals.home.closerThan(c.player.blockPosition(), 10)))
+					if (hutFilled != null && (c.goals.home == null || !c.goals.home.closerThan(c.player.blockPosition(), 10)))   // (its forts too: Ann and Hal left a field of them)
 						c.tidy.shelter(hutFilled);                            // morning: its night's hut may come down again (its call)
 					hutFilled = null;
 					stop();

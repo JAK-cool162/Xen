@@ -47,7 +47,7 @@ final class Tidy {
 	void shelter(List<BlockPos> blocks) {
 		if (blocks.isEmpty() || c.player == null) return;
 		var p = c.personality;
-		float tidy = 0.45f + 0.45f * p.diligence - 0.3f * p.sin(xen.mod.core.Sins.SLOTH);
+		float tidy = 0.8f + 0.2f * p.diligence - 0.15f * p.sin(xen.mod.core.Sins.SLOTH);   // (nearly always: the land round its bases was a scatter of night huts)
 		if (random.nextFloat() >= tidy) {
 			c.journal("thinks", "leaves its night's hut standing (could come in handy)");
 			return;
@@ -72,7 +72,7 @@ final class Tidy {
 	private boolean wants(long[] e) {
 		if (e[2] == 0) {
 			var p = c.personality;
-			float tidy = 0.55f + 0.45f * p.diligence - 0.3f * p.sin(xen.mod.core.Sins.SLOTH);
+			float tidy = 0.85f + 0.15f * p.diligence - 0.15f * p.sin(xen.mod.core.Sins.SLOTH);   // (nearly always: pillars of dirt and cobble were left all over)
 			e[2] = random.nextFloat() < tidy ? 1 : 2;
 		}
 		return e[2] == 1;
