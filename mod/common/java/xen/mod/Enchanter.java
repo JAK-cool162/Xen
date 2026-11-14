@@ -27,6 +27,83 @@ final class Enchanter {
 	private int budget = 2400;
 	/** Its enchanting done for now, the table to mine and carry (no home to keep it at). */
 	private boolean takeAlong;
+	/** The table mined and in its bag: back to its base with it, to put it down there (the team's, for all of them). */
+	private boolean bringHome;
+	private long baseLookAt;
+
+	/** Its base: its home, or its team's. */
+	private BlockPos base() {
+		return c.goals.home != null ? c.goals.home : c.mod.teamHome(c);
+	}
+
+	/** Something it has that's worth enchanting and isn't yet (a teammate asks this of it). */
+	boolean wantsTable() {
+		return c.player != null && (worthSlot() >= 0 || wornWorth() != null);
+	}
+
+	/** A teammate, near its base, with something worth enchanting: the table stays there for them. */
+	private boolean teamNeedsIt(BlockPos at) {
+		for (Companion x : c.mod.companions) {
+			if (x == c || x.player() == null || x.player().level() != c.player.level() || !c.mod.sameSide(c, x)) continue;
+			if (x.player().blockPosition().closerThan(at, 400) && x.enchanter.wantsTable()) return true;
+		}
+		return false;
+	}
+
+	/** An enchanting table within 12 blocks of there (its base has one already?). */
+	private BlockPos tableNear(BlockPos at) {
+		var level = level();
+		for (BlockPos q : BlockPos.betweenClosed(at.offset(-12, -4, -12), at.offset(12, 4, 12)))
+			if (level.isLoaded(q) && level.getBlockState(q).is(Blocks.ENCHANTING_TABLE)) return q.immutable();
+		return null;
+	}
+
+	/** Its table down, a block or two off its feet (on the ground, nothing in the way). Null: no spot here. */
+	private Action putDown(String why) {
+		BlockPos feet = c.player.blockPosition();
+		for (int k = 1; k <= 2; k++) {                                           // (a block off, or two: in a tunnel a block wide, along it)
+			for (Direction d : Direction.Plane.HORIZONTAL) {
+				BlockPos at = feet.relative(d, k);
+				if (!level().getBlockState(at).canBeReplaced() || level().getBlockState(at.below()).canBeReplaced()) continue;
+				if (c.hands.placeSeen(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("enchanting_table"), at.below(), Direction.UP, -1)) {
+					table = at.immutable();
+					c.places.remember("enchanting table", table);
+					c.acted = true;
+					if (why != null) {
+						XenMod.LOG.info("{} {} at {}", c.name, why, table.toShortString());
+						c.journal("does", why);
+					}
+					return Action.PLACE;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Every so often, not enchanting: home at its base with a table in its bag and none there, it puts it down there (for
+	 * the whole team: a teammate's table is theirs too).
+	 */
+	Action toBase() {
+		if (on || c.player == null || c.items().getOrDefault("enchanting_table", 0) == 0) return null;
+		long now = c.player.level().getGameTime();
+		if (now < baseLookAt) return null;
+		BlockPos base = base();
+		if (base == null || !c.player.blockPosition().closerThan(base, 12) || c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+			baseLookAt = now + 20 * 10;
+			return null;
+		}
+		BlockPos there = tableNear(base);
+		if (there != null) {                                                     // (one there already: that's the team's; its own stays in its bag)
+			if (table == null || !table.equals(there)) c.places.remember("enchanting table", there);
+			baseLookAt = now + 20 * 60;
+			return null;
+		}
+		Action put = putDown("puts its enchanting table down at its base, for the team");
+		baseLookAt = now + (put == null ? 20 * 30 : 20 * 5);
+		return put;
+	}
+
 
 	Enchanter(Companion c) {
 		this.c = c;
@@ -221,11 +298,36 @@ final class Enchanter {
 			retryAt = c.player.level().getGameTime() + 20 * 60 * 5;
 			return null;
 		}
+		if (bringHome) {                                                        // its table in its bag: back to its base with it, and down there
+			BlockPos base = base();
+			if (base == null || c.items().getOrDefault("enchanting_table", 0) == 0) {
+				bringHome = false;
+				on = false;
+				return null;
+			}
+			if (!c.player.blockPosition().closerThan(base, 6)) {
+				c.goals.instant = "bringing its enchanting table back to its base";
+				return c.walkTo(Vec3.atBottomCenterOf(base));
+			}
+			bringHome = false;
+			on = false;
+			baseLookAt = 0;
+			return toBase();
+		}
 		if (takeAlong) {                                                        // its enchanting done for now and no home to keep the table at: it mines it and takes it along, as players do
 			BlockPos tt = table();
 			if (tt == null) {
 				takeAlong = false;
 				on = false;
+				BlockPos base = base();
+				if (base != null && c.items().getOrDefault("enchanting_table", 0) > 0 && base.closerThan(c.player.blockPosition(), 160)
+						&& !base.closerThan(c.player.blockPosition(), 12) && tableNear(base) == null) {   // (its base near enough, and no table there: it brings it back)
+					bringHome = true;
+					on = true;
+					tries = 0;
+					budget = 2400 + (int) (12 * Math.sqrt(base.distSqr(c.player.blockPosition())));
+					c.journal("does", "brings its enchanting table back to its base");
+				}
 				return null;
 			}
 			if (!c.hands.canClick(tt)) return c.walkTo(Vec3.atBottomCenterOf(tt));
@@ -245,21 +347,11 @@ final class Enchanter {
 				if (!c.crafter.hasOrder()) c.crafter.orderRecipe("enchanting_table", 1);
 				return null;
 			}
-			BlockPos near = c.goals.home != null && c.goals.home.closerThan(c.player.blockPosition(), 48) ? c.goals.home : c.player.blockPosition();   // (home if it's near; a far home isn't worth the trip, it takes the table along after)
+			BlockPos base = base();
+			BlockPos near = base != null && base.closerThan(c.player.blockPosition(), 48) ? base : c.player.blockPosition();   // (its base if it's near; a far one isn't worth the trip, it takes the table along after)
 			if (c.player.blockPosition().distSqr(near) > 36) return c.walkTo(Vec3.atBottomCenterOf(near));
-			BlockPos feet = c.player.blockPosition();
-			for (int k = 1; k <= 2; k++) {                                       // (a block off, or two: in a tunnel a block wide, along it)
-				for (Direction d : Direction.Plane.HORIZONTAL) {
-					BlockPos at = feet.relative(d, k);
-					if (!level().getBlockState(at).canBeReplaced() || level().getBlockState(at.below()).canBeReplaced()) continue;
-					if (c.hands.placeSeen(at, s -> BuiltInRegistries.ITEM.getKey(s.getItem()).getPath().equals("enchanting_table"), at.below(), Direction.UP, -1)) {
-						table = at.immutable();
-						c.places.remember("enchanting table", table);
-						c.acted = true;
-						return Action.PLACE;
-					}
-				}
-			}
+			Action put = putDown(near.equals(base) ? "puts its enchanting table down at its base" : null);
+			if (put != null) return put;
 			c.journal("does", "no spot to put its enchanting table down here: tries again somewhere else");
 			on = false;
 			retryAt = c.player.level().getGameTime() + 20 * 20;
@@ -332,11 +424,13 @@ final class Enchanter {
 		c.acted = true;
 		on = false;
 		boolean moreNow = done && (worthSlot() >= 0 || wornWorth() != null) && c.items().getOrDefault("lapis_lazuli", 0) > 0;
-		if (!moreNow && (c.goals.home == null || !t.closerThan(c.goals.home, 24))) {   // (nothing more to enchant here now, and this isn't home: Ann left hers by a lava pool and was 330 blocks off when she next wanted it)
+		BlockPos base = base();
+		boolean atBase = base != null && t.closerThan(base, 24);
+		if (!moreNow && (!atBase || !teamNeedsIt(t))) {                       // nothing more to enchant here now: away from its base it takes the table along (Ann left hers by a lava pool and was 330 blocks off when she next wanted it); at its base it's its choice, kept there while a teammate still needs it, else taken along (and brought back)
 			takeAlong = true;
 			on = true;
-			c.journal("does", "takes its enchanting table along (no home to keep it at)");
-		}
+			c.journal("does", atBase ? "takes its enchanting table along (no teammate needs it here now)" : "takes its enchanting table along (no home to keep it at)");
+		} else if (!moreNow && atBase) c.journal("does", "leaves its enchanting table at the base for its team");
 		retryAt = c.player.level().getGameTime() + (done ? 20 * 60 * 2 : 20 * 60 * 20);   // (done: the next piece soon; not enough levels: a good while)
 		if (done) rerolls = reroll ? rerolls + 1 : 0;
 		if (done && reroll) {

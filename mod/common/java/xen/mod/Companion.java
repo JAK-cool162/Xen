@@ -1480,6 +1480,11 @@ public final class Companion {
 			if (e != null) return e;
 		}
 		if (mode == Mode.FREE && mod.config.wants && !minion) {
+			Action base = enchanter.toBase();                           // home with an enchanting table in its bag and none at its base: down there, for the team
+			if (base != null) {
+				goals.instant = "putting its enchanting table down at its base";
+				return base;
+			}
 			Action b = btb.next();
 			if (goals.instant.isEmpty() && !btb.why.isEmpty()) goals.instant = btb.why;
 			if (b != null) return b;
