@@ -493,8 +493,8 @@ final class Btb {
 				best = op;
 			}
 		}
-		boolean life = best != null && (bestScore >= 50 || best.task == Task.SHELTER || best.task == Task.SLEEP || best.task == Task.RETREAT || best.task == Task.FOOD && o.meals == 0);
-		if (best != null && live.size() > 1 && !life) {                           // its own choice among the good ones: the best most often, a near one now and then (the curious more often)
+		boolean mustDo = best != null && (bestScore >= 50 || best.task == Task.SHELTER || best.task == Task.SLEEP || best.task == Task.RETREAT || best.task == Task.FOOD && o.meals == 0);
+		if (best != null && live.size() > 1 && !mustDo) {                           // its own choice among the good ones: the best most often, a near one now and then (the curious more often)
 			float temp = 0.12f + 0.3f * c.personality.curiosity;
 			double sum = 0;
 			double[] w = new double[live.size()];
