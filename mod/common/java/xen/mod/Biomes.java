@@ -127,7 +127,41 @@ final class Biomes {
 				which = e.getKey();
 			}
 		}
-		return best == null ? null : new Object[] {best, which};
+		if (best != null) return new Object[] {best, which};
+		return c.mod.config.luck >= 2 ? onMap(item) : null;                  // knowing the world: none it saw, the nearest on the world's own map
+	}
+
+	private final Map<String, Object[]> mapped = new HashMap<>();
+	private final Map<String, Long> mappedAt = new HashMap<>();
+
+	/** The nearest biome within 800 blocks that tends to have this, as the world's map has it (like /locate biome); looked up once a minute an item. */
+	private Object[] onMap(String item) {
+		ServerLevel level = (ServerLevel) c.player.level();
+		if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		long now = level.getGameTime();
+		Long at = mappedAt.get(item);
+		if (at != null && now - at < 1200) return mapped.get(item);
+		mappedAt.put(item, now);
+		java.util.Set<String> names = new java.util.HashSet<>();
+		for (var e : HAS.entrySet()) if (!cave(e.getKey()) && java.util.Arrays.asList(e.getValue()).contains(item)) names.add(e.getKey());
+		Object[] r = null;
+		if (!names.isEmpty()) {
+			try {
+				var found = level.findClosestBiome3d(h -> h.unwrapKey().map(k -> names.contains(k.identifier().getPath())).orElse(false), c.player.blockPosition(), 800, 32, 64);
+				if (found != null) {
+					BlockPos p = found.getFirst();
+					String b = found.getSecond().unwrapKey().map(k -> k.identifier().getPath()).orElse("biome");
+					r = new Object[] {new BlockPos(p.getX(), c.player.getBlockY(), p.getZ()), b};
+					Object[] had = mapped.get(item);
+					if (had == null || ((BlockPos) had[0]).distSqr(p) > 64 * 64)
+						c.journal("thinks", String.format(java.util.Locale.ROOT, "for %s: knows of a %s %.0f blocks off", item.replace('_', ' '), b.replace('_', ' '), Math.sqrt(p.distSqr(c.player.blockPosition()))));
+				}
+			} catch (RuntimeException e) {
+				r = null;
+			}
+		}
+		mapped.put(item, r);
+		return r;
 	}
 
 	/** For /xen g1x and its answers: the biome it's in and the ones it has seen. */
