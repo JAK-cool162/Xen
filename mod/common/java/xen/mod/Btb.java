@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -523,6 +523,8 @@ final class Btb {
 	/** How many of an item it carries, by name (cooked_beef), or by a name's start (cooked_*): for its instructions. */
 	int invCount(String key) {
 		if (c.player == null) return 0;
+		if (key.equals("diamond_ore_near"))                                   // (diamond ore it knows of close by: within 32 blocks)
+			return c.mod.config.luck > 0 ? c.hunch.oresNear("diamond", c.player.blockPosition(), 32, 24, 8).size() : 0;
 		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");
 		boolean prefix = key.endsWith("*");
 		String k = prefix ? key.substring(0, key.length() - 1) : key;
@@ -615,6 +617,7 @@ final class Btb {
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
+			case EAT -> c.chores.eat();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
 				c.knowledge.learn("crops_water", Knowledge.How.SEEN);             // (farmland by water: known, not found out by the field drying up)
