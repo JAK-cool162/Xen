@@ -1842,6 +1842,7 @@ public class XenMod implements ModInitializer {
 			if (!plan.startsWith("You will")) continue;
 			best.chores.own = false;                                          // (a promise, not an errand of its own: nothing of its own drops it; Ivy's lava trip dropped her five for Hal)
 			giftPending.put(needy.name, new Object[] {best, has, pieces});
+			LOG.info("{} gives diamonds to {} (team {})", best.name, needy.name, String.valueOf(teamOf(needy)).replace("xen_", ""));   // (for the experiment's report)
 			best.chatter(needy.name + ", you lost your gear? Hold on, I've got " + n + " diamonds for you.", true);
 			best.journal("does", "shares " + n + " diamonds with " + needy.name + " (" + pieces + " of 6 of its diamond gear, " + has + " diamonds; " + Math.round(bestD) + " blocks off)");
 			needy.journal("thinks", best.name + " is bringing it " + n + " diamonds");
@@ -1921,6 +1922,7 @@ public class XenMod implements ModInitializer {
 			if (!plan.startsWith("You will")) continue;
 			best.chores.own = false;
 			foodPending.put(needy.name, new Object[] {best, needy.items().getOrDefault("food", 0)});
+			LOG.info("{} gives food to {} (team {})", best.name, needy.name, String.valueOf(teamOf(needy)).replace("xen_", ""));   // (for the experiment's report)
 			best.chatter(needy.name + ", you're starving? Hold on, I've got " + food.replace('_', ' ') + " for you.", true);
 			best.journal("does", "brings food to " + needy.name + " (" + food + "; it's at " + Math.round(np.getHealth()) + " health, food " + level + ", " + Math.round(bestD) + " blocks off)");
 			needy.journal("thinks", best.name + " is bringing it food");
