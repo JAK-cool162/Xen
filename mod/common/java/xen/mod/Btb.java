@@ -643,7 +643,8 @@ final class Btb {
 
 	/** /xen teambase: its team's next base part, started now (a test, or a nudge). */
 	String teamBase() {
-		return fortStep();
+		order(Task.FORT, "the player", 60f);                                    // (through its own choosing, as a leader's job: it keeps at it, its brain knows it's building)
+		return "will build its team's base (the next part) now";
 	}
 
 	private String fortStep() {
