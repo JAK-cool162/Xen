@@ -2451,12 +2451,19 @@ public final class Companion {
 		var level = (ServerLevel) player.level();
 		long time = Compat.timeOfDay(level) % 24000;
 		if (time < 12600 || time > 23400 || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
-		BlockPos feet = player.blockPosition(), best = null;
-		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -4, -16), feet.offset(16, 4, 16)))
-			if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock
-					&& (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+		BlockPos feet = player.blockPosition(), best = nearBed;
+		if (best == null || !(level.getBlockState(best).getBlock() instanceof net.minecraft.world.level.block.BedBlock) || level.getGameTime() - nearBedAt > 100) {
+			best = null;                                                     // (looked for again every five seconds, not every tick)
+			nearBedAt = level.getGameTime();
+			for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -4, -16), feet.offset(16, 4, 16)))
+				if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock
+						&& (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+			nearBed = best;
+		}
 		return best == null ? null : sleepIn(best, false);
 	}
+	private BlockPos nearBed;
+	private long nearBedAt;
 
 	private Action bedtime() {
 		var level = (ServerLevel) player.level();
