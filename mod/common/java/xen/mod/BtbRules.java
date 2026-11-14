@@ -68,7 +68,11 @@ final class BtbRules {
 				Btb.Task task = Btb.Task.valueOf(w[1].toUpperCase(Locale.ROOT));
 				int i = 2;
 				float score = 0;
-				if (verb.equals("do") || verb.equals("boost")) score = Float.parseFloat(w[i++]);
+				if (verb.equals("do") || verb.equals("boost")) {                 // (the score's optional for "do": 4, a good middling choice)
+					if (i < w.length && w[i].matches("[+-]?[0-9.]+")) score = Float.parseFloat(w[i++]);
+					else if (verb.equals("do")) score = 4f;
+					else throw new IllegalArgumentException("boost needs a number");
+				}
 				else if (!verb.equals("never")) throw new IllegalArgumentException("do, boost or never");
 				List<Cond> conds = new ArrayList<>();
 				if (i < w.length && w[i].equalsIgnoreCase("if")) i++;
@@ -83,7 +87,9 @@ final class BtbRules {
 	}
 
 	private static Cond cond(String t) {
-		t = t.toLowerCase(Locale.ROOT);
+		t = t.toLowerCase(Locale.ROOT).replace("_inv", "");                     // (raw_inv=true: what's in its bag)
+		if (t.endsWith("=true")) t = t.substring(0, t.length() - 5) + ">0";
+		else if (t.endsWith("=false")) t = t.substring(0, t.length() - 6) + "=0";
 		for (String op : new String[] {">=", "<=", "!=", ">", "<", "="}) {
 			int k = t.indexOf(op);
 			if (k > 0) return new Cond(t.substring(0, k), op, t.substring(k + op.length()));
@@ -107,7 +113,7 @@ final class BtbRules {
 				case "meals" -> o.meals();
 				case "danger", "monsters" -> o.danger();
 				case "iron" -> o.iron();
-				case "raw" -> o.raw();
+				case "raw" -> has.applyAsInt("raw_*") + has.applyAsInt("raw_meat");                 // (raw ore and raw meat: what a furnace is for)
 				case "fuel" -> o.fuel();
 				case "diamonds" -> o.diamonds();
 				case "logs", "wood" -> o.logs();
@@ -151,6 +157,8 @@ final class BtbRules {
 			#        BLAZE PEARLS TOOLS VISIT SLEEP STASH FARM
 			# CONDITIONS (all must hold): health<10  food>=18  meals<4  tier>=3 (3 = iron pickaxe, 4 = diamond)
 			#        any item in its bag by name: cooked_beef>=4  cooked_*<4 (a * matches the rest)  bread>0  beef>0
+			#        raw_meat>0 (beef, pork, mutton, chicken, rabbit, fish)  raw>0 (raw ore or raw meat)
+			#        x=true is x>0, x=false is x=0, a name may end in _inv; the score of "do" may be left out (4)
 			#        diamonds>=3  iron>=3  danger>=1  night  day  !night  underground  sheltered  overworld  nether
 			#        goal=gear  goal=enchant  goal=home  goal=nether
 			# Scores: most of its own choices are between 2 and 5; a roof at night is 5, a bed 5.5.

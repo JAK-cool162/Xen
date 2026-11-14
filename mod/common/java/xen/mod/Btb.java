@@ -523,6 +523,7 @@ final class Btb {
 	/** How many of an item it carries, by name (cooked_beef), or by a name's start (cooked_*): for its instructions. */
 	int invCount(String key) {
 		if (c.player == null) return 0;
+		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");
 		boolean prefix = key.endsWith("*");
 		String k = prefix ? key.substring(0, key.length() - 1) : key;
 		var inv = c.player.getInventory();
