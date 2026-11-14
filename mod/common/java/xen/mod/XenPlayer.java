@@ -116,6 +116,8 @@ public class XenPlayer extends ServerPlayer {
 	/** Hit: how the one who hit it did it, at that very moment (a crit is decided right then, before they land). */
 	@Override
 	public boolean hurtServer(net.minecraft.server.level.ServerLevel level, DamageSource source, float amount) {
+		if (companion != null && source.getEntity() instanceof XenPlayer x && x != this && !isAlliedTo(x) && getTeam() != null && x.getTeam() != null
+				&& companion.mod.config.pvp.equals("teams") && !(Companion.fullDiamond(this) && Companion.fullDiamond(x))) return false;   // fair fights only, however it started (a hit back, a grudge, a stray swing): both in full diamond or no harm done (nine dead at the world's spawn after a restart)
 		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && source.getDirectEntity() == by) {
 			companion.struckBy(by, amount);
 		}
