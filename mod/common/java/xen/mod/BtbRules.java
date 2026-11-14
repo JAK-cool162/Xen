@@ -161,6 +161,7 @@ final class BtbRules {
 			# diamond_in_range (or iron_in_range, lapis_in_range, coal_in_range...): that ore known within 32 blocks
 			# diamonds_wanted>0: diamonds its goals (armor, tools, table) still want
 			# hostile_in_range>0: monsters within 32 blocks (hostile_near: within 16)
+			# bed_in_range>0: a bed within 16 blocks, or one in its bag (the game lets it sleep only at night, no monster within 8)
 			# CONDITIONS (all must hold): health<10  food>=18  meals<4  tier>=3 (3 = iron pickaxe, 4 = diamond)
 			#        any item in its bag by name: cooked_beef>=4  cooked_*<4 (a * matches the rest)  bread>0  beef>0
 			#        raw_meat>0 (beef, pork, mutton, chicken, rabbit, fish)  raw>0 (raw ore or raw meat)

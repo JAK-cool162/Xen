@@ -467,7 +467,7 @@ final class Btb {
 			break;
 		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT ? retreatStep() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT ? retreatStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -593,6 +593,16 @@ final class Btb {
 		if (key.endsWith("_in_range") || key.endsWith("_near")) {               // (ore it knows of close by, within 32 blocks: diamond_in_range, iron_ore_near, lapis_in_range)
 			String what = key.replace("_in_range", "").replace("_near", "").replace("_ore", "").replace("deepslate_", "");
 			return c.mod.config.luck > 0 ? c.hunch.oresNear(what, c.player.blockPosition(), 32, 24, 8).size() : 0;
+		}
+		if (key.equals("bed_in_range") || key.equals("bed")) {                 // (a bed within 16 blocks, or one in its bag it can put down)
+			int n = 0;
+			BlockPos feet = c.player.blockPosition();
+			for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -4, -16), feet.offset(16, 4, 16)))
+				if (c.player.level().getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock) n++;
+			var inv = c.player.getInventory();
+			for (int i = 0; i < inv.getContainerSize(); i++)
+				if (net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath().endsWith("_bed")) n += inv.getItem(i).getCount();
+			return n;
 		}
 		if (key.equals("diamonds_wanted")) return Math.max(0, c.goals.diamondsWanted() - invCount("diamond"));   // (diamonds its goals still want)
 		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");

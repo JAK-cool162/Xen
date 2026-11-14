@@ -2445,6 +2445,19 @@ public final class Companion {
 		return null;
 	}
 
+	/** Its brain's SLEEP: the nearest bed within 16 blocks, at night, lain down in (any bed it can get to, not only its own). */
+	Action sleepNear() {
+		if (player == null || player.isSleeping()) return player != null && player.isSleeping() ? Action.IDLE : null;
+		var level = (ServerLevel) player.level();
+		long time = Compat.timeOfDay(level) % 24000;
+		if (time < 12600 || time > 23400 || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		BlockPos feet = player.blockPosition(), best = null;
+		for (BlockPos q : BlockPos.betweenClosed(feet.offset(-16, -4, -16), feet.offset(16, 4, 16)))
+			if (level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.BedBlock
+					&& (best == null || q.distSqr(feet) < best.distSqr(feet))) best = q.immutable();
+		return best == null ? null : sleepIn(best, false);
+	}
+
 	private Action bedtime() {
 		var level = (ServerLevel) player.level();
 		if (player.isSleeping()) {
