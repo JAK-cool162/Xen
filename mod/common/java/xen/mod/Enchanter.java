@@ -390,7 +390,7 @@ final class Enchanter {
 		int slot = worthSlot();
 		int bagTier = slot < 0 ? 0 : MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getInventory().getItem(slot).getItem()).getPath());
 		var worn = wornWorth();
-		if (worn != null && bagTier < MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getItemBySlot(worn).getItem()).getPath()) && takeOffForTable())
+		if (worn != null && bagTier <= MindSense.tier(BuiltInRegistries.ITEM.getKey(c.player.getItemBySlot(worn).getItem()).getPath()) && takeOffForTable())   // (as good as its pickaxe: the armor first; Rex, full diamond, put Efficiency on two pickaxes, his armor bare)
 			slot = worthSlot();                                                // (the diamond armor it wears before a spare iron pickaxe in its bag: Ann's third enchant went on that, her armor bare)
 		if (slot < 0 || c.items().getOrDefault("lapis_lazuli", 0) == 0) {
 			on = false;
