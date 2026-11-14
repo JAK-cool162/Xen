@@ -73,8 +73,8 @@ final class Thinker {
 			names.append(names.length() > 0 ? "; " : "").append(String.format(Locale.ROOT, "%s (health %.0f, food %d, %s)", m.name, m.player().getHealth(),
 					m.player().getFoodData().getFoodLevel(), Companion.fullDiamond(m.player()) ? "full diamond" : "not full diamond"));
 		}
-		String team = String.valueOf(mod.teamOf(lead)).replace("xen_", "");
-		String sys = "You are " + lead.name + ", leader of the " + team + " team in Minecraft, racing the other team to full enchanted diamond armor. You think of your own plans. Be short.";
+		String teamName = String.valueOf(mod.teamOf(lead)).replace("xen_", "");
+		String sys = "You are " + lead.name + ", leader of the " + teamName + " team in Minecraft, racing the other team to full enchanted diamond armor. You think of your own plans. Be short.";
 		String user = "What just happened: " + what + ". What you know: " + WorldBrief.of(lead) + " Your teammates: " + names + ". What do you do? Reply with exactly three lines:\nPLAN: your plan, one short sentence in your own words\n"
 				+ "WHO: the teammates who do it (names, or all)\nDO: one word from " + String.join(", ", DOS) + (enemy == null ? "" : " (REVENGE: go after " + enemy.getName().getString() + ", full diamond only)");
 		post(url, sys, user, 120, text -> mod.server.execute(() -> applyIdea(lead, team, text, enemy, what)));
@@ -98,7 +98,7 @@ final class Thinker {
 			waiting.put("dream:" + c.name, false);
 			String idea = text.replace('\n', ' ').strip();
 			if (idea.length() > 140) idea = idea.substring(0, 140);
-			Ideas.Doing d = Ideas.interpret(idea);
+			Wishes.Doing d = Wishes.interpret(idea);
 			if (d == null) {
 				XenMod.LOG.info("{} dreams: {} (a wish: nothing it can do with it yet)", c.name, idea);
 				c.journal("thinks", "a wish: " + idea);
@@ -111,7 +111,7 @@ final class Thinker {
 	}
 
 	/** An idea made into what it does: a build (its wish) or a job (an order of its own). */
-	static void act(Companion c, Ideas.Doing d, String by, float weight) {
+	static void act(Companion c, Wishes.Doing d, String by, float weight) {
 		if (d.kind().equals("build")) c.btb.wishFor(d.arg(), by, weight);
 		else {
 			try {
@@ -131,7 +131,7 @@ final class Thinker {
 			else if (up.startsWith("DO")) for (String d : DOS) if (up.contains(d)) doing = d;
 		}
 		if (doing == null) for (String d : DOS) if (text.toUpperCase(Locale.ROOT).contains(d)) doing = d;   // (its word anywhere)
-		Ideas.Doing free = plan == null ? null : Ideas.interpret(plan);              // (its plan in its own words: a house, a farm, the tower, anything it can do)
+		Wishes.Doing free = plan == null ? null : Wishes.interpret(plan);              // (its plan in its own words: a house, a farm, the tower, anything it can do)
 		if (free != null && free.kind().equals("build")) doing = "BUILD";
 		if (plan == null || plan.length() < 4 || doing == null) {
 			XenMod.LOG.info("{} (leads {}) thought, but no plan came of it: {}", lead.name, mod.teamOf(lead), text.replace('\n', ' ').substring(0, Math.min(140, text.length())));
