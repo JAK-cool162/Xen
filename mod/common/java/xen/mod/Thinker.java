@@ -50,7 +50,7 @@ final class Thinker {
 
 	/** A leader writes its team's laws and gives each teammate a role (a title and what it does), in words; the roles lean their choices. */
 	void teamTalk(Companion lead, List<Companion> members) {
-		String url = mod.config.thinkUrl;
+		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
 		if (url == null || url.isBlank() || lead.player == null) return;
 		StringBuilder names = new StringBuilder();
 		for (Companion m : members) if (m != lead) names.append(names.length() > 0 ? ", " : "").append(m.name).append(m.personality.bravery > 0.5f ? " (brave)" : m.personality.diligence > 0.5f ? " (hard-working)" : m.personality.curiosity > 0.5f ? " (curious)" : " (calm)");
@@ -70,14 +70,15 @@ final class Thinker {
 				if (law.length() > 3 && laws.size() < 3) laws.add(law.length() > 90 ? law.substring(0, 90) : law);
 				continue;
 			}
-			for (Companion m : members) {
-				if (m == lead || !line.toLowerCase(Locale.ROOT).startsWith(m.name.toLowerCase(Locale.ROOT))) continue;
-				String rest = line.substring(m.name.length()).replaceFirst("^\\s*[:\\-]\\s*", "").strip();
-				if (rest.isEmpty()) continue;
-				m.role = rest.length() > 60 ? rest.substring(0, 60) : rest;
-				m.roleTask = roleTask(rest);
-				roles++;
-			}
+		}
+		for (Companion m : members) {                                          // "Ann - Miner", "Ann: Cook - keeps us fed", anywhere in its words
+			if (m == lead) continue;
+			var hit = java.util.regex.Pattern.compile("\\b" + m.name + "\\b\\s*[:\\-\u2013(]\\s*([A-Za-z][A-Za-z' ]{2,40}?)(?=[,;.)\\n]|\\s+-|$)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text);
+			if (!hit.find()) continue;
+			String rest = hit.group(1).strip();
+			m.role = rest.length() > 40 ? rest.substring(0, 40) : rest;
+			m.roleTask = roleTask(rest);
+			roles++;
 		}
 		for (Companion m : members)                                           // (anyone it didn't name: a role that fits its nature)
 			if (m != lead && (m.role == null || m.role.isEmpty())) {
@@ -104,7 +105,7 @@ final class Thinker {
 
 	/** A villager it meets gets a name and a role of its own, from the model (its name shows over its head). */
 	void nameVillager(Companion c, net.minecraft.world.entity.npc.villager.Villager v) {
-		String url = mod.config.thinkUrl;
+		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
 		if (url == null || url.isBlank() || v.hasCustomName()) return;
 		String job = net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(v.getVillagerData().profession().value()).getPath();
 		post(url, "You name villagers in a cozy Minecraft village. Answer with only a name and a title, like: Mira the Lantern-Keeper",

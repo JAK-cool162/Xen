@@ -220,6 +220,8 @@ public final class XenConfig {
 	public String thinkUrl = "";
 	/** How often each Xen thinks it over with that model, in seconds. */
 	public int thinkEvery = 120;
+	/** A bigger language model for the rarer, wordier things: team laws, roles, villagers' names (empty: the thinkUrl one). */
+	public String talkUrl = "";
 	/**
 	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
 	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",
