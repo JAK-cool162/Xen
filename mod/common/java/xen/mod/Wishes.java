@@ -14,11 +14,16 @@ final class Wishes {
 	/** What it comes to: "build" and the builder's word (or "schematic:Name"), or "task" and a job; null: a wish only. */
 	record Doing(String kind, String arg, String label) {}
 
+	/** The player's grand schematics: built when asked, never from an idea of its own. */
+	private static final java.util.Set<String> BIG = java.util.Set.of("Cliff_Stair_Case", "Wizard_Tower", "Medieval_House_with_Bridge", "coal-farm", "enderman-xp-farm",
+			"mob-grinder", "potion-brewer");
+
 	static Doing interpret(String idea) {
 		String t = " " + idea.toLowerCase(Locale.ROOT).replaceAll("[^a-z ]", " ") + " ";
 		for (String name : Schematic.list()) {                                    // the player's schematics, by a word of their name ("tower", "staircase", "wall")
 			for (String w : name.toLowerCase(Locale.ROOT).split("[_\\- ]+")) {
 				if (w.length() < 4 || w.equals("from") || w.equals("with") || w.equals("small") || w.equals("house")) continue;
+				if (BIG.contains(name)) continue;                                      // (the grand ones: the player's own call, /xen build; not a passing idea)
 				if (t.contains(" " + w + " ") || t.contains(" " + w + "s ") || w.equals("stair") && t.contains("staircase"))
 					return new Doing("build", "schematic:" + name, "build the " + name.replace('_', ' '));
 			}

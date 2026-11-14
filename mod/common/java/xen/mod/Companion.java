@@ -2977,12 +2977,25 @@ public final class Companion {
 		chatter(pick3("I've got your back, " + lead.name + ".", "Coming with you, " + lead.name + ".", "Lead the way, " + lead.name + ". I'll watch your stuff."), true);
 	}
 
+	/** Along on a teammate's trip out (exploring, a trial chamber, the village): not the Nether. */
+	private boolean groupTrip;
+
+	/** Along with a teammate going exploring (or to a trial chamber, the village): it follows, watches its back. */
+	void joinGroup(Companion lead, String where) {
+		joinTrip(lead);
+		groupTrip = true;
+		XenMod.LOG.info("{} goes along with {} ({}), a group", name, lead.name, where);
+	}
+
 	/** The trip it came along on is over (they're home, dead and gone, or twenty minutes): back to its own things. */
 	void tripCheck() {
 		if (buddyOf == null || player == null) return;
 		var lead = buddyOf.player;
-		boolean over = lead == null || !lead.isAlive() && escortFor == null || player.level().getGameTime() - buddyFrom > 20 * 60 * 20
-				|| buddyOf.nether.purpose == null && !buddyOf.nether.inNether() && !nether.inNether() && lead.level() == player.level();
+		Btb.Task lt = buddyOf.btb.task;
+		boolean over = lead == null || !lead.isAlive() && escortFor == null || player.level().getGameTime() - buddyFrom > 20 * 60 * (groupTrip ? 10 : 20)
+				|| (groupTrip ? lt != Btb.Task.EXPLORE && lt != Btb.Task.TRIALS && lt != Btb.Task.VISIT && lt != Btb.Task.TRADE
+						: buddyOf.nether.purpose == null && !buddyOf.nether.inNether() && !nether.inNether() && lead.level() == player.level());
+		if (over) groupTrip = false;
 		if (!over) return;
 		if (buddyOf.tripBuddy == this) buddyOf.tripBuddy = null;
 		buddyOf = null;

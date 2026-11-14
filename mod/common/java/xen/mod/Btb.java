@@ -548,6 +548,7 @@ final class Btb {
 		if (best == null)                                                        // (out in the dark with nothing it can start: on to other ground, not standing there)
 			return (o.night || c.goals.sunDown()) && o.overworld && !o.under && !o.sheltered ? c.goals.exploreStep() : null;
 		String plan = start(best.task, o);
+		if (plan != null && plan.startsWith("You will") && (best.task == Task.EXPLORE || best.task == Task.TRIALS || best.task == Task.VISIT)) bringGroup();   // (out exploring: not alone)
 		if (best.task != loggedTask || now() - loggedAt > 20 * 60) {             // (what it picked and what came of it, once a minute: a Xen standing still shows why)
 			loggedTask = best.task;
 			loggedAt = now();
@@ -639,6 +640,24 @@ final class Btb {
 		c.mod.saveProjects();
 		XenMod.LOG.info("{} puts its team's whole plan down at once at {}: {} blocks ({})", c.name, pj.at().toShortString(), n, String.join(", ", pj.plan));
 		return "the team's whole plan put down at " + pj.at().toShortString() + ": " + n + " blocks";
+	}
+
+	/** Out exploring (or to a trial chamber, the village): a teammate or two nearby, free and well, may come along. */
+	private void bringGroup() {
+		if (c.player == null || c.mod.teamOf(c) == null || c.buddyOf != null) return;
+		int n = 0;
+		for (Companion m : c.mod.companions) {
+			if (n >= 2) break;
+			var p = m.player();
+			if (m == c || p == null || !p.isAlive() || !c.mod.sameSide(c, m) || m.buddyOf != null || m.tripBuddy != null || m.mode != Companion.Mode.FREE
+					|| p.distanceTo(c.player) > 48 || p.getHealth() < 14 || p.getFoodData().getFoodLevel() < 10 || m.fightingNow()) continue;
+			Task busyWith = m.btb.task;
+			if (busyWith == Task.DIAMONDS || busyWith == Task.ENCHANT || busyWith == Task.TABLE || busyWith == Task.FORT || busyWith == Task.SHELTER || busyWith == Task.RETREAT) continue;   // (its own race first)
+			float yes = 0.25f + 0.35f * m.personality.curiosity + 0.25f * m.personality.loyalty;
+			if (m.random().nextFloat() >= yes) continue;
+			m.joinGroup(c, task.name().toLowerCase(Locale.ROOT));
+			n++;
+		}
 	}
 
 	/** Its own idea of something to build (or one its leader had): what, and who thought of it. */
