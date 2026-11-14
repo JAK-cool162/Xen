@@ -538,7 +538,7 @@ final class Btb {
 					yield "You will bake bread from your wheat.";
 				}
 				var prey = ch.nearestAnimal();
-				boolean noAnimals = prey == null || prey.distanceTo(c.player) > 24;
+				boolean noAnimals = (prey == null || prey.distanceTo(c.player) > 24) && (c.mod.config.luck <= 0 || c.hunch.animalsAt(false) == null);   // (animals anywhere within 128 blocks: it hunts them, first; a village or fishing only when there are none)
 				if (noAnimals && !o.night && c.visits.candidate()) {               // (no animals about, a village it knows: its hay is bread)
 					String v = c.visits.begin();
 					if (v != null) {
