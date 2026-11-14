@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -536,6 +536,32 @@ final class Btb {
 	}
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
+	/** Its basic kit (the player's list): 16 logs, a stone pickaxe, a stone axe, 4 cooked beef, pork or mutton, a shield. What's missing, how many. */
+	int kitMissing() {
+		int n = 0;
+		if (invCount("*_log") < 16) n++;
+		if (c.crafter.pickTier() < 2) n++;
+		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) n++;
+		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) n++;
+		if (invCount("shield") == 0) n++;
+		return n;
+	}
+
+	/** The next piece of its basic kit: wood first (the tools and the shield are made of it), the pickaxe, the axe, the food, the shield. */
+	private String kitStep(Obs o) {
+		Chores ch = c.chores;
+		int logs = invCount("*_log");
+		if (logs < 16) return ch.gather("wood", 16 - logs);
+		if (c.crafter.pickTier() < 2) return planFor("stone_pickaxe", 1, "basic kit: a stone pickaxe");
+		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) return planFor("stone_axe", 1, "basic kit: a stone axe");
+		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) {
+			if (invCount("beef") + invCount("porkchop") + invCount("mutton") > 0) return ch.smelt();
+			return ch.hunt(4);
+		}
+		if (invCount("shield") == 0) return planFor("shield", 1, "basic kit: a shield");
+		return "You have your basic kit.";
+	}
+
 	private long forcedAt = -100_000, retreatFrom;
 	private net.minecraft.world.phys.Vec3 retreatTo;
 
@@ -604,17 +630,18 @@ final class Btb {
 				if (net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(i).getItem()).getPath().endsWith("_bed")) n += inv.getItem(i).getCount();
 			return n;
 		}
+		if (key.equals("kit_missing")) return kitMissing();                    // (pieces of its basic kit it hasn't got)
 		if (key.equals("diamonds_wanted")) return Math.max(0, c.goals.diamondsWanted() - invCount("diamond"));   // (diamonds its goals still want)
 		if (key.equals("raw_meat")) return invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") + invCount("rabbit") + invCount("cod") + invCount("salmon");
-		boolean prefix = key.endsWith("*");
-		String k = prefix ? key.substring(0, key.length() - 1) : key;
+		boolean prefix = key.endsWith("*"), suffix = !prefix && key.startsWith("*");   // (cooked_* by the start, *_log by the end)
+		String k = prefix ? key.substring(0, key.length() - 1) : suffix ? key.substring(1) : key;
 		var inv = c.player.getInventory();
 		int n = 0;
 		for (int i = 0; i < inv.getContainerSize(); i++) {
 			var st = inv.getItem(i);
 			if (st.isEmpty()) continue;
 			String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
-			if (prefix ? id.startsWith(k) : id.equals(k)) n += st.getCount();
+			if (prefix ? id.startsWith(k) : suffix ? id.endsWith(k) : id.equals(k)) n += st.getCount();
 		}
 		return n;
 	}
@@ -699,6 +726,7 @@ final class Btb {
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
 			case EAT -> c.chores.eat();
+			case KIT -> kitStep(o);
 			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
