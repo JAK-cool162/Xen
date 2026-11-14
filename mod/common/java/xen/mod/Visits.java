@@ -166,7 +166,26 @@ final class Visits {
 	boolean candidate() {
 		if (c.player == null || at != null) return at != null;
 		BlockPos feet = c.player.blockPosition();
+		if (placeOf("village", feet) == null) locateVillage(feet);
 		return placeOf("village", feet) != null || placeOf("ruined portal", feet) != null;
+	}
+
+	private long villageLookedAt = -100_000;
+
+	/** Knowing the world: the nearest village within 256 blocks, as the game's own map knows it (food, beds, golems; only 2 of 10 Xens had found one, most deaths came hungry at night). */
+	private void locateVillage(BlockPos feet) {
+		if (c.mod.config.luck <= 0 || !(c.player.level() instanceof net.minecraft.server.level.ServerLevel level) || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+		if (level.getGameTime() - villageLookedAt < 20 * 60 * 5) return;
+		villageLookedAt = level.getGameTime();
+		try {
+			BlockPos v = level.findNearestMapStructure(net.minecraft.tags.StructureTags.VILLAGE, feet, 16, false);
+			if (v == null) return;
+			BlockPos at = new BlockPos(v.getX(), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, v.getX(), v.getZ()), v.getZ());
+			c.places.remember("village", at);
+			XenMod.LOG.info("{} knows of a village at {} ({} blocks)", c.name, at.toShortString(), (int) Math.sqrt(at.distSqr(feet)));
+		} catch (RuntimeException e) {
+			XenMod.LOG.info("{} couldn't look for a village: {}", c.name, e.toString());
+		}
 	}
 
 	/** Its brain sends it: off to the nearest (a "You will..." plan), or null if there's none. */
