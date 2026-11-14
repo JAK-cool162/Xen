@@ -597,7 +597,22 @@ final class Builder {
 	 * it, a road from the way in to its door), then builds it part by part, the house first. Null (its own idea) or why
 	 * not (asked) when there's no room for it.
 	 */
+	/** Its team's fortress: a whole place with a high wall round it (a house, a garden, a road out through the gate). */
+	boolean fortress;
+
+	String startFortress(BlockPos near) {
+		if (c.player == null) return "no body";
+		ServerLevel level = (ServerLevel) c.player.level();
+		String r = place(level, near, c.player.blockPosition(), true, true);
+		fortress = r != null && r.startsWith("You will");
+		return r;
+	}
+
 	private String place(ServerLevel level, BlockPos near, BlockPos feet, boolean asked) {
+		return place(level, near, feet, asked, false);
+	}
+
+	private String place(ServerLevel level, BlockPos near, BlockPos feet, boolean asked, boolean fort) {
 		Architect.Palette p = palette(level, feet);
 		Taste.Design d0 = c.taste.design(false, creative, null, area(level, feet));
 		Taste.Design ds = new Taste.Design(d0.w(), d0.d(), d0.wallH(), d0.roof(), d0.ridgeAlongWidth(), d0.base(), d0.frame(), d0.lowerStone(), d0.shutters(),
@@ -606,7 +621,7 @@ final class Builder {
 		if (!creative && (ds.base() || ds.lowerStone()) && !p.base().equals("cobblestone") && c.crafter.pickTier() >= 1)
 			p = Architect.ofWood(p.name(), true, p.window().equals("glass_pane"));
 		String biome = VillageHouses.kindAt(level, feet);
-		Imagined.Layout l = Imagined.picture(c, level, near != null ? near : feet, creative, ds, p, stage, new Random(), biome);
+		Imagined.Layout l = Imagined.picture(c, level, near != null ? near : feet, creative, ds, p, stage, new Random(), biome, fort);
 		if (l == null) return asked ? "You can't lay out a place here: there isn't flat dry ground enough for a house. Somewhere more open would work." : null;
 		String wood = woodType();
 		Imagined.Part h = l.house();

@@ -285,6 +285,11 @@ final class Imagined {
 	 * likes best. Null: there's no room for a house here.
 	 */
 	static Layout picture(Companion c, ServerLevel level, BlockPos center, boolean creative, Taste.Design ds, Architect.Palette palette, int stage, Random r, String biome) {
+		return picture(c, level, center, creative, ds, palette, stage, r, biome, false);
+	}
+
+	/** A fortress: the same place, a high wall round it all for sure (a team's base: no pool, no seats, a garden). */
+	static Layout picture(Companion c, ServerLevel level, BlockPos center, boolean creative, Taste.Design ds, Architect.Palette palette, int stage, Random r, String biome, boolean fortress) {
 		long t0 = System.nanoTime();
 		Ground g = survey(level, c.player, center);
 		Taste t = c.taste;
@@ -313,6 +318,14 @@ final class Imagined {
 		if (wantSeat) {
 			extras.add(ownKind("sitting area", 3, 3, SEAT));
 			chose.add("seat");
+		}
+		if (fortress) {
+			wantWall = true;
+			garden = true;
+			extras.clear();
+			chose.remove("pool");
+			chose.remove("seat");
+			chose.add("fortress");
 		}
 		if (wantWall) chose.add("wall");
 		if (lamps) chose.add("lamps");
@@ -924,10 +937,11 @@ final class Imagined {
 			boolean corner = (at.contains(BlockPos.asLong(x + 1, 0, z)) || at.contains(BlockPos.asLong(x - 1, 0, z)))
 					&& (at.contains(BlockPos.asLong(x, 0, z + 1)) || at.contains(BlockPos.asLong(x, 0, z - 1)));
 			boolean isPost = nearGate || corner || i % 5 == 0;
-			int high = nearGate ? 4 : isPost ? 3 : 2;
+			boolean fort = java.util.Arrays.asList(l.chose()).contains("fortress");   // (a fortress: a wall one higher, gate towers)
+			int high = (nearGate ? 4 : isPost ? 3 : 2) + (fort ? 1 : 0);
 			for (int k = 1; k <= high; k++) put(steps, new BlockPos(x, y + k, z), isPost ? post : body, Architect.WALLS, false);
 			if (isPost) put(steps, new BlockPos(x, y + high + 1, z), light, Architect.OUTSIDE, true);
-			else put(steps, new BlockPos(x, y + 3, z), cap + "[type=bottom]", Architect.ROOF, true);
+			else put(steps, new BlockPos(x, y + high + 1, z), cap + "[type=bottom]", Architect.ROOF, true);
 		}
 		BlockPos mid = w.get(w.size() / 2);
 		return plan("wall", steps, mid, mid.above());

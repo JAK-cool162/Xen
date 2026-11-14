@@ -70,17 +70,23 @@ final class Leader {
 			if (dia < 4) noArmor++;
 			else if (!allEnchanted(c)) unenchanted++;
 		}
+		boolean fortStarted = false;
+		for (Companion c : members) fortStarted |= c.builder.fortress && c.builder.busy();
 		String plan = hungry + hurt > n / 2 ? "regroup: food and rest first"
 				: noKit > n / 3 ? "kit up: everyone's basic kit"
+				: noArmor <= n / 2 ? "fortress: a walled base for the team, the geared ones build it"
 				: noArmor > n / 3 ? "diamonds: full diamond armor for all"
 				: unenchanted > 0 ? "enchant: our diamond gear enchanted"
 				: "hold: guard the base, help the slow ones";
 		boolean changed = !plan.equals(lastPlan.put(lead.name, plan));
 		StringBuilder jobs = new StringBuilder();
 		int took = 0, refused = 0;
+		if (plan.startsWith("fortress") && !fortStarted && diamondArmor(lead) >= 4 && !lead.enchanter.possible()) lead.btb.order(Btb.Task.FORT, lead.name, 1.2f);   // (the leader lays it out itself)
+		int builders = 0;
 		for (Companion c : members) {
 			if (c == lead) continue;
 			Btb.Task job = jobFor(c, plan);
+			if (job == Btb.Task.FORT && ++builders > 3) job = jobFor(c, "diamonds");   // (three build; the rest of the geared ones go on with the race)
 			if (job == null) continue;
 			var p = c.personality;
 			float trust = c.trust(lead.player().getUUID());
@@ -111,6 +117,7 @@ final class Leader {
 		if (meals < 2) return Btb.Task.FOOD;
 		if (c.btb.kitMissing() > 0) return Btb.Task.KIT;
 		int dia = diamondArmor(c);
+		if (plan.startsWith("fortress") && dia >= 4 && (allEnchanted(c) || !c.enchanter.possible())) return Btb.Task.FORT;   // (in diamond and nothing to enchant with yet: it builds the team's walls)
 		if (dia < 4 && c.crafter.pickTier() >= 3) return Btb.Task.DIAMONDS;
 		if (dia < 4) return Btb.Task.IRON;
 		if (!allEnchanted(c)) return Btb.Task.ENCHANT;

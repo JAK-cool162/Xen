@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -559,6 +559,25 @@ final class Btb {
 	}
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
+	/** Its team's fortress: help a teammate already building it, or start it (at the team's base, or here, which becomes the base). */
+	private String fortStep() {
+		for (Companion o : c.mod.companions) {
+			if (o == c || o.player() == null || !o.builder.fortress || !o.builder.busy() || !c.mod.sameSide(o, c) || c.mod.teamOf(c) == null) continue;
+			if (o.player().distanceToSqr(c.player) > 300 * 300) continue;
+			String r = c.builder.help(o);
+			if (r != null && r.startsWith("You will")) XenMod.LOG.info("{} btb: helps {} build the team's fortress", c.name, o.name);
+			return r;
+		}
+		BlockPos at = c.mod.teamHome(c);
+		if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
+		String r = c.builder.startFortress(at);
+		if (r != null && r.startsWith("You will")) {
+			if (c.goals.home == null) c.goals.home = at;
+			XenMod.LOG.info("{} btb: starts its team's fortress at {}", c.name, at.toShortString());
+		}
+		return r;
+	}
+
 	/** Its basic kit (the player's list): 16 logs, a stone pickaxe, a stone axe, 4 cooked beef, pork or mutton, a shield. What's missing, how many. */
 	int kitMissing() {
 		int n = 0;
@@ -790,6 +809,7 @@ final class Btb {
 			case SLEEP -> "You will sleep in your bed.";
 			case EAT -> c.chores.eat();
 			case KIT -> kitStep(o);
+			case FORT -> fortStep();
 			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)

@@ -1759,7 +1759,7 @@ public class XenMod implements ModInitializer {
 	/** A teammate's base (the nearest), or null: its team shares one. */
 	BlockPos teamHome(Companion c) {
 		String t = teamOf(c);
-		if (t == null || !ownTeam(t) || c.player() == null) return null;
+		if (t == null || !ownTeam(t) && !config.teamsLocked || c.player() == null) return null;   // (a color team's base too, when the teams are fixed)
 		BlockPos best = null;
 		for (Companion o : companions) {
 			if (o == c || o.goals.home == null || !t.equals(teamOf(o)) || o.player() == null || o.player().level() != c.player().level()) continue;
