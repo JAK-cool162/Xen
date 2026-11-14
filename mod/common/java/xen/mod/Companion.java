@@ -4872,6 +4872,7 @@ public final class Companion {
 		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
 			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
 			if (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other)) continue;
+			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;   // (just back from dying, with nothing: let be a while; Gus killed Hal seven seconds after he woke)
 			double d = player.distanceTo(other);
 			if (d < 24 && (best == null || d < player.distanceTo(best)) && (d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
 				best = other;
