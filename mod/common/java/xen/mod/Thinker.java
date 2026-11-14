@@ -60,6 +60,72 @@ final class Thinker {
 		post(url, sys, user, 220, text -> mod.server.execute(() -> applyTeamTalk(lead, members, text)));
 	}
 
+	/** What a leader's plan can be done with (its word, then the job; REVENGE: after the enemy, a fair fight). */
+	private static final String[] DOS = {"FOOD", "FARM", "DIAMONDS", "ENCHANT", "TRADE", "FORT", "RETREAT", "EXPLORE", "SMELT", "VISIT", "REVENGE"};
+
+	/** Its leader's own idea for what happened: a plan in its words, who does it, and what that comes to. */
+	void leaderIdea(Companion lead, String what, List<Companion> team, net.minecraft.server.level.ServerPlayer enemy) {
+		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
+		if (url == null || url.isBlank() || lead.player == null) return;
+		StringBuilder names = new StringBuilder();
+		for (Companion m : team) {
+			if (m == lead) continue;
+			names.append(names.length() > 0 ? "; " : "").append(String.format(Locale.ROOT, "%s (health %.0f, food %d, %s)", m.name, m.player().getHealth(),
+					m.player().getFoodData().getFoodLevel(), Companion.fullDiamond(m.player()) ? "full diamond" : "not full diamond"));
+		}
+		String team = String.valueOf(mod.teamOf(lead)).replace("xen_", "");
+		String sys = "You are " + lead.name + ", leader of the " + team + " team in Minecraft, racing the other team to full enchanted diamond armor. You think of your own plans. Be short.";
+		String user = "What just happened: " + what + ". Your teammates: " + names + ". What do you do? Reply with exactly three lines:\nPLAN: your plan, one short sentence in your own words\n"
+				+ "WHO: the teammates who do it (names, or all)\nDO: one word from " + String.join(", ", DOS) + (enemy == null ? "" : " (REVENGE: go after " + enemy.getName().getString() + ", full diamond only)");
+		post(url, sys, user, 120, text -> mod.server.execute(() -> applyIdea(lead, team, text, enemy, what)));
+	}
+
+	private void applyIdea(Companion lead, List<Companion> team, String text, net.minecraft.server.level.ServerPlayer enemy, String what) {
+		String plan = null, who = "all", doing = null;
+		for (String raw : text.split("\\n")) {
+			String line = raw.replaceAll("^[\\s*\\-]+", "").strip(), up = line.toUpperCase(Locale.ROOT);
+			if (up.startsWith("PLAN")) plan = line.replaceFirst("(?i)^plan\\s*[:.-]\\s*", "").strip();
+			else if (up.startsWith("WHO")) who = line.replaceFirst("(?i)^who\\s*[:.-]\\s*", "").strip();
+			else if (up.startsWith("DO")) for (String d : DOS) if (up.contains(d)) doing = d;
+		}
+		if (doing == null) for (String d : DOS) if (text.toUpperCase(Locale.ROOT).contains(d)) doing = d;   // (its word anywhere)
+		if (plan == null || plan.length() < 4 || doing == null) {
+			XenMod.LOG.info("{} (leads {}) thought, but no plan came of it: {}", lead.name, mod.teamOf(lead), text.replace('\n', ' ').substring(0, Math.min(140, text.length())));
+			return;
+		}
+		if (plan.length() > 120) plan = plan.substring(0, 120);
+		boolean all = who.toLowerCase(Locale.ROOT).contains("all") || who.toLowerCase(Locale.ROOT).contains("everyone");
+		List<String> took = new java.util.ArrayList<>(), no = new java.util.ArrayList<>();
+		for (Companion m : team) {
+			if (m.player() == null || !all && !who.toLowerCase(Locale.ROOT).contains(m.name.toLowerCase(Locale.ROOT))) continue;
+			float yes = Math.max(0.15f, Math.min(0.95f, 0.5f + 0.4f * m.personality.loyalty - 0.25f * (m.personality.power - 0.3f)));
+			if (m == lead) yes = 1;
+			if (m.random().nextFloat() >= yes) {
+				no.add(m.name);
+				continue;
+			}
+			if (doing.equals("REVENGE")) {
+				if (enemy == null || !enemy.isAlive() || !Companion.fullDiamond(m.player()) || !Companion.fullDiamond(enemy)) {   // (fair fights only)
+					no.add(m.name + " (not a fair fight)");
+					continue;
+				}
+				m.hunt(enemy);
+			} else {
+				Btb.Task t;
+				try {
+					t = Btb.Task.valueOf(doing);
+				} catch (IllegalArgumentException e) {
+					continue;
+				}
+				m.btb.order(t, lead.name, 0.9f);
+			}
+			took.add(m.name);
+		}
+		XenMod.LOG.info("{} (leads {}) has an idea for \"{}\": {} [{}; {} take it{}]", lead.name, mod.teamOf(lead), what, plan, doing,
+				took.isEmpty() ? "nobody" : String.join(", ", took), no.isEmpty() ? "" : "; no: " + String.join(", ", no));
+		lead.chatter(plan, false);
+	}
+
 	private void applyTeamTalk(Companion lead, List<Companion> members, String text) {
 		List<String> laws = new java.util.ArrayList<>();
 		int roles = 0;

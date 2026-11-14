@@ -30,6 +30,32 @@ final class Leader {
 		this.mod = mod;
 	}
 
+	private final java.util.Map<String, Long> ideaAt = new java.util.HashMap<>();
+
+	/** Its team's leader (null: none, or not about). */
+	Companion leaderOf(Companion c) {
+		if (mod.config.leaders == null || mod.config.leaders.isBlank()) return null;
+		for (String name : mod.config.leaders.split("[, ]+"))
+			for (Companion x : mod.companions)
+				if (x.name.equalsIgnoreCase(name) && x.player() != null && x.player().isAlive() && (x == c || mod.sameSide(x, c))) return x;
+		return null;
+	}
+
+	/**
+	 * Something happened to a team (a death, hunger): its leader thinks of a plan of its own (the bigger model), at
+	 * most once in three minutes a team; what it says becomes jobs its teammates take or not.
+	 */
+	void event(Companion about, String what, net.minecraft.server.level.ServerPlayer enemy) {
+		Companion lead = leaderOf(about);
+		if (lead == null) return;
+		long now = lead.player().level().getGameTime();
+		if (now < ideaAt.getOrDefault(lead.name, 0L)) return;
+		ideaAt.put(lead.name, now + 20 * 60 * 3);
+		java.util.List<Companion> team = new java.util.ArrayList<>();
+		for (Companion x : mod.companions) if (x.player() != null && (x == lead || mod.sameSide(lead, x))) team.add(x);
+		mod.thinker.leaderIdea(lead, what, team, enemy);
+	}
+
 	void tick() {
 		if (mod.config.leaders == null || mod.config.leaders.isBlank()) return;
 		for (String name : mod.config.leaders.split("[, ]+")) {
@@ -39,6 +65,9 @@ final class Leader {
 			long now = lead.player().level().getGameTime();
 			if (now < nextRound.getOrDefault(lead.name, 0L)) continue;
 			nextRound.put(lead.name, now + 20 * 60);
+			int starving = 0;
+			for (Companion x : mod.companions) if (x.player() != null && (x == lead || mod.sameSide(lead, x)) && x.player().getFoodData().getFoodLevel() <= 6) starving++;
+			if (starving >= 3) event(lead, starving + " of the team are starving and there are no animals near", null);   // (an idea for that: a farm, the village, fishing...)
 			try {
 				lead(lead, now);
 			} catch (RuntimeException e) {

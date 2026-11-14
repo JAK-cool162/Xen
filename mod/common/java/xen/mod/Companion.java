@@ -1480,6 +1480,8 @@ public final class Companion {
 			if (e != null) return e;
 		}
 		if (mode == Mode.FREE && mod.config.wants && !minion) {
+			Action after = huntStep();                                  // its leader's revenge: after the one who killed its teammate
+			if (after != null) return after;
 			Action base = enchanter.toBase();                           // home with an enchanting table in its bag and none at its base: down there, for the team
 			if (base != null) {
 				goals.instant = "putting its enchanting table down at its base";
@@ -4915,11 +4917,41 @@ public final class Companion {
 			if (bare && other.getLastHurtByMob() != player) continue;          // (no armor, no weapon, and it didn't start it: not a fight; Gus killed Hal three times, Hal with nothing)   // (just back from dying, with nothing: let be a while; Gus killed Hal seven seconds after he woke)
 			if (!fullDiamond(player) || !fullDiamond(other)) continue;          // fair fights only (the player's rule): both in full diamond armor, or no fight (the war cost blue 83 diamonds in an hour, half-dressed Xens killed for their gear)
 			double d = player.distanceTo(other);
-			if (d < 24 && (best == null || d < player.distanceTo(best)) && (d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
+			boolean hunted = other.getUUID().equals(huntFor) && player.level().getGameTime() < huntUntil;   // (its leader's revenge: that one, from further off, seen or not)
+			if ((d < 24 || hunted && d < 96) && (best == null || hunted || d < player.distanceTo(best)) && (hunted || d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
 				best = other;
+				if (hunted) break;
 			}
 		}
 		return best;
+	}
+
+	/** Its leader's revenge: who it's after (a fair fight only: both in full diamond), until when, and where that one was last. */
+	java.util.UUID huntFor;
+	String huntName = "";
+	long huntUntil;
+
+	/** Sent after someone for revenge (its leader's plan): four minutes to find them. */
+	void hunt(ServerPlayer who) {
+		huntFor = who.getUUID();
+		huntName = who.getName().getString();
+		huntUntil = player.level().getGameTime() + 20 * 60 * 4;
+	}
+
+	/** On its way to the one it's after (the fight itself is its fighting's). Null: not hunting, or that one's gone, or not a fair fight. */
+	private Action huntStep() {
+		if (huntFor == null || player == null) return null;
+		ServerPlayer t = server.getPlayerList().getPlayer(huntFor);
+		if (player.level().getGameTime() >= huntUntil || t == null || !t.isAlive() || t.level() != player.level() || !fullDiamond(player) || !fullDiamond(t)
+				|| player.getHealth() < 12) {
+			if (t != null && !t.isAlive()) XenMod.LOG.info("{} got its revenge on {}", name, huntName);
+			huntFor = null;
+			return null;
+		}
+		if (player.distanceTo(t) < 20) return null;                               // (close: its fighting takes over)
+		goals.instant = "after " + huntName + " (revenge)";
+		run(true);
+		return walkTo(t.position());
 	}
 
 	/** Full diamond (or netherite) armor on: four pieces. */
@@ -5323,6 +5355,8 @@ public final class Companion {
 				player.level().isDarkOutside() ? "night" : "day", tierAlive, Math.round(lastHealthBefore), armedAlive ? "armed" : "no weapon",
 				goals.instant == null || goals.instant.isEmpty() ? "-" : goals.instant, btb.task, mod.teamOf(this));   // (for the test runs: what it was doing, what its brain was on, its team: the death script reads this)
 		diedOf = source.getEntity() != null ? BuiltInRegistries.ENTITY_TYPE.getKey(source.getEntity().getType()).getPath().replace('_', ' ') : how.replace('_', ' ');
+		if (!inArena) mod.leader.event(this, name + " died (" + (source.getEntity() instanceof XenPlayer k ? "killed by " + k.getName().getString() + " of the other team" : cause) + ")",
+				source.getEntity() instanceof ServerPlayer k2 ? k2 : null);   // (its leader may think of something: revenge, food, a change of plan)
 		confusion.surprise(0.3f);                                         // (back from death: where am I, where's my stuff?)
 		if (!inArena && (how.contains("fall") || how.contains("drown") || how.contains("cactus") || how.contains("sweetBerry"))) jokes.embarrass(1800, "it died to " + how.replace("sweetBerryBush", "a berry bush"));   // (a silly death: embarrassing)
 		if (!inArena && !source.is(net.minecraft.world.damagesource.DamageTypes.GENERIC_KILL) && random.nextFloat() < 0.4f + 0.4f * personality.chattiness) {
