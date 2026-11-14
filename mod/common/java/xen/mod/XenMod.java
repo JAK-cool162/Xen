@@ -1771,6 +1771,8 @@ public class XenMod implements ModInitializer {
 		java.util.List<String> by = new ArrayList<>();
 		/** Its parts from schematics, in order: "name|dx|dz" from where it is (empty: a place it pictures itself). */
 		java.util.List<String> plan = new ArrayList<>();
+		/** Where each part's corner went when it was first begun (by its number): taken up again, the same spot, not the top of what's built. */
+		java.util.Map<String, Integer> partY = new java.util.HashMap<>();
 
 		BlockPos at() {
 			return new BlockPos(x, y, z);

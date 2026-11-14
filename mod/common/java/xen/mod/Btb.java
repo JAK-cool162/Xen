@@ -635,8 +635,16 @@ final class Btb {
 			}
 			var level = (net.minecraft.server.level.ServerLevel) c.player.level();
 			int x = pj.x + Integer.parseInt(part[1]), z = pj.z + Integer.parseInt(part[2]);
-			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-			BlockPos origin = new BlockPos(x, sc.groundLayer() ? top - 1 : top, z);
+			String key = String.valueOf(pj.partsDone);
+			if (pj.partY == null) pj.partY = new java.util.HashMap<>();
+			Integer y0 = pj.partY.get(key);
+			if (y0 == null) {                                                         // (first begun: on the ground there; kept, so taking it up again builds on, not on top of it)
+				int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+				y0 = sc.groundLayer() ? top - 1 : top;
+				pj.partY.put(key, y0);
+				c.mod.saveProjects();
+			}
+			BlockPos origin = new BlockPos(x, y0, z);
 			String r = c.builder.startTeamSchematic(sc, origin);
 			if (r != null && r.startsWith("You will")) {
 				if (c.goals.home == null) c.goals.home = pj.at();
