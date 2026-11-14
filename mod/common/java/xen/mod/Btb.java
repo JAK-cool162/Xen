@@ -467,7 +467,7 @@ final class Btb {
 			break;
 		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT ? retreatStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -566,7 +566,7 @@ final class Btb {
 			return null;
 		}
 		c.run(true);
-		why = "running back (its instructions)";
+		why = task == Task.SHELTER ? "down a mine for the night" : "running back (its instructions)";
 		Action a = d > 48 ? c.wanderTo(retreatTo) : c.walkTo(retreatTo);
 		if (a == null) a = c.walkTo(retreatTo);
 		if (a == null) retreatTo = null;                                       // (no way there)
@@ -624,6 +624,7 @@ final class Btb {
 
 	private String start(Task t, Obs o) {
 		Chores ch = c.chores;
+		retreatTo = null;
 		return switch (t) {
 			case WOOD -> {
 				packedWoodAt = now();
@@ -735,6 +736,21 @@ final class Btb {
 	/** A roof, or plan B: a hole dug by hand here or close by (never left standing about out in the dark). */
 	private String shelterOrPlanB(Obs o) {
 		Chores ch = c.chores;
+		if (o.tier == 0 && o.overworld && !o.under) {                            // (nothing to dig or build with: down a mine someone dug, its staircase needs no tools; Hal died nine times one night digging in by hand)
+			BlockPos at = c.player.blockPosition();
+			Chores.Mine best = null;
+			for (Chores.Mine m : Chores.MINES) {
+				if (m.entrance.distSqr(at) > 160 * 160 || !m.dim.equals(c.player.level().dimension().toString())) continue;
+				if (best == null || m.entrance.distSqr(at) < best.entrance.distSqr(at)) best = m;
+			}
+			if (best != null) {
+				BlockPos down = best.base != null ? best.base : best.entrance.relative(best.dir, 8).below(8);
+				retreatTo = net.minecraft.world.phys.Vec3.atBottomCenterOf(down);
+				retreatFrom = now();
+				XenMod.LOG.info("{} btb: nothing to shelter with: down {} mine at {} for the night", c.name, best.by == c ? "its own" : best.by.name + "'s", best.entrance.toShortString());
+				return "You will go down " + (best.by == c ? "your" : best.by.name + "'s") + " mine for the night.";
+			}
+		}
 		String plan = o.under ? ch.digIn() : ch.shelter();
 		if (plan != null && plan.startsWith("You will")) return plan;
 		String dig = ch.digIn();
@@ -820,7 +836,7 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy() || task == Task.RETREAT && retreatTo != null || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
