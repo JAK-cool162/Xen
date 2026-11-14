@@ -875,7 +875,7 @@ final class Fighter {
 				c.journal("fight", "a spider's in its hole with it: out, and fights it");
 				return null;
 			}
-			if (p.hurtTime > 0 && p.getAttackStrengthScale(0.5f) >= 0.9f) return hit(inReach);
+			if (p.getAttackStrengthScale(0.5f) >= 0.9f) return hit(inReach);   // (every charged swing, not only once it's hit: Nia and Max, digging in, armed, died to a zombie at the hole's edge)
 		}
 		if (feet.getY() > hole.getY() - 2) {
 			net.minecraft.core.BlockPos under = feet.below();
