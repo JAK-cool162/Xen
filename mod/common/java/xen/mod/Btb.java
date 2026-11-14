@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -352,7 +352,8 @@ final class Btb {
 		}
 		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions (config/xen/instructions.txt): choices and scores from a file, no change to the mod
 			if (r.verb().equals("never") || !BtbRules.holds(r.conds(), o, goal, this::invCount)) continue;
-			if (r.verb().equals("do")) out.add(new Option(r.task(), r.score(), r.why()));
+			if (r.verb().equals("force")) out.add(new Option(r.task(), 100f, r.why()));
+			else if (r.verb().equals("do")) out.add(new Option(r.task(), r.score(), r.why()));
 			else out.replaceAll(op -> op.task == r.task() ? new Option(op.task, op.base + r.score(), op.why) : op);
 		}
 		for (BtbRules.Rule r : c.mod.btbRules.rules())
@@ -450,8 +451,23 @@ final class Btb {
 			if (task == Task.VISIT) c.visits.stop(life);
 			dropped = true;
 		}
+		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions' "force": that, now, whatever it's on
+			if (!r.verb().equals("force") || !BtbRules.holds(r.conds(), o, goal, this::invCount)) continue;
+			if (task != r.task() && task != Task.NONE && busy() && now() - forcedAt > 20 * 10 && now() >= notBefore.getOrDefault(r.task(), 0L)) {
+				forcedAt = now();
+				XenMod.LOG.info("{} btb: forced to {} ({}): drops {}", c.name, r.task(), r.why(), task);
+				c.journal("does", "btb: its instructions force " + r.task().name().toLowerCase(Locale.ROOT) + ": drops " + task.name().toLowerCase(Locale.ROOT));
+				if (c.chores.busy()) c.chores.cancel();
+				if (c.nether.busy()) c.nether.cancel();
+				if (c.builder.busy()) c.builder.cancel();
+				if (c.farmer.on) c.farmer.cancel();
+				if (task == Task.VISIT || task == Task.FOOD) c.visits.stop("forced");
+				dropped = true;
+			}
+			break;
+		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT ? retreatStep() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -520,9 +536,60 @@ final class Btb {
 	}
 
 	/** Sets the task going with the muscle memory it has: "You will ..." if it could. */
+	private long forcedAt = -100_000, retreatFrom;
+	private net.minecraft.world.phys.Vec3 retreatTo;
+
+	/** Its instructions' RUN: back to its base, or (none near) straight away from the nearest monster. */
+	private String retreatStart() {
+		var p = c.player;
+		BlockPos at = p.blockPosition(), home = c.goals.home;
+		retreatFrom = now();
+		if (home != null && home.distSqr(at) > 8 * 8 && home.distSqr(at) < 800 * 800) {
+			retreatTo = net.minecraft.world.phys.Vec3.atBottomCenterOf(home);
+			return "You will run back to your base.";
+		}
+		var m = nearestHostile(32);
+		if (m == null) return "Nothing to run from.";
+		var away = p.position().subtract(m.position()).multiply(1, 0, 1).normalize().scale(24).add(p.position());
+		int x = (int) Math.floor(away.x), z = (int) Math.floor(away.z);
+		int y = p.level().isLoaded(new BlockPos(x, 0, z)) ? p.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) : (int) p.getY();
+		retreatTo = new net.minecraft.world.phys.Vec3(x + 0.5, y, z + 0.5);
+		return "You will run away from the " + m.getType().getDescription().getString().toLowerCase(Locale.ROOT) + ".";
+	}
+
+	private Action retreatStep() {
+		if (retreatTo == null) return null;
+		double d = c.player.position().distanceTo(retreatTo);
+		if (d < 4 || now() - retreatFrom > 20 * 60 * 2) {                      // (there, or two minutes on: done)
+			retreatTo = null;
+			notBefore.put(Task.RETREAT, now() + 20 * 20);
+			return null;
+		}
+		c.run(true);
+		why = "running back (its instructions)";
+		Action a = d > 48 ? c.wanderTo(retreatTo) : c.walkTo(retreatTo);
+		if (a == null) a = c.walkTo(retreatTo);
+		if (a == null) retreatTo = null;                                       // (no way there)
+		return a;
+	}
+
+	private net.minecraft.world.entity.Mob nearestHostile(int r) {
+		var p = c.player;
+		net.minecraft.world.entity.Mob best = null;
+		for (var m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(r),
+				x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy))
+			if (best == null || m.distanceToSqr(p) < best.distanceToSqr(p)) best = m;
+		return best;
+	}
+
 	/** How many of an item it carries, by name (cooked_beef), or by a name's start (cooked_*): for its instructions. */
 	int invCount(String key) {
 		if (c.player == null) return 0;
+		if (key.equals("hostile_in_range") || key.equals("hostile") || key.equals("hostile_near") || key.equals("monsters_in_range")) {   // (monsters within 32 blocks; "near": 16)
+			int r = key.equals("hostile_near") ? 16 : 32;
+			return c.player.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, c.player.getBoundingBox().inflate(r),
+					x -> x.isAlive() && x instanceof net.minecraft.world.entity.monster.Enemy).size();
+		}
 		if (key.endsWith("_in_range") || key.endsWith("_near")) {               // (ore it knows of close by, within 32 blocks: diamond_in_range, iron_ore_near, lapis_in_range)
 			String what = key.replace("_in_range", "").replace("_near", "").replace("_ore", "").replace("deepslate_", "");
 			return c.mod.config.luck > 0 ? c.hunch.oresNear(what, c.player.blockPosition(), 32, 24, 8).size() : 0;
@@ -620,7 +687,8 @@ final class Btb {
 			case EXPLORE -> "You will look around.";
 			case VISIT -> c.visits.begin();
 			case SLEEP -> "You will sleep in your bed.";
-			case EAT -> c.chores.eat();                                            // (eats the best it has now: its instructions' "do EAT")
+			case EAT -> c.chores.eat();
+			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {
 				notBefore.put(Task.FARM, now() + 20 * 60 * 20);                   // (one try in twenty minutes: once it has a farm the option is gone)
 				c.knowledge.learn("crops_water", Knowledge.How.SEEN);             // (farmland by water: known, not found out by the field drying up)
@@ -742,7 +810,7 @@ final class Btb {
 		}
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
-				|| task == Task.STASH && c.storage.busy() || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.STASH && c.storage.busy() || task == Task.RETREAT && retreatTo != null || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */

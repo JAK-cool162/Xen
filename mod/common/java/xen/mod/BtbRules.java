@@ -65,7 +65,8 @@ final class BtbRules {
 			String[] w = line.split("\\s+");
 			try {
 				String verb = w[0].toLowerCase(Locale.ROOT);
-				Btb.Task task = Btb.Task.valueOf(w[1].toUpperCase(Locale.ROOT));
+				String tn = w[1].toUpperCase(Locale.ROOT);
+				Btb.Task task = Btb.Task.valueOf(tn.equals("RUN") ? "RETREAT" : tn);
 				int i = 2;
 				float score = 0;
 				if (verb.equals("do") || verb.equals("boost")) {                 // (the score's optional for "do": 4, a good middling choice)
@@ -73,7 +74,7 @@ final class BtbRules {
 					else if (verb.equals("do")) score = 4f;
 					else throw new IllegalArgumentException("boost needs a number");
 				}
-				else if (!verb.equals("never")) throw new IllegalArgumentException("do, boost or never");
+				else if (!verb.equals("never") && !verb.equals("force")) throw new IllegalArgumentException("do, boost, never or force");
 				List<Cond> conds = new ArrayList<>();
 				if (i < w.length && w[i].equalsIgnoreCase("if")) i++;
 				for (; i < w.length; i++) conds.add(cond(w[i]));
@@ -152,11 +153,14 @@ final class BtbRules {
 			#   do TASK SCORE if CONDITIONS "why"     a choice, with its score, when the conditions hold
 			#   boost TASK +N if CONDITIONS           raise (or lower, with -N) a choice it already has
 			#   never TASK if CONDITIONS              take that choice away
+			#   force TASK if CONDITIONS              that, now: it drops what it's on (the first force that holds wins)
 			#
 			# TASKS: WOOD STONE COAL IRON SMELT FOOD SHELTER DIAMONDS ENCHANT TABLE HOME EXPLORE SMELTER
 			#        BLAZE PEARLS TOOLS VISIT SLEEP STASH FARM EAT (eat the best food it has, now)
+			#        RUN (or RETREAT: back to its base, or away from the nearest monster if no base is near)
 			# diamond_in_range (or iron_in_range, lapis_in_range, coal_in_range...): that ore known within 32 blocks
 			# diamonds_wanted>0: diamonds its goals (armor, tools, table) still want
+			# hostile_in_range>0: monsters within 32 blocks (hostile_near: within 16)
 			# CONDITIONS (all must hold): health<10  food>=18  meals<4  tier>=3 (3 = iron pickaxe, 4 = diamond)
 			#        any item in its bag by name: cooked_beef>=4  cooked_*<4 (a * matches the rest)  bread>0  beef>0
 			#        raw_meat>0 (beef, pork, mutton, chicken, rabbit, fish)  raw>0 (raw ore or raw meat)
