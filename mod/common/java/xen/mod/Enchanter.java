@@ -40,6 +40,21 @@ final class Enchanter {
 		if (table != null && level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) return table;
 		table = c.places.get("enchanting table");
 		if (table != null && !level().getBlockState(table).is(Blocks.ENCHANTING_TABLE)) table = null;
+		if (table == null && c.mod.config.luck > 0) {                          // (knowing the world: a table another Xen made, near enough, does as well as its own; Cid had one, nine others dug obsidian for theirs)
+			BlockPos best = null;
+			for (Companion x : c.mod.companions) {
+				if (x == c || x.player() == null || x.player().level() != c.player.level()) continue;
+				BlockPos t = x.places.get("enchanting table");
+				if (t == null || t.distSqr(c.player.blockPosition()) > 400 * 400) continue;
+				if (level().isLoaded(t) && !level().getBlockState(t).is(Blocks.ENCHANTING_TABLE)) continue;
+				if (best == null || t.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = t;
+			}
+			if (best != null) {
+				table = best;
+				c.places.remember("enchanting table", best);
+				XenMod.LOG.info("{} knows of an enchanting table another Xen made at {}", c.name, best.toShortString());
+			}
+		}
 		return table;
 	}
 
