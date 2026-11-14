@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE, GRIND, WISH, TRIALS }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE, GRIND, WISH, TRIALS, FIND }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -282,7 +282,12 @@ final class Btb {
 				out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
 		XenMod.Project proj = c.mod.project(c);
-		if (proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= 3 && o.health >= 12 && o.meals > 0
+		boolean builder = c.roleTask == Task.FORT;                             // (its role: the team's builder, it starts the base, builds it, extends it)
+		if (builder && !o.night && !dusk && o.overworld && o.tier >= 2 && o.health >= 12 && o.meals > 0 && (proj == null || proj.finished || !c.player.blockPosition().closerThan(proj.at(), 300)))
+			out.add(new Option(Task.FORT, 4.5f, proj == null ? "its role, builder: the team's base, begun" : "its role, builder: the team's base, built on"));
+		if (c.roleTask == Task.FIND && !o.night && !dusk && o.overworld && o.health >= 12 && o.meals > 0)
+			out.add(new Option(Task.FIND, 4.4f, "its role, resource finder: what the team is short of"));
+		if (proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= (builder ? 2 : 3) && o.health >= 12 && o.meals > 0
 				&& c.player.blockPosition().closerThan(proj.at(), 300))   // (its team's fortress, unfinished: taken up again by whoever's free; the further along, the keener: a finished one is worth more than another started)
 			out.add(new Option(Task.FORT, 3.2f + 1.6f * proj.progress(), String.format(Locale.ROOT, "the team's fortress, %.0f%% built: finishing it beats starting anew", 100 * proj.progress())));
 		if (goal.equals("home") && !o.night) out.add(earlyHome ? new Option(Task.HOME, 3.7f, "an early base: a chest for its diamonds and ore, its bed for a spawn") : new Option(Task.HOME, 3, "a home"));
@@ -660,6 +665,24 @@ final class Btb {
 		}
 	}
 
+	/** Its team's count of something (all its teammates' bags, its own too). */
+	private int teamCount(String key) {
+		int n = 0;
+		for (Companion m : c.mod.companions) if (m.player() != null && (m == c || c.mod.sameSide(c, m))) n += m.btb.invCount(key);
+		return n;
+	}
+
+	/** Its role, resource finder: what the team is shortest of, fetched (sugar cane for books, obsidian for a table, lapis, diamonds); the team share hands it on. */
+	private String findStep() {
+		boolean table = false;
+		for (Companion m : c.mod.companions) if (m.player() != null && (m == c || c.mod.sameSide(c, m)) && (m.enchanter.table() != null || m.btb.invCount("enchanting_table") > 0)) table = true;
+		int books = teamCount("sugar_cane") + teamCount("paper") + 3 * teamCount("book");
+		if (books < 9) return planFor("sugar_cane", 9, "resource finder: sugar cane for the team's books");
+		if (!table && teamCount("obsidian") < 4) return planFor("obsidian", 4, "resource finder: obsidian for the team's enchanting table");
+		if (teamCount("lapis_lazuli") < 12) return planFor("lapis_lazuli", 9, "resource finder: lapis for the team's enchanting");
+		return planFor("diamond", 5, "resource finder: diamonds for the team's armor");
+	}
+
 	/** Its own idea of something to build (or one its leader had): what, and who thought of it. */
 	private String wish;
 
@@ -705,6 +728,12 @@ final class Btb {
 			return r;
 		}
 		XenMod.Project pj = c.mod.project(c);
+		if (pj != null && pj.finished && c.roleTask == Task.FORT && pj.plan != null && !pj.plan.isEmpty()) {   // its role, builder: the base finished, it grows (another house along)
+			pj.plan.add("Hardcore_House|" + (60 + 26 * (pj.plan.size() - 3)) + "|0");
+			pj.finished = false;
+			c.mod.saveProjects();
+			XenMod.LOG.info("{} extends its team's base: another house ({} parts now)", c.name, pj.plan.size());
+		}
 		if (pj != null && pj.finished) return "The team's fortress is finished.";
 		boolean resume = pj != null;
 		if (pj == null) {                                                         // none yet: its team's, here or at its base (it stays the team's, whoever leaves it)
@@ -1257,6 +1286,7 @@ final class Btb {
 			}
 			case FORT -> fortStep();
 			case WISH -> wishStep();
+			case FIND -> findStep();
 			case TRIALS -> c.trials.start();                                       // (a trial chamber: its spawners, keys, vaults and loot)
 			case RETREAT -> retreatStart();                                            // (eats the best it has now: its instructions' "do EAT")
 			case FARM -> {

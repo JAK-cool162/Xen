@@ -218,7 +218,8 @@ final class Thinker {
 		if (r.matches(".*\\b(miner|digger|mining|mine)\\b.*")) return Btb.Task.DIAMONDS;
 		if (r.matches(".*\\b(cook|chef|hunter|farmer|food|baker)\\b.*")) return Btb.Task.FOOD;
 		if (r.matches(".*\\b(scout|explorer|ranger|runner)\\b.*")) return Btb.Task.EXPLORE;
-		if (r.matches(".*\\b(builder|architect|mason)\\b.*")) return Btb.Task.HOME;
+		if (r.matches(".*\\b(builder|architect|mason)\\b.*")) return Btb.Task.FORT;
+		if (r.matches(".*\\b(finder|prospector|forager|seeker)\\b.*")) return Btb.Task.FIND;
 		if (r.matches(".*\\b(smith|enchanter|crafter|blacksmith|wizard)\\b.*")) return Btb.Task.ENCHANT;
 		if (r.matches(".*\\b(gatherer|lumberjack|woodcutter)\\b.*")) return Btb.Task.WOOD;
 		return null;

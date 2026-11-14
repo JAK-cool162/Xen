@@ -94,7 +94,33 @@ final class Leader {
 		return true;
 	}
 
+	/** Two builders and a resource finder on each team (its leader's picks: the best geared build, the most curious finds; a model's roles stay for the rest). */
+	private void staff(Companion lead) {
+		List<Companion> team = new ArrayList<>();
+		for (Companion x : mod.companions) if (x.player() != null && x != lead && mod.sameSide(lead, x)) team.add(x);
+		long builders = team.stream().filter(x -> x.roleTask == Btb.Task.FORT).count(), finders = team.stream().filter(x -> x.roleTask == Btb.Task.FIND).count();
+		team.sort((a, b) -> Integer.compare(diamondArmor(b), diamondArmor(a)));
+		for (Companion x : team) {
+			if (builders >= 2) break;
+			if (x.roleTask == Btb.Task.FORT || x.roleTask == Btb.Task.FIND) continue;
+			x.role = "Builder";
+			x.roleTask = Btb.Task.FORT;
+			builders++;
+			XenMod.LOG.info("{} (leads {}): {} is a builder (the team's base)", lead.name, mod.teamOf(lead), x.name);
+		}
+		team.sort((a, b) -> Float.compare(b.personality.curiosity, a.personality.curiosity));
+		for (Companion x : team) {
+			if (finders >= 1) break;
+			if (x.roleTask == Btb.Task.FORT || x.roleTask == Btb.Task.FIND) continue;
+			x.role = "Resource finder";
+			x.roleTask = Btb.Task.FIND;
+			finders++;
+			XenMod.LOG.info("{} (leads {}): {} is the resource finder", lead.name, mod.teamOf(lead), x.name);
+		}
+	}
+
 	private void lead(Companion lead, long now) {
+		staff(lead);
 		String team = mod.teamOf(lead);
 		if (team == null) return;
 		List<Companion> members = new ArrayList<>();
