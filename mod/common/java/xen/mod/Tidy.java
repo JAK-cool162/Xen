@@ -90,9 +90,78 @@ final class Tidy {
 		return ground <= 1;
 	}
 
+	/** Holes it dug to sleep in (a pit, a tunnel into a hill): filled back in once it's out of them, by day. */
+	private final List<long[]> holes = new ArrayList<>();
+	private BlockPos filling;
+	private long fillingSince;
+
+	void dug(List<BlockPos> cells) {
+		if (cells == null || cells.isEmpty() || c.player == null) return;
+		long now = c.player.level().getGameTime();
+		for (BlockPos b : cells) holes.add(new long[] {b.asLong(), now});
+		while (holes.size() > 64) holes.remove(0);
+	}
+
+	/** The next hole cell filled back in: the deepest first, the inside of a tunnel before its mouth. */
+	private Action fillNext() {
+		if (holes.isEmpty() || c.player == null || c.fightingNow() || c.builder.busy()) return null;
+		XenPlayer p = c.player;
+		ServerLevel level = (ServerLevel) p.level();
+		long now = level.getGameTime();
+		holes.removeIf(e -> {
+			BlockPos b = BlockPos.of(e[0]);
+			return !level.isLoaded(b) || !level.getBlockState(b).canBeReplaced() || now - e[1] > 20 * 60 * 5;
+		});
+		if (holes.isEmpty() || level.isDarkOutside() || !p.onGround()) return null;
+		BlockPos feet = p.blockPosition();
+		for (long[] e : holes) {
+			BlockPos b = BlockPos.of(e[0]);
+			if (b.equals(feet) || b.equals(feet.above()) || b.equals(feet.below())) return null;   // (still in it: out first)
+		}
+		if (!level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
+				m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty()) return null;
+		BlockPos best = null;
+		for (long[] e : holes) {
+			BlockPos b = BlockPos.of(e[0]);
+			if (b.distSqr(feet) > 144) continue;
+			if (best == null || b.getY() < best.getY() || b.getY() == best.getY() && b.distSqr(feet) > best.distSqr(feet)) best = b;
+		}
+		if (best == null) return null;
+		if (!best.equals(filling)) {
+			filling = best;
+			fillingSince = now;
+		} else if (now - fillingSince > 200) {                               // ten seconds and no luck: it lets that one be
+			final long k = best.asLong();
+			holes.removeIf(e -> e[0] == k);
+			filling = null;
+			return null;
+		}
+		doing = "filling in the hole it slept in";
+		c.goals.instant = doing;
+		if (p.getEyePosition().distanceTo(Vec3.atCenterOf(best)) <= p.blockInteractionRange() - 0.5) {
+			if (c.hands.placeAt(best, "earth")) {
+				c.acted = true;
+				return Action.PLACE;
+			}
+			final long k = best.asLong();
+			holes.removeIf(e -> e[0] == k);                                    // (nothing to fill it with, or no way to place it: leaves it)
+			if (c.hands.cantPlace.contains("nothing") || c.hands.cantPlace.contains("no block")) holes.clear();
+			return null;
+		}
+		for (Direction d : Direction.Plane.HORIZONTAL) {                       // over to it: the ground beside it
+			BlockPos col = best.relative(d);
+			int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, col.getX(), col.getZ());
+			if (Math.abs(y - best.getY()) > 3) continue;
+			Action a = c.walkTo(new Vec3(col.getX() + 0.5, y, col.getZ() + 0.5));
+			if (a != null) return a;
+		}
+		return null;
+	}
+
 	/** This moment's tidying (null: nothing to tidy, or not now). */
 	Action next() {
-		if (placed.isEmpty() || c.player == null || c.fightingNow() || c.fighter.perched() || c.pillaring || c.builder.busy() || c.chores.onOreWay()) return null;
+		if (placed.isEmpty()) return fillNext();
+		if (c.player == null || c.fightingNow() || c.fighter.perched() || c.pillaring || c.builder.busy() || c.chores.onOreWay()) return null;
 		XenPlayer p = c.player;
 		ServerLevel level = (ServerLevel) p.level();
 		long now = level.getGameTime();
@@ -133,7 +202,7 @@ final class Tidy {
 			if (!wants(e)) continue;
 			if (best == null || b.getY() > best.getY() || b.getY() == best.getY() && b.distSqr(feet) < best.distSqr(feet)) best = b;
 		}
-		if (best == null) return null;
+		if (best == null) return fillNext();
 		if (!best.equals(working)) {
 			working = best;
 			workingSince = now;

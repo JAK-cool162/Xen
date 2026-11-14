@@ -988,6 +988,7 @@ final class Chores {
 				if (!c.player.level().isDarkOutside() && now() > until) {
 					if (hutFilled != null && (c.goals.home == null || !c.goals.home.closerThan(c.player.blockPosition(), 10)))   // (its forts too: Ann and Hal left a field of them)
 						c.tidy.shelter(hutFilled);                            // morning: its night's hut may come down again (its call)
+					c.tidy.dug(pit != null ? pit : dugout);                       // and the hole or tunnel it slept in: filled back in once it's out
 					hutFilled = null;
 					stop();
 					if (resume != null) c.mode = resume;                        // following again, as it was told
