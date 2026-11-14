@@ -26,7 +26,7 @@ import java.util.Map;
  */
 final class Btb {
 	/** What it can do as a task (one at a time). */
-	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE }
+	enum Task { NONE, WOOD, STONE, COAL, IRON, SMELT, FOOD, SHELTER, DIAMONDS, ENCHANT, TABLE, HOME, EXPLORE, SMELTER, BLAZE, PEARLS, TOOLS, VISIT, SLEEP, STASH, FARM, EAT, RETREAT, KIT, FORT, TRADE, GRIND }
 
 	/** The state it is in, for its journal and /xen status. */
 	enum State { SURVIVE, FIGHT, COMMAND, WORK, EXPLORE, REST }
@@ -350,6 +350,8 @@ final class Btb {
 				default -> true;
 			});
 		}
+		if (badEnchanted() != null && c.player.experienceLevel >= 5 && invCount("lapis_lazuli") >= 3 && c.enchanter.table() != null && !o.night)
+			out.add(new Option(Task.GRIND, 3.8f, "a bad roll on its " + badName() + ": strip it at a grindstone, enchant it again"));
 		if (!o.night && o.overworld && c.mod.config.trading && c.trader.hasSomethingToTrade() && (c.trader.villagerNear() != null || c.visits.nearest("village") != null)) {
 			boolean shelf = c.trader.wantsShelf() && o.tier >= 3;                  // (its team has no enchanting table: emeralds, then a librarian's bookshelf)
 			int em = invCount("emerald");
@@ -477,7 +479,7 @@ final class Btb {
 			break;
 		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.TABLE && shelfFrom >= 0 ? booksStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.TABLE && shelfFrom >= 0 ? booksStep() : task == Task.GRIND ? grindStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -624,6 +626,108 @@ final class Btb {
 	}
 
 	private long houseAt = -100_000;
+	private long grindFrom = -1;
+	private BlockPos grindAt;
+
+	private static boolean badRoll(net.minecraft.world.item.ItemStack st) {
+		if (st.isEmpty() || !st.isEnchanted()) return false;
+		String item = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+		if (!item.startsWith("diamond_") && !item.startsWith("netherite_")) return false;
+		for (var h : st.getOrDefault(net.minecraft.core.component.DataComponents.ENCHANTMENTS, net.minecraft.world.item.enchantment.ItemEnchantments.EMPTY).keySet())
+			if (Enchanter.wants(item, h.getRegisteredName())) return false;
+		return true;
+	}
+
+	/** Its worn armor or a diamond tool in its bag enchanted with none of what it wants (Knockback, Respiration, Unbreaking alone...). */
+	net.minecraft.world.item.ItemStack badEnchanted() {
+		if (c.player == null) return null;
+		for (var slot : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
+			if (badRoll(c.player.getItemBySlot(slot))) return c.player.getItemBySlot(slot);
+		var inv = c.player.getInventory();
+		for (int i = 0; i < 36; i++) if (badRoll(inv.getItem(i))) return inv.getItem(i);
+		return null;
+	}
+
+	private String badName() {
+		var st = badEnchanted();
+		return st == null ? "gear" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().replace('_', ' ');
+	}
+
+	/** At a grindstone (its own, put down; made if it has none): the bad one in, the clean one out, a little of its levels back. */
+	private Action grindStep() {
+		var level = c.player.level();
+		var bad = badEnchanted();
+		if (bad == null) {
+			grindFrom = -1;
+			return null;
+		}
+		BlockPos feet = c.player.blockPosition();
+		if (grindAt == null || !level.getBlockState(grindAt).is(net.minecraft.world.level.block.Blocks.GRINDSTONE)) {
+			grindAt = null;
+			for (BlockPos q : BlockPos.betweenClosed(feet.offset(-6, -2, -6), feet.offset(6, 2, 6)))
+				if (level.getBlockState(q).is(net.minecraft.world.level.block.Blocks.GRINDSTONE)) {
+					grindAt = q.immutable();
+					break;
+				}
+		}
+		if (grindAt == null) {
+			if (invCount("grindstone") == 0) {
+				String r = planFor("grindstone", 1, "a grindstone, to strip a bad enchantment");
+				if (!r.startsWith("You will")) {
+					c.journal("thinks", "btb: can't make a grindstone now: " + r);
+					grindFrom = -1;
+					notBefore.put(Task.GRIND, now() + 20 * 60 * 5);
+				}
+				return null;                                                    // (its planner and crafter make it: next time, down it goes)
+			}
+			for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+				BlockPos q = feet.relative(d);
+				if (!level.getBlockState(q).canBeReplaced() || level.getBlockState(q.below()).canBeReplaced()) continue;
+				if (c.hands.placeItem(q, st -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath().equals("grindstone"), q.below(), net.minecraft.core.Direction.UP, 0)) {
+					grindAt = q;
+					c.acted = true;
+					return Action.PLACE;
+				}
+			}
+			grindFrom = -1;
+			return null;
+		}
+		if (!c.hands.canClick(grindAt)) return c.walkTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(grindAt));
+		var inv = c.player.getInventory();
+		int slot = -1;
+		for (int i = 0; i < 36; i++) if (inv.getItem(i) == bad) slot = i;
+		if (slot < 0) {                                                       // (worn: off, into its bag first)
+			for (int i = 0; i < 36 && slot < 0; i++) if (inv.getItem(i).isEmpty()) slot = i;
+			if (slot < 0) {
+				grindFrom = -1;
+				return null;
+			}
+			for (var es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+					net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
+				if (c.player.getItemBySlot(es) == bad) {
+					inv.setItem(slot, bad.copy());
+					c.player.setItemSlot(es, net.minecraft.world.item.ItemStack.EMPTY);
+				}
+		}
+		String name = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(inv.getItem(slot).getItem()).getPath();
+		c.hands.stop();
+		c.hands.use(grindAt);                                                  // right-click: the grindstone
+		if (!(c.player.containerMenu instanceof net.minecraft.world.inventory.GrindstoneMenu menu)) {
+			grindFrom = -1;
+			return null;
+		}
+		// the menu: 0 and 1 the items in, 2 what comes out, then its bag (3-29) and hotbar (30-38)
+		Compat.click(menu, slot < 9 ? 30 + slot : 3 + slot - 9, true, c.player);
+		if (menu.getSlot(2).hasItem()) Compat.click(menu, 2, true, c.player);
+		c.player.closeContainer();
+		c.acted = true;
+		XenMod.LOG.info("{} btb: strips the enchantment it didn't want off its {} at a grindstone (to enchant it again)", c.name, name);
+		c.journal("does", "strips the enchantment off its " + name.replace('_', ' ') + " at a grindstone, to enchant it again");
+		grindFrom = -1;
+		return Action.IDLE;
+	}
+
 	private long shelfFrom = -1;
 	private BlockPos shelfAt;
 
@@ -854,6 +958,11 @@ final class Btb {
 			case SLEEP -> "You will sleep in your bed.";
 			case EAT -> c.chores.eat();
 			case KIT -> kitStep(o);
+			case GRIND -> {                                                     // its gear enchanted with nothing it wanted: stripped at a grindstone, to enchant again
+				grindFrom = now();
+				grindAt = null;
+				yield "You will strip the enchantment you didn't want off your " + badName() + " at a grindstone, and enchant it again.";
+			}
 			case TRADE -> {                                                     // a village's villagers: sell what it has plenty of, buy what it needs (a librarian's bookshelf)
 				if (c.trader.villagerNear() != null) yield c.trader.withVillager(null);
 				String go = c.visits.begin();
@@ -1003,7 +1112,7 @@ final class Btb {
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
 				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.TRADE && c.visits.visiting()
-				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.GRIND && grindFrom >= 0 && now() - grindFrom < 20 * 90 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
