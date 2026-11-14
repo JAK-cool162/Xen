@@ -609,6 +609,29 @@ final class Btb {
 			if (at == null) at = c.goals.home != null ? c.goals.home : c.player.blockPosition();
 			pj = c.mod.newProject(c, at, c.random().nextLong() | 1);
 			if (pj == null) return "no team";
+			for (String part : TEAM_PLAN) if (java.nio.file.Files.exists(Schematic.dir().resolve(part.split("\\|")[0] + ".litematic"))) pj.plan.add(part);
+			if (pj.plan.size() < TEAM_PLAN.length) pj.plan.clear();                  // (all of them, or its own pictured place)
+			c.mod.saveProjects();
+		}
+		if (pj.plan != null && !pj.plan.isEmpty() && pj.partsDone < pj.plan.size()) {   // its team's plan from schematics: the next part, where it goes
+			String[] part = pj.plan.get(pj.partsDone).split("\\|");
+			Schematic sc;
+			try {
+				sc = Schematic.load(part[0]);
+			} catch (java.io.IOException e) {
+				return "You can't read the schematic " + part[0] + ".";
+			}
+			var level = (net.minecraft.server.level.ServerLevel) c.player.level();
+			int x = pj.x + Integer.parseInt(part[1]), z = pj.z + Integer.parseInt(part[2]);
+			int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+			BlockPos origin = new BlockPos(x, sc.groundLayer() ? top - 1 : top, z);
+			String r = c.builder.startTeamSchematic(sc, origin);
+			if (r != null && r.startsWith("You will")) {
+				if (c.goals.home == null) c.goals.home = pj.at();
+				XenMod.LOG.info("{} btb: {} its team's {} at {} (part {} of {})", c.name, resume ? "takes up" : "starts", part[0].replace('_', ' '), origin.toShortString(),
+						pj.partsDone + 1, pj.plan.size());
+			}
+			return r;
 		}
 		BlockPos at = pj.at();
 		String r = c.builder.startFortress(at, pj.seed);
@@ -648,6 +671,9 @@ final class Btb {
 	}
 
 	/** A job its team's leader gave it (and it took): a strong choice for three minutes, its own life and a roof still first. */
+	/** A team's base from the player's schematics, in order: its house, a wall on its front, the stone fortress beside. */
+	private static final String[] TEAM_PLAN = {"Hardcore_House|0|0", "Medieval_Wall|-5|-12", "Medieval_Wall|24|-12", "Small_Stone_Fortress|26|0"};
+
 	private long weighSaidAt = -100_000, behindAt = -100_000;
 	/** What it saw that it weighed each option by (for the log). */
 	private final java.util.Map<Task, String> seen = new java.util.EnumMap<>(Task.class);

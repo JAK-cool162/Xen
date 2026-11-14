@@ -294,6 +294,55 @@ final class Schematic {
 		return new Architect.Plan(name, steps, middle, middle, Direction.NORTH, new net.minecraft.world.phys.AABB(middle));
 	}
 
+	/**
+	 * The same shape, built by Xens in survival for their team: the ground it came with left out (the land there is the
+	 * land), its wood the wood they have, and what's hard to come by swapped for what's near enough (stone that needs
+	 * smelting and cracked or mossy bricks: cobblestone; concrete and terracotta: cobblestone; calcite: diorite;
+	 * deepslate bricks and tiles: cobbled deepslate).
+	 */
+	Architect.Plan adapted(ServerLevel level, BlockPos origin, String wood) {
+		List<Architect.Step> steps = new ArrayList<>();
+		for (BlockPos e : empty) {
+			BlockPos w = origin.offset(e);
+			var here = level.getBlockState(w);
+			if (!here.isAir() && !here.canBeReplaced() && e.getY() > 0) steps.add(new Architect.Step(w, null, Architect.DIG, false));
+		}
+		for (Block b : blocks) {
+			String sp = adapt(b.spec(), wood);
+			if (sp == null || sp.contains("half=upper") && !sp.contains("_stairs") && !sp.contains("_trapdoor") || sp.contains("part=head")) continue;
+			BlockState st = Architect.state(sp);
+			if (st == null) continue;
+			String n = sp.indexOf('[') >= 0 ? sp.substring(0, sp.indexOf('[')) : sp;
+			steps.add(new Architect.Step(origin.offset(b.at()), st, phase(sp, st), decor(n)));
+		}
+		steps.sort(java.util.Comparator.comparingInt(Architect.Step::phase).thenComparingInt(st -> st.pos().getY()));
+		BlockPos middle = origin.offset(sizeX / 2, 0, sizeZ / 2);
+		return new Architect.Plan(name, steps, middle, middle, Direction.NORTH, new net.minecraft.world.phys.AABB(middle));
+	}
+
+	private static final java.util.Set<String> GROUND = java.util.Set.of("grass_block", "dirt", "coarse_dirt", "podzol", "rooted_dirt", "mud", "moss_block", "snow_block",
+			"snow", "short_grass", "tall_grass", "fern", "large_fern", "dirt_path", "farmland", "moss_carpet", "leaf_litter", "bush", "firefly_bush", "short_dry_grass", "tall_dry_grass");
+	private static final java.util.regex.Pattern WOOD = java.util.regex.Pattern.compile("(?<![a-z_])(stripped_)?(dark_oak|pale_oak|oak|spruce|birch|jungle|acacia|mangrove|cherry)(?=_)");
+
+	/** One block of it, adapted (null: left out). */
+	static String adapt(String spec, String wood) {
+		int k = spec.indexOf('[');
+		String n = k >= 0 ? spec.substring(0, k) : spec, props = k >= 0 ? spec.substring(k) : "";
+		if (GROUND.contains(n) || n.endsWith("_tulip") || n.equals("dandelion") || n.equals("poppy") || n.endsWith("_sapling")) return null;
+		if (wood != null && !wood.isEmpty()) n = WOOD.matcher(n).replaceAll("$1" + wood);
+		n = switch (n) {
+			case "stone", "cracked_stone_bricks", "mossy_stone_bricks", "mossy_cobblestone", "infested_stone" -> "cobblestone";
+			case "calcite" -> "diorite";
+			case "deepslate_bricks", "deepslate_tiles", "polished_deepslate", "cracked_deepslate_bricks", "cracked_deepslate_tiles", "chiseled_deepslate" -> "cobbled_deepslate";
+			default -> n;
+		};
+		if (n.endsWith("_concrete") || n.endsWith("_concrete_powder") || n.endsWith("_terracotta") && !n.contains("glazed") || n.equals("terracotta")) n = "cobblestone";
+		for (String pre : new String[] {"deepslate_brick_", "deepslate_tile_", "polished_deepslate_"}) if (n.startsWith(pre)) n = "cobbled_deepslate_" + n.substring(pre.length());
+		if (n.startsWith("mossy_stone_brick_")) n = "stone_brick_" + n.substring(18);
+		if (n.startsWith("mossy_cobblestone_")) n = "cobblestone_" + n.substring(18);
+		return n + props;
+	}
+
 	/** Its bottom layer is mostly ground (grass, dirt, stone): it goes in place of the ground there, one block down. */
 	boolean groundLayer() {
 		int ground = 0;

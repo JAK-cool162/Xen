@@ -815,6 +815,23 @@ final class Builder {
 	BlockPos schematicAt;
 
 	/** A schematic (config/xen/schematics/), its lowest corner at origin, as it was saved. */
+	/** Building a part of its team's project (a schematic): when it's done, the project hears of it. */
+	boolean teamPart;
+
+	/** A part of its team's project, from a schematic, adapted (the ground left out, its own wood, survival blocks). */
+	String startTeamSchematic(Schematic s, BlockPos origin) {
+		creative = c.player.isCreative();
+		design = null;
+		copied = null;
+		String wood = woodType();
+		String plan = begin(s.adapted((ServerLevel) c.player.level(), origin, wood), " for the team, from the schematic", "the schematic's");
+		schematic = s;
+		schematicAt = origin.immutable();
+		fortress = true;                                                        // (its teammates help with it)
+		teamPart = true;
+		return plan;
+	}
+
 	String startSchematic(Schematic s, BlockPos origin) {
 		creative = c.player.isCreative();
 		design = null;
@@ -1214,6 +1231,10 @@ final class Builder {
 			c.lore(c.name + " finished laying out a place of its own at " + layout.center().getX() + " " + layout.center().getZ());
 		} else {
 			c.say(miss == 0 ? "Done! Come see the " + what + "!" : "Done! The " + what + " is ready (" + miss + (miss == 1 ? " block" : " blocks") + " I couldn't manage).");
+			if (teamPart) {                                                      // (a part of its team's project: done, kept)
+				teamPart = false;
+				c.mod.projectPart(c, -1, helpers, false);
+			}
 		}
 		switch (plan.name()) {
 			case "farm" -> c.goals.farm = plan.middle();

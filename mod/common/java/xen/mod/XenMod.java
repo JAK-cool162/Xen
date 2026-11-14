@@ -1768,6 +1768,8 @@ public class XenMod implements ModInitializer {
 		long seed;
 		boolean finished;
 		java.util.List<String> by = new ArrayList<>();
+		/** Its parts from schematics, in order: "name|dx|dz" from where it is (empty: a place it pictures itself). */
+		java.util.List<String> plan = new ArrayList<>();
 
 		BlockPos at() {
 			return new BlockPos(x, y, z);
@@ -1829,7 +1831,10 @@ public class XenMod implements ModInitializer {
 		Project pj = project(c);
 		if (pj == null || pj.finished) return;
 		pj.partsDone++;
-		pj.parts = Math.max(pj.parts, pj.partsDone + left);
+		if (pj.plan != null && !pj.plan.isEmpty()) {
+			pj.parts = pj.plan.size();
+			last = pj.partsDone >= pj.plan.size();
+		} else pj.parts = Math.max(pj.parts, pj.partsDone + left);
 		for (String n : java.util.stream.Stream.concat(java.util.stream.Stream.of(c.name), helpers.stream()).toList()) if (!pj.by.contains(n)) pj.by.add(n);
 		if (last) {
 			pj.finished = true;
