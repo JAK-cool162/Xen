@@ -4913,12 +4913,24 @@ public final class Companion {
 			String held = BuiltInRegistries.ITEM.getKey(other.getMainHandItem().getItem()).getPath();
 			boolean bare = other.getArmorValue() == 0 && !held.endsWith("_sword") && !held.endsWith("_axe") && !held.equals("trident") && !held.equals("mace");
 			if (bare && other.getLastHurtByMob() != player) continue;          // (no armor, no weapon, and it didn't start it: not a fight; Gus killed Hal three times, Hal with nothing)   // (just back from dying, with nothing: let be a while; Gus killed Hal seven seconds after he woke)
+			if (!fullDiamond(player) || !fullDiamond(other)) continue;          // fair fights only (the player's rule): both in full diamond armor, or no fight (the war cost blue 83 diamonds in an hour, half-dressed Xens killed for their gear)
 			double d = player.distanceTo(other);
 			if (d < 24 && (best == null || d < player.distanceTo(best)) && (d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
 				best = other;
 			}
 		}
 		return best;
+	}
+
+	/** Full diamond (or netherite) armor on: four pieces. */
+	static boolean fullDiamond(net.minecraft.world.entity.player.Player p) {
+		int n = 0;
+		for (var es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET}) {
+			String k = BuiltInRegistries.ITEM.getKey(p.getItemBySlot(es).getItem()).getPath();
+			if (k.startsWith("diamond_") || k.startsWith("netherite_")) n++;
+		}
+		return n == 4;
 	}
 
 	private static int cat(ServerLevel level, BlockPos pos) {
