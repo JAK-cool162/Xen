@@ -1282,7 +1282,8 @@ final class Walker {
 		if (c.player.isCreative()) return 2;
 		float speed = c.hands.digSpeed(s, level, p);
 		if (speed < 1f / 200) return INF;                                     // more than ten seconds: not that way
-		return 1 / speed + 12;                                                // (a player walks round or over rather than tunnel through)
+		boolean surface = p.getY() >= 55 && (s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || level.canSeeSky(p.above()));
+		return 1 / speed + (surface ? 45 : 12);                               // (a player walks round or over rather than tunnel through; up on the land all the more: the land round their bases was dug up all over)
 	}
 
 	/** Ground it may dig: earth, stone, sand, ores, leaves, snow (what the world is made of, not what people make). */
