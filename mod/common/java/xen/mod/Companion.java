@@ -2643,7 +2643,7 @@ public final class Companion {
 
 	/** On its way back for things worth the run, well enough to keep going (a monster far off is no reason to stop and dig in). */
 	boolean rushingForValuables() {
-		return lostAt != null && lostValuable && player != null && player.getHealth() >= 8;
+		return lostAt != null && lostValuable && player != null && player.getHealth() >= 8 && (backDeaths == 0 || !player.level().isDarkOutside());   // (killed once on the way at night: it waits for the light)
 	}
 	private double lostBest;
 	private long lostProgressAt;
@@ -3140,6 +3140,7 @@ public final class Companion {
 
 	/** When it last ran back for its things (no stopping for ore meanwhile), and till when it gets a pickaxe first. */
 	private long rushingBack = -100, lostToolUntil;
+	private int backDeaths;
 
 	/** Is the ground its things lie on going (a player, a Xen too, within the server's simulation distance of it)? */
 	private boolean lostThingsTicking() {
@@ -5387,6 +5388,14 @@ public final class Companion {
 		boolean gone = how.contains("lava") || how.contains("outOfWorld") || how.contains("void") || how.contains("fire") || how.contains("explosion")
 				|| how.contains("drown") && !(valuableNow && shallow) || player.isUnderWater() && !(valuableNow && shallow);   // (deep under water: not worth drowning again for; a diamond kit under a few blocks of it is: Jay's, by a drowned at the shore)
 		if (!inArena && !hardcore() && lostAt != null && lostValuable && !valuableNow && player.level().getGameTime() < lostUntil && lostDimension == player.level().dimension()) {
+			if (++backDeaths >= 2) {                                         // (killed twice on the way back: they stay there; Rex died three times in ten minutes at night for his)
+				chatter(pick3("Not going back for it again.", "Forget it. I'll start over.", "Too dangerous. My stuff can stay."), true);
+				journal("does", "gives up on its things (died twice going back for them)");
+				lostAt = null;
+				backDeaths = 0;
+				respawnIn = 60;
+				return;
+			}
 			journal("thinks", "died with nothing on it: its diamonds and gear still lie at " + lostAt.toShortString() + ", those it goes back for");   // (a second death, naked, on the way: not the empty one over the full one; Jay lost his enchanted diamonds that way)
 			saidGoingBack = false;
 			aloneUntil = 0;
@@ -5403,6 +5412,7 @@ public final class Companion {
 		}
 		lostAt = gone || inArena || again ? null : here;              // its things are lying there: back for them after
 		lostValuable = valuableNow;                                   // (what took hours to get lies there: it runs for it, no getting ready first)
+		backDeaths = 0;
 		saidGoingBack = false;
 		lostDimension = player.level().dimension();
 		lostUntil = player.level().getGameTime() + 72_000;            // (its things last five minutes of the ground there going: see lostAged)
