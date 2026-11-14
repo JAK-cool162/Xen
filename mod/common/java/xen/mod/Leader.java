@@ -246,6 +246,18 @@ final class Leader {
 				}
 			}
 		}
+		for (Companion m : members) {                                          // a table near and levels, but no lapis: a teammate's (Max, a table and 27 levels, no lapis; Fin carried 157)
+			if (m.btb.invCount("lapis_lazuli") >= 3 || m.player().experienceLevel < 1 || !m.enchanter.wantsTable()
+					|| m.enchanter.table() == null && m.btb.invCount("enchanting_table") == 0) continue;
+			for (Companion g : members) {
+				if (g == m || g.btb.invCount("lapis_lazuli") < 9 || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().distanceTo(m.player()) > 200) continue;
+				String r = g.chores.give(m.player(), "lapis_lazuli", 6);
+				if (r != null && r.startsWith("You will")) {
+					XenMod.LOG.info("{} (leads {}): team share: {} gives 6 lapis to {} (a table, levels, no lapis)", lead.name, team.replace("xen_", ""), g.name, m.name);
+					return;
+				}
+			}
+		}
 		if (members.stream().anyMatch(m -> m.enchanter.table() != null)) return;   // (the team has a table: no book needed)
 		Companion maker = null;
 		for (Companion m : members) if (m.btb.invCount("obsidian") >= 4 && m.btb.invCount("book") == 0) maker = m;

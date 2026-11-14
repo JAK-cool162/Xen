@@ -99,7 +99,11 @@ final class Thinker {
 			String idea = text.replace('\n', ' ').strip();
 			if (idea.length() > 140) idea = idea.substring(0, 140);
 			Wishes.Doing d = Wishes.interpret(idea);
-			if (d == null) {
+			boolean free = c.btb.goal.equals("home") || c.btb.goal.equals("world") || c.btb.goal.equals("nether");   // (its gear and enchanting done: its ideas are what it does; before that, wishes for later)
+			if (d != null && !free) {
+				XenMod.LOG.info("{} has an idea for later: {} -> {} (its gear first)", c.name, idea, d.label());
+				c.journal("thinks", "an idea for later: " + idea);
+			} else if (d == null) {
 				XenMod.LOG.info("{} dreams: {} (a wish: nothing it can do with it yet)", c.name, idea);
 				c.journal("thinks", "a wish: " + idea);
 			} else {
