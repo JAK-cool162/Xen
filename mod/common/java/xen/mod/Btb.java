@@ -1149,7 +1149,8 @@ final class Btb {
 				return "You will go down " + (best.by == c ? "your" : best.by.name + "'s") + " mine for the night.";
 			}
 		}
-		String plan = o.under ? ch.digIn() : ch.shelter();
+		String plan = ch.digIn();                                               // (a hole, two down and a block over its head, filled after: no box of blocks left on the land; the player asked)
+		if (plan == null || !plan.startsWith("You will")) plan = ch.shelter();   // (no hole here: the old hut, torn down after)
 		if (plan != null && plan.startsWith("You will")) return plan;
 		String dig = ch.digIn();
 		if (dig != null && dig.startsWith("You will")) {
