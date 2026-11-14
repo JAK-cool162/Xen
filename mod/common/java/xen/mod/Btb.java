@@ -350,6 +350,8 @@ final class Btb {
 				default -> true;
 			});
 		}
+		if (ordered != null && now() - orderedAt < 20 * 60 * 3 && (!o.night || o.under))   // its leader's job for it
+			out.add(new Option(ordered, 4.0f + orderedWeight, "its leader " + orderedBy + " asked: " + ordered.name().toLowerCase(Locale.ROOT)));
 		for (BtbRules.Rule r : c.mod.btbRules.rules()) {                         // its instructions (config/xen/instructions.txt): choices and scores from a file, no change to the mod
 			if (r.verb().equals("never") || !BtbRules.holds(r.conds(), o, goal, this::invCount)) continue;
 			if (r.verb().equals("force")) out.add(new Option(r.task(), 100f, r.why()));
@@ -560,6 +562,19 @@ final class Btb {
 		}
 		if (invCount("shield") == 0) return planFor("shield", 1, "basic kit: a shield");
 		return "You have your basic kit.";
+	}
+
+	/** A job its team's leader gave it (and it took): a strong choice for three minutes, its own life and a roof still first. */
+	private Task ordered;
+	private String orderedBy = "";
+	private float orderedWeight;
+	private long orderedAt = -100_000;
+
+	void order(Task t, String by, float weight) {
+		ordered = t;
+		orderedBy = by;
+		orderedWeight = weight;
+		orderedAt = now();
 	}
 
 	private long forcedAt = -100_000, retreatFrom;
@@ -915,6 +930,7 @@ final class Btb {
 
 	/** Its task is over: the outcome goes to its learning, and the next one is its to choose. */
 	private void finish(Obs o) {
+		if (task == ordered) ordered = null;                                     // (its leader's job: done, or tried)
 		if (busy()) return;
 		double seconds = (now() - taskAt) / 20.0;
 		boolean died = c.genDeaths > deathsAt;

@@ -382,6 +382,8 @@ public class XenMod implements ModInitializer {
 	final Solver.Mind solverMind = new Solver.Mind();
 	/** What the Back to Basics brain learned (shared by every Xen, kept in config/xen/btb.json). */
 	final BtbLearner btbLearner = new BtbLearner();
+	/** Team leaders (the "leaders" setting): a plan for the team, jobs for each. */
+	final Leader leader = new Leader(this);
 	/** The Xens' instructions: choices, scores and when, from config/xen/instructions.txt (edited while the game runs). */
 	final BtbRules btbRules = new BtbRules(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("instructions.txt"));
 	/** What Xens see, think, say and hear (for the Experimental tab's log). */
@@ -552,6 +554,7 @@ public class XenMod implements ModInitializer {
 			try {
 				shareDiamonds();                                               // (a friend back on its feet: spare diamonds to one who lost its gear)
 				shareFood();                                                   // (a friend starving with nothing to eat: some of its food)
+				leader.tick();                                                 // (team leaders: a plan, and jobs for their teammates)
 			} catch (RuntimeException e) {
 				LOG.warn("Xen diamond sharing stumbled: {}", e.toString());
 			}

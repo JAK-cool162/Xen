@@ -214,6 +214,8 @@ public final class XenConfig {
 	public int teams = -1;
 	/** The teams as they are, for good: no Xen starts a team of its own or goes over to another, and a new one joins the smallest (a red-against-blue training world). */
 	public boolean teamsLocked = false;
+	/** Team leaders by name ("Cid,Bob"): each plans for its team and gives its teammates jobs, which each takes or not. */
+	public String leaders = "";
 	/**
 	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
 	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",
