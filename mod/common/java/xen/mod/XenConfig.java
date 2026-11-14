@@ -212,6 +212,8 @@ public final class XenConfig {
 	 * is a rival they may fight), 0 = none, 1 = all Xens on one team, 2-6 = Xens split into that many teams.
 	 */
 	public int teams = -1;
+	/** The teams as they are, for good: no Xen starts a team of its own or goes over to another, and a new one joins the smallest (a red-against-blue training world). */
+	public boolean teamsLocked = false;
 	/**
 	 * Fighting players: "own" (its own call: it fights back when someone attacks it or its owner with a weapon, lets a
 	 * friend's mistake go, gets away when it's losing, and a poke with an empty hand only gets its attention), "off",

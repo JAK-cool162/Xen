@@ -1918,7 +1918,7 @@ public class XenMod implements ModInitializer {
 
 	/** Now and then a Xen with a leader's nature and friends around starts a team of its own (an SMP thing). */
 	private void maybeFoundTeams() {
-		if (config.teams == 0 || companions.size() < 2) return;
+		if (config.teams == 0 || config.teamsLocked || companions.size() < 2) return;
 		for (Companion c : companions) {
 			if (c.player() == null || c.minion || c.personality.loner || ownTeam(teamOf(c)) || onPlayersTeam(c)) continue;
 			var p = c.personality;
@@ -1983,7 +1983,7 @@ public class XenMod implements ModInitializer {
 			var known = roster.get(c.name);
 			String had = known != null && known.has("team") ? known.get("team").getAsString() : null;
 			int index = had == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(had.replace("xen_", ""));
-			if (index < 0 || index >= n) index = likedTeam(c, n, null);           // the team of those around it it likes most
+			if ((index < 0 || index >= n) && !config.teamsLocked) index = likedTeam(c, n, null);   // the team of those around it it likes most (locked teams: the smallest)
 			if (index < 0 || index >= n) {
 				int[] size = new int[n];
 				for (Companion o : companions) {
@@ -2030,7 +2030,7 @@ public class XenMod implements ModInitializer {
 	 */
 	void rethinkTeam(Companion c) {
 		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
-		if (n < 2 || c.arenaTeam != null || c.player == null || c.personality.loyalty > 0.7f || c.personality.loner) return;
+		if (n < 2 || config.teamsLocked || c.arenaTeam != null || c.player == null || c.personality.loyalty > 0.7f || c.personality.loner) return;
 		String now = teamOf(c);
 		int mine = now == null ? -1 : java.util.Arrays.asList(TEAM_COLORS).indexOf(now.replace("xen_", ""));
 		double[] s = new double[n];
