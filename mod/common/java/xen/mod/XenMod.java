@@ -1952,7 +1952,7 @@ public class XenMod implements ModInitializer {
 		var board = server.getScoreboard();
 		var knownTeam = roster.get(c.name);
 		String kept = knownTeam != null && knownTeam.has("team") ? knownTeam.get("team").getAsString() : null;
-		if (c.arenaTeam == null && ownTeam(kept) && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a team it started or joined itself
+		if (c.arenaTeam == null && !config.teamsLocked && ownTeam(kept) && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a team it started or joined itself
 			board.addPlayerToTeam(c.name, board.getPlayerTeam(kept));
 			return;
 		}
@@ -1972,7 +1972,7 @@ public class XenMod implements ModInitializer {
 			return;
 		}
 		int n = Math.min(Math.max(config.teams, 0), TEAM_COLORS.length);
-		if (n == 0 || c.personality.loner) {                            // (a lone wolf is on nobody's team)
+		if (n == 0 || c.personality.loner && !config.teamsLocked) {      // (a lone wolf is on nobody's team; locked teams: everyone's on one)
 			if (teamOf(c) != null) board.removePlayerFromTeam(c.name);
 			return;
 		}
