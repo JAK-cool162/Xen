@@ -340,6 +340,7 @@ final class Btb {
 		// last thing (its holes fill, it swims off its staircase).
 		boolean hurt = o.health < 14, noFood = o.meals == 0 && o.food < 16, wet = nearWater();
 		if (noFood) out.replaceAll(op -> op.task == Task.FOOD ? new Option(Task.FOOD, 4.8f, "nothing to eat in its bag") : op);
+		out.removeIf(op -> now() < notBefore.getOrDefault(op.task, 0L) && op.task != Task.SLEEP && op.task != Task.FARM);   // (one it let go for taking too long: not straight back to it)
 		out.removeIf(op -> switch (op.task) {
 			case COAL, IRON, DIAMONDS -> hurt || noFood;
 			case PEARLS, BLAZE -> o.health < 16 || noFood;                         // (a fight it picks: well and fed only; Bob at three health, nothing to eat, after an enderman)
@@ -1426,6 +1427,15 @@ final class Btb {
 
 	/** Still on it? (Its chore, its build, its trip, its enchanting.) */
 	boolean busy() {
+		if (task != Task.NONE && task != Task.SLEEP && task != Task.FORT && task != Task.ENCHANT && task != Task.DIAMONDS && task != Task.TRIALS && task != Task.WISH
+				&& now() - taskAt > 20 * 60 * 8) {                               // (eight minutes on one chore: stuck, it lets it go and doesn't take it up again for a while; Gus "getting stone for a furnace (0 of 8)" and Ivy "picking up food" a quarter of an hour each, a table and thirty levels in their bags)
+			XenMod.LOG.info("{} btb: {} took eight minutes: lets it go", c.name, task);
+			notBefore.put(task, now() + 20 * 60 * 5);
+			c.chores.cancel();
+			c.visits.stop("it had been at it too long");
+			task = Task.NONE;
+			return false;
+		}
 		if (task == Task.SLEEP) {                                                 // (the night in its bed; half a minute and not asleep, something else: no room for it, monsters about)
 			if (c.player.isSleeping()) return true;
 			long day = Compat.timeOfDay(c.player.level()) % 24000;
