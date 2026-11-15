@@ -52,6 +52,8 @@ final class Instinct {
 		if (p.isInLava()) now = outOfLava(level);
 		else if (p.isUnderWater() && p.getAirSupply() < p.getMaxAirSupply() * 0.6 && openAbove(level)) now = upForAir();
 		else if (inFire(level, p.blockPosition())) now = outOfFire(level);
+		else if (p.isOnFire() && !p.isInWater() && p.getHealth() < 14 && level.dimension() != net.minecraft.world.level.Level.NETHER
+				&& !p.hasEffect(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE) && c.hands.hotbar(st -> st.getItem() == net.minecraft.world.item.Items.WATER_BUCKET) < 0) now = toWater(level);
 		else if (deadlyEdge(level)) now = backFromEdge();
 		if (now.isEmpty() && p.tickCount <= c.airUp && p.isInWater()) {                 // its mind said: straight up for air (the keys, last of all)
 			upForAir();
@@ -160,6 +162,29 @@ final class Instinct {
 		p.setSprinting(false);
 		if (to != null) toward(Vec3.atBottomCenterOf(to));
 		return "getting out of the lava";
+	}
+
+	/** Burning, out of the lava, no water bucket: into the nearest water near (eight out, a few up or down), as a player runs for the river. Empty: none near. (Ivy, out of the lava, burned seventeen seconds to death picking up dirt.) */
+	private String toWater(ServerLevel level) {
+		var p = c.player;
+		BlockPos feet = p.blockPosition(), best = null;
+		double bestD = Double.MAX_VALUE;
+		for (int dy = -3; dy <= 2; dy++)
+			for (int dx = -8; dx <= 8; dx++)
+				for (int dz = -8; dz <= 8; dz++) {
+					BlockPos q = feet.offset(dx, dy, dz);
+					if (!level.getFluidState(q).is(FluidTags.WATER)) continue;
+					double d = Math.hypot(dx, dz) + Math.abs(dy) * 0.5;
+					if (d < bestD) {
+						bestD = d;
+						best = q;
+					}
+				}
+		if (best == null) return "";
+		p.setSprinting(true);
+		toward(Vec3.atBottomCenterOf(best));
+		if (p.onGround() && best.getY() >= feet.getY()) p.setJumping(true);
+		return "running for the water (on fire)";
 	}
 
 	private String outOfFire(ServerLevel level) {
