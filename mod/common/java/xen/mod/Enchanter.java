@@ -136,6 +136,8 @@ final class Enchanter {
 		return (ServerLevel) c.player.level();
 	}
 
+	private long lastNext;
+
 	/** Tables it couldn't get to (its way-finder found no way): not walked to again. */
 	private final java.util.Set<Long> unreachable = new java.util.HashSet<>();
 
@@ -321,6 +323,12 @@ final class Enchanter {
 
 	Action next() {
 		if (!on) return null;
+		long nowT = c.player.level().getGameTime();
+		if (nowT - lastNext > 100) {                                           // (paused a while, for the night or a fight: its clock starts again; Ann, back to it, gave up after one tick)
+			startedAt = nowT;
+			tries = 0;
+		}
+		lastNext = nowT;
 		if (++tries > budget || c.player.level().getGameTime() - startedAt > budget) {   // (two minutes, more for a walk to its table, by the clock: something's wrong, it gives up)
 			BlockPos gt = table();
 			XenMod.LOG.info("{} enchanting: gives up after {} ticks (table {}, {} blocks off, can click {}, carried {}, bringing home {}, taking along {})", c.name, tries,
