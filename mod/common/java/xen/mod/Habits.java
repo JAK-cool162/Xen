@@ -420,7 +420,9 @@ final class Habits {
 	private static final java.util.regex.Pattern OLD_ARMOR = java.util.regex.Pattern.compile("^(leather|chainmail|golden|iron)_(helmet|chestplate|leggings|boots)$");
 	private static final Set<String> CLUTTER = Set.of("egg", "clay_ball", "phantom_membrane", "red_mushroom", "brown_mushroom", "dandelion", "poppy", "blue_orchid",
 			"allium", "azure_bluet", "oxeye_daisy", "cornflower", "lily_of_the_valley", "sunflower", "lilac", "rose_bush", "peony", "pink_petals", "dead_bush",
-			"short_grass", "fern", "wildflowers", "leaf_litter", "firefly_bush", "bush", "cactus_flower");
+			"short_grass", "fern", "wildflowers", "leaf_litter", "firefly_bush", "bush", "cactus_flower",
+			"brown_egg", "blue_egg", "raw_copper", "pointed_dripstone", "dripstone_block", "acacia_boat", "oak_boat", "birch_boat", "spruce_boat", "dark_oak_boat",
+			"jungle_boat", "mangrove_boat", "cherry_boat", "pale_oak_boat", "calcite", "melon_seeds", "pumpkin_seeds");   // (Gus's bag, full at 35 kinds: copper, dripstone, a boat, eggs; the enchanting table given him fell on the ground)
 
 	/** What a player with a full bag throws out first: a wooden or stone tool it has an iron or diamond one of, armor worse than what it wears, flowers and the like, arrows with no bow. */
 	private boolean clutter(String id, java.util.Map<String, Integer> have) {
