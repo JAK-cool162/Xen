@@ -1197,7 +1197,8 @@ public final class Companion {
 			airUp = player.tickCount + 5;                             // hold space to swim up, like a player (straight up: Instinct, last)
 			return Action.IDLE;
 		}
-		if (player.level().getGameTime() < typingUntil && player.onGround() && !player.isInWater() && !fightingNow() && danger() < 0.4f && player.hurtTime == 0) {   // typing in chat: a player stands still to type (and ten lines a minute aren't worth the walk lost)
+		if (player.level().getGameTime() < typingUntil && player.onGround() && !player.isInWater() && !fightingNow() && danger() < 0.4f && player.hurtTime == 0
+				&& !player.isOnFire() && player.getHealth() > 8 && !player.isInLava()) {   // (on fire, or hurt: no stopping to type; Tia burned to death at one health "typing in chat")   // typing in chat: a player stands still to type (and ten lines a minute aren't worth the walk lost)
 			goals.instant = "typing in chat";
 			hands.stop();
 			acted = true;
