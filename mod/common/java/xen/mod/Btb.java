@@ -277,7 +277,7 @@ final class Btb {
 		}
 		if (goal.equals("enchant")) {
 			if (c.enchanter.possible() && c.player.level().getGameTime() > c.enchanter.retryAt)   // (not again the moment it couldn't: Ann tried every three seconds)
-				out.add(new Option(Task.ENCHANT, 4.2f, "the makings of an enchantment: its gear enchanted"));
+				out.add(new Option(Task.ENCHANT, 5.4f, "the makings of an enchantment: its gear enchanted"));   // (all it needs in hand: before another round of its kit; Fin, a table, lapis, 25 levels, went hunting instead at 4.2 against 5.6)
 			else if (c.enchanter.table() == null && invCount("enchanting_table") == 0)   // (a table it has: waiting on its levels or its next go, not another table; Cid, just enchanted, set off for four more obsidian)
 				out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
 		}
