@@ -357,6 +357,7 @@ final class Enchanter {
 		}
 		if (takeAlong) {                                                        // its enchanting done for now and no home to keep the table at: it mines it and takes it along, as players do
 			BlockPos tt = table();
+			if (tt != null && (!tt.equals(c.places.get("enchanting table")) || !tt.closerThan(c.player.blockPosition(), 12))) tt = null;   // (only its own, the one it just used: Dee, her table already in her bag, set off 151 blocks to mine a teammate's)
 			if (tt == null) {
 				takeAlong = false;
 				on = false;
