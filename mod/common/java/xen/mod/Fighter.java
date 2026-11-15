@@ -779,6 +779,10 @@ final class Fighter {
 		for (net.minecraft.world.entity.Mob m : p.level().getEntitiesOfClass(net.minecraft.world.entity.Mob.class, p.getBoundingBox().inflate(8),
 				m -> m.isAlive() && m.getTarget() == p)) nearest = Math.min(nearest, p.distanceTo(m));
 		boolean climber = spider(foe);   // (a spider climbs down into a hole after it: Bob dug in from one at seven health, never swung, and it killed him in there)
+		if (p.getHealth() < 8 && canPerch(foe) && nearest <= 10) {               // low and a zombie's close: up two blocks first, a second's work, not two blocks of digging with it at the edge (Nia, Rex, Cid, Quin died digging in at 1 to 3 health)
+			Action up = perch(foe, d);
+			if (up != null) return up;
+		}
 		if (nearest > 6 && now() - holeLostAt > 200 && !climber && !c.rushingForValuables()) {   // (knocked out of a hole: not another for ten seconds, it fights; on its way back for its diamonds, a monster six blocks off is no reason to dig in: Ann, in a hole at noon, her gear 509 blocks off)
 			Action dig = startDigIn(on);
 			if (dig != null) return dig;
