@@ -88,32 +88,152 @@ final class Thinker {
 	void dream(Companion c) {
 		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
 		if (url == null || url.isBlank() || c.player == null || Boolean.TRUE.equals(waiting.get("dream:" + c.name))) return;
+		List<String[]> menu = menu(c);                                            // what it really can do now (key, words): its idea is one of these
+		if (menu.isEmpty()) return;
 		waiting.put("dream:" + c.name, true);
 		var p = c.personality;
 		String team = mod.teamOf(c);
-		String sys = String.format(Locale.ROOT, "You are %s, a Minecraft player%s: %s, %s, %s. You can do anything in Minecraft. You have your own ideas.", c.name,
+		String sys = String.format(Locale.ROOT, "You are %s, a Minecraft player%s: %s, %s, %s. You decide what to do next.", c.name,
 				team == null ? "" : " on the " + team.replace("xen_", "") + " team", p.bravery > 0.5f ? "brave" : "careful", p.curiosity > 0.5f ? "curious" : "steady",
-				p.kindness > 0.5f ? "kind" : "tough");
-		String user = "What you know: " + WorldBrief.of(c) + " Think of one new idea of your own: something to do or build next, using what you know. Only real vanilla Minecraft:"
-				+ " its blocks, items, mobs and places (no electricity, machines, engines, solar panels or anything not in the game). Answer in one short sentence.";
+				p.kindness > 0.5f ? "kind" : (p.loyalty < 0.45f ? "sly" : "tough"));
+		StringBuilder list = new StringBuilder();
+		for (int k = 0; k < menu.size(); k++) list.append(k + 1).append(". ").append(menu.get(k)[1]).append('\n');
+		String user = "What you know: " + WorldBrief.of(c) + "\nWhat you can do now:\n" + list
+				+ "Pick ONE. Reply with its number and a short reason in your own words, like: 3 - we need food.\n"
+				+ "If your idea is bigger than any of these, reply instead: JOB: a job title - what you would do (it becomes your role on the team).";
 		post(url, sys, user, 60, text -> mod.server.execute(() -> {
 			waiting.put("dream:" + c.name, false);
-			String idea = text.replace('\n', ' ').strip();
-			if (idea.length() > 140) idea = idea.substring(0, 140);
-			Wishes.Doing d = Wishes.interpret(idea);
-			boolean free = c.btb.goal.equals("home") || c.btb.goal.equals("world") || c.btb.goal.equals("nether");   // (its gear and enchanting done: its ideas are what it does; before that, wishes for later)
-			if (d != null && !free) {
-				XenMod.LOG.info("{} has an idea for later: {} -> {} (its gear first)", c.name, idea, d.label());
-				c.journal("thinks", "an idea for later: " + idea);
-			} else if (d == null) {
-				XenMod.LOG.info("{} dreams: {} (a wish: nothing it can do with it yet)", c.name, idea);
-				c.journal("thinks", "a wish: " + idea);
-			} else {
-				XenMod.LOG.info("{} has an idea: {} -> {}", c.name, idea, d.label());
-				act(c, d, "its own idea", 0.7f);
+			if (c.player == null) return;
+			String t = text.replace('\n', ' ').strip();
+			var job = java.util.regex.Pattern.compile("(?i)JOB\\s*:\\s*([A-Za-z][A-Za-z' ]{2,30}?)\\s*(?:-|:|,|\\(|$)(.*)").matcher(t);
+			if (job.find()) {                                                      // too big for a task: a job it plays (its role), not something done now
+				String title = job.group(1).strip(), what = job.group(2).strip();
+				if (c.roleTask == Btb.Task.FORT || c.roleTask == Btb.Task.FIND) {
+					XenMod.LOG.info("{} thinks of a job ({}), but keeps its own: {}", c.name, title, c.role);
+					return;
+				}
+				c.role = title.length() > 30 ? title.substring(0, 30) : title;
+				Btb.Task rt = roleTask(title + " " + what);
+				if (rt != null) c.roleTask = rt;
+				XenMod.LOG.info("{} takes up a job of its own: {} ({}){}", c.name, c.role, what.length() > 80 ? what.substring(0, 80) : what, rt == null ? "" : " -> " + rt);
+				c.chatter("I'll be the team's " + c.role.toLowerCase(Locale.ROOT) + ".", false);
+				return;
 			}
-			c.chatter(idea, false);
+			var num = java.util.regex.Pattern.compile("^\\D{0,12}?(\\d{1,2})").matcher(t);
+			if (!num.find()) {
+				XenMod.LOG.info("{} thought, but picked nothing it can do: {}", c.name, t.length() > 120 ? t.substring(0, 120) : t);
+				return;
+			}
+			int k = Integer.parseInt(num.group(1)) - 1;
+			if (k < 0 || k >= menu.size()) {
+				XenMod.LOG.info("{} picked {}, not on its list", c.name, k + 1);
+				return;
+			}
+			String[] pick = menu.get(k);
+			String why = t.replaceFirst("^\\D{0,12}?\\d{1,2}\\s*[-.:)]*\\s*", "");
+			if (why.length() > 100) why = why.substring(0, 100);
+			XenMod.LOG.info("{} has an idea: {} ({})", c.name, pick[1], why);
+			c.journal("thinks", "an idea: " + pick[1] + (why.isEmpty() ? "" : " - " + why));
+			doIdea(c, pick[0]);
+			if (!why.isEmpty()) c.chatter(why, false);
 		}));
+	}
+
+	/** What it can really do now, for its idea to be one of (a key it acts on, and the words the model reads). */
+	private List<String[]> menu(Companion c) {
+		List<String[]> m = new java.util.ArrayList<>();
+		var it = c.items();
+		boolean full = Companion.fullDiamond(c.player), day = !c.player.level().isDarkOutside();
+		boolean over = c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
+		if (c.enchanter.possible()) m.add(new String[] {"ENCHANT", "enchant your armor and tools at an enchanting table"});
+		if (c.enchanter.table() == null && it.getOrDefault("enchanting_table", 0) == 0 && c.crafter.pickTier() >= 4)
+			m.add(new String[] {"TABLE", "get obsidian from lava (water in a hole beside it) for an enchanting table"});
+		if (!full) m.add(new String[] {"DIAMONDS", "mine for diamonds for your armor"});
+		if (it.getOrDefault("food", 0) < 8) m.add(new String[] {"FOOD", "get food: hunt animals, cook meat, bake bread"});
+		if (over && day) m.add(new String[] {"FARM", "make a wheat farm near water at your base"});
+		XenMod.Project pj = mod.project(c);
+		if (pj != null && !pj.finished && day) m.add(new String[] {"FORT", "help build the team's base"});
+		String team = mod.teamOf(c);
+		if (team != null && day && over && mateCount(c, 300) >= 2 && mod.server.getTickCount() - meetingAt.getOrDefault(team, -100_000L) > 20 * 60 * 30)
+			m.add(new String[] {"MEETING", "call a team meeting: everyone comes, duels to see who is the strongest"});
+		Companion lead = team == null ? null : mod.leader.leaderOf(c);
+		if (team != null && lead != null && lead != c && c.personality.loyalty < 0.45f && mod.server.getTickCount() - betrayedAt.getOrDefault(c.name, -1_000_000L) > 20 * 60 * 60 * 2)
+			m.add(new String[] {"BETRAY", "betray " + lead.name + " and join the other team"});
+		if (hungryMate(c) != null && it.getOrDefault("food", 0) >= 8) m.add(new String[] {"HELP", "give food to " + hungryMate(c).name + ", who is hungry"});
+		if (day && over) m.add(new String[] {"EXPLORE", "explore with a friend"});
+		if (c.visits.nearest("village") != null && day) m.add(new String[] {"TRADE", "trade with the villagers"});
+		return m;
+	}
+
+	private final java.util.Map<String, Long> meetingAt = new java.util.HashMap<>(), betrayedAt = new java.util.HashMap<>();
+
+	private int mateCount(Companion c, int far) {
+		int n = 0;
+		for (Companion m : mod.companions)
+			if (m != c && m.player() != null && mod.sameSide(c, m) && m.player().level() == c.player.level() && m.player().distanceTo(c.player) < far) n++;
+		return n;
+	}
+
+	private Companion hungryMate(Companion c) {
+		for (Companion m : mod.companions)
+			if (m != c && m.player() != null && mod.sameSide(c, m) && m.player().level() == c.player.level() && m.player().distanceTo(c.player) < 64
+					&& m.player().getFoodData().getFoodLevel() < 8 && m.items().getOrDefault("food", 0) == 0) return m;
+		return null;
+	}
+
+	/** Its idea, done (a task of its own, or one of the team's: a meeting, a betrayal, a gift). */
+	private void doIdea(Companion c, String key) {
+		switch (key) {
+			case "MEETING" -> meeting(c);
+			case "BETRAY" -> {
+				betrayedAt.put(c.name, (long) mod.server.getTickCount());
+				mod.defect(c);
+			}
+			case "HELP" -> {
+				Companion m = hungryMate(c);
+				if (m == null) return;
+				for (String f : new String[] {"bread", "cooked_beef", "cooked_porkchop", "cooked_mutton", "cooked_chicken", "baked_potato", "cooked_cod", "cooked_salmon", "apple", "carrot"})
+					if (c.btb.invCount(f) >= 3) {
+						c.chores.give(m.player(), f, Math.min(6, c.btb.invCount(f) / 2));
+						XenMod.LOG.info("{} takes food to {} (its own idea)", c.name, m.name);
+						return;
+					}
+			}
+			default -> {
+				try {
+					c.btb.order(Btb.Task.valueOf(key), "its own idea", 0.8f);
+				} catch (IllegalArgumentException e) {
+					// (no such job)
+				}
+			}
+		}
+	}
+
+	/** A team meeting: its teammates near come to it; once they're there, they pair off and duel (to half health) to see who's strongest. */
+	private void meeting(Companion c) {
+		String team = mod.teamOf(c);
+		if (team == null || c.player == null) return;
+		meetingAt.put(team, (long) mod.server.getTickCount());
+		List<String> coming = new java.util.ArrayList<>();
+		for (Companion m : mod.companions) {
+			if (m == c || m.player() == null || !mod.sameSide(c, m) || m.player().level() != c.player.level() || m.player().distanceTo(c.player) > 300 || m.fightingNow()) continue;
+			m.joinGroup(c, "a team meeting");
+			coming.add(m.name);
+		}
+		c.say("Team meeting! Come to me. Let's see who's the strongest.");
+		XenMod.LOG.info("{} calls a team meeting: {} coming", c.name, coming.isEmpty() ? "nobody" : String.join(", ", coming));
+		mod.later(20 * 90, () -> {                                                  // a minute and a half to get there: then the duels
+			if (c.player == null) return;
+			List<Companion> here = new java.util.ArrayList<>();
+			here.add(c);
+			for (Companion m : mod.companions)
+				if (m != c && m.player() != null && mod.sameSide(c, m) && m.player().level() == c.player.level() && m.player().distanceTo(c.player) < 24) here.add(m);
+			java.util.Collections.shuffle(here, new java.util.Random(c.random().nextLong()));
+			List<String> pairs = new java.util.ArrayList<>();
+			for (int k = 0; k + 1 < here.size(); k += 2)
+				if (here.get(k).skills.duel(here.get(k + 1))) pairs.add(here.get(k).name + " vs " + here.get(k + 1).name);
+			XenMod.LOG.info("{}'s meeting: {} came; duels: {}", c.name, here.size(), pairs.isEmpty() ? "none" : String.join(", ", pairs));
+		});
 	}
 
 	/** An idea made into what it does: a build (its wish) or a job (an order of its own). */

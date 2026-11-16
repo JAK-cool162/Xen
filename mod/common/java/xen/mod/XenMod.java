@@ -2052,6 +2052,24 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
+	/** It betrays its team (its own idea): over to the other team, for good (its roster keeps it there). */
+	void defect(Companion c) {
+		String was = teamOf(c);
+		if (was == null || c.player() == null) return;
+		var board = server.getScoreboard();
+		net.minecraft.world.scores.PlayerTeam other = null;
+		for (var t : board.getPlayerTeams())
+			if (t.getName().startsWith("xen_") && !t.getName().equals(was) && !t.getPlayers().isEmpty()) other = t;
+		if (other == null) return;
+		Companion lead = leader.leaderOf(c);
+		board.addPlayerToTeam(c.name, other);
+		roster.remember(c, other.getName());
+		c.role = "";
+		c.roleTask = null;
+		c.say(lead != null ? "Sorry " + lead.name + ". I'm with " + other.getName().replace("xen_", "") + " now." : "I'm with " + other.getName().replace("xen_", "") + " now.");
+		LOG.info("{} betrays {} ({}): joins {}", c.name, was.replace("xen_", ""), lead == null ? "no leader" : lead.name, other.getName().replace("xen_", ""));
+	}
+
 	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */
 	void joinTeam(Companion c) {
 		var board = server.getScoreboard();
