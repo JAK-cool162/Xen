@@ -131,12 +131,39 @@ final class Thinker {
 			}
 			String[] pick = menu.get(k);
 			String why = t.replaceFirst("^\\D{0,12}?\\d{1,2}\\s*[-.:)]*\\s*", "");
+			String said = why.toLowerCase(Locale.ROOT);
+			if (!about(said, pick[0]))                                             // (its number and its reason disagree, a small model's slip: its reason wins; Fin picked the base, "we need food")
+				for (String[] o : menu)
+					if (o != pick && about(said, o[0])) {
+						pick = o;
+						break;
+					}
 			if (why.length() > 100) why = why.substring(0, 100);
 			XenMod.LOG.info("{} has an idea: {} ({})", c.name, pick[1], why);
 			c.journal("thinks", "an idea: " + pick[1] + (why.isEmpty() ? "" : " - " + why));
 			doIdea(c, pick[0]);
 			if (!why.isEmpty()) c.chatter(why, false);
 		}));
+	}
+
+	/** Does its reason speak of this (food, diamonds, a farm...)? */
+	private static boolean about(String said, String key) {
+		String[] words = switch (key) {
+			case "FOOD" -> new String[] {"food", "hungry", "eat", "hunt", "cook", "starv"};
+			case "DIAMONDS" -> new String[] {"diamond"};
+			case "ENCHANT" -> new String[] {"enchant"};
+			case "TABLE" -> new String[] {"obsidian", "table", "lava"};
+			case "FARM" -> new String[] {"farm", "wheat", "crop", "seed"};
+			case "FORT" -> new String[] {"base", "build", "wall", "fort"};
+			case "MEETING" -> new String[] {"meeting", "strongest", "duel", "gather", "together"};
+			case "BETRAY" -> new String[] {"betray", "traitor", "switch", "other team", "leave"};
+			case "HELP" -> new String[] {"give", "share", "help"};
+			case "EXPLORE" -> new String[] {"explore", "look around", "discover"};
+			case "TRADE" -> new String[] {"trade", "villager", "emerald"};
+			default -> new String[0];
+		};
+		for (String w : words) if (said.contains(w)) return true;
+		return false;
 	}
 
 	/** What it can really do now, for its idea to be one of (a key it acts on, and the words the model reads). */
