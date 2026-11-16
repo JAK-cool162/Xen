@@ -89,6 +89,7 @@ final class Thinker {
 		String url = mod.config.talkUrl == null || mod.config.talkUrl.isBlank() ? mod.config.thinkUrl : mod.config.talkUrl;
 		if (url == null || url.isBlank() || c.player == null || Boolean.TRUE.equals(waiting.get("dream:" + c.name))) return;
 		List<String[]> menu = menu(c);                                            // what it really can do now (key, words): its idea is one of these
+		java.util.Collections.shuffle(menu, new java.util.Random(c.random().nextLong()));   // (a small model leans on the same place in a list: Fin, Hal, Kai all picked the base)
 		if (menu.isEmpty()) return;
 		waiting.put("dream:" + c.name, true);
 		var p = c.personality;
@@ -99,7 +100,7 @@ final class Thinker {
 		StringBuilder list = new StringBuilder();
 		for (int k = 0; k < menu.size(); k++) list.append(k + 1).append(". ").append(menu.get(k)[1]).append('\n');
 		String user = "What you know: " + WorldBrief.of(c) + "\nWhat you can do now:\n" + list
-				+ "Pick ONE. Reply with its number and a short reason in your own words, like: 3 - we need food.\n"
+				+ "Pick the ONE that fits you and your team best right now. Reply with its number, a dash, then your own reason (one short sentence about your situation).\n"
 				+ "If your idea is bigger than any of these, reply instead: JOB: a job title - what you would do (it becomes your role on the team).";
 		post(url, sys, user, 60, text -> mod.server.execute(() -> {
 			waiting.put("dream:" + c.name, false);
