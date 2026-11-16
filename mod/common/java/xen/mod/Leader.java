@@ -135,6 +135,7 @@ final class Leader {
 			if (dia < 4) noArmor++;
 			else if (!allEnchanted(c)) unenchanted++;
 		}
+		keep(lead, members, team, now);
 		boolean fortStarted = false;
 		for (Companion c : members) fortStarted |= c.builder.fortress && c.builder.busy();
 		// the race so far: how much the team gained under the plan it was on (what it learns which plans pay)
@@ -231,6 +232,67 @@ final class Leader {
 	 * and the makings of a book (a book, paper, sugar cane, leather) to whoever has the obsidian for the team's table.
 	 * Within a team nobody haggles: what's spare (by its worth to the one holding it) goes where it's needed.
 	 */
+	private final java.util.Map<String, Long> keptAt = new java.util.HashMap<>();
+
+	/**
+	 * Keeping its people: now and then the leader looks at who might leave (the least loyal, the most worth keeping:
+	 * its fighters in full diamond first) and wins them over its own way: diamonds or lapis from its own bag, food when
+	 * they're hungry, or a word (it tells them what they're worth to the team). Each brings them closer (their loyalty
+	 * grows), the way a leader keeps a team: nothing stops one leaving but how it's treated.
+	 */
+	private void keep(Companion lead, List<Companion> members, String team, long now) {
+		if (now - keptAt.getOrDefault(team, -100_000L) < 20 * 60 * 3 || lead.player() == null) return;
+		Companion best = null;
+		float bestWorth = 0;
+		for (Companion m : members) {
+			if (m == lead || m.player() == null || m.personality.loyalty >= 0.6f) continue;
+			float worth = (0.6f - m.personality.loyalty) + (Companion.fullDiamond(m.player()) ? 0.3f : 0) + 0.05f * enchantedPieces(m);
+			if (best == null || worth > bestWorth) {
+				best = m;
+				bestWorth = worth;
+			}
+		}
+		if (best == null) return;
+		keptAt.put(team, now);
+		Companion m = best;
+		float was = m.personality.loyalty, gain;
+		String how;
+		boolean near = m.player().level() == lead.player().level() && m.player().distanceTo(lead.player()) < 200;
+		if (near && lead.btb.invCount("diamond") >= 3 && !Companion.fullDiamond(m.player())) {
+			lead.chores.give(m.player(), "diamond", 3);
+			how = "gives it 3 diamonds";
+			gain = 0.08f;
+			lead.say(m.name + ", these are for you. You're part of this team.");
+		} else if (near && lead.btb.invCount("lapis_lazuli") >= 8 && !allEnchanted(m) && m.btb.invCount("lapis_lazuli") < 3) {
+			lead.chores.give(m.player(), "lapis_lazuli", 6);
+			how = "gives it 6 lapis";
+			gain = 0.06f;
+			lead.say(m.name + ", here's lapis. Get that armor enchanted.");
+		} else if (near && m.player().getFoodData().getFoodLevel() < 14 && lead.btb.invCount("bread") >= 4) {
+			lead.chores.give(m.player(), "bread", 4);
+			how = "gives it bread";
+			gain = 0.05f;
+			lead.say(m.name + ", eat. Can't have you starving.");
+		} else {
+			how = "tells it what it's worth";
+			gain = 0.03f;
+			lead.say(Companion.fullDiamond(m.player())
+					? lead.pick3(m.name + ", you're our best fighter. We need you here.", m.name + ", this team doesn't work without you.", "Glad you're with us, " + m.name + ". Seriously.")
+					: lead.pick3(m.name + ", stick with us. We'll get you that diamond armor.", m.name + ", you matter to this team.", "Hey " + m.name + ", we've got your back."));
+		}
+		m.personality.loyalty = Math.min(1f, m.personality.loyalty + gain);
+		XenMod.LOG.info("{} (leads {}) keeps {} with the team: {} (loyalty {} -> {})", lead.name, team.replace("xen_", ""), m.name, how,
+				String.format(java.util.Locale.ROOT, "%.2f", was), String.format(java.util.Locale.ROOT, "%.2f", m.personality.loyalty));
+	}
+
+	private static int enchantedPieces(Companion c) {
+		int n = 0;
+		for (var es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+				net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET})
+			if (c.player().getItemBySlot(es).isEnchanted()) n++;
+		return n;
+	}
+
 	private void share(Companion lead, List<Companion> members, String team) {
 		Companion needy = null;
 		int short_ = Integer.MAX_VALUE;
