@@ -599,6 +599,25 @@ final class Nether {
 	}
 
 	/** Where it poured water on lava for obsidian, and when. */
+	/** The hole by the lava it dug for its water (the player's way), or null. */
+	private BlockPos waterHole;
+
+	/**
+	 * A block of stone beside the lava, level with it, to dig out and fill with water: natural rock it can dig, firm
+	 * under it, no other lava over it, the nearest to it. Null: none (it pours over the lava instead).
+	 */
+	private BlockPos holeBeside(ServerLevel level, BlockPos lava) {
+		BlockPos best = null;
+		for (Direction dir : Direction.Plane.HORIZONTAL) {
+			BlockPos h = lava.relative(dir);
+			var st = level.getBlockState(h);
+			if (!level.getFluidState(h).isEmpty() || st.getCollisionShape(level, h).isEmpty() || !Hands.natural(st) || st.getDestroySpeed(level, h) < 0 || st.getDestroySpeed(level, h) > 3) continue;
+			if (!level.getFluidState(h.above()).isEmpty() || level.getBlockState(h.below()).getCollisionShape(level, h.below()).isEmpty() || !level.getFluidState(h.below()).isEmpty()) continue;
+			if (best == null || h.distSqr(c.player.blockPosition()) < best.distSqr(c.player.blockPosition())) best = h.immutable();
+		}
+		return best;
+	}
+
 	private BlockPos pouredTop;
 	private long pouredTopAt;
 
@@ -783,6 +802,48 @@ final class Nether {
 			}
 			return c.walkTo(Goal.near(top, 3));                                // (anywhere dry within three of it: over the lava itself is no place to walk to; Bob, forty seconds no closer, pool after pool)
 		}
+		// The player's way (taught by the one who plays with them): a hole dug in the stone beside the lava, from the side,
+		// water in it at once (the lava it touches turns to obsidian), then in the water itself while it mines: whatever
+		// it opens, the water flows in first, and lava runs slower than water. Not standing on the stone it digs.
+		if (waterHole != null && !waterHole.closerThan(lavaAt, 1.5)) waterHole = null;   // (another pool now)
+		if (pouredAt < 0 && waterHole == null) waterHole = holeBeside(level, lavaAt);
+		if (pouredAt < 0 && waterHole != null) {
+			BlockPos h = waterHole, feet = c.player.blockPosition();
+			if (level.getFluidState(h).is(net.minecraft.tags.FluidTags.WATER)) {        // (water in it already)
+				pouredAt = now();
+				pouredTop = h;
+				pouredTopAt = now();
+				return Action.IDLE;
+			}
+			if (!level.getBlockState(h).getCollisionShape(level, h).isEmpty()) {         // the stone still there: dug from beside
+				if (feet.equals(h.above())) {                                                // (on it: a step aside first, never down into the hole by the lava)
+					for (Direction dir : Direction.Plane.HORIZONTAL) {
+						BlockPos n = feet.relative(dir);
+						if (n.relative(dir.getOpposite()).equals(feet) && !n.equals(lavaAt.above()) && level.getBlockState(n).getCollisionShape(level, n).isEmpty()
+								&& level.getBlockState(n.above()).getCollisionShape(level, n.above()).isEmpty() && level.getBlockState(n.below()).isFaceSturdy(level, n.below(), Direction.UP)
+								&& level.getFluidState(n).isEmpty() && level.getFluidState(n.below()).isEmpty())
+							return c.walkTo(Vec3.atBottomCenterOf(n));
+					}
+				}
+				if (c.player.getEyePosition().distanceTo(Vec3.atCenterOf(h)) > 4.2) return c.walkTo(Goal.near(h.above(), 2));
+				c.goals.instant = "digging a hole beside the lava for its water";
+				if (c.hands.digging(h)) return Action.MINE;
+				if (c.hands.mine(h)) {
+					c.acted = true;
+					return Action.MINE;
+				}
+				waterHole = null;                                                            // (can't dig it from here: the old way, water over the lava)
+			} else {
+				c.goals.instant = "water in the hole beside the lava";                       // dug: the water in at once, before the lava runs in
+				c.hands.pour(h, Direction.UP);
+				pouredAt = now();
+				pouredTop = h.immutable();
+				pouredTopAt = now();
+				c.acted = true;
+				c.journal("does", "dug a hole by the lava at " + lavaAt.toShortString() + " and put water in it: the lava turns to obsidian, it mines from in the water");
+				return Action.PLACE;
+			}
+		}
 		if (pouredAt < 0 && !level.getBlockState(top).isAir() && level.getFluidState(top).isEmpty()) {   // sealed under the rock: the stone over it opened first, from beside (never from on top of it)
 			BlockPos feet = c.player.blockPosition();
 			if (feet.getX() == top.getX() && feet.getZ() == top.getZ()) {
@@ -816,6 +877,19 @@ final class Nether {
 			return Action.PLACE;
 		}
 		if (now() - pouredAt < 30) return Action.IDLE;                             // the water flows over it
+		if (waterHole != null) {                                                      // into its water hole, then it mines from there (the obsidian is round it, the water keeps the lava off)
+			BlockPos h = waterHole;
+			if (!c.player.blockPosition().equals(h) && now() - pouredAt < 30 + 20 * 8 && level.getFluidState(h).is(net.minecraft.tags.FluidTags.WATER)) {
+				c.goals.instant = "stepping into its water by the obsidian";
+				return c.walkTo(Vec3.atBottomCenterOf(h));
+			}
+			waterHole = null;
+			pouredAt = -1;
+			lavaAt = null;
+			c.acted = true;
+			c.chatter("Obsidian! In the water, safe. Now to mine it.", false);
+			return Action.IDLE;                                                          // (its water stays: each block it mines, the water runs in first)
+		}
 		pouredAt = -1;
 		lavaAt = null;
 		c.acted = true;
