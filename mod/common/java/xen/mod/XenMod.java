@@ -2079,6 +2079,16 @@ public class XenMod implements ModInitializer {
 			lead.say(lead.pick3(c.name + ", you traitor! You'll pay for this.", "Seriously " + c.name + "? After everything? Fine. Go.", c.name + " just sold us out to " + newTeam.replace("xen_", "") + ". Remember that, everyone."));
 			LOG.info("{} (leads {}) on {}'s betrayal: mad, and its team with it", lead.name, oldTeam.replace("xen_", ""), c.name);
 			leader.event(lead, c.name + " betrayed our team and joined " + newTeam.replace("xen_", ""), c.player());   // (its own plan for it: revenge, a fair fight only, or not)
+			List<String> rallied = new ArrayList<>();                                   // and it rallies the rest: everyone wavering hears it from their leader
+			for (Companion m : companions) {
+				if (m == lead || m.player() == null || !oldTeam.equals(teamOf(m)) || m.personality.loyalty >= 0.45f) continue;
+				m.personality.loyalty = Math.min(1f, m.personality.loyalty + 0.06f);
+				rallied.add(m.name + String.format(java.util.Locale.ROOT, " %.2f", m.personality.loyalty));
+			}
+			if (!rallied.isEmpty()) {
+				lead.say(lead.pick3("The rest of us stick together. Nobody else leaves.", "We don't need traitors. We've got each other.", "Whoever's still here: thank you. We finish this together."));
+				LOG.info("{} rallies its team after {} left: {}", lead.name, c.name, String.join(", ", rallied));
+			}
 		});
 	}
 

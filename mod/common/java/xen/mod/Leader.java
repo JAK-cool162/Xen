@@ -241,7 +241,7 @@ final class Leader {
 	 * grows), the way a leader keeps a team: nothing stops one leaving but how it's treated.
 	 */
 	private void keep(Companion lead, List<Companion> members, String team, long now) {
-		if (now - keptAt.getOrDefault(team, -100_000L) < 20 * 60 * 3 || lead.player() == null) return;
+		if (now - keptAt.getOrDefault(team, -100_000L) < 20 * 60 * 2 || lead.player() == null) return;
 		Companion best = null;
 		float bestWorth = 0;
 		for (Companion m : members) {
