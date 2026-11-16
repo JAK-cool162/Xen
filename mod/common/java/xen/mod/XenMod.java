@@ -2068,6 +2068,18 @@ public class XenMod implements ModInitializer {
 		c.roleTask = null;
 		c.say(lead != null ? "Sorry " + lead.name + ". I'm with " + other.getName().replace("xen_", "") + " now." : "I'm with " + other.getName().replace("xen_", "") + " now.");
 		LOG.info("{} betrays {} ({}): joins {}", c.name, was.replace("xen_", ""), lead == null ? "no leader" : lead.name, other.getName().replace("xen_", ""));
+		final String oldTeam = was, newTeam = other.getName();
+		Incidents.happened("betrayed", c.name, was.replace("xen_", ""));
+		for (Companion m : companions) {                                           // its old team: mad at it, and they say so
+			if (m == c || m.player() == null || !oldTeam.equals(teamOf(m))) continue;
+			m.betrayedBy(c);
+		}
+		if (lead != null) later(40, () -> {
+			if (lead.player() == null) return;
+			lead.say(lead.pick3(c.name + ", you traitor! You'll pay for this.", "Seriously " + c.name + "? After everything? Fine. Go.", c.name + " just sold us out to " + newTeam.replace("xen_", "") + ". Remember that, everyone."));
+			LOG.info("{} (leads {}) on {}'s betrayal: mad, and its team with it", lead.name, oldTeam.replace("xen_", ""), c.name);
+			leader.event(lead, c.name + " betrayed our team and joined " + newTeam.replace("xen_", ""), c.player());   // (its own plan for it: revenge, a fair fight only, or not)
+		});
 	}
 
 	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */

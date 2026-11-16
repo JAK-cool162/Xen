@@ -6316,6 +6316,17 @@ public final class Companion {
 	private final Map<String, Integer> hogged = new HashMap<>();
 	private final java.util.Set<Long> jokesTold = new java.util.HashSet<>();
 
+	/** A teammate turned on its team: it's mad at it for a good while, and trusts it a lot less. */
+	void betrayedBy(Companion traitor) {
+		if (player == null || traitor.player() == null) return;
+		long now = player.level().getGameTime();
+		madAt = traitor.name;
+		madUntil = now + 20 * 60 * 30;
+		madSaidAt = now;
+		trust(traitor.player().getUUID(), -0.4f);
+		journal("feels", traitor.name + " betrayed the team: mad at it");
+	}
+
 	/** The diamonds it had on it a moment ago (for what's remembered when it dies). */
 	int diamondsCarried() {
 		return lastItems.getOrDefault("diamond", 0);
