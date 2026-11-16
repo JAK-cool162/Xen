@@ -37,6 +37,8 @@ final class Btb {
 	/** Why it is doing it, in words. */
 	String why = "";
 	private long taskAt;
+	/** The team base's parts built when it took one up (-1: none taken up): it stays on it till that part's done. */
+	private int fortCommitParts = -1;
 	private String stateAt = "";
 	private float hurtSince;
 	private int deathsAt, tierAt, ironAt, fuelAt, enchantStuffAt, levelAt;
@@ -285,6 +287,15 @@ final class Btb {
 		boolean builder = c.roleTask == Task.FORT;                             // (its role: the team's builder, it starts the base, builds it, extends it)
 		if (builder && !o.night && !dusk && o.overworld && o.tier >= 2 && o.health >= 12 && o.meals > 0 && (proj == null || proj.finished || !c.player.blockPosition().closerThan(proj.at(), 300)))
 			out.add(new Option(Task.FORT, 4.5f, proj == null ? "its role, builder: the team's base, begun" : "its role, builder: the team's base, built on"));
+		if (fortCommitParts >= 0) {                                               // a part of the team's base it took up: it finishes it before anything else but the night, food, and its health
+			if (proj == null || proj.finished || proj.partsDone > fortCommitParts) {
+				if (proj != null && proj.partsDone > fortCommitParts) XenMod.LOG.info("{} btb: its part of the team's base is built ({} of {})", c.name, proj.partsDone, Math.max(1, proj.plan.size()));
+				fortCommitParts = -1;
+			} else if (!o.night && !dusk && o.overworld && o.health >= 10 && o.meals > 0)
+				out.add(new Option(Task.FORT, 6.2f, "the part of the team's base it started: it finishes it (no half-built base)"));
+		}
+		if (builder && proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= 2 && o.health >= 12 && o.meals > 0)
+			out.add(new Option(Task.FORT, 5.0f, "its role, builder: the team's base, built on"));
 		if (c.roleTask == Task.FIND && !o.night && !dusk && o.overworld && o.health >= 12 && o.meals > 0)
 			out.add(new Option(Task.FIND, 4.4f, "its role, resource finder: what the team is short of"));
 		if (proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= (builder ? 2 : 3) && o.health >= 12 && o.meals > 0
@@ -738,6 +749,10 @@ final class Btb {
 			XenMod.LOG.info("{} extends its team's base: another house ({} parts now)", c.name, pj.plan.size());
 		}
 		if (pj != null && pj.finished) return "The team's fortress is finished.";
+		if (pj != null && fortCommitParts < 0) {                                   // it takes up a part of the team's base: it sees it through (no half-built walls)
+			fortCommitParts = pj.partsDone;
+			XenMod.LOG.info("{} btb: commits to the team's base until part {} of {} is built", c.name, pj.partsDone + 1, Math.max(1, pj.plan.size()));
+		}
 		boolean resume = pj != null;
 		if (pj == null) {                                                         // none yet: its team's, here or at its base (it stays the team's, whoever leaves it)
 			BlockPos at = c.mod.teamHome(c);
