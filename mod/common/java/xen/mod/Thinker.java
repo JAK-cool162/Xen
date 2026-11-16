@@ -185,7 +185,7 @@ final class Thinker {
 		if (team != null && day && over && mateCount(c, 300) >= 2 && mod.server.getTickCount() - meetingAt.getOrDefault(team, -100_000L) > 20 * 60 * 30)
 			m.add(new String[] {"MEETING", "call a team meeting: everyone comes, duels to see who is the strongest"});
 		Companion lead = team == null ? null : mod.leader.leaderOf(c);
-		if (team != null && lead != null && lead != c && c.personality.loyalty < 0.45f && mod.server.getTickCount() - betrayedAt.getOrDefault(c.name, -1_000_000L) > 20 * 60 * 60 * 2)
+		if (team != null && lead != null && lead != c && c.personality.loyalty < 0.45f && aheadOfTheOther(c) && mod.server.getTickCount() - betrayedAt.getOrDefault(c.name, -1_000_000L) > 20 * 60 * 60 * 2)
 			m.add(new String[] {"BETRAY", "betray " + lead.name + " and join the other team"});
 		if (hungryMate(c) != null && it.getOrDefault("food", 0) >= 8) m.add(new String[] {"HELP", "give food to " + hungryMate(c).name + ", who is hungry"});
 		if (day && over) m.add(new String[] {"EXPLORE", "explore with a friend"});
@@ -194,6 +194,17 @@ final class Thinker {
 	}
 
 	private final java.util.Map<String, Long> meetingAt = new java.util.HashMap<>(), betrayedAt = new java.util.HashMap<>();
+
+	/** Its team ahead in the race (a traitor only goes over to the team that's behind: it evens things, never piles on; Eve and Sol left red, the team behind). */
+	private boolean aheadOfTheOther(Companion c) {
+		int mine = 0, theirs = 0;
+		for (Companion x : mod.companions) {
+			if (x.player() == null || mod.teamOf(x) == null) continue;
+			if (x == c || mod.sameSide(c, x)) mine += x.btb.raceScore();
+			else theirs += x.btb.raceScore();
+		}
+		return mine > theirs;
+	}
 
 	private int mateCount(Companion c, int far) {
 		int n = 0;
