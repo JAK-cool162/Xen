@@ -248,6 +248,26 @@ final class Thinker {
 		}
 	}
 
+	/** Every half minute: enough of them here (two besides it, within 32 blocks), or four minutes gone: the duels. */
+	private void meetingCheck(Companion c, int tries) {
+		mod.later(20 * 30, () -> {
+			if (c.player == null) return;
+			List<Companion> here = new java.util.ArrayList<>();
+			here.add(c);
+			for (Companion m : mod.companions)
+				if (m != c && m.player() != null && mod.sameSide(c, m) && m.player().level() == c.player.level() && m.player().distanceTo(c.player) < 32) here.add(m);
+			if (here.size() < 3 && tries < 7) {
+				meetingCheck(c, tries + 1);
+				return;
+			}
+			java.util.Collections.shuffle(here, new java.util.Random(c.random().nextLong()));
+			List<String> pairs = new java.util.ArrayList<>();
+			for (int k = 0; k + 1 < here.size(); k += 2)
+				if (here.get(k).skills.duel(here.get(k + 1))) pairs.add(here.get(k).name + " vs " + here.get(k + 1).name);
+			XenMod.LOG.info("{}'s meeting: {} came after {} s; duels: {}", c.name, here.size(), 30 * (tries + 1), pairs.isEmpty() ? "none" : String.join(", ", pairs));
+		});
+	}
+
 	/** A team meeting: its teammates near come to it; once they're there, they pair off and duel (to half health) to see who's strongest. */
 	private void meeting(Companion c) {
 		String team = mod.teamOf(c);
@@ -261,18 +281,7 @@ final class Thinker {
 		}
 		c.say("Team meeting! Come to me. Let's see who's the strongest.");
 		XenMod.LOG.info("{} calls a team meeting: {} coming", c.name, coming.isEmpty() ? "nobody" : String.join(", ", coming));
-		mod.later(20 * 90, () -> {                                                  // a minute and a half to get there: then the duels
-			if (c.player == null) return;
-			List<Companion> here = new java.util.ArrayList<>();
-			here.add(c);
-			for (Companion m : mod.companions)
-				if (m != c && m.player() != null && mod.sameSide(c, m) && m.player().level() == c.player.level() && m.player().distanceTo(c.player) < 24) here.add(m);
-			java.util.Collections.shuffle(here, new java.util.Random(c.random().nextLong()));
-			List<String> pairs = new java.util.ArrayList<>();
-			for (int k = 0; k + 1 < here.size(); k += 2)
-				if (here.get(k).skills.duel(here.get(k + 1))) pairs.add(here.get(k).name + " vs " + here.get(k + 1).name);
-			XenMod.LOG.info("{}'s meeting: {} came; duels: {}", c.name, here.size(), pairs.isEmpty() ? "none" : String.join(", ", pairs));
-		});
+		meetingCheck(c, 0);
 	}
 
 	/** An idea made into what it does: a build (its wish) or a job (an order of its own). */
