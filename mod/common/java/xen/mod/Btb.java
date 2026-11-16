@@ -738,7 +738,11 @@ final class Btb {
 			if (o == c || o.player() == null || !o.builder.fortress || !o.builder.busy() || !c.mod.sameSide(o, c) || c.mod.teamOf(c) == null) continue;
 			if (o.player().distanceToSqr(c.player) > 300 * 300) continue;
 			String r = c.builder.help(o);
-			if (r != null && r.startsWith("You will")) XenMod.LOG.info("{} btb: helps {} build the team's fortress", c.name, o.name);
+			if (r != null && r.startsWith("You will")) {
+				XenMod.LOG.info("{} btb: helps {} build the team's fortress", c.name, o.name);
+				XenMod.Project hp = c.mod.project(c);
+				if (hp != null && fortCommitParts < 0) fortCommitParts = hp.partsDone;   // (helping: it sees that part through too)
+			}
 			return r;
 		}
 		XenMod.Project pj = c.mod.project(c);
