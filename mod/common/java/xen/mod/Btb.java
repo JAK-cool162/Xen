@@ -368,6 +368,10 @@ final class Btb {
 				default -> true;
 			});
 		}
+		if ((o.night || c.goals.sunDown()) && o.overworld && c.player.tickCount < 20 * 60 * 8 && c.player.getArmorValue() == 0) {   // just respawned into the night with nothing on: dug in where it is till morning, not back out into what killed it (Max, twice in ten minutes)
+			out.removeIf(op -> op.task != Task.SHELTER);
+			if (out.isEmpty()) out.add(new Option(Task.SHELTER, 6f, "respawned at night with nothing: dug in till morning"));
+		}
 		if (badEnchanted() != null && c.player.experienceLevel >= 5 && invCount("lapis_lazuli") >= 3 && c.enchanter.table() != null && !o.night)
 			out.add(new Option(Task.GRIND, 3.8f, "a bad roll on its " + badName() + ": strip it at a grindstone, enchant it again"));
 		if (!o.night && o.overworld && c.mod.config.trading && c.trader.hasSomethingToTrade() && (c.trader.villagerNear() != null || c.visits.nearest("village") != null)) {
