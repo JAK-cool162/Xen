@@ -265,6 +265,13 @@ public final class Companion {
 
 	/** StockXen out of hiding: geared (full diamond and a diamond sword), it hunts; till then it keeps out of sight and gathers, and nobody goes after it. */
 	boolean stockRevealed;
+	/** Is there anyone to follow, really: online, alive, in its world, not itself? Asked before it follows anyone (not found out after standing about). */
+	boolean canFollow(UUID who) {
+		if (who == null || player == null) return false;
+		ServerPlayer l = server.getPlayerList().getPlayer(who);
+		return l != null && l != player && l.isAlive() && !l.isSpectator() && l.level() == player.level();
+	}
+
 	/** Since when it's been following (its leader, a trip): an hour of following a Xen that isn't going anywhere is a bug. */
 	private long followSince = -1;
 
@@ -3072,6 +3079,10 @@ public final class Companion {
 
 	/** Along on a teammate's trip: it follows them (through the portal too), watches their back, and keeps their things safe if they fall. */
 	void joinTrip(Companion lead) {
+		if (lead == null || lead.player == null || !canFollow(lead.player.getUUID())) {   // (only someone who's there to follow: not one who's gone, dead, or in another world)
+			XenMod.LOG.info("{} won't go along: {} isn't there to follow", name, lead == null ? "nobody" : lead.name);
+			return;
+		}
 		buddyOf = lead;
 		lead.tripBuddy = this;
 		buddyWasMode = mode;

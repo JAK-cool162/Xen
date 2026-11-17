@@ -783,6 +783,7 @@ public class XenMod implements ModInitializer {
 			} catch (RuntimeException e) {
 				c.mode = Companion.Mode.FOLLOW;
 			}
+			if (c.mode == Companion.Mode.FOLLOW && c.owner == null) c.mode = Companion.Mode.FREE;   // (no one of its own to follow, and a trip doesn't outlast the server: on its own again)
 			if (o.has("ax")) c.anchor = new BlockPos(o.get("ax").getAsInt(), o.get("ay").getAsInt(), o.get("az").getAsInt());
 			if (o.has("boss")) c.mode = Companion.Mode.FREE;                   // (minions are gone since 1.2: an old world's minion is a Xen of its own now)
 			c.join(server.overworld(), null, 0);                                // (the server puts it back where it was, bag and all)

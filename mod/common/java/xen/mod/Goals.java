@@ -284,7 +284,7 @@ final class Goals {
 		buildingHome = best == Short.SHELTER && dream == Long.HOME && home == null && !c.player.level().isDarkOutside();
 		String plan = chore(best);
 		if (!nearby) c.mode = Companion.Mode.FREE;                      // (a shelter would have it stay; it's still free)
-		else if (best == Short.SHELTER) c.mode = Companion.Mode.FOLLOW;   // it builds it where it is, next to its friend
+		else if (best == Short.SHELTER && (c.canFollow(c.leader) || c.canFollow(c.owner))) c.mode = Companion.Mode.FOLLOW;   // it builds it where it is, next to its friend (only a friend who's there: else it stays free)
 		if (cant(plan)) {
 			if (Companion.DEBUG) XenMod.LOG.info("[xen debug] {} wanted to {}, but: {}", c.name, best.what, plan);
 			liking.merge(best, -0.05f, (a, b) -> Math.max(0f, a + b));       // it can't right now: a little less keen
