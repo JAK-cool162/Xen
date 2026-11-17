@@ -2988,6 +2988,9 @@ public final class Companion {
 		XenMod.LOG.info("{} goes along with {} ({}), a group", name, lead.name, where);
 	}
 
+	/** Called to a team meeting: it follows its caller till then (game time). */
+	long meetingUntil;
+
 	/** The trip it came along on is over (they're home, dead and gone, or twenty minutes): back to its own things. */
 	void tripCheck() {
 		if (buddyOf == null || player == null) return;
@@ -2996,6 +2999,7 @@ public final class Companion {
 		boolean over = lead == null || !lead.isAlive() && escortFor == null || player.level().getGameTime() - buddyFrom > 20 * 60 * (groupTrip ? 10 : 20)
 				|| (groupTrip ? lt != Btb.Task.EXPLORE && lt != Btb.Task.TRIALS && lt != Btb.Task.VISIT && lt != Btb.Task.TRADE
 						: buddyOf.nether.purpose == null && !buddyOf.nether.inNether() && !nether.inNether() && lead.level() == player.level());
+		if (over && lead != null && lead.isAlive() && player.level().getGameTime() < meetingUntil) over = false;   // (called to a team meeting: it goes, whatever its caller's doing; meetings had nobody come)
 		if (over) groupTrip = false;
 		if (!over) return;
 		if (buddyOf.tripBuddy == this) buddyOf.tripBuddy = null;

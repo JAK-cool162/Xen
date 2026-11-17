@@ -277,6 +277,7 @@ final class Thinker {
 		for (Companion m : mod.companions) {
 			if (m == c || m.player() == null || !mod.sameSide(c, m) || m.player().level() != c.player.level() || m.player().distanceTo(c.player) > 300 || m.fightingNow()) continue;
 			m.joinGroup(c, "a team meeting");
+			m.meetingUntil = m.player().level().getGameTime() + 20 * 60 * 4;
 			coming.add(m.name);
 		}
 		c.say("Team meeting! Come to me. Let's see who's the strongest.");
