@@ -2165,6 +2165,10 @@ public class XenMod implements ModInitializer {
 	/** Put a Xen on its team (one team for all, or the smallest of several, keeping the team it had). */
 	void joinTeam(Companion c) {
 		var board = server.getScoreboard();
+		if (c.pip()) {                                                             // Pip: on nobody's team
+			if (teamOf(c) != null) board.removePlayerFromTeam(c.name);
+			return;
+		}
 		var knownTeam = roster.get(c.name);
 		String kept = knownTeam != null && knownTeam.has("team") ? knownTeam.get("team").getAsString() : null;
 		if (c.arenaTeam == null && !config.teamsLocked && ownTeam(kept) && board.getPlayerTeam(kept) != null && !c.personality.loner) {   // a team it started or joined itself
@@ -2307,7 +2311,38 @@ public class XenMod implements ModInitializer {
 		return made;
 	}
 
+	/** Pip's deaths, kept with the world: ten and it's banned. */
+	private java.nio.file.Path pipFile() {
+		return brainFile().resolveSibling("pip.json");
+	}
+
+	int pipLivesLeft() {
+		try {
+			if (!Files.exists(pipFile())) return 10;
+			var o = com.google.gson.JsonParser.parseString(Files.readString(pipFile())).getAsJsonObject();
+			return 10 - o.get("deaths").getAsInt();
+		} catch (Exception e) {
+			return 10;
+		}
+	}
+
+	/** Pip died: one life less (what's left). */
+	int pipDied() {
+		int left = pipLivesLeft() - 1;
+		try {
+			Files.createDirectories(pipFile().getParent());
+			Files.writeString(pipFile(), "{\"deaths\": " + (10 - left) + "}");
+		} catch (Exception e) {
+			LOG.warn("Xen: couldn't keep Pip's lives: {}", e.toString());
+		}
+		return left;
+	}
+
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
+		if (wanted != null && wanted.equals("Pip") && pipLivesLeft() <= 0) {
+			ctx.getSource().sendFailure(Component.literal("Pip is banned: ten lives spent."));
+			return 0;
+		}
 		if (wanted != null && wanted.equalsIgnoreCase("random")) wanted = null;   // "random": a random name and skin
 		ServerPlayer owner = ctx.getSource().getPlayer();              // null from the server console
 		long mine = owner == null ? 0 : companions.stream().filter(c -> owner.getUUID().equals(c.owner) && !c.minion).count();

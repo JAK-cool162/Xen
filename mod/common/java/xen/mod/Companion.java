@@ -227,7 +227,44 @@ public final class Companion {
 		return player != null && (!minion || ((ServerLevel) player.level()).isPositionEntityTicking(player.blockPosition()));
 	}
 
+	/** Pip: the lone one who thinks it can take both teams. Every stat at its max, no team, no rules, ten lives. */
+	boolean pip() {
+		return name.equals("Pip");
+	}
+
+	private boolean pipped;
+	private long pipHuntAt;
+
+	/** Pip's max: brave, tireless, curious, hungry for power, loyal to nobody; every fighting knack and every skill at the top. */
+	private void pipUp() {
+		pipped = true;
+		var p = personality;
+		p.bravery = 1f;
+		p.curiosity = 1f;
+		p.diligence = 1f;
+		p.power = 1f;
+		p.loyalty = 0f;
+		p.kindness = 0.15f;
+		p.loner = true;
+		for (int i = 0; i < p.fightGenes.length; i++) p.fightGenes[i] = 1f;
+		if (p.fightGenes.length > 8) p.fightGenes[8] = 0.35f;                   // (retreat: it backs off only when it must)
+		for (int i = 0; i < skills.level.length; i++) skills.level[i] = 1f;
+		XenMod.LOG.info("Pip is here: every stat at its max, no team, no rules, {} of 10 lives left", mod.pipLivesLeft());
+	}
+
 	void tick() {
+		if (pip() && player != null) {
+			if (!pipped) pipUp();
+			long now = player.level().getGameTime();
+			if (huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, it goes after)
+				pipHuntAt = now;
+				ServerPlayer near = null;
+				for (ServerPlayer o : server.getPlayerList().getPlayers())
+					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level() && o.distanceTo(player) < 160
+							&& (near == null || o.distanceTo(player) < near.distanceTo(player))) near = o;
+				if (near != null) hunt(near);
+			}
+		}
 		tickInner();
 		gesture();                                                      // last: nothing this tick undoes it
 		if (player != null) {
@@ -4933,12 +4970,13 @@ public final class Companion {
 		if (!mod.config.pvp.equals("teams")) return null;
 		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
 			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
-			if (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other)) continue;
+			boolean pipFight = pip() || other instanceof XenPlayer po && po.companion != null && po.companion.pip();   // (Pip: no team, no rules, everyone's foe)
+			if (!pipFight && (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other))) continue;
 			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;
 			String held = BuiltInRegistries.ITEM.getKey(other.getMainHandItem().getItem()).getPath();
 			boolean bare = other.getArmorValue() == 0 && !held.endsWith("_sword") && !held.endsWith("_axe") && !held.equals("trident") && !held.equals("mace");
-			if (bare && other.getLastHurtByMob() != player) continue;          // (no armor, no weapon, and it didn't start it: not a fight; Gus killed Hal three times, Hal with nothing)   // (just back from dying, with nothing: let be a while; Gus killed Hal seven seconds after he woke)
-			if (!fullDiamond(player) || !fullDiamond(other)) continue;          // fair fights only (the player's rule): both in full diamond armor, or no fight (the war cost blue 83 diamonds in an hour, half-dressed Xens killed for their gear)
+			if (!pip() && bare && other.getLastHurtByMob() != player) continue;          // (no armor, no weapon, and it didn't start it: not a fight; Gus killed Hal three times, Hal with nothing)   // (just back from dying, with nothing: let be a while; Gus killed Hal seven seconds after he woke)
+			if (!pipFight && (!fullDiamond(player) || !fullDiamond(other))) continue;          // fair fights only (the player's rule): both in full diamond armor, or no fight (the war cost blue 83 diamonds in an hour, half-dressed Xens killed for their gear)
 			double d = player.distanceTo(other);
 			boolean hunted = other.getUUID().equals(huntFor) && player.level().getGameTime() < huntUntil;   // (its leader's revenge: that one, from further off, seen or not)
 			if ((d < 24 || hunted && d < 96) && (best == null || hunted || d < player.distanceTo(best)) && (hunted || d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
@@ -4965,7 +5003,7 @@ public final class Companion {
 	private Action huntStep() {
 		if (huntFor == null || player == null) return null;
 		ServerPlayer t = server.getPlayerList().getPlayer(huntFor);
-		if (player.level().getGameTime() >= huntUntil || t == null || !t.isAlive() || t.level() != player.level() || !fullDiamond(player) || !fullDiamond(t)
+		if (player.level().getGameTime() >= huntUntil || t == null || !t.isAlive() || t.level() != player.level() || !pip() && (!fullDiamond(player) || !fullDiamond(t))
 				|| player.getHealth() < 12) {
 			if (t != null && !t.isAlive()) XenMod.LOG.info("{} got its revenge on {}", name, huntName);
 			huntFor = null;
@@ -5433,6 +5471,20 @@ public final class Companion {
 			helper = tripBuddy;
 		}
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
+		if (pip() && !inArena) {                                      // Pip: ten lives, then banned for good
+			int left = mod.pipDied();
+			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] Pip died (" + source.getLocalizedDeathMessage(player).getString()
+					+ "): " + left + " of 10 lives left." + (left <= 0 ? " Pip is banned." : "")).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
+			XenMod.LOG.info("Pip died: {} of 10 lives left", left);
+			if (left <= 0) {
+				goneHow = source.getLocalizedDeathMessage(player).getString();
+				goneAt = here;
+				lore("Pip is banned: ten lives spent");
+				goneIn = 40;
+				respawnIn = -1;
+				return;
+			}
+		}
 		if (hardcore() && !inArena) {                                 // one life: that was it
 			goneHow = source.getLocalizedDeathMessage(player).getString();
 			goneAt = here;

@@ -141,6 +141,7 @@ final class Knowledge {
 	}
 
 	boolean knows(String id) {
+		if (c.pip()) return true;                                                // (Pip knows every trick)
 		seed();
 		if (known.containsKey(id)) return true;
 		int gen = c.personality.generation, smart = c.mod.config.smartsAtGeneration;
