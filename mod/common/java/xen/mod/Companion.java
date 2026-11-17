@@ -294,11 +294,11 @@ public final class Companion {
 				stockRevealed = true;
 				XenMod.LOG.info("StockXen comes out of hiding: geared, it goes after both teams");
 			}
-			if (stockRevealed && huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, it goes after)
+			if (stockRevealed && huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, anywhere in its world, it goes after)
 				pipHuntAt = now;
 				ServerPlayer near = null;
 				for (ServerPlayer o : server.getPlayerList().getPlayers())
-					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level() && o.distanceTo(player) < 160
+					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level()
 							&& (near == null || o.distanceTo(player) < near.distanceTo(player))) near = o;
 				if (near != null) hunt(near);
 			}
@@ -5024,7 +5024,7 @@ public final class Companion {
 			if (!pipFight && (!fullDiamond(player) || !fullDiamond(other))) continue;          // fair fights only (the player's rule): both in full diamond armor, or no fight (the war cost blue 83 diamonds in an hour, half-dressed Xens killed for their gear)
 			double d = player.distanceTo(other);
 			boolean hunted = other.getUUID().equals(huntFor) && player.level().getGameTime() < huntUntil;   // (its leader's revenge: that one, from further off, seen or not)
-			if ((d < 24 || hunted && d < 96) && (best == null || hunted || d < player.distanceTo(best)) && (hunted || d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
+			if ((d < 24 || hunted && (d < 96 || pip())) && (best == null || hunted || d < player.distanceTo(best)) && (hunted || d <= NEAR || WorldSenses.sees(player, hands.yaw, hands.pitch, other))) {
 				best = other;
 				if (hunted) break;
 			}
@@ -5041,7 +5041,7 @@ public final class Companion {
 	void hunt(ServerPlayer who) {
 		huntFor = who.getUUID();
 		huntName = who.getName().getString();
-		huntUntil = player.level().getGameTime() + 20 * 60 * 4;
+		huntUntil = player.level().getGameTime() + 20 * 60 * (pip() ? 15 : 4);   // (StockXen: no range limit, so longer to get there)
 	}
 
 	/** On its way to the one it's after (the fight itself is its fighting's). Null: not hunting, or that one's gone, or not a fair fight. */
