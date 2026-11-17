@@ -265,6 +265,8 @@ public final class Companion {
 
 	/** StockXen out of hiding: geared (full diamond and a diamond sword), it hunts; till then it keeps out of sight and gathers, and nobody goes after it. */
 	boolean stockRevealed;
+	/** Since when it's been following (its leader, a trip): an hour of following a Xen that isn't going anywhere is a bug. */
+	private long followSince = -1;
 
 	private boolean pipped;
 	private long pipHuntAt;
@@ -288,6 +290,22 @@ public final class Companion {
 	}
 
 	void tick() {
+		if (player != null && owner == null) {                              // following no one: its own things again (a trip it was on lost over a restart left it following nobody; 13 of 20 stood about so, an hour)
+			long nowF = player.level().getGameTime();
+			if (mode != Mode.FOLLOW) followSince = -1;
+			else if (followSince < 0) followSince = nowF;
+			if (mode == Mode.FOLLOW && buddyOf == null && comeFor == null && nowF % 100 == 0) {
+				ServerPlayer l = leader == null ? null : server.getPlayerList().getPlayer(leader);
+				boolean xenLead = l instanceof XenPlayer;
+				if (l == null || !l.isAlive() || l.level() != player.level() || xenLead && (nowF - followSince > 20 * 60 * 10 || l.distanceTo(player) > 96)) {
+					mode = Mode.FREE;
+					leader = null;
+					followSince = -1;
+					journal("does", "no one to follow: back to its own things");
+					XenMod.LOG.info("{} was following no one: back to its own things", name);
+				}
+			}
+		}
 		if (pip() && player != null) {
 			if (!pipped) pipUp();
 			long now = player.level().getGameTime();
