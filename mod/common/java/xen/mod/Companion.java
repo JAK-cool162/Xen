@@ -5649,11 +5649,13 @@ public final class Companion {
 			for (int k = 0; k < 8; k++) {
 				double a = random.nextDouble() * Math.PI * 2, r = 48 + random.nextDouble() * 48;
 				int x = (int) Math.floor(from.x + Math.cos(a) * r), z = (int) Math.floor(from.z + Math.sin(a) * r);
+				if (!ow.isLoaded(new BlockPos(x, 64, z))) continue;             // (only ground it can know: in a chunk not loaded the ground reads as the bottom of the world, and no monsters show; Dee woke at y 7 in the dark, then fell out of the world)
 				Vec3 cand = dryNear(ow, new Vec3(x + 0.5, ow.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z + 0.5));
-				if (cand == null) continue;
+				if (cand == null || cand.y < ow.getSeaLevel() - 8 || !ow.isLoaded(BlockPos.containing(cand))
+						|| !ow.getBlockState(BlockPos.containing(cand).below()).isCollisionShapeFullBlock(ow, BlockPos.containing(cand).below())) continue;   // (on open ground at the surface, standing on something)
 				boolean clear = ow.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(cand, cand).inflate(24),
 						m -> m.isAlive() && m instanceof net.minecraft.world.entity.monster.Enemy).isEmpty();
-				if (clear || k == 7) {
+				if (clear) {                                                   // (none clear: its own bed after all, rather than a guess)
 					at = cand;
 					XenMod.LOG.info("{} died again soon after waking at night: wakes {} blocks off this time{}", name, (int) cand.distanceTo(from), clear ? ", no monsters there" : "");
 					break;
