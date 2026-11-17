@@ -280,7 +280,11 @@ final class Btb {
 			if (c.enchanter.possible() && c.player.level().getGameTime() > c.enchanter.retryAt)   // (not again the moment it couldn't: Ann tried every three seconds)
 				out.add(new Option(Task.ENCHANT, 5.4f, "the makings of an enchantment: its gear enchanted"));   // (all it needs in hand: before another round of its kit; Fin, a table, lapis, 25 levels, went hunting instead at 4.2 against 5.6)
 			else if (c.enchanter.table() == null && invCount("enchanting_table") == 0)   // (a table it has: waiting on its levels or its next go, not another table; Cid, just enchanted, set off for four more obsidian)
-				out.add(new Option(Task.TABLE, 3.2f, "an enchanting table (a book, four obsidian)"));
+			{
+				boolean rest = invCount("obsidian") >= 4 && invCount("diamond") >= 2 && invCount("lapis_lazuli") >= 1 && c.player.experienceLevel >= 5;   // (all but the book: the table is all that stands between it and enchanting; the whole of red, 21 to 34 levels, obsidian, diamonds and lapis in hand, went smelting and trading at 3.2 against 5.5)
+				boolean bookNow = invCount("book") > 0 || invCount("paper") >= 3 && invCount("leather") >= 1;
+				out.add(new Option(Task.TABLE, rest ? (bookNow ? 5.8f : 5.0f) : 3.2f, rest ? "an enchanting table: all it needs but the book" : "an enchanting table (a book, four obsidian)"));
+			}
 		}
 		XenMod.Project proj = c.mod.project(c);
 		boolean builder = c.roleTask == Task.FORT;                             // (its role: the team's builder, it starts the base, builds it, extends it)
