@@ -754,6 +754,11 @@ final class Crafter {
 	private Action roomForTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
+		if (nookAt != null && level.getBlockState(nookAt).canBeReplaced()) {   // its nook dug: now the table goes in it (Fin and Rex dug nook after nook and never tried one: twenty minutes)
+			nookAt = null;
+			tableFails = 0;
+			return null;
+		}
 		if (tableFails < 2 || tableFailAt == null || tableFailAt.distSqr(feet) > 16)   // (spots in reach that it tried twice and couldn't put it on, a tunnel's: a nook of its own instead; Nia, three times from its mine at y 28)
 			for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -1; dy <= 1; dy++) {
 				BlockPos pos = feet.offset(dx, dy, dz);
@@ -767,7 +772,10 @@ final class Crafter {
 			for (Direction e : Direction.values()) if (!level.getFluidState(side.relative(e)).isEmpty()) wet = true;
 			if (wet) continue;
 			c.goals.instant = "digging a nook in the wall for its crafting table";
-			if (c.hands.mine(side)) return Action.IDLE;
+			if (c.hands.mine(side)) {
+				nookAt = side.immutable();
+				return Action.IDLE;
+			}
 		}
 		BlockPos best = null;
 		for (int dx = -10; dx <= 10; dx++) for (int dz = -10; dz <= 10; dz++) for (int dy = -2; dy <= 2; dy++) {
@@ -811,6 +819,8 @@ final class Crafter {
 
 	/** Times running it couldn't put its table down on the spots in reach, and where (somewhere else: a fresh try). */
 	private int tableFails;
+	/** The nook it's digging for its table (dug: the table goes there). */
+	private BlockPos nookAt;
 	private BlockPos tableFailAt;
 
 	/** At the table: right-click it, click the recipe, take the tool, close it. */
