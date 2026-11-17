@@ -1459,6 +1459,10 @@ final class Btb {
 	private String planFor(String item, int n, String why) {
 		if (!item.equals(c.plans.goal)) c.plans.setGoal(item, n, null);
 		Plans.Step s = c.plans.advice();
+		if (s == null) {                                                         // (its own old goal for the same thing, let go of just now, or a plan from before what it has changed: worked out afresh once; Kai and Cid, "no way to book" with the way in hand)
+			c.plans.setGoal(item, n, null);
+			s = c.plans.advice();
+		}
 		if (s == null) return "no way to " + item.replace('_', ' ') + " it knows of";
 		if (c.plans.start(s.option)) return "You will " + s.says() + " (" + why + ").";
 		return "can't now: " + s.says();
