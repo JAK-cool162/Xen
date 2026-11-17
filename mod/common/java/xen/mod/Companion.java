@@ -272,6 +272,7 @@ public final class Companion {
 	/** Pip's max: brave, tireless, curious, hungry for power, loyal to nobody; every fighting knack and every skill at the top. */
 	private void pipUp() {
 		pipped = true;
+		if (buddyOf == null) mode = Mode.FREE;                             // (its own boss: it follows nobody; summoned fresh it was left in follow mode with no one to follow, and stood about)
 		var p = personality;
 		p.bravery = 1f;
 		p.curiosity = 1f;

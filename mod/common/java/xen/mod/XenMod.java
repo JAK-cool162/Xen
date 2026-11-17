@@ -1638,6 +1638,7 @@ public class XenMod implements ModInitializer {
 
 	/** On the same side: both on the same team, or no teams to speak of (either on none). */
 	boolean sameSide(Companion a, Companion b) {
+		if (a.pip() || b.pip()) return a == b;                           // (StockXen: no side but its own; no team didn't mean everyone's teammate)
 		String ta = teamOf(a), tb = teamOf(b);
 		return ta == null || tb == null || ta.equals(tb);
 	}
