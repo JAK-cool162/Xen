@@ -3325,13 +3325,14 @@ public final class Companion {
 	private void totems() {
 		int n = 0;
 		var inv = player.getInventory();
-		for (int i = 0; i < inv.getContainerSize(); i++) if (Hands.isTotem(inv.getItem(i))) n += inv.getItem(i).getCount();
-		if (Hands.isTotem(player.getOffhandItem())) n++;
+		for (int i = 0; i < Math.min(36, inv.getContainerSize()); i++) if (Hands.isTotem(inv.getItem(i))) n += inv.getItem(i).getCount();   // (its bag: the inventory's own count takes in its armor and off hand too, so a held totem counted twice and one put back looked used up)
+		if (Hands.isTotem(player.getOffhandItem())) n += player.getOffhandItem().getCount();
+		boolean popped = totemsHad > n && player.hasEffect(net.minecraft.world.effect.MobEffects.REGENERATION) && player.hasEffect(net.minecraft.world.effect.MobEffects.ABSORPTION);   // (gone with the game's totem effects on: it went off)
 		if (totemsHad > n && player.hasEffect(net.minecraft.world.effect.MobEffects.REGENERATION) && player.getHealth() <= 8) {
 			say(pick3("My totem saved me!", "Whoa, that was close. Bye, totem.", "The totem! I'd be dead without it."));
 			journal("does", "a totem of undying saved its life");
 		}
-		if (pip() && totemsHad > n && !mod.stockTotemUsed()) stockTotemSpent("its totem went off in its hand");   // (the game's own totem, in its hand: its first chance spent)
+		if (pip() && popped && !mod.stockTotemUsed()) stockTotemSpent("its totem went off in its hand");   // (the game's own totem, in its hand: its first chance spent)
 		if (pip() && mod.stockTotemUsed() && n > 0) {                              // two chances, no more: a totem it comes by later isn't its to use
 			for (int i = 0; i < inv.getContainerSize(); i++) if (Hands.isTotem(inv.getItem(i))) inv.setItem(i, net.minecraft.world.item.ItemStack.EMPTY);
 			if (Hands.isTotem(player.getOffhandItem())) player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, net.minecraft.world.item.ItemStack.EMPTY);
