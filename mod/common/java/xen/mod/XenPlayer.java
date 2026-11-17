@@ -173,6 +173,7 @@ public class XenPlayer extends ServerPlayer {
 
 	@Override
 	public void die(DamageSource source) {
+		if (companion != null && companion.stockTotem(source)) return;            // StockXen: its totem in its bag takes the first fatal hit (not a death: no respawn, nothing dropped)
 		super.die(source);
 		if (companion != null) companion.died(source);
 	}

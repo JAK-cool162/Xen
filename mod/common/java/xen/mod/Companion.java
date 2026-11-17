@@ -232,6 +232,37 @@ public final class Companion {
 		return name.equals("StockXen");
 	}
 
+	/** StockXen's first chance spent (its totem): told to everyone, kept with the world. Not a death: no respawn, nothing dropped. */
+	void stockTotemSpent(String how) {
+		if (mod.stockTotemUsed()) return;
+		mod.stockSetTotemUsed();
+		mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] StockXen's totem saved him (" + how + "). His next death is his last.")
+				.withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
+		XenMod.LOG.info("StockXen's totem saved him ({}): one chance left", how);
+	}
+
+	/**
+	 * A fatal hit with its totem in its bag, not its hand (the game's own totem only works held): the same as the game's
+	 * totem, by hand. Its one totem used up, one health, the totem's effects; it lives. False: no totem left to use.
+	 */
+	boolean stockTotem(net.minecraft.world.damagesource.DamageSource source) {
+		if (!pip() || player == null || mod.stockTotemUsed()) return false;
+		var inv = player.getInventory();
+		int slot = -1;
+		for (int i = 0; i < inv.getContainerSize() && slot < 0; i++) if (Hands.isTotem(inv.getItem(i))) slot = i;
+		if (slot < 0) return false;
+		inv.getItem(slot).shrink(1);
+		player.setHealth(1f);
+		player.removeAllEffects();
+		player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.REGENERATION, 900, 1));
+		player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.ABSORPTION, 100, 1));
+		player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.FIRE_RESISTANCE, 800, 0));
+		player.level().broadcastEntityEvent(player, (byte) 35);                   // (the totem's flash and sound, as the game does it)
+		totemsHad = Math.max(0, totemsHad - 1);
+		stockTotemSpent(source.getLocalizedDeathMessage(player).getString().replace("StockXen ", ""));
+		return true;
+	}
+
 	/** StockXen out of hiding: geared (full diamond and a diamond sword), it hunts; till then it keeps out of sight and gathers, and nobody goes after it. */
 	boolean stockRevealed;
 
@@ -252,7 +283,7 @@ public final class Companion {
 		for (int i = 0; i < p.fightGenes.length; i++) p.fightGenes[i] = 1f;
 		if (p.fightGenes.length > 8) p.fightGenes[8] = 0.35f;                   // (retreat: it backs off only when it must)
 		for (int i = 0; i < skills.level.length; i++) skills.level[i] = 1f;
-		XenMod.LOG.info("StockXen is here, quietly: every stat at its max, no team, no rules, {} of 10 lives left; resources first", mod.pipLivesLeft());
+		XenMod.LOG.info("StockXen is here: every stat at its max, no team, no rules; {}", mod.stockTotemUsed() ? "its totem spent, one chance left" : "two chances (its totem, then its life)");
 	}
 
 	void tick() {
@@ -3299,6 +3330,12 @@ public final class Companion {
 			say(pick3("My totem saved me!", "Whoa, that was close. Bye, totem.", "The totem! I'd be dead without it."));
 			journal("does", "a totem of undying saved its life");
 		}
+		if (pip() && totemsHad > n && !mod.stockTotemUsed()) stockTotemSpent("its totem went off in its hand");   // (the game's own totem, in its hand: its first chance spent)
+		if (pip() && mod.stockTotemUsed() && n > 0) {                              // two chances, no more: a totem it comes by later isn't its to use
+			for (int i = 0; i < inv.getContainerSize(); i++) if (Hands.isTotem(inv.getItem(i))) inv.setItem(i, net.minecraft.world.item.ItemStack.EMPTY);
+			if (Hands.isTotem(player.getOffhandItem())) player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND, net.minecraft.world.item.ItemStack.EMPTY);
+			n = 0;
+		}
 		totemsHad = n;
 		if (n > 0 && dangerous()) hands.holdTotem();
 	}
@@ -5484,19 +5521,17 @@ public final class Companion {
 					+ "): " + source.getLocalizedDeathMessage(player).getString()).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
 			XenMod.LOG.info("StockXen killed {} ({})", name, mod.teamOf(this));
 		}
-		if (pip() && !inArena) {                                      // StockXen: ten lives, then banned for good
-			int left = mod.pipDied();
+		if (pip() && !inArena) {                                      // StockXen: two chances (its totem, then this): a real death is the end
+			mod.stockSetEliminated();
 			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] StockXen died (" + source.getLocalizedDeathMessage(player).getString()
-					+ "): " + left + " of 10 lives left." + (left <= 0 ? " StockXen is banned." : "")).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
-			XenMod.LOG.info("StockXen died: {} of 10 lives left", left);
-			if (left <= 0) {
-				goneHow = source.getLocalizedDeathMessage(player).getString();
-				goneAt = here;
-				lore("StockXen is banned: ten lives spent");
-				goneIn = 40;
-				respawnIn = -1;
-				return;
-			}
+					+ "). Eliminated for good.").withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
+			XenMod.LOG.info("StockXen died ({}): eliminated for good", source.getLocalizedDeathMessage(player).getString());
+			goneHow = source.getLocalizedDeathMessage(player).getString();
+			goneAt = here;
+			lore("StockXen is eliminated: totem spent, then this death");
+			goneIn = 40;
+			respawnIn = -1;
+			return;
 		}
 		if (hardcore() && !inArena) {                                 // one life: that was it
 			goneHow = source.getLocalizedDeathMessage(player).getString();

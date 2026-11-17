@@ -2311,36 +2311,60 @@ public class XenMod implements ModInitializer {
 		return made;
 	}
 
-	/** Pip's deaths, kept with the world: ten and it's banned. */
+	/** StockXen's two chances, kept with the world: its totem (spent or not), and whether it's gone for good. */
 	private java.nio.file.Path pipFile() {
 		return brainFile().resolveSibling("stockxen.json");
 	}
 
-	int pipLivesLeft() {
+	private com.google.gson.JsonObject stockState() {
 		try {
-			if (!Files.exists(pipFile())) return 10;
-			var o = com.google.gson.JsonParser.parseString(Files.readString(pipFile())).getAsJsonObject();
-			return 10 - o.get("deaths").getAsInt();
+			if (Files.exists(pipFile())) return com.google.gson.JsonParser.parseString(Files.readString(pipFile())).getAsJsonObject();
 		} catch (Exception e) {
-			return 10;
+			LOG.warn("Xen: couldn't read StockXen's chances: {}", e.toString());
+		}
+		return new com.google.gson.JsonObject();
+	}
+
+	private void stockSave(com.google.gson.JsonObject o) {
+		try {
+			Files.createDirectories(pipFile().getParent());
+			Files.writeString(pipFile(), o.toString());
+		} catch (Exception e) {
+			LOG.warn("Xen: couldn't keep StockXen's chances: {}", e.toString());
 		}
 	}
 
-	/** Pip died: one life less (what's left). */
-	int pipDied() {
-		int left = pipLivesLeft() - 1;
-		try {
-			Files.createDirectories(pipFile().getParent());
-			Files.writeString(pipFile(), "{\"deaths\": " + (10 - left) + "}");
-		} catch (Exception e) {
-			LOG.warn("Xen: couldn't keep Pip's lives: {}", e.toString());
+	private Boolean stockTotemCache;
+
+	boolean stockTotemUsed() {
+		if (stockTotemCache == null) {
+			var o = stockState();
+			stockTotemCache = o.has("totemUsed") && o.get("totemUsed").getAsBoolean();
 		}
-		return left;
+		return stockTotemCache;
+	}
+
+	void stockSetTotemUsed() {
+		stockTotemCache = true;
+		var o = stockState();
+		o.addProperty("totemUsed", true);
+		stockSave(o);
+	}
+
+	boolean stockEliminated() {
+		var o = stockState();
+		return o.has("eliminated") && o.get("eliminated").getAsBoolean();
+	}
+
+	void stockSetEliminated() {
+		var o = stockState();
+		o.addProperty("eliminated", true);
+		stockSave(o);
 	}
 
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
-		if (wanted != null && wanted.equals("StockXen") && pipLivesLeft() <= 0) {
-			ctx.getSource().sendFailure(Component.literal("StockXen is banned: ten lives spent."));
+		if (wanted != null && wanted.equals("StockXen") && stockEliminated()) {
+			ctx.getSource().sendFailure(Component.literal("StockXen is eliminated: no more chances."));
 			return 0;
 		}
 		if (wanted != null && wanted.equalsIgnoreCase("random")) wanted = null;   // "random": a random name and skin
