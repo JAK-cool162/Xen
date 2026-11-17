@@ -246,7 +246,7 @@ final class Leader {
 		float bestWorth = 0;
 		for (Companion m : members) {
 			if (m == lead || m.player() == null || m.personality.loyalty >= 0.6f) continue;
-			float worth = (0.6f - m.personality.loyalty) + (Companion.fullDiamond(m.player()) ? 0.3f : 0) + 0.05f * enchantedPieces(m);
+			float worth = (0.6f - m.personality.loyalty) + (m.personality.loyalty < 0.3f ? 0.5f : 0) + (Companion.fullDiamond(m.player()) ? 0.3f : 0) + 0.05f * enchantedPieces(m);   // (one who might leave now first: Cid talked to Kai, safe, while Oto wavered)
 			if (best == null || worth > bestWorth) {
 				best = m;
 				bestWorth = worth;
