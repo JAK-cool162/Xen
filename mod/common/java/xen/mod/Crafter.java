@@ -754,10 +754,11 @@ final class Crafter {
 	private Action roomForTable() {
 		ServerLevel level = (ServerLevel) c.player.level();
 		BlockPos feet = c.player.blockPosition();
-		for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -1; dy <= 1; dy++) {
-			BlockPos pos = feet.offset(dx, dy, dz);
-			if (tableSpot(level, pos, feet) && c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) <= 4.3) return null;
-		}
+		if (tableFails < 2 || tableFailAt == null || tableFailAt.distSqr(feet) > 16)   // (spots in reach that it tried twice and couldn't put it on, a tunnel's: a nook of its own instead; Nia, three times from its mine at y 28)
+			for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) for (int dy = -1; dy <= 1; dy++) {
+				BlockPos pos = feet.offset(dx, dy, dz);
+				if (tableSpot(level, pos, feet) && c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) <= 4.3) return null;
+			}
 		for (Direction d : Direction.Plane.HORIZONTAL) {                  // boxed in (its night hole, a tunnel): a nook in the wall at its feet for the table, as a player digs one (Max tried for its shield five times from its covered hole, and made nothing)
 			BlockPos side = feet.relative(d);
 			var st = level.getBlockState(side);
@@ -799,11 +800,18 @@ final class Crafter {
 			if (c.hands.placeSeen(pos, s -> path(s).equals("crafting_table"), pos.below(), Direction.UP, -1)) {
 				table = tableSeen = pos;
 				placedTable = pos;
+				tableFails = 0;
 				return true;
 			}
 		}
+		tableFails = tableFailAt != null && tableFailAt.distSqr(feet) <= 16 ? tableFails + 1 : 1;
+		tableFailAt = feet.immutable();
 		return false;
 	}
+
+	/** Times running it couldn't put its table down on the spots in reach, and where (somewhere else: a fresh try). */
+	private int tableFails;
+	private BlockPos tableFailAt;
 
 	/** At the table: right-click it, click the recipe, take the tool, close it. */
 	private boolean craftAt(BlockPos at, String name) {
