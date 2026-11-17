@@ -505,7 +505,7 @@ final class Btb {
 			break;
 		}
 		if (task != Task.NONE) {
-			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.TABLE && shelfFrom >= 0 ? booksStep() : task == Task.GRIND ? grindStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
+			if (busy()) return task == Task.EXPLORE ? c.goals.exploreStep() : task == Task.RETREAT || task == Task.SHELTER && retreatTo != null ? retreatStep() : task == Task.TABLE && caneTo != null ? caneStep() : task == Task.TABLE && shelfFrom >= 0 ? booksStep() : task == Task.GRIND ? grindStep() : task == Task.SLEEP ? c.sleepNear() : null;   // (still on it: a trip, a build, a look around)
 			finish(o);                                                                // (its chore ended: how did that go?)
 		}
 		thinkGoal(o);
@@ -1447,12 +1447,42 @@ final class Btb {
 			shelfAt = null;
 			return "You will put your bookshelf down and break it for its three books.";
 		}
-		if (!tabled && it.getOrDefault("book", 0) < 1) return planFor("book", 1, "a book for the enchanting table");
+		if (!tabled && it.getOrDefault("book", 0) < 1) {
+			String r = planFor("book", 1, "a book for the enchanting table");
+			if (r.startsWith("can't now: go to the")) {                          // (no cane in reach of its sense of the world: off to the river it saw, then it looks there; Cid, "can't now" again and again with the way in hand)
+				Object[] b = c.biomes.nearestWith("sugar_cane");
+				if (b != null) {
+					caneTo = (BlockPos) b[0];
+					caneFrom = now();
+					return "You will head for the " + ((String) b[1]).replace('_', ' ') + " " + (int) Math.sqrt(caneTo.distSqr(c.player.blockPosition())) + " blocks off, for sugar cane (a book for the enchanting table).";
+				}
+			}
+			return r;
+		}
 		if (tabled && c.player.experienceLevel < 3) {                           // the table, no levels to pay with: coal ore gives them (and torches)
 			String xp = c.chores.mine(c.lessons.depth("coal", 40), "coal", 16);
 			if (xp != null && xp.startsWith("You will")) return xp + " (levels to enchant with)";
 		}
 		return c.nether.go("table", 0);
+	}
+
+	/** The river it's walking to for its book's sugar cane, and since when (five minutes, then it looks again). */
+	private BlockPos caneTo;
+	private long caneFrom = -1;
+
+	private Action caneStep() {
+		if (caneTo == null || c.player == null) return null;
+		var to = net.minecraft.world.phys.Vec3.atBottomCenterOf(caneTo);
+		double d = c.player.position().distanceTo(to);
+		if (d < 20) {                                                            // there: the cane it sees now, its plan picks
+			caneTo = null;
+			return null;
+		}
+		c.goals.instant = "heading for the river, for sugar cane";
+		Action a = d > 48 ? c.wanderTo(to) : c.walkTo(to);
+		if (a == null) a = c.walkTo(to);
+		if (a == null) caneTo = null;                                            // (no way there)
+		return a;
 	}
 
 	/** The next step of its plan for this (the recipe tree works out what's missing): started, "You will ...", or why not. */
@@ -1494,7 +1524,7 @@ final class Btb {
 		if (task == Task.EXPLORE) return now() - taskAt < 20 * 45 && !(c.player.level().isDarkOutside() && c.player.level().canSeeSky(c.player.blockPosition().above()));   // (a look around: most of a minute; out under the night sky it stops)
 		return task != Task.NONE && (c.chores.busy() || c.builder.busy() || c.nether.busy() || c.enchanter.on || c.trials.on || (task == Task.VISIT || task == Task.TABLE) && c.visits.visiting()
 				|| task == Task.STASH && c.storage.busy() || (task == Task.RETREAT || task == Task.SHELTER) && retreatTo != null || task == Task.TRADE && c.visits.visiting()
-				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.GRIND && grindFrom >= 0 && now() - grindFrom < 20 * 90 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
+				|| task == Task.TABLE && shelfFrom >= 0 && now() - shelfFrom < 20 * 30 || task == Task.TABLE && caneTo != null && now() - caneFrom < 20 * 60 * 5 || task == Task.GRIND && grindFrom >= 0 && now() - grindFrom < 20 * 90 || task == Task.FARM && c.farmer.on || task == Task.FOOD && (c.fisher.on || c.visits.visiting()));
 	}
 
 	/** Every tick: what hurt it while it was on its task (for its learning). */
