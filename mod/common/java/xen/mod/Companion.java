@@ -5479,6 +5479,11 @@ public final class Companion {
 			helper = tripBuddy;
 		}
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
+		if (!pip() && source.getEntity() instanceof XenPlayer kx && kx.companion != null && kx.companion.pip()) {   // StockXen's kill: everyone hears it
+			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] StockXen killed " + name + " (" + String.valueOf(mod.teamOf(this)).replace("xen_", "")
+					+ "): " + source.getLocalizedDeathMessage(player).getString()).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
+			XenMod.LOG.info("StockXen killed {} ({})", name, mod.teamOf(this));
+		}
 		if (pip() && !inArena) {                                      // StockXen: ten lives, then banned for good
 			int left = mod.pipDied();
 			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] StockXen died (" + source.getLocalizedDeathMessage(player).getString()
