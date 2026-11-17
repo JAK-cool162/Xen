@@ -299,7 +299,7 @@ public final class Companion {
 				pipHuntAt = now;
 				ServerPlayer near = null;
 				for (ServerPlayer o : server.getPlayerList().getPlayers())
-					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level()
+					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level() && !(o instanceof XenPlayer xo && xo.companion != null && now - xo.companion.respawnedAt < 20 * 60 * 3)
 							&& (near == null || o.distanceTo(player) < near.distanceTo(player))) near = o;
 				if (near != null) hunt(near);
 			}
@@ -5019,6 +5019,7 @@ public final class Companion {
 			boolean pipFight = pip() && stockRevealed || other instanceof XenPlayer po && po.companion != null && po.companion.pip();   // (StockXen: no team, no rules; anyone who sees it goes for it, hiding or not; it goes for them only once out of hiding)
 			if (!pipFight && (pip() || other instanceof XenPlayer po2 && po2.companion != null && po2.companion.pip())) continue;
 			if (!pipFight && (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other))) continue;
+			if (pipFight && !pip() && (player.level().getGameTime() - respawnedAt < 20 * 60 * 3 || player.getArmorValue() == 0 && !isWeapon(player.getMainHandItem()))) continue;   // (after StockXen: not just back from dying, nor with no armor and no weapon; Sol went at it bare-handed ten times in four minutes, back each time)
 			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;
 			String held = BuiltInRegistries.ITEM.getKey(other.getMainHandItem().getItem()).getPath();
 			boolean bare = other.getArmorValue() == 0 && !held.endsWith("_sword") && !held.endsWith("_axe") && !held.equals("trident") && !held.equals("mace");
