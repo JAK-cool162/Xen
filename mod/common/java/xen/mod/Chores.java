@@ -1140,7 +1140,7 @@ final class Chores {
 			int top = c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
 			if (top - feet.getY() > 6) {
 				doing = "heading up to the surface for trees";
-				return c.walkTo(new net.minecraft.world.phys.Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
+				return climbUp(feet, top);
 			}
 		}
 		if (known == null && forWood && c.mod.config.luck >= 2 && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {   // knowing everything: the nearest tree (Bob looked round the plains for trees four minutes)
@@ -3344,6 +3344,46 @@ final class Chores {
 	private BlockPos plugTarget;
 	private int lavaPlugs;
 
+	/** Its climb to the surface: the best height it's reached and when, and whether it's digging its own stairs now. */
+	private int climbBestY;
+	private long climbBestAt, climbSeenAt = -1_000;
+	private boolean climbByStairs;
+	private net.minecraft.core.Direction climbDir = net.minecraft.core.Direction.NORTH;
+
+	/**
+	 * Up to the surface, as a player does: a way up it can walk (a cave's slope), and when that gets it no higher for ten
+	 * seconds, its own staircase dug up (Ivy walked and waited at y 41 for three hours, Pia at y -4: "heading up to the
+	 * surface for trees", no way up it could find, and never a block dug).
+	 */
+	private Action climbUp(BlockPos feet, int top) {
+		long t = now();
+		if (t - climbSeenAt > 200) {                                        // (a new climb)
+			climbBestY = feet.getY();
+			climbBestAt = t;
+			climbByStairs = false;
+		}
+		climbSeenAt = t;
+		if (feet.getY() > climbBestY) {
+			climbBestY = feet.getY();
+			climbBestAt = t;
+		}
+		if (!climbByStairs && t - climbBestAt > 20 * 10) climbByStairs = true;   // (ten seconds, no higher: its own stairs)
+		if (!climbByStairs) {
+			Action a = c.walkTo(new Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
+			if (a != null) return a;
+			climbByStairs = true;                                           // (no way up at all: its own stairs straight off)
+		}
+		for (int i = 0; i < 4; i++) {
+			Action s = c.walker.stairsUp(climbDir);
+			if (s != null) {
+				doing = doing + " (digging stairs up)";
+				return s;
+			}
+			climbDir = climbDir.getClockWise();                            // (that way's lava, water, bedrock: another)
+		}
+		return c.walkTo(new Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
+	}
+
 	private Action mine(BlockPos b) {
 		ServerLevel level = (ServerLevel) c.player.level();
 		boolean quenched = level.getBlockState(b).is(net.minecraft.world.level.block.Blocks.OBSIDIAN) && level.getFluidState(b.above()).is(net.minecraft.tags.FluidTags.WATER);   // (obsidian with water running over it: the hole fills with water, the lava by it turns to obsidian too)
@@ -3561,7 +3601,7 @@ final class Chores {
 			boolean needs = !c.hands.canEat() && (food.getFoodLevel() <= 10 || c.player.getHealth() <= 12 && food.getFoodLevel() < 18);   // (nothing to eat, and hungry, or hurt and not healing: worth the climb; well fed, the mine comes first: Bob climbed out at twenty health for a sheep)
 			if (needs && world.dimension() == net.minecraft.world.level.Level.OVERWORLD && !world.isDarkOutside() && top - at.getY() > 6) {   // (by day: up to where they are, as for trees; Ann, five health and nothing to eat, ten minutes down there "no animals down here")
 				doing = forWool ? "heading up to the surface for sheep" : "heading up to the surface for animals";
-				return c.walkTo(new net.minecraft.world.phys.Vec3(at.getX() + 0.5, top, at.getZ() + 0.5));
+				return climbUp(at, top);
 			}
 			finish(forWool ? "No sheep down here." : "No animals down here.");
 			return null;
