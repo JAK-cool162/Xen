@@ -323,6 +323,23 @@ final class Leader {
 				}
 			}
 		}
+		XenMod.Project pj = mod.project(lead);                                   // its builders on the base: the team brings them wood and stone (one builder alone needed 178 logs and 192 stone)
+		if (pj != null && !pj.finished && pj.on != null)
+			for (Companion m : members) {
+				if (!pj.on.contains(m.name) || m.btb.task != Btb.Task.FORT) continue;
+				for (String[] want : new String[][] {{"log", "*_log", "24", "16"}, {"cobblestone", "cobblestone", "96", "64"}}) {
+					if (m.btb.invCount(want[1]) >= 64) continue;
+					for (Companion g : members) {
+						if (g == m || g.btb.invCount(want[1]) < Integer.parseInt(want[2]) || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE
+								|| g.btb.task == Btb.Task.FORT || g.player().level() != m.player().level() || g.player().distanceTo(m.player()) > 160) continue;
+						String r = g.chores.give(m.player(), want[0], Integer.parseInt(want[3]));
+						if (r != null && r.startsWith("You will")) {
+							XenMod.LOG.info("{} (leads {}): team share: {} brings {} {} to {} (building the base)", lead.name, team.replace("xen_", ""), g.name, want[3], want[0], m.name);
+							return;
+						}
+					}
+				}
+			}
 		for (Companion m : members) {                                          // diamonds in its bag and nothing to make armor on: a teammate's logs (Ann carried 27 diamonds round a treeless savanna)
 			if (m.btb.invCount("diamond") < 5 || m.btb.invCount("crafting_table") > 0 || m.btb.invCount("*_log") >= 2 || m.btb.invCount("*_planks") >= 4) continue;
 			for (Companion g : members) {

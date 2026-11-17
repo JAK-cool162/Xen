@@ -1770,6 +1770,8 @@ public class XenMod implements ModInitializer {
 		long seed;
 		boolean finished;
 		java.util.List<String> by = new ArrayList<>();
+		/** Who took up the part being built now (they see it through; cleared when it's done). */
+		java.util.List<String> on = new ArrayList<>();
 		/** Its parts from schematics, in order: "name|dx|dz" from where it is (empty: a place it pictures itself). */
 		java.util.List<String> plan = new ArrayList<>();
 		/** Where each part's corner went when it was first begun (by its number): taken up again, the same spot, not the top of what's built. */
@@ -1835,6 +1837,7 @@ public class XenMod implements ModInitializer {
 		Project pj = project(c);
 		if (pj == null || pj.finished) return;
 		pj.partsDone++;
+		if (pj.on != null) pj.on.clear();
 		if (pj.plan != null && !pj.plan.isEmpty()) {
 			pj.parts = pj.plan.size();
 			last = pj.partsDone >= pj.plan.size();

@@ -37,8 +37,7 @@ final class Btb {
 	/** Why it is doing it, in words. */
 	String why = "";
 	private long taskAt;
-	/** The team base's parts built when it took one up (-1: none taken up): it stays on it till that part's done. */
-	private int fortCommitParts = -1;
+
 	private String stateAt = "";
 	private float hurtSince;
 	private int deathsAt, tierAt, ironAt, fuelAt, enchantStuffAt, levelAt;
@@ -287,13 +286,8 @@ final class Btb {
 		boolean builder = c.roleTask == Task.FORT;                             // (its role: the team's builder, it starts the base, builds it, extends it)
 		if (builder && !o.night && !dusk && o.overworld && o.tier >= 2 && o.health >= 12 && o.meals > 0 && (proj == null || proj.finished || !c.player.blockPosition().closerThan(proj.at(), 300)))
 			out.add(new Option(Task.FORT, 4.5f, proj == null ? "its role, builder: the team's base, begun" : "its role, builder: the team's base, built on"));
-		if (fortCommitParts >= 0) {                                               // a part of the team's base it took up: it finishes it before anything else but the night, food, and its health
-			if (proj == null || proj.finished || proj.partsDone > fortCommitParts) {
-				if (proj != null && proj.partsDone > fortCommitParts) XenMod.LOG.info("{} btb: its part of the team's base is built ({} of {})", c.name, proj.partsDone, Math.max(1, proj.plan.size()));
-				fortCommitParts = -1;
-			} else if (!o.night && !dusk && o.overworld && o.health >= 10 && o.meals > 0)
-				out.add(new Option(Task.FORT, 6.2f, "the part of the team's base it started: it finishes it (no half-built base)"));
-		}
+		if (proj != null && !proj.finished && proj.on != null && proj.on.contains(c.name) && !o.night && !dusk && o.overworld && o.health >= 10 && o.meals > 0)
+			out.add(new Option(Task.FORT, 6.2f, "the part of the team's base it took up: it finishes it (no half-built base)"));   // (before anything else but the night, food, and its health)
 		if (builder && proj != null && !proj.finished && !o.night && !dusk && o.overworld && o.tier >= 2 && o.health >= 12 && o.meals > 0)
 			out.add(new Option(Task.FORT, 5.0f, "its role, builder: the team's base, built on"));
 		if (c.roleTask == Task.FIND && !o.night && !dusk && o.overworld && o.health >= 12 && o.meals > 0)
@@ -733,6 +727,15 @@ final class Btb {
 		return "will build its team's base (the next part) now";
 	}
 
+	/** It takes up the part of its team's base being built now: it's on it (kept in the team's project, so a restart doesn't forget) till that part's done. */
+	private void commit(XenMod.Project pj) {
+		if (pj.on == null) pj.on = new java.util.ArrayList<>();
+		if (pj.on.contains(c.name)) return;
+		pj.on.add(c.name);
+		c.mod.saveProjects();
+		XenMod.LOG.info("{} btb: commits to the team's base until part {} of {} is built", c.name, pj.partsDone + 1, Math.max(1, pj.plan.size()));
+	}
+
 	private String fortStep() {
 		for (Companion o : c.mod.companions) {
 			if (o == c || o.player() == null || !o.builder.fortress || !o.builder.busy() || !c.mod.sameSide(o, c) || c.mod.teamOf(c) == null) continue;
@@ -741,7 +744,7 @@ final class Btb {
 			if (r != null && r.startsWith("You will")) {
 				XenMod.LOG.info("{} btb: helps {} build the team's fortress", c.name, o.name);
 				XenMod.Project hp = c.mod.project(c);
-				if (hp != null && fortCommitParts < 0) fortCommitParts = hp.partsDone;   // (helping: it sees that part through too)
+				if (hp != null) commit(hp);                                          // (helping: it sees that part through too)
 			}
 			return r;
 		}
@@ -753,10 +756,7 @@ final class Btb {
 			XenMod.LOG.info("{} extends its team's base: another house ({} parts now)", c.name, pj.plan.size());
 		}
 		if (pj != null && pj.finished) return "The team's fortress is finished.";
-		if (pj != null && fortCommitParts < 0) {                                   // it takes up a part of the team's base: it sees it through (no half-built walls)
-			fortCommitParts = pj.partsDone;
-			XenMod.LOG.info("{} btb: commits to the team's base until part {} of {} is built", c.name, pj.partsDone + 1, Math.max(1, pj.plan.size()));
-		}
+		if (pj != null) commit(pj);                                               // it takes up a part of the team's base: it sees it through (no half-built walls), restarts and all
 		boolean resume = pj != null;
 		if (pj == null) {                                                         // none yet: its team's, here or at its base (it stays the team's, whoever leaves it)
 			BlockPos at = c.mod.teamHome(c);
