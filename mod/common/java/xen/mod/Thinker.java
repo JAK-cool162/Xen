@@ -185,7 +185,7 @@ final class Thinker {
 		if (team != null && day && over && mateCount(c, 300) >= 2 && mod.server.getTickCount() - meetingAt.getOrDefault(team, -100_000L) > 20 * 60 * 30)
 			m.add(new String[] {"MEETING", "call a team meeting: everyone comes, duels to see who is the strongest"});
 		Companion lead = team == null ? null : mod.leader.leaderOf(c);
-		if (team != null && lead != null && lead != c && c.personality.loyalty < 0.45f && mod.server.getTickCount() - betrayedAt.getOrDefault(c.name, -1_000_000L) > 20 * 60 * 60 * 2)
+		if (team != null && lead != null && lead != c && c.personality.loyalty < 0.3f && (c.mad() && lead.name.equals(c.madAt) || !aheadOfTheOther(c)) && c.random().nextInt(3) == 0 && mod.server.getTickCount() - betrayedAt.getOrDefault(c.name, -1_000_000L) > 20 * 60 * 60 * 2)
 			m.add(new String[] {"BETRAY", "betray " + lead.name + " and join the other team"});
 		if (hungryMate(c) != null && it.getOrDefault("food", 0) >= 8) m.add(new String[] {"HELP", "give food to " + hungryMate(c).name + ", who is hungry"});
 		if (day && over) m.add(new String[] {"EXPLORE", "explore with a friend"});
