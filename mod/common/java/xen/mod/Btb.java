@@ -126,9 +126,9 @@ final class Btb {
 		if (now() - goalAt < 20 * 60 * 3 && !goalDone(o)) return;
 		goalAt = now();
 		String was = goal;
-		boolean geared = o.tier >= 4 && (o.diamonds >= c.goals.diamondsWanted() || Companion.fullDiamond(c.player));   // (full diamond on and a diamond pickaxe: geared; the sword and the table's two diamonds wait, enchanting first: Ivy, Max, Rex in full diamond with 20+ levels went off to build a home)   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
+		boolean geared = Companion.fullDiamond(c.player) || o.tier >= 4 && o.diamonds >= c.goals.diamondsWanted();   // (full diamond on: geared, pickaxe or not; Oto, full diamond and 32 levels, no diamond pickaxe, went off to build a home)   // (full diamond on and a diamond pickaxe: geared; the sword and the table's two diamonds wait, enchanting first: Ivy, Max, Rex in full diamond with 20+ levels went off to build a home)   // (the diamonds for what it still lacks in its bag: geared; the table's two are the enchanting goal's)
 		boolean tabled = c.enchanter.table() != null || c.crafter.has("enchanting_table");
-		boolean early = !geared && c.goals.home == null && c.mod.config.wants && o.tier >= 3 && o.overworld && earlyBase();
+		boolean early = !geared && c.goals.home == null && c.mod.config.wants && o.tier >= 3 && o.overworld && earlyBase() && c.mod.project(c) == null && !bare();   // (its team has a base, or it's just back from a death: its gear first, not a home of its own; Cid, nothing on, off to build one)
 		if (early) goal = "home";                                                // an iron pickaxe: a base first, a small one (a chest for its diamonds and ore, a table, a furnace; its bed for a spawn): a death after costs it only what it carries, and it wakes by it
 		else if (!geared) goal = "gear";                                         // tools, iron, diamonds, armor: first, always
 		else if (!tabled || !enchantedGear()) goal = "enchant";                 // (its tools and its armor enchanted, both)
