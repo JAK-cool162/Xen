@@ -227,10 +227,13 @@ public final class Companion {
 		return player != null && (!minion || ((ServerLevel) player.level()).isPositionEntityTicking(player.blockPosition()));
 	}
 
-	/** Pip: the lone one who thinks it can take both teams. Every stat at its max, no team, no rules, ten lives. */
+	/** StockXen: the lone one who thinks it can take both teams. Every stat at its max, no team, no rules, ten lives. */
 	boolean pip() {
-		return name.equals("Pip");
+		return name.equals("StockXen");
 	}
+
+	/** StockXen out of hiding: geared (full diamond and a diamond sword), it hunts; till then it keeps out of sight and gathers, and nobody goes after it. */
+	boolean stockRevealed;
 
 	private boolean pipped;
 	private long pipHuntAt;
@@ -249,14 +252,18 @@ public final class Companion {
 		for (int i = 0; i < p.fightGenes.length; i++) p.fightGenes[i] = 1f;
 		if (p.fightGenes.length > 8) p.fightGenes[8] = 0.35f;                   // (retreat: it backs off only when it must)
 		for (int i = 0; i < skills.level.length; i++) skills.level[i] = 1f;
-		XenMod.LOG.info("Pip is here: every stat at its max, no team, no rules, {} of 10 lives left", mod.pipLivesLeft());
+		XenMod.LOG.info("StockXen is here, quietly: every stat at its max, no team, no rules, {} of 10 lives left; resources first", mod.pipLivesLeft());
 	}
 
 	void tick() {
 		if (pip() && player != null) {
 			if (!pipped) pipUp();
 			long now = player.level().getGameTime();
-			if (huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, it goes after)
+			if (!stockRevealed && fullDiamond(player) && btb.invCount("diamond_sword") + btb.invCount("netherite_sword") > 0) {   // geared: out of hiding
+				stockRevealed = true;
+				XenMod.LOG.info("StockXen comes out of hiding: geared, it goes after both teams");
+			}
+			if (stockRevealed && huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, it goes after)
 				pipHuntAt = now;
 				ServerPlayer near = null;
 				for (ServerPlayer o : server.getPlayerList().getPlayers())
@@ -4970,7 +4977,8 @@ public final class Companion {
 		if (!mod.config.pvp.equals("teams")) return null;
 		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
 			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
-			boolean pipFight = pip() || other instanceof XenPlayer po && po.companion != null && po.companion.pip();   // (Pip: no team, no rules, everyone's foe)
+			boolean pipFight = pip() && stockRevealed || other instanceof XenPlayer po && po.companion != null && po.companion.pip() && po.companion.stockRevealed;   // (StockXen out of hiding: no team, no rules, everyone's foe; hiding: nobody's)
+			if (!pipFight && (pip() || other instanceof XenPlayer po2 && po2.companion != null && po2.companion.pip())) continue;
 			if (!pipFight && (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other))) continue;
 			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;
 			String held = BuiltInRegistries.ITEM.getKey(other.getMainHandItem().getItem()).getPath();
@@ -5471,15 +5479,15 @@ public final class Companion {
 			helper = tripBuddy;
 		}
 		journal("does", "died: " + source.getLocalizedDeathMessage(player).getString());
-		if (pip() && !inArena) {                                      // Pip: ten lives, then banned for good
+		if (pip() && !inArena) {                                      // StockXen: ten lives, then banned for good
 			int left = mod.pipDied();
-			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] Pip died (" + source.getLocalizedDeathMessage(player).getString()
-					+ "): " + left + " of 10 lives left." + (left <= 0 ? " Pip is banned." : "")).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
-			XenMod.LOG.info("Pip died: {} of 10 lives left", left);
+			mod.server.getPlayerList().broadcastSystemMessage(net.minecraft.network.chat.Component.literal("[Xen] StockXen died (" + source.getLocalizedDeathMessage(player).getString()
+					+ "): " + left + " of 10 lives left." + (left <= 0 ? " StockXen is banned." : "")).withStyle(net.minecraft.ChatFormatting.DARK_PURPLE), false);
+			XenMod.LOG.info("StockXen died: {} of 10 lives left", left);
 			if (left <= 0) {
 				goneHow = source.getLocalizedDeathMessage(player).getString();
 				goneAt = here;
-				lore("Pip is banned: ten lives spent");
+				lore("StockXen is banned: ten lives spent");
 				goneIn = 40;
 				respawnIn = -1;
 				return;

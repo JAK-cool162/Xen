@@ -2313,7 +2313,7 @@ public class XenMod implements ModInitializer {
 
 	/** Pip's deaths, kept with the world: ten and it's banned. */
 	private java.nio.file.Path pipFile() {
-		return brainFile().resolveSibling("pip.json");
+		return brainFile().resolveSibling("stockxen.json");
 	}
 
 	int pipLivesLeft() {
@@ -2339,8 +2339,8 @@ public class XenMod implements ModInitializer {
 	}
 
 	private int summon(CommandContext<CommandSourceStack> ctx, String wanted) {
-		if (wanted != null && wanted.equals("Pip") && pipLivesLeft() <= 0) {
-			ctx.getSource().sendFailure(Component.literal("Pip is banned: ten lives spent."));
+		if (wanted != null && wanted.equals("StockXen") && pipLivesLeft() <= 0) {
+			ctx.getSource().sendFailure(Component.literal("StockXen is banned: ten lives spent."));
 			return 0;
 		}
 		if (wanted != null && wanted.equalsIgnoreCase("random")) wanted = null;   // "random": a random name and skin
