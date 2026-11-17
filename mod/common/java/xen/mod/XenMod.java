@@ -2055,6 +2055,70 @@ public class XenMod implements ModInitializer {
 		}
 	}
 
+	/** The teams each Xen walked out on (a returnee is judged by it), kept with the world. */
+	private java.util.Map<String, java.util.List<String>> leftTeams;
+
+	private java.nio.file.Path leftTeamsFile() {
+		return brainFile().resolveSibling("left_teams.json");
+	}
+
+	private java.util.Map<String, java.util.List<String>> leftTeams() {
+		if (leftTeams == null) {
+			leftTeams = new java.util.HashMap<>();
+			try {
+				if (Files.exists(leftTeamsFile())) {
+					java.util.Map<String, java.util.List<String>> m = new com.google.gson.Gson().fromJson(Files.readString(leftTeamsFile()),
+							new com.google.gson.reflect.TypeToken<java.util.Map<String, java.util.List<String>>>() {}.getType());
+					if (m != null) leftTeams.putAll(m);
+				}
+			} catch (Exception e) {
+				LOG.warn("Xen: couldn't read who left which team: {}", e.toString());
+			}
+		}
+		return leftTeams;
+	}
+
+	private void saveLeftTeams() {
+		try {
+			Files.createDirectories(leftTeamsFile().getParent());
+			Files.writeString(leftTeamsFile(), new com.google.gson.Gson().toJson(leftTeams()));
+		} catch (Exception e) {
+			LOG.warn("Xen: couldn't keep who left which team: {}", e.toString());
+		}
+	}
+
+	/**
+	 * A Xen asking to join a team: its leader decides, the same way on either side. What it's worth to the team (its
+	 * armor and enchantments, its levels) against what the leader asks of a newcomer; more of one who walked out on this
+	 * very team before (a returnee), more again for each time; a kind leader asks less. No leader there: it's let in.
+	 */
+	private boolean askToJoin(Companion c, String from, String to) {
+		Companion boss = null;
+		for (Companion x : companions) if (x != c && x.player() != null && to.equals(teamOf(x)) && leader.leaderOf(x) != null) {
+			boss = leader.leaderOf(x);
+			break;
+		}
+		if (boss == null || boss.player() == null) return true;
+		int times = 0;
+		for (String t : leftTeams().getOrDefault(c.name, java.util.List.of())) if (t.equals(to)) times++;
+		float worth = c.btb.raceScore() + Math.min(5, c.player().experienceLevel / 6f) + (Companion.fullDiamond(c.player()) ? 2 : 0);
+		float asks = 4 + 4 * times - 2.5f * boss.personality.kindness;            // (a newcomer: about 3; back after leaving them once: about 7; twice: 11)
+		boolean in = worth >= asks;
+		final Companion b = boss;
+		final int tm = times;
+		c.say(times > 0 ? b.name + ", I'm back. Can I rejoin " + to.replace("xen_", "") + "?" : b.name + ", I want to join " + to.replace("xen_", "") + ". Will you have me?");
+		later(40, () -> {
+			if (b.player() == null) return;
+			if (in) b.say(tm > 0 ? b.pick3("Fine, " + c.name + ". Welcome back. Leave again and you're done.", "We could use you, " + c.name + ". Don't make me regret it.", "Back again? Alright. Last chance.")
+					: b.pick3("Welcome, " + c.name + ".", "Sure, " + c.name + ". Pull your weight.", "Get in, " + c.name + ". We've got work."));
+			else b.say(tm > 0 ? b.pick3("No, " + c.name + ". You walked out on us. Earn it first.", "You left us. Why would we take you back?", "Not after last time, " + c.name + ".")
+					: b.pick3("Not yet, " + c.name + ". Show me what you've got first.", "We don't need you right now, " + c.name + ".", "Come back when you're geared, " + c.name + "."));
+		});
+		LOG.info("{} asks to join {} ({}): {} decides {} (worth {} against {}{})", c.name, to.replace("xen_", ""), times > 0 ? "a returnee, left them " + times + " time" + (times > 1 ? "s" : "") : "new", boss.name,
+				in ? "yes" : "no", String.format(java.util.Locale.ROOT, "%.1f", worth), String.format(java.util.Locale.ROOT, "%.1f", asks), "");
+		return in;
+	}
+
 	/** It betrays its team (its own idea): over to the other team, for good (its roster keeps it there). */
 	void defect(Companion c) {
 		String was = teamOf(c);
@@ -2065,6 +2129,9 @@ public class XenMod implements ModInitializer {
 			if (t.getName().startsWith("xen_") && !t.getName().equals(was) && !t.getPlayers().isEmpty()) other = t;
 		if (other == null) return;
 		Companion lead = leader.leaderOf(c);
+		if (!askToJoin(c, was, other.getName())) return;                       // the other team's leader decides: in, or not (then it stays where it is)
+		leftTeams().computeIfAbsent(c.name, k -> new java.util.ArrayList<>()).add(was);
+		saveLeftTeams();
 		board.addPlayerToTeam(c.name, other);
 		roster.remember(c, other.getName());
 		c.role = "";
