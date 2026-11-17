@@ -528,6 +528,22 @@ final class Crafter {
 	}
 
 	Action next() {
+		long nowC = c.player.level().getGameTime();
+		String cur = order != null ? order : making;
+		if (cur == null || !cur.equals(craftGoal)) {
+			craftGoal = cur;
+			craftGoalSince = nowC;
+		} else if (nowC - craftGoalSince > 20 * 120) {                          // two minutes making one thing and not one made: it lets it go for now (Fin and Rex, an hour on a table they couldn't put down, did nothing else at all)
+			XenMod.LOG.info("{} gives up on making {} for now: two minutes and none made", c.name, cur.replace('_', ' '));
+			c.journal("thinks", "lets " + cur.replace('_', ' ') + " go for now: two minutes on it and nothing made");
+			order = null;
+			making = null;
+			craftGoal = null;
+			nookAt = null;
+			tableFails = 0;
+			nextTry = nowC + 20 * 60 * 2;
+			return null;
+		}
 		if (order != null) return orderNext();
 		if (c.player.level().getGameTime() < nextTry) return takeTableAlong();   // (it just failed at something: not again yet, only its table to pick up)
 		String goal = wanted();
@@ -667,6 +683,7 @@ final class Crafter {
 		Slot result = menu.getResultSlot();
 		boolean made = result.hasItem();
 		if (made) Compat.click(menu, result.index, true, c.player);                 // shift-click the result
+		if (made) craftGoalSince = level.getGameTime();                              // (one made: its clock starts again)
 		for (Slot s : menu.getInputGridSlots()) if (s.hasItem()) Compat.click(menu, s.index, true, c.player);   // leftovers back
 		ItemStack carried = menu.getCarried();
 		if (!carried.isEmpty()) {
@@ -819,6 +836,9 @@ final class Crafter {
 
 	/** Times running it couldn't put its table down on the spots in reach, and where (somewhere else: a fresh try). */
 	private int tableFails;
+	/** What it's been making (an order or its own), since when (game time) without one made. */
+	private String craftGoal;
+	private long craftGoalSince;
 	/** The nook it's digging for its table (dug: the table goes there). */
 	private BlockPos nookAt;
 	private BlockPos tableFailAt;
