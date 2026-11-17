@@ -758,6 +758,16 @@ final class Crafter {
 			BlockPos pos = feet.offset(dx, dy, dz);
 			if (tableSpot(level, pos, feet) && c.player.getEyePosition().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(pos)) <= 4.3) return null;
 		}
+		for (Direction d : Direction.Plane.HORIZONTAL) {                  // boxed in (its night hole, a tunnel): a nook in the wall at its feet for the table, as a player digs one (Max tried for its shield five times from its covered hole, and made nothing)
+			BlockPos side = feet.relative(d);
+			var st = level.getBlockState(side);
+			if (st.canBeReplaced() || st.getDestroySpeed(level, side) < 0 || !level.getBlockState(side.below()).isCollisionShapeFullBlock(level, side.below()) || c.builder.planned(side)) continue;
+			boolean wet = false;
+			for (Direction e : Direction.values()) if (!level.getFluidState(side.relative(e)).isEmpty()) wet = true;
+			if (wet) continue;
+			c.goals.instant = "digging a nook in the wall for its crafting table";
+			if (c.hands.mine(side)) return Action.IDLE;
+		}
 		BlockPos best = null;
 		for (int dx = -10; dx <= 10; dx++) for (int dz = -10; dz <= 10; dz++) for (int dy = -2; dy <= 2; dy++) {
 			BlockPos pos = feet.offset(dx, dy, dz);
