@@ -139,7 +139,21 @@ final class Enchanter {
 	private long lastNext;
 
 	/** Tables it couldn't get to (its way-finder found no way): not walked to again. */
-	private final java.util.Set<Long> unreachable = new java.util.HashSet<>();
+	private final Unreachable unreachable = new Unreachable();
+
+	/** Shared by every Xen, for half an hour: a table one gave up on after its long walk, no other walks to (Kai and Quin, an hour of walking each to the same one 10 down at 365, -212). */
+	private static final java.util.Map<Long, Long> GAVE_UP = new java.util.concurrent.ConcurrentHashMap<>();
+
+	private final class Unreachable {
+		boolean contains(long at) {
+			Long t = GAVE_UP.get(at);
+			return t != null && c.player != null && c.player.level().getGameTime() - t < 20 * 60 * 30;
+		}
+
+		void add(long at) {
+			if (c.player != null) GAVE_UP.put(at, c.player.level().getGameTime());
+		}
+	}
 
 	/** Its enchanting table: remembered, or one it sees around its home. */
 	BlockPos table() {
