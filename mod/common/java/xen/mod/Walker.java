@@ -1281,7 +1281,7 @@ final class Walker {
 		if ((cell(p.above()) & K_FALLING) != 0 && !passable(p.above())) return INF;
 		if (c.player.isCreative()) return 2;
 		float speed = c.hands.digSpeed(s, level, p);
-		if (speed < 1f / 200) return INF;                                     // more than ten seconds: not that way
+		if (speed < (c.crafter.pickTier() == 0 && p.getY() < 50 ? 1f / 400 : 1f / 200)) return INF;   // more than ten seconds: not that way (no pickaxe at all, down deep: twenty, by hand, or it never gets out; Pia, no pickaxe at y -4 in the deepslate, for an hour)
 		boolean tree = s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath().endsWith("_ore");   // (trees and ore: its to take, as much as it likes)
 		boolean surface = !tree && p.getY() >= 55 && (s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || level.canSeeSky(p.above()));
 		return 1 / speed + (surface ? 45 : 12);                               // (a player walks round or over rather than tunnel through; up on the land all the more: the land round their bases was dug up all over)
