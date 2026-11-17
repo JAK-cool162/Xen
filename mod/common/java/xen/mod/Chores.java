@@ -2187,6 +2187,10 @@ final class Chores {
 			if (noWay) c.journal("way", "lets the " + fetchKind.replace('_', ' ') + " at " + pickupAt.toShortString() + " go: no way there it can take (" + c.walker.lastProblem + ")");
 			if (!noWay && fetchMatch.test(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(pickupAt).getBlock()).getPath())) {
 				doing = String.format(java.util.Locale.ROOT, "getting %s (%d of %d)", fetchDrop.replace('_', ' '), countItem(fetchDrop) - had, fetchWant);
+				if (pickupAt.distSqr(c.player.blockPosition()) > 48 * 48) {          // (far off: the long way there first, a leg at a time, as to a far table; Max set off for the river's sugar cane and never took a step)
+					Action far = c.wanderTo(Vec3.atBottomCenterOf(pickupAt));
+					if (far != null) return far;
+				}
 				return reach(pickupAt);
 			}
 			if (noWay) {
