@@ -121,6 +121,12 @@ public class XenPlayer extends ServerPlayer {
 		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && source.getDirectEntity() == by) {
 			companion.struckBy(by, amount);
 		}
+		if (companion != null && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer by && by != this && companion.skills.sparringWith(by.getUUID())
+				&& getHealth() - amount < 6) {                                       // a practice duel never kills: the hit that would take it under three hearts ends it (Max, no armor, died in his own meeting's duel)
+			companion.skills.endSpar(true);
+			if (by instanceof XenPlayer bx && bx.companion != null && bx.companion.skills.sparringWith(getUUID())) bx.companion.skills.endSpar(false);
+			return false;
+		}
 		float before = getHealth();
 		boolean hurt = super.hurtServer(level, source, amount);
 		if (hurt && companion != null && !isCreative()) {
