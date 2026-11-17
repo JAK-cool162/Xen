@@ -309,6 +309,7 @@ final class Schematic {
 		}
 		for (Block b : blocks) {
 			String sp = adapt(b.spec(), wood);
+			if (sp == null && b.at().getY() > 1) sp = groundUp(b.spec());           // (ground blocks up in the building, not its ground: a moss roof, a planter; Fin's Hardcore House went up with no roof)
 			if (sp == null || sp.contains("half=upper") && !sp.contains("_stairs") && !sp.contains("_trapdoor") || sp.contains("part=head")) continue;
 			BlockState st = Architect.state(sp);
 			if (st == null) continue;
@@ -325,6 +326,17 @@ final class Schematic {
 	private static final java.util.regex.Pattern WOOD = java.util.regex.Pattern.compile("(?<![a-z_])(stripped_)?(dark_oak|pale_oak|oak|spruce|birch|jungle|acacia|mangrove|cherry)(?=_)");
 
 	/** One block of it, adapted (null: left out). */
+	/** A ground block up in a building (its roof of moss, a planter of dirt): kept, as survival can make it (grass: dirt, it greens). Plants: null. */
+	private static String groundUp(String spec) {
+		String n = spec.indexOf('[') >= 0 ? spec.substring(0, spec.indexOf('[')) : spec;
+		n = n.replace("minecraft:", "");
+		return switch (n) {
+			case "moss_block", "moss_carpet", "dirt", "coarse_dirt", "rooted_dirt", "mud", "snow_block" -> n;
+			case "grass_block", "podzol", "dirt_path", "farmland" -> "dirt";
+			default -> null;
+		};
+	}
+
 	static String adapt(String spec, String wood) {
 		int k = spec.indexOf('[');
 		String n = k >= 0 ? spec.substring(0, k) : spec, props = k >= 0 ? spec.substring(k) : "";
