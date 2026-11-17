@@ -4977,7 +4977,7 @@ public final class Companion {
 		if (!mod.config.pvp.equals("teams")) return null;
 		for (ServerPlayer other : server.getPlayerList().getPlayers()) {           // team battles: Xens of other teams
 			if (!(other instanceof XenPlayer) || other == player || !other.isAlive() || other.level() != player.level()) continue;
-			boolean pipFight = pip() && stockRevealed || other instanceof XenPlayer po && po.companion != null && po.companion.pip() && po.companion.stockRevealed;   // (StockXen out of hiding: no team, no rules, everyone's foe; hiding: nobody's)
+			boolean pipFight = pip() && stockRevealed || other instanceof XenPlayer po && po.companion != null && po.companion.pip();   // (StockXen: no team, no rules; anyone who sees it goes for it, hiding or not; it goes for them only once out of hiding)
 			if (!pipFight && (pip() || other instanceof XenPlayer po2 && po2.companion != null && po2.companion.pip())) continue;
 			if (!pipFight && (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other))) continue;
 			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;
