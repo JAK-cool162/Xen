@@ -59,6 +59,17 @@ final class Btb {
 	}
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
+	/** When what it is and has last changed (a step, an item, a tool's wear, a level), and how it was then. */
+	private long progressAt;
+	private int progressSig;
+	/** Tasks that are waiting by nature (the night in a bed or a hole, a furnace's smelting, crops growing): not checked for getting nowhere. */
+	private static final java.util.Set<Task> WAITS = java.util.EnumSet.noneOf(Task.class);
+	static {
+		for (String w : new String[] {"SLEEP", "SHELTER", "SMELT", "FARM", "WISH", "RETREAT", "EAT"})
+			try {
+				WAITS.add(Task.valueOf(w));
+			} catch (IllegalArgumentException e) { }
+	}
 	private long visitLookedAt = -100_000;
 	/** When it could first sleep this night, on its way to bed (-1: not yet). */
 	private long sleepFrom = -1;
@@ -1509,6 +1520,15 @@ final class Btb {
 			task = Task.NONE;
 			return false;
 		}
+		if (task != Task.NONE && !WAITS.contains(task) && now() - taskAt > 20 * 90 && now() - progressAt > 20 * 90) {   // checks itself: a minute and a half on it and nothing's changed (not a step, nothing in its bag, no wear on a tool): a waste of time, dropped, something else (13 stood following no one for an hour; Max tried its table five times from a hole)
+			XenMod.LOG.info("{} btb: {} got nowhere for a minute and a half: a waste of time, something else", c.name, task);
+			c.journal("thinks", "that (" + task.name().toLowerCase(java.util.Locale.ROOT) + ") was getting nowhere: something else");
+			notBefore.put(task, now() + 20 * 60 * 3);
+			c.chores.cancel();
+			c.visits.stop("it was getting nowhere");
+			task = Task.NONE;
+			return false;
+		}
 		if (task == Task.SLEEP) {                                                 // (the night in its bed; half a minute and not asleep, something else: no room for it, monsters about)
 			if (c.player.isSleeping()) return true;
 			long day = Compat.timeOfDay(c.player.level()) % 24000;
@@ -1530,6 +1550,19 @@ final class Btb {
 	/** Every tick: what hurt it while it was on its task (for its learning). */
 	void tick() {
 		if (c.player == null) return;
+		if (c.player.tickCount % 20 == 0) {                                     // (what's changed: where it is, what it has, its tools' wear, its levels; any of it is getting somewhere)
+			BlockPos f = c.player.blockPosition();
+			int sig = java.util.Objects.hash(f.getX() >> 1, f.getY() >> 1, f.getZ() >> 1, c.player.experienceLevel);
+			var inv = c.player.getInventory();
+			for (int i = 0; i < inv.getContainerSize(); i++) {
+				var st = inv.getItem(i);
+				if (!st.isEmpty()) sig = 31 * sig + java.util.Objects.hash(i, st.getItem(), st.getCount(), st.getDamageValue());
+			}
+			if (sig != progressSig) {
+				progressSig = sig;
+				progressAt = now();
+			}
+		}
 		float h = c.player.getHealth();
 		if (task != Task.NONE && h < lastHealth && c.player.isAlive()) hurtSince += lastHealth - h;
 		lastHealth = h;
