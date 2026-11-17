@@ -323,6 +323,34 @@ final class Leader {
 				}
 			}
 		}
+		for (Companion m : members) {                                          // the makings of its enchanting from a teammate: lapis for one with a table and levels and none (Gus, a table and 25 levels, no lapis; Ann had 128), a book's paper or leather, or a book, for one with the rest of a table
+			if (m.player() == null || m.player().getHealth() < 1 || allEnchanted(m)) continue;
+			long et = m.player().level().getGameTime();
+			if (et < kitSent.getOrDefault("ench:" + m.name, 0L)) continue;
+			boolean tabled = m.enchanter.table() != null || m.crafter.has("enchanting_table");
+			java.util.List<String[]> wants = new java.util.ArrayList<>();          // {item, how many it needs, how many a giver keeps back}
+			if (tabled && m.player().experienceLevel >= 3 && m.btb.invCount("lapis_lazuli") < 3) wants.add(new String[] {"lapis_lazuli", "9", "12"});
+			if (!tabled && m.btb.invCount("book") == 0 && m.btb.invCount("obsidian") >= 4 && m.btb.invCount("diamond") >= 2) {
+				wants.add(new String[] {"book", "1", "0"});
+				if (m.btb.invCount("paper") < 3) wants.add(new String[] {"paper", String.valueOf(3 - m.btb.invCount("paper")), "0"});
+				if (m.btb.invCount("leather") < 1) wants.add(new String[] {"leather", "1", "0"});
+			}
+			for (String[] w : wants)
+				for (Companion g : members) {
+					if (g == m || g.player() == null || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().level() != m.player().level()
+							|| g.player().distanceTo(m.player()) > 200) continue;
+					int n = Integer.parseInt(w[1]), keep = Integer.parseInt(w[2]);
+					boolean gTabled = g.enchanter.table() != null || g.crafter.has("enchanting_table");
+					if (w[0].equals("book") || w[0].equals("paper") || w[0].equals("leather")) keep = gTabled ? 0 : (w[0].equals("paper") ? 3 : 1);   // (its own book's makings kept, till it has its table)
+					if (g.btb.invCount(w[0]) - keep < n) continue;
+					String r = g.chores.give(m.player(), w[0], n);
+					if (r != null && r.startsWith("You will")) {
+						kitSent.put("ench:" + m.name, et + 20 * 60 * 3);
+						XenMod.LOG.info("{} (leads {}): team share: {} brings {} {} {} (for its enchanting)", lead.name, team.replace("xen_", ""), g.name, m.name, n, w[0]);
+						return;
+					}
+				}
+		}
 		for (Companion m : members) {                                          // back from a death with nothing: a teammate's spare kit (its old pickaxe, a sword, some food), not a start from nothing
 			if (m.player() == null || !m.btb.bare() || m.player().getHealth() < 1) continue;
 			long kt = m.player().level().getGameTime();
