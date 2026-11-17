@@ -323,6 +323,27 @@ final class Leader {
 				}
 			}
 		}
+		for (Companion m : members) {                                          // back from a death with nothing: a teammate's spare kit (its old pickaxe, a sword, some food), not a start from nothing
+			if (m.player() == null || !m.btb.bare() || m.player().getHealth() < 1) continue;
+			for (Companion g : members) {
+				if (g == m || g.player() == null || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().level() != m.player().level()
+						|| g.player().distanceTo(m.player()) > 200) continue;
+				String give = null;
+				if (m.crafter.pickTier() < 3 && g.btb.invCount("iron_pickaxe") > 0 && (g.btb.invCount("diamond_pickaxe") > 0 || g.btb.invCount("iron_pickaxe") > 1)) give = "iron_pickaxe";
+				else if (m.btb.invCount("iron_sword") + m.btb.invCount("diamond_sword") + m.btb.invCount("stone_sword") == 0 && g.btb.invCount("iron_sword") > 0 && g.btb.invCount("diamond_sword") > 0) give = "iron_sword";
+				else if (m.btb.meals() < 2) for (String f : new String[] {"bread", "cooked_beef", "cooked_porkchop", "baked_potato", "cooked_mutton", "cooked_chicken"})
+					if (g.btb.invCount(f) >= 8) {
+						give = f;
+						break;
+					}
+				if (give == null) continue;
+				String r = g.chores.give(m.player(), give, give.endsWith("pickaxe") || give.endsWith("sword") ? 1 : 6);
+				if (r != null && r.startsWith("You will")) {
+					XenMod.LOG.info("{} (leads {}): team share: {} brings {} a starter kit: {} (back from a death with nothing)", lead.name, team.replace("xen_", ""), g.name, m.name, give);
+					return;
+				}
+			}
+		}
 		XenMod.Project pj = mod.project(lead);                                   // its builders on the base: the team brings them wood and stone (one builder alone needed 178 logs and 192 stone)
 		if (pj != null && !pj.finished && pj.on != null)
 			for (Companion m : members) {

@@ -816,13 +816,24 @@ final class Btb {
 	}
 
 	/** Its basic kit (the player's list): 16 logs, a stone pickaxe, a stone axe, 4 cooked beef, pork or mutton, a shield. What's missing, how many. */
+	/** Back from a death with nothing on and no iron pickaxe: the short way back (a stone pickaxe, a table, a little food, then down for iron and diamonds). */
+	boolean bare() {
+		return c.player != null && c.player.getArmorValue() == 0 && c.crafter.pickTier() < 3;
+	}
+
+	/** Food in its bag, any kind (bread, cooked meat, potatoes...). */
+	int meals() {
+		return c.items().getOrDefault("food", 0);
+	}
+
 	int kitMissing() {
 		int n = 0;
-		if (invCount("*_log") + invCount("*_planks") / 4 < 16) n++;            // (planks count: four to a log)
+		boolean bare = bare();                                                    // (just back from a death, nothing on: only what gets it mining again)
+		if (!bare && invCount("*_log") + invCount("*_planks") / 4 < 16) n++;   // (planks count: four to a log)
 		if (c.crafter.pickTier() < 2) n++;
-		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) n++;
-		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) n++;
-		if (invCount("shield") == 0) n++;
+		if (!bare && invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) n++;
+		if (meals() < (bare ? 2 : 4)) n++;                                       // (any food: bread counts; Xens with sixteen bread went hunting in a savanna with no animals)
+		if (!bare && invCount("shield") == 0) n++;
 		if (invCount("crafting_table") == 0) n++;                              // (one in its bag: diamonds found in a cave or a treeless savanna become armor on the spot)
 		return n;
 	}
@@ -831,13 +842,14 @@ final class Btb {
 	private String kitStep(Obs o) {
 		Chores ch = c.chores;
 		int logs = invCount("*_log") + invCount("*_planks") / 4;
+		boolean bare = bare();
 		if (c.crafter.pickTier() < 2) return planFor("stone_pickaxe", 1, "basic kit: a stone pickaxe");
-		if (invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) return planFor("stone_axe", 1, "basic kit: a stone axe");
-		if (invCount("cooked_beef") + invCount("cooked_porkchop") + invCount("cooked_mutton") < 4) {
-			if (invCount("beef") + invCount("porkchop") + invCount("mutton") > 0) return ch.smelt();
+		if (!bare && invCount("stone_axe") + invCount("iron_axe") + invCount("diamond_axe") + invCount("netherite_axe") == 0) return planFor("stone_axe", 1, "basic kit: a stone axe");
+		if (meals() < (bare ? 2 : 4)) {
+			if (invCount("beef") + invCount("porkchop") + invCount("mutton") + invCount("chicken") > 0) return ch.smelt();
 			return ch.hunt(4);
 		}
-		if (invCount("shield") == 0) return planFor("shield", 1, "basic kit: a shield");
+		if (!bare && invCount("shield") == 0) return planFor("shield", 1, "basic kit: a shield");
 		if (invCount("crafting_table") == 0) return planFor("crafting_table", 1, "basic kit: a crafting table to carry");
 		if (logs < 16) return ch.gather("wood", 16 - logs);                     // (the logs last: in a savanna it walked about for trees while its diamonds waited)
 		return "You have your basic kit.";
