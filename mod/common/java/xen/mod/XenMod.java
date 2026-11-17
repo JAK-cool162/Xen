@@ -1253,6 +1253,13 @@ public class XenMod implements ModInitializer {
 						})))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
+				.then(Commands.literal("stocktarget").requires(XenMod::mayRun)             // StockXen's prey: one team only ("xen_blue"), or "none" for anyone
+						.then(Commands.argument("team", StringArgumentType.word()).executes(ctx -> {
+							String t = StringArgumentType.getString(ctx, "team");
+							stockSetTarget(t.equals("none") ? null : t);
+							ctx.getSource().sendSuccess(() -> Component.literal(t.equals("none") ? "StockXen goes after anyone." : "StockXen goes after " + t + " only."), true);
+							return 1;
+						})))
 				.then(Commands.literal("settings").executes(this::showSettings))
 				.then(Commands.literal("set").requires(XenMod::mayRun)
 						.then(Commands.argument("setting", StringArgumentType.word()).suggests((ctx, b) -> {
@@ -2355,6 +2362,29 @@ public class XenMod implements ModInitializer {
 	boolean stockEliminated() {
 		var o = stockState();
 		return o.has("eliminated") && o.get("eliminated").getAsBoolean();
+	}
+
+	private String stockTargetCache;
+	private boolean stockTargetRead;
+
+	/** The one team StockXen goes after (its player's call), or null: anyone. */
+	String stockTarget() {
+		if (!stockTargetRead) {
+			var o = stockState();
+			stockTargetCache = o.has("target") && !o.get("target").isJsonNull() ? o.get("target").getAsString() : null;
+			stockTargetRead = true;
+		}
+		return stockTargetCache;
+	}
+
+	void stockSetTarget(String team) {
+		stockTargetCache = team;
+		stockTargetRead = true;
+		var o = stockState();
+		if (team == null) o.remove("target");
+		else o.addProperty("target", team);
+		stockSave(o);
+		LOG.info("StockXen's prey: {}", team == null ? "anyone" : team);
 	}
 
 	void stockSetEliminated() {

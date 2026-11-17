@@ -295,11 +295,16 @@ public final class Companion {
 				stockRevealed = true;
 				XenMod.LOG.info("StockXen comes out of hiding: geared, it goes after both teams");
 			}
+			if (huntFor != null && mod.stockTarget() != null) {                // (after someone not its prey: dropped for its prey)
+				ServerPlayer h = server.getPlayerList().getPlayer(huntFor);
+				if (h == null || h.getTeam() == null || !h.getTeam().getName().equals(mod.stockTarget())) huntFor = null;
+			}
 			if (stockRevealed && huntFor == null && now - pipHuntAt > 200 && player.getHealth() >= 14) {   // (every ten seconds: the nearest Xen of either team, anywhere in its world, it goes after)
 				pipHuntAt = now;
 				ServerPlayer near = null;
 				for (ServerPlayer o : server.getPlayerList().getPlayers())
 					if (o instanceof XenPlayer && o != player && o.isAlive() && o.level() == player.level() && !(o instanceof XenPlayer xo && xo.companion != null && now - xo.companion.respawnedAt < 20 * 60 * 3)
+							&& (mod.stockTarget() == null || o.getTeam() != null && o.getTeam().getName().equals(mod.stockTarget()))   // (its prey only, when its player named a team)
 							&& (near == null || o.distanceTo(player) < near.distanceTo(player))) near = o;
 				if (near != null) hunt(near);
 			}
@@ -5019,6 +5024,7 @@ public final class Companion {
 			boolean pipFight = pip() && stockRevealed || other instanceof XenPlayer po && po.companion != null && po.companion.pip();   // (StockXen: no team, no rules; anyone who sees it goes for it, hiding or not; it goes for them only once out of hiding)
 			if (!pipFight && (pip() || other instanceof XenPlayer po2 && po2.companion != null && po2.companion.pip())) continue;
 			if (!pipFight && (player.isAlliedTo(other) || player.getTeam() == null || other.getTeam() == null || diplomacy.atPeace(other))) continue;
+			if (pip() && mod.stockTarget() != null && (other.getTeam() == null || !other.getTeam().getName().equals(mod.stockTarget()))) continue;   // (its prey only; anyone else, only when they hit it first)
 			if (pipFight && !pip() && (player.level().getGameTime() - respawnedAt < 20 * 60 * 3 || player.getArmorValue() == 0 && !isWeapon(player.getMainHandItem()))) continue;   // (after StockXen: not just back from dying, nor with no armor and no weapon; Sol went at it bare-handed ten times in four minutes, back each time)
 			if (other instanceof XenPlayer xp && xp.companion != null && player.level().getGameTime() - xp.companion.respawnedAt < 20 * 60 * 3) continue;
 			String held = BuiltInRegistries.ITEM.getKey(other.getMainHandItem().getItem()).getPath();
