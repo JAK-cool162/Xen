@@ -1253,6 +1253,19 @@ public class XenMod implements ModInitializer {
 						})))
 				.then(Commands.literal("learn").then(Commands.literal("on").executes(ctx -> setting(ctx, "learn", true)))
 						.then(Commands.literal("off").executes(ctx -> setting(ctx, "learn", false))))
+				.then(Commands.literal("planfor").requires(XenMod::mayRun)                 // what a Xen's plan for a thing would be, from what it has now (nothing started): for finding why it says "no way"
+						.then(Commands.argument("who", StringArgumentType.word()).then(Commands.argument("item", StringArgumentType.word()).executes(ctx -> {
+							String who = StringArgumentType.getString(ctx, "who"), item = StringArgumentType.getString(ctx, "item");
+							for (Companion c : companions) {
+								if (!c.name.equals(who) || c.player() == null) continue;
+								String says = c.plans.explain(item);
+								LOG.info("planfor {} {}: {}", who, item, says);
+								ctx.getSource().sendSuccess(() -> Component.literal(says), false);
+								return 1;
+							}
+							ctx.getSource().sendFailure(Component.literal("No Xen " + who + " here."));
+							return 0;
+						}))))
 				.then(Commands.literal("stocktarget").requires(XenMod::mayRun)             // StockXen's prey: one team only ("xen_blue"), or "none" for anyone
 						.then(Commands.argument("team", StringArgumentType.word()).executes(ctx -> {
 							String t = StringArgumentType.getString(ctx, "team");

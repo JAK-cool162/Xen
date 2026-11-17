@@ -212,6 +212,14 @@ final class Plans {
 	}
 
 	/** The plan for n of a thing, from what it has now. */
+	/** Its plan for one of a thing as it would make it now, in words, with what it doesn't know where to get (nothing changes). */
+	String explain(String item) {
+		Plan p = make(item, 1);
+		StringBuilder sb = new StringBuilder(p.ok ? "ok" : "NOT ok").append(", budget left ").append(budget).append(", unknown ").append(p.unknown).append(", steps:");
+		for (Step s : p.steps) sb.append(" | ").append(s.says());
+		return sb.toString();
+	}
+
 	Plan make(String item, int n) {
 		budget = 4000;
 		Ctx ctx = new Ctx(stock(), c.crafter.pickTier(), c.crafter.tableNear() != null, nearFurnace());
