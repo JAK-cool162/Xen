@@ -232,7 +232,7 @@ final class Leader {
 	 * and the makings of a book (a book, paper, sugar cane, leather) to whoever has the obsidian for the team's table.
 	 * Within a team nobody haggles: what's spare (by its worth to the one holding it) goes where it's needed.
 	 */
-	private final java.util.Map<String, Long> keptAt = new java.util.HashMap<>();
+	private final java.util.Map<String, Long> keptAt = new java.util.HashMap<>(), kitSent = new java.util.HashMap<>();
 
 	/**
 	 * Keeping its people: now and then the leader looks at who might leave (the least loyal, the most worth keeping:
@@ -325,6 +325,8 @@ final class Leader {
 		}
 		for (Companion m : members) {                                          // back from a death with nothing: a teammate's spare kit (its old pickaxe, a sword, some food), not a start from nothing
 			if (m.player() == null || !m.btb.bare() || m.player().getHealth() < 1) continue;
+			long kt = m.player().level().getGameTime();
+			if (kt < kitSent.getOrDefault(m.name, 0L)) continue;                     // (one on its way already: Eve and Lea both set off with a pickaxe for Rex)
 			for (Companion g : members) {
 				if (g == m || g.player() == null || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().level() != m.player().level()
 						|| g.player().distanceTo(m.player()) > 200) continue;
@@ -339,6 +341,7 @@ final class Leader {
 				if (give == null) continue;
 				String r = g.chores.give(m.player(), give, give.endsWith("pickaxe") || give.endsWith("sword") ? 1 : 6);
 				if (r != null && r.startsWith("You will")) {
+					kitSent.put(m.name, kt + 20 * 60 * 5);
 					XenMod.LOG.info("{} (leads {}): team share: {} brings {} a starter kit: {} (back from a death with nothing)", lead.name, team.replace("xen_", ""), g.name, m.name, give);
 					return;
 				}
