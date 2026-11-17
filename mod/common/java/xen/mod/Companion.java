@@ -1392,6 +1392,13 @@ public final class Companion {
 		}
 		Action hungry = starving();                                   // starving with nothing to eat: food before errands
 		if (hungry != null) return hungry;
+		if (pip() && mod.stockTarget() != null && huntFor != null && mode == Mode.FREE && !minion) {   // (sent after a team by its player: the hunt before its hole for the night, or any chore)
+			Action h = huntStep();
+			if (h != null) {
+				if (chores.busy()) chores.cancel();
+				return h;
+			}
+		}
 		Action bedFirst = bedBeforeNight();                           // night coming, no bed: wool first (its own errands wait)
 		if (bedFirst != null) return bedFirst;
 		if (mode == Mode.FREE && mod.config.wants && !inArena && goals.nightfall() && goals.think()) {   // dark, out in the open: a roof before errands
