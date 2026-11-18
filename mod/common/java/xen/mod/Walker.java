@@ -1369,7 +1369,7 @@ final class Walker {
 			if (!b.equals(digTarget)) {                                       // (a new block: getting on; the same one twelve seconds and not broken: not through there)
 				digTarget = b.immutable();
 				digSince = now();
-			} else if (now() - digSince > 20 * (c.crafter.pickTier() == 0 && c.player.getY() < 50 ? 22 : 12)) {   // (by hand down deep, deepslate takes fifteen seconds)
+			} else if (now() - digSince > Math.min(20 * 120, 20 * (c.crafter.pickTier() == 0 && c.player.getY() < 50 ? 22 : 12) * (c.player.onGround() ? 1 : 5) * (c.player.isUnderWater() ? 5 : 1))) {   // (by hand down deep, deepslate takes fifteen seconds; afloat or under water, the game makes digging five times slower each)
 				digTarget = null;
 				if (c.hands.helpBreak(b, "twelve seconds digging its way through it")) return false;   // (its helping hand, now and then: on its way)
 				problem(m, "can't get through the " + BuiltInRegistries.BLOCK.getKey(level.getBlockState(b).getBlock()).getPath() + " at " + b.toShortString());

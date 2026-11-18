@@ -3821,6 +3821,8 @@ public final class Companion {
 	}
 
 	private Vec3 wanderLeg, wanderGoal;
+	/** When it last put a block into the water under it to climb out, and said so. */
+	private long waterTowerAt = -1_000, waterTowerSaid = -100_000;
 	/** Digging straight on to there (its way-finder couldn't think through the rock) till then, no new way each tick. */
 	private long digStraightUntil;
 	private Vec3 digStraightGoal;
@@ -3966,6 +3968,18 @@ public final class Companion {
 				}
 			}
 			if (w != null) return w;
+			if (player.isInWater() && !player.level().canSeeSky(player.blockPosition().above()) && hands.spareBlock() != null) {   // no way at all, in water under the ground (a flooded shaft, each wall with water by it, so none to dig): the water under it filled, a block at a time, till it stands up out of it, as a player does (Jay, an hour and a half in a shaft of water at y 1)
+				if (tick - waterTowerAt < 30) return Action.JUMP;            // (towering: up, its hands put the block)
+				if (hands.startPillar()) {
+					waterTowerAt = tick;
+					goals.instant = "filling the water under it to climb out";
+					if (tick - waterTowerSaid > 1200) {
+						waterTowerSaid = tick;
+						journal("water", "no way out of the water down here: fills it under itself to climb out");
+					}
+					return Action.JUMP;
+				}
+			}
 			return digToward(goal);                                          // (no way at all: straight there, digging through)
 		}
 		if (mod.config.pathAssist) {
