@@ -39,7 +39,7 @@ final class LlmClient {
 	/** Set up: a URL to call. */
 	boolean on() {
 		String u = mod.config.brainUrl;
-		return u != null && !u.isBlank();
+		return u != null && !u.isBlank() && !u.trim().equalsIgnoreCase("off") && !u.trim().equalsIgnoreCase("none");
 	}
 
 	/** The chat endpoint from what the setting says (a base, a /v1, or the whole path). */

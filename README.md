@@ -535,7 +535,7 @@ The key: put it in `config/xen/brain_key.txt` (first line), or the `XEN_BRAIN_KE
 `/xen set brainKey ...` (that one is saved in `config/xen.json`: don't share that file then). Other settings:
 `brainEvery` (seconds between thoughts, 60), `brainPerMinute` (calls a minute for all Xens together, 12: the
 bill), `brainXens` (`all`, or names), `brainTalk`, `brainVision`, `brainTokens` (more for a thinking model),
-`brainTimeout`. `/xen set brainUrl` with nothing after it turns the big brain off.
+`brainTimeout`. `/xen set brainUrl off` turns the big brain off.
 
 #### Evolution: 30 days in real Minecraft
 
