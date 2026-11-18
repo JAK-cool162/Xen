@@ -3414,6 +3414,21 @@ final class Chores {
 			}
 			climbDir = climbDir.getClockWise();                            // (that way's lava, water, bedrock: another)
 		}
+		var lv = c.player.level();                                          // no stairs any way (gravel over them, water, lava): straight up, a player's way: the block over its head dug, a jump, a block under its feet (Nia, gravel over its stairs at y 2, an hour)
+		BlockPos head = c.player.blockPosition().above(2);
+		boolean wet = !lv.getFluidState(head).isEmpty() || !lv.getFluidState(head.above()).isEmpty();
+		if (!wet && !c.player.isInWater()) {
+			if (!lv.getBlockState(head).canBeReplaced()) {
+				if (lv.getBlockState(head).getDestroySpeed(lv, head) >= 0 && c.hands.mine(head)) {
+					doing = "digging a way straight up to the surface";
+					return Action.IDLE;
+				}
+			} else if (!c.player.onGround()) return Action.IDLE;                 // (in the jump: the block goes under it)
+			else if (c.hands.spareBlock() != null && c.hands.startPillar()) {
+				doing = "pillaring up to the surface";
+				return Action.JUMP;
+			}
+		}
 		return c.walkTo(new Vec3(feet.getX() + 0.5, top, feet.getZ() + 0.5));
 	}
 
