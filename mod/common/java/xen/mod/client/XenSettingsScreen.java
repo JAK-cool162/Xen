@@ -23,7 +23,7 @@ import java.util.List;
  * phone the launcher's scroll gesture) when they don't all fit, with arrows on the right showing there's more.
  */
 public class XenSettingsScreen extends Screen {
-	private static final String[] TABS = {"Basics", "How to", "Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Xen 2.0", "Experimental"};
+	private static final String[] TABS = {"Basics", "How to", "Talk", "Xens", "Goals", "PvP", "Build", "Speed", "Xen 2.0", "AI brain", "Experimental"};
 	/** The How to tab. */
 	private static final int HOW_TO_TAB = 1;
 	private static final String[] ABOUT = {
@@ -36,6 +36,7 @@ public class XenSettingsScreen extends Screen {
 			"Building: redstone circuits and notes on signs.",
 			"For slower computers and phones.",
 			"How Xen 2.0 thinks: its three brains, its reaction time, its confusion, how much it says.",
+			"A big brain from any AI with an OpenAI-style API (DeepSeek, OpenAI, OpenRouter, Ollama...): it plans and talks; Xen's own brain keeps its reflexes.",
 			"Tell Xens who they are, and write your own rules for them.",
 	};
 	private static final String SCRIPT_HELP = "One rule per line: when <something happens>: <what to do>. Lines starting with # are notes.\n"
@@ -226,6 +227,7 @@ public class XenSettingsScreen extends Screen {
 						"Where gameplay logs are saved (as .jsonl files). config/xen/gameplay_logs, or gameplay_logs in the game folder (next to the gameplay recorder's). Any other folder: /xen set gameplayLogFolder <folder> (a full path for a shared or synced folder). If it can't be written to, they go to config/xen/gameplay_logs.");
 				onOff("Notes on signs", "signs", "Xens leave notes on signs (where they died and why, lava, diamonds, where they went) when nobody's around to hear, and make signs from planks for it.");
 			}
+			case 9 -> bigBrain();
 			default -> experimental();
 		}
 		scrollPanel();
@@ -369,6 +371,64 @@ public class XenSettingsScreen extends Screen {
 			settings.set("script", v);
 			showScriptStatus(v);
 		});
+	}
+
+	/** The AI brain: where it is (URL, model, key), how often it thinks, how much it says, a test. */
+	private void bigBrain() {
+		int label = 11, y = top;
+		String[][] fields = {
+				{"API URL", "brainUrl", "https://api.deepseek.com  (or https://openrouter.ai/api/v1, http://127.0.0.1:11434/v1 ...)",
+						"Any OpenAI-style chat API: its base URL, or the whole .../chat/completions. Empty or \"off\": no big brain (Xen's own brain alone)."},
+				{"Model", "brainModel", "deepseek-chat  (the model's name as your API lists it)",
+						"The model's name exactly as your provider writes it (DeepSeek: deepseek-chat; OpenRouter: provider/model; Ollama: llama3.1). Empty: the server's default."}};
+		for (String[] f : fields) {
+			inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal(f[0]), font)));
+			y += label;
+			net.minecraft.client.gui.components.EditBox box = new net.minecraft.client.gui.components.EditBox(font, left, y, panelWidth, 20, Component.literal(f[0]));
+			box.setMaxLength(300);
+			box.setHint(Component.literal(f[2]).withStyle(ChatFormatting.DARK_GRAY));
+			String now = settings.value(f[1]);
+			box.setValue(now == null || now.equals("null") ? "" : now);
+			String key = f[1];
+			box.setResponder(v -> settings.set(key, v.trim()));
+			box.setTooltip(tip(Component.literal(f[3])));
+			keys.add(key);
+			inPanel(addRenderableWidget(box));
+			y += 24;
+		}
+		inPanel(addRenderableWidget(new StringWidget(left, y, panelWidth, label, Component.literal("API key"), font)));
+		y += label;
+		net.minecraft.client.gui.components.EditBox keyBox = new net.minecraft.client.gui.components.EditBox(font, left, y, panelWidth, 20, Component.literal("API key"));
+		keyBox.setMaxLength(400);
+		keyBox.setHint(Component.literal(XenSettings.brainKeySet() ? "A key is set (hidden). Paste a new one to change it." : "Paste your API key (a local server needs none)")
+				.withStyle(ChatFormatting.DARK_GRAY));
+		keyBox.setResponder(v -> {
+			if (!v.isBlank()) XenSettings.setBrainKey(v);
+		});
+		keyBox.setTooltip(tip(Component.literal("Saved in config/xen/brain_key.txt, not in xen.json (so the settings can be shared). It's never shown here again. "
+				+ "Or set the XEN_BRAIN_KEY environment variable.")));
+		inPanel(addRenderableWidget(keyBox));
+		y += 26;
+		top = y;
+		row = 0;
+		choice("Thinks every", "brainEvery", List.of(60, 30, 120, 300), n -> n + " s", "How often each Xen thinks it over with the AI (sooner right after something big: a death, a goal reached, a task that got nowhere, someone talking to it).");
+		choice("Calls a minute", "brainPerMinute", List.of(12, 6, 30, 60, 120), n -> "at most " + n, "All Xens together, at most this many calls a minute: what keeps the bill in hand. 20 Xens thinking every minute need 20.");
+		choice("Its say", "brainWeight", List.of("2.5", "1.0", "6.0", "0.0"), n -> { double d; try { d = Double.parseDouble(n); } catch (NumberFormatException e) { return n; } return d == 0 ? "only notes it" : d <= 1 ? "advises" : d <= 3 ? "leads" : "rules"; },
+				"How much the AI's choice weighs against Xen's own brain. Its reflexes (fighting, fleeing, eating, its shelter at night) stay its own whatever this says.");
+		choice("Answer length", "brainTokens", List.of(400, 800, 1500, 250), n -> n + " tokens", "How long an answer may be. A thinking model (one that reasons first) needs more.");
+		onOff("Talks with it", "brainTalk", "Xen answers chat in its own words (the AI's), and says what it's thinking now and then. What you ask it to do is still done Xen's own reliable way.");
+		onOff("Sees (vision model)", "brainVision", "Now and then the AI also gets the picture of what the Xen sees (for a model that takes images; needs the live view folder config/xen/live).");
+		choice("Which Xens", "brainXens", List.of("all"), x -> x, "Which Xens have the big brain: all, or names (/xen set brainXens Kai,Cid).");
+		int[] at = next();
+		if (row % columns == 1) at = next();                                     // (the test on a row of its own)
+		StringWidget status = new StringWidget(left, at[1] + 24, panelWidth, 12, Component.literal(XenSettings.brainStatus()).withStyle(ChatFormatting.GRAY), font);
+		status.setMaxWidth(panelWidth);
+		inPanel(addRenderableWidget(Button.builder(Component.literal("Test it"), b -> {
+			status.setMessage(Component.literal("Asking...").withStyle(ChatFormatting.YELLOW));
+			XenSettings.testBrain(r -> minecraft.execute(() -> status.setMessage(Component.literal(r).withStyle(r.startsWith("Works") ? ChatFormatting.GREEN : ChatFormatting.RED))));
+		}).bounds(left, at[1], buttonWidth, 20).tooltip(tip(Component.literal("One call to the AI: are the URL, model and key right?"))).build()));
+		inPanel(addRenderableWidget(status));
+		row += columns;
 	}
 
 	/** Under the script box: how it reads (lines it can't read in red). */

@@ -35,6 +35,60 @@ public final class XenSettings {
 		else config.save();                                               // saved right away: nothing's lost if the game stops
 	}
 
+	/** The big brain's key file (config/xen/brain_key.txt): kept out of xen.json, so the settings can be shared. */
+	private static java.nio.file.Path brainKeyFile() {
+		return FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("brain_key.txt");
+	}
+
+	/** Is there a key for the big brain (the setting, the environment, or the file)? */
+	public static boolean brainKeySet() {
+		if (XenMod.INSTANCE != null && XenMod.INSTANCE.config != null && XenMod.INSTANCE.config.brainKey != null && !XenMod.INSTANCE.config.brainKey.isBlank()) return true;
+		String env = System.getenv("XEN_BRAIN_KEY");
+		if (env != null && !env.isBlank()) return true;
+		try {
+			var f = brainKeyFile();
+			return java.nio.file.Files.exists(f) && !java.nio.file.Files.readString(f).isBlank();
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/** The big brain's key, to its file (empty: the file goes). */
+	public static void setBrainKey(String key) {
+		try {
+			var f = brainKeyFile();
+			if (key == null || key.isBlank()) java.nio.file.Files.deleteIfExists(f);
+			else {
+				java.nio.file.Files.createDirectories(f.getParent());
+				java.nio.file.Files.writeString(f, key.trim() + "\n");
+			}
+		} catch (Exception e) {
+			XenMod.LOG.warn("Xen: couldn't keep the brain key: {}", e.toString());
+		}
+	}
+
+	/** One call to the big brain, to see the URL, model and key work; the result (or why not) comes back in words. */
+	public static void testBrain(java.util.function.Consumer<String> done) {
+		XenMod m = XenMod.INSTANCE;
+		if (m == null || m.server == null) {
+			done.accept("Open a world first (on a server: /xen brain test).");
+			return;
+		}
+		if (!m.brain.llm.on()) {
+			done.accept("Set the API URL first.");
+			return;
+		}
+		long t0 = System.currentTimeMillis();
+		m.brain.llm.chat(java.util.List.of(new LlmClient.Msg("user", "Reply with exactly: Xen brain online")), 20, 0.0)
+				.whenComplete((r, e) -> done.accept(e != null ? "Failed: " + m.brain.llm.lastError : "Works (" + (System.currentTimeMillis() - t0) + " ms): " + r));
+	}
+
+	/** How the big brain is going, in a line. */
+	public static String brainStatus() {
+		XenMod m = XenMod.INSTANCE;
+		return m == null ? "" : m.brain.llm.status();
+	}
+
 	public void reset() {
 		config.reset();
 	}
