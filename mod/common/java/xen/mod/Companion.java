@@ -5692,6 +5692,15 @@ public final class Companion {
 					break;
 				}
 			}
+			if (at == from) {                                                // (nowhere near it could know: the world's spawn, if it's there and clear, rather than the same camped bed; Sol died three times in six minutes at its own)
+				BlockPos sp = ow.getRespawnData().pos();
+				Vec3 spawn = ow.isLoaded(sp) ? dryNear(ow, new Vec3(sp.getX() + 0.5, ow.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sp.getX(), sp.getZ()), sp.getZ() + 0.5)) : null;
+				if (spawn != null && spawn.distanceTo(from) > 24 && ow.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, new net.minecraft.world.phys.AABB(spawn, spawn).inflate(24),
+						mb -> mb.isAlive() && mb instanceof net.minecraft.world.entity.monster.Enemy).isEmpty()) {
+					at = spawn;
+					XenMod.LOG.info("{} died again soon after waking at night: wakes at the world's spawn this time", name);
+				}
+			}
 		}
 		XenMod.quietJoin = true;                                      // (coming back isn't news: no "joined the game")
 		try {
