@@ -480,6 +480,17 @@ final class Walker {
 		return fails >= 2 || now() - bestAt > 120 && bestGap > 2;
 	}
 
+	/**
+	 * Stuck: the way it had let go, and a fair go for the next one (its failures and its "no nearer" clock from now). Without
+	 * that, stuck stayed stuck: each new way thrown away before its first step, and only a step done ever took a failure off
+	 * (Fin planned 450 ways on one spot in seven minutes, at 3 hearts; Pia 340).
+	 */
+	void fresh() {
+		stop();
+		fails = 0;
+		bestAt = now();
+	}
+
 	boolean hasBlocks() {
 		return throwaway() > 0;
 	}
@@ -508,7 +519,9 @@ final class Walker {
 		untouched = 0;
 		var p = c.player;
 		BlockPos feet = p.blockPosition(), up = feet.relative(d).above();
-		if (path == null || path.size() != 1 || path.get(0).kind() != Kind.ASCEND || !path.get(0).from().equals(feet)) {
+		Move on = path != null && path.size() == 1 && path.get(0).kind() == Kind.ASCEND ? path.get(0) : null;
+		boolean mid = on != null && !feet.equals(on.to()) && (!p.onGround() || feet.getX() == on.from().getX() && feet.getZ() == on.from().getZ() && feet.getY() == on.to().getY());   // (in the jump, or up on the step's edge: that step still, not a new one from where it hangs; Bob dug the wrong blocks every other step)
+		if (on == null || !on.from().equals(feet) && !mid) {
 			level = (ServerLevel) p.level();
 			eyes = feet;
 			if (breaks(feet.above(2)) >= INF || breaks(up.above()) >= INF || breaks(up) >= INF || !step(feet.relative(d))) return null;
@@ -1334,6 +1347,7 @@ final class Walker {
 				m.to().toShortString(), c.player.blockPosition().toShortString(), String.format("%.2f,%.2f,%.2f", c.player.getX(), c.player.getY(), c.player.getZ()),
 				c.player.onGround(), Math.round(c.player.getYRot()), c.player.zza, String.format("%.2f,%.2f", c.player.getDeltaMovement().x, c.player.getDeltaMovement().z));
 		if (c.hands.busy()) {                                               // its hands are at it (digging, a block down, a jump up)
+			if (c.hands.diggingNow()) stepStarted = now();                   // (the digging is the move's work: its three seconds start once the way's open, not from the first block; by hand a block takes eight to fifteen, and every step up Bob's staircase was "stuck", three minutes a block)
 			if (handsBusySince < 0 || !c.player.blockPosition().equals(handsBusyAt)) {
 				handsBusySince = now();
 				handsBusyAt = c.player.blockPosition().immutable();
