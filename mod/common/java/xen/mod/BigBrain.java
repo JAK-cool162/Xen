@@ -207,10 +207,25 @@ final class BigBrain {
 
 	private void apply(Companion c, Mind m, String text, List<String> valid) {
 		JsonObject j = LlmClient.firstJson(text);
-		if (j == null) {
-			XenMod.LOG.info("{}'s brain answered something it couldn't read: {}", c.name, text.length() > 160 ? text.substring(0, 160) : text);
-			m.rejected = "Your last answer was not one JSON object. Answer with JSON only.";
-			return;
+		if (j == null) {                                                         // (a smaller model, just a word or a line: the first choice it names, if any)
+			String up = text.toUpperCase(Locale.ROOT), named = null;
+			int at = Integer.MAX_VALUE;
+			for (String v : valid) {
+				var mt = java.util.regex.Pattern.compile("\\b" + v + "\\b").matcher(up);
+				if (mt.find() && mt.start() < at) {
+					at = mt.start();
+					named = v;
+				}
+			}
+			if (named == null) {
+				XenMod.LOG.info("{}'s brain answered something it couldn't read: {}", c.name, text.length() > 160 ? text.substring(0, 160) : text);
+				m.rejected = "Your last answer was not one JSON object. Answer with JSON only.";
+				return;
+			}
+			j = new JsonObject();
+			j.addProperty("do", named);
+			j.addProperty("thought", text.length() > 160 ? text.substring(0, 160) : text);
+			m.rejected = "Answer with the JSON object next time, not just a word.";
 		}
 		String thought = str(j, "thought"), plan = str(j, "plan"), say = str(j, "say"), pick = str(j, "do").toUpperCase(Locale.ROOT).trim();
 		int minutes = 4;
