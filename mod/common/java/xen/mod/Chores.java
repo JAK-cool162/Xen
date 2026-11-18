@@ -2294,6 +2294,10 @@ final class Chores {
 				lastCloser = now();
 			}
 		}
+		if (target == null && (lookFor.contains("tree") || lookFor.contains("log") || lookFor.contains("wood"))) {   // trees grow up top: deep down or down a pit, the way up first (Nia looked round at y 1 for trees, half a minute at a time, for an hour)
+			Action up = surfaceFirst();
+			if (up != null) return up;
+		}
 		if (target == null) {
 			if (blocksLookingSince < 0) blocksLookingSince = now();
 			else if (now() - blocksLookingSince > 20 * 30) {                    // half a minute and none: not here (Ann looked up and down on the spot for five minutes for obsidian behind the stone)
@@ -3355,6 +3359,23 @@ final class Chores {
 	/** The block it's putting blocks in the lava round (to mine it), and how many so far. */
 	private BlockPos plugTarget;
 	private int lavaPlugs;
+
+	/** Down deep, or down a ravine or pit with the sky over it: its climb up to the surface (null: it's up top already). */
+	private Action surfaceFirst() {
+		if (c.player.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) return null;
+		BlockPos feet = c.player.blockPosition();
+		var lv = c.player.level();
+		int top = lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+		if (lv.canSeeSky(feet.above())) {
+			int rim = top;
+			for (int[] d : new int[][] {{14, 0}, {-14, 0}, {0, 14}, {0, -14}, {10, 10}, {-10, 10}, {10, -10}, {-10, -10}, {28, 0}, {-28, 0}, {0, 28}, {0, -28}})
+				if (lv.isLoaded(feet.offset(d[0], 0, d[1]))) rim = Math.max(rim, lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX() + d[0], feet.getZ() + d[1]));
+			top = rim - feet.getY() > 12 ? rim : feet.getY();
+		}
+		if (top - feet.getY() <= 6) return null;
+		doing = "heading up to the surface for trees";
+		return climbUp(feet, top);
+	}
 
 	/** Its climb to the surface: the best height it's reached and when, and whether it's digging its own stairs now. */
 	private int climbBestY;
