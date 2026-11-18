@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ul>
  * Off with no brainUrl. Only the Xens in brainXens ("all", or names) have one.
  */
-final class Brain {
+final class BigBrain {
 	private final XenMod mod;
 	final LlmClient llm;
 
@@ -57,7 +57,7 @@ final class Brain {
 
 	private final Map<String, Mind> minds = new ConcurrentHashMap<>();
 
-	Brain(XenMod mod) {
+	BigBrain(XenMod mod) {
 		this.mod = mod;
 		this.llm = new LlmClient(mod);
 	}

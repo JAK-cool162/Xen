@@ -5444,7 +5444,7 @@ public final class Companion {
 	/** A line in the journal (the Experimental tab's log): what it sees, thinks, says, how it goes. */
 	void journal(String kind, String text) {
 		LiveView.journaled(name, kind, text);                           // (watched live: config/xen/live)
-		mod.brain.noted(this, kind, text);                              // (its big brain's memory of what happened)
+		mod.bigBrain.noted(this, kind, text);                              // (its big brain's memory of what happened)
 		if (mod.config.journal && mod.journal != null) mod.journal.add(name, kind, text);
 	}
 
@@ -5469,7 +5469,7 @@ public final class Companion {
 
 	// ------------------------------------------------------------------------ death and life
 	void died(DamageSource source) {
-		mod.brain.nudge(this, "You DIED: " + source.getLocalizedDeathMessage(player).getString() + ". You lost what you carried (it is on the ground where you died) and start again from your bed or spawn.");
+		mod.bigBrain.nudge(this, "You DIED: " + source.getLocalizedDeathMessage(player).getString() + ". You lost what you carried (it is on the ground where you died) and start again from your bed or spawn.");
 		fighter.died();                                                // (what it was fighting cost more than it had)
 		tips.died();                                                   // (the tips it was weighing: right or wrong)
 		gut.died();                                                    // (if it had just gone against its gut: the gut was right)

@@ -388,7 +388,7 @@ public class XenMod implements ModInitializer {
 	/** Its thoughts in words (the "thinkUrl" setting: a small language model beside the server). */
 	final Thinker thinker = new Thinker(this);
 	/** The big brain (any OpenAI-style API), fused with the old one: see Brain. */
-	final Brain brain = new Brain(this);
+	final BigBrain bigBrain = new BigBrain(this);
 	/** The Xens' instructions: choices, scores and when, from config/xen/instructions.txt (edited while the game runs). */
 	final BtbRules btbRules = new BtbRules(FabricLoader.getInstance().getConfigDir().resolve("xen").resolve("instructions.txt"));
 	/** What Xens see, think, say and hear (for the Experimental tab's log). */
@@ -951,7 +951,7 @@ public class XenMod implements ModInitializer {
 			Companion c = named;
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> {
-						if (!brain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
+						if (!bigBrain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
 					}));
 			return;
 		}
@@ -977,7 +977,7 @@ public class XenMod implements ModInitializer {
 			String t = asked;
 			chat.ask(sender.getName().getString(), t, c.name, request -> onServer(() -> c.request(request, sender, t)),
 					reply -> server.execute(() -> {
-						if (!brain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
+						if (!bigBrain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
 					}));
 			return;
 		}
@@ -996,7 +996,7 @@ public class XenMod implements ModInitializer {
 			Companion c = nearest;
 			chat.ask(sender.getName().getString(), text, c.name, request -> onServer(() -> c.request(request, sender, text)),
 					reply -> server.execute(() -> {
-						if (!brain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
+						if (!bigBrain.talk(c, sender, text, reply)) c.say(reply);   // (its big brain answers in its own words, if it has one)
 					}));
 		}
 	}
@@ -1276,20 +1276,20 @@ public class XenMod implements ModInitializer {
 							return 0;
 						}))))
 				.then(Commands.literal("brain").executes(ctx -> {                       // the big brain: how it's going, each one's thought and plan
-							String st = brain.status();
+							String st = bigBrain.status();
 							for (String line : st.split("\n")) ctx.getSource().sendSuccess(() -> Component.literal(line), false);
 							LOG.info("brain status: {}", st.replace('\n', ' '));
 							return 1;
 						})
 						.then(Commands.literal("test").requires(XenMod::mayRun).executes(ctx -> {   // one call, to see the URL, model and key work
-							if (!brain.llm.on()) {
+							if (!bigBrain.llm.on()) {
 								ctx.getSource().sendFailure(Component.literal("No brainUrl set: /xen set brainUrl https://api.deepseek.com (and brainModel, brainKey)"));
 								return 0;
 							}
 							var src = ctx.getSource();
 							long t0 = System.currentTimeMillis();
-							brain.llm.chat(java.util.List.of(new LlmClient.Msg("user", "Reply with exactly: Xen brain online")), 20, 0.0).whenComplete((r, e) -> server.execute(() -> {
-								String msg = e != null ? "Brain test failed: " + brain.llm.lastError : "Brain test OK (" + (System.currentTimeMillis() - t0) + " ms): " + r;
+							bigBrain.llm.chat(java.util.List.of(new LlmClient.Msg("user", "Reply with exactly: Xen brain online")), 20, 0.0).whenComplete((r, e) -> server.execute(() -> {
+								String msg = e != null ? "Brain test failed: " + bigBrain.llm.lastError : "Brain test OK (" + (System.currentTimeMillis() - t0) + " ms): " + r;
 								LOG.info(msg);
 								src.sendSuccess(() -> Component.literal(msg), false);
 							}));

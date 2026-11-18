@@ -74,19 +74,19 @@ public final class XenSettings {
 			done.accept("Open a world first (on a server: /xen brain test).");
 			return;
 		}
-		if (!m.brain.llm.on()) {
+		if (!m.bigBrain.llm.on()) {
 			done.accept("Set the API URL first.");
 			return;
 		}
 		long t0 = System.currentTimeMillis();
-		m.brain.llm.chat(java.util.List.of(new LlmClient.Msg("user", "Reply with exactly: Xen brain online")), 20, 0.0)
-				.whenComplete((r, e) -> done.accept(e != null ? "Failed: " + m.brain.llm.lastError : "Works (" + (System.currentTimeMillis() - t0) + " ms): " + r));
+		m.bigBrain.llm.chat(java.util.List.of(new LlmClient.Msg("user", "Reply with exactly: Xen brain online")), 20, 0.0)
+				.whenComplete((r, e) -> done.accept(e != null ? "Failed: " + m.bigBrain.llm.lastError : "Works (" + (System.currentTimeMillis() - t0) + " ms): " + r));
 	}
 
 	/** How the big brain is going, in a line. */
 	public static String brainStatus() {
 		XenMod m = XenMod.INSTANCE;
-		return m == null ? "" : m.brain.llm.status();
+		return m == null ? "" : m.bigBrain.llm.status();
 	}
 
 	public void reset() {
