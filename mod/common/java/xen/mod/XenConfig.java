@@ -222,6 +222,35 @@ public final class XenConfig {
 	public String thinkUrl = "";
 	/** How often each Xen thinks it over with that model, in seconds. */
 	public int thinkEvery = 120;
+	/**
+	 * Xen's big brain: any OpenAI-style chat API (OpenAI, DeepSeek, OpenRouter, Groq, Together, Mistral, a local llama.cpp,
+	 * Ollama or LM Studio): the base URL ("https://api.deepseek.com", "https://openrouter.ai/api/v1",
+	 * "http://127.0.0.1:11434/v1") or the whole .../chat/completions. Empty: off (its old brain alone, as before).
+	 */
+	public String brainUrl = "";
+	/** The model's name as the API knows it ("deepseek-chat", "gpt-4o-mini", "deepseek/deepseek-chat", "llama3.1"); empty: the server's default. */
+	public String brainModel = "";
+	/** The API key. Empty: the XEN_BRAIN_KEY environment variable, or the first line of config/xen/brain_key.txt (better: keys out of this file). */
+	public String brainKey = "";
+	/** How often each Xen thinks it over with its big brain, in seconds (sooner after something big). */
+	public int brainEvery = 60;
+	/** Calls a minute, all Xens together, at most (the bill: 20 Xens thinking every minute is 20 a minute). */
+	public int brainPerMinute = 12;
+	/** How long a call may take, in seconds. */
+	public int brainTimeout = 45;
+	/** How long its answer may be, in tokens (a thinking model needs more). */
+	public int brainTokens = 400;
+	/** How much the big brain's choice weighs with the old one's (its score plus this): 2.5 leads, 6 rules, 0 only advises. */
+	public double brainWeight = 2.5;
+	/** It sees too: its eyes' picture goes with every brainSeeEvery-th question (for a vision model; needs the live view on: the folder config/xen/live). */
+	public boolean brainVision = false;
+	public int brainSeeEvery = 3;
+	/** Which Xens have a big brain: "all", or names ("Kai,Cid"). */
+	public String brainXens = "all";
+	/** It talks with its big brain: answers in its own words, and says what it's thinking now and then. */
+	public boolean brainTalk = true;
+	/** Seconds to wait for its big brain's answer to someone before its quick one. */
+	public int brainTalkWait = 12;
 	/** A bigger language model for the rarer, wordier things: team laws, roles, villagers' names (empty: the thinkUrl one). */
 	public String talkUrl = "";
 	/**

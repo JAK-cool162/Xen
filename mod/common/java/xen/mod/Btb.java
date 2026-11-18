@@ -59,6 +59,8 @@ final class Btb {
 	}
 	private double worthAt;
 	private final Map<Task, Long> notBefore = new EnumMap<>(Task.class);
+	/** How it was the last time it chose (for its big brain, talking). */
+	volatile Obs lastObs;
 	/** When what it is and has last changed (a step, an item, a tool's wear, a level), and how it was then. */
 	private long progressAt;
 	private int progressSig;
@@ -146,7 +148,10 @@ final class Btb {
 		else if (c.goals.home == null && c.mod.config.wants) goal = "home";      // a base before the Nether: a chest for what it has (a death there costs it everything it carries), its bed for a spawn, its table set up
 		else if (netherNeeds()) goal = "nether";                                // (blaze rods and ender pearls: the eyes for the End; no giving up on a goal, it stays on it till it's done)
 		else goal = "world";
-		if (!goal.equals(was)) c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
+		if (!goal.equals(was)) {
+			c.journal("thinks", "its goal for now: " + goal + (was.isEmpty() ? "" : " (was " + was + ")"));
+			if (!was.isEmpty()) c.mod.brain.nudge(c, "Your goal changed: " + was + " is done, now " + goal + ".");
+		}
 	}
 
 	/** When it first went for an early base this time (ten minutes for it; then its gear, and another go in half an hour). */
@@ -483,6 +488,7 @@ final class Btb {
 	Action next() {
 		if (c.player == null || !c.player.isAlive()) return null;
 		Obs o = observe();
+		lastObs = o;
 		String life = o.health <= 8 && o.meals == 0 && o.food < 18 ? "hurt (" + Math.round(o.health) + " health) and nothing to eat"
 				: o.health <= 8 && o.danger >= 2 ? "hurt (" + Math.round(o.health) + " health) with monsters about"
 				: o.health <= 8 && o.night && o.overworld && !o.under && !o.sheltered ? "hurt (" + Math.round(o.health) + " health) out under the night sky"
@@ -525,14 +531,34 @@ final class Btb {
 		BtbLearner learn = c.mod.btbLearner;
 		Option best = null;
 		float bestScore = -1e9f;
-		Task idea = c.mod.thinker.idea(c, opts.stream().filter(op -> now() >= notBefore.getOrDefault(op.task, 0L)).map(op -> op.task.name() + " (" + op.why + ")").toList(), o);
+		java.util.Map<Task, float[]> weighed = weigh(opts, o);
+		boolean big = c.mod.brain.on(c);
+		Task idea = big ? null : c.mod.thinker.idea(c, opts.stream().filter(op -> now() >= notBefore.getOrDefault(op.task, 0L)).map(op -> op.task.name() + " (" + op.why + ")").toList(), o);
+		Task brainPick = null;
+		boolean urgent = false;                                                  // (a reflex's matter: the shelter at night, its bed, getting away, food with none: the old brain's alone)
+		if (big) {
+			java.util.Map<Task, Float> sc = new EnumMap<>(Task.class);
+			List<String> desc = new ArrayList<>();
+			java.util.Set<Task> said = java.util.EnumSet.noneOf(Task.class);
+			for (Option op : opts) {
+				if (now() < notBefore.getOrDefault(op.task, 0L)) continue;
+				float[] wt = weighed.get(op.task);
+				sc.merge(op.task, op.base + learn.bias(key, op.task.name()) + wt[0] + wt[1], Math::max);
+				if (said.add(op.task)) desc.add(op.task.name() + " (" + op.why + ")");
+				if (op.task == Task.SHELTER || op.task == Task.SLEEP || op.task == Task.RETREAT || op.task == Task.EAT || op.task == Task.FOOD && o.meals == 0) urgent = true;
+			}
+			brainPick = c.mod.brain.pick(c, desc, sc, o);
+		}
 		List<Option> live = new ArrayList<>();
 		List<Float> scores = new ArrayList<>();
-		java.util.Map<Task, float[]> weighed = weigh(opts, o);
 		for (Option op : opts) {
 			if (now() < notBefore.getOrDefault(op.task, 0L)) continue;           // (it just failed at that: something else for a bit)
 			float[] wt = weighed.get(op.task);
 			float learned = learn.bias(key, op.task.name()), thought = op.task == idea ? 0.7f : 0f;   // (its own idea, thought through: a little more keen)
+			if (big && !urgent) {                                                   // its big brain's choice, thought through: it leads (the reflexes' matters aside)
+				if (op.task == brainPick) thought += (float) c.mod.config.brainWeight;
+				else if (c.mod.brain.avoids(c, op.task)) thought -= 2f;
+			}
 			float score = op.base + learned + thought + wt[0] + wt[1];           // (Xenfish: its price, the race)
 			wt[2] = learned;
 			wt[3] = thought;
@@ -552,7 +578,7 @@ final class Btb {
 				float[] ww = weighed.get(ow.task);
 				String saw = seen.get(ow.task);
 				sb.append(String.format(Locale.ROOT, "%s%s %.1f (rules %.1f, learned %+.1f, quick %+.1f%s, race %+.1f%s)", sb.length() > 0 ? ", " : "", ow.task.name(), ww[4], ow.base, ww[2], ww[0],
-						saw == null ? "" : ": " + saw, ww[1], ww[3] > 0 ? ", its idea +0.7" : ""));
+						saw == null ? "" : ": " + saw, ww[1], ww[3] > 1 ? ", the big brain picked it" : ww[3] > 0 ? ", its idea +0.7" : ww[3] < 0 ? ", the big brain avoids it" : ""));
 			});
 			XenMod.LOG.info("{} weighs: {}", c.name, sb);
 		}
@@ -1522,6 +1548,7 @@ final class Btb {
 		}
 		if (task != Task.NONE && !WAITS.contains(task) && now() - taskAt > 20 * 90 && now() - progressAt > 20 * 90) {   // checks itself: a minute and a half on it and nothing's changed (not a step, nothing in its bag, no wear on a tool): a waste of time, dropped, something else (13 stood following no one for an hour; Max tried its table five times from a hole)
 			XenMod.LOG.info("{} btb: {} got nowhere for a minute and a half: a waste of time, something else", c.name, task);
+			c.mod.brain.nudge(c, task.name() + " got nowhere for a minute and a half (no step, nothing gained), so it was dropped.");
 			c.journal("thinks", "that (" + task.name().toLowerCase(java.util.Locale.ROOT) + ") was getting nowhere: something else");
 			notBefore.put(task, now() + 20 * 60 * 3);
 			c.chores.cancel();

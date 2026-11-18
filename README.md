@@ -507,6 +507,36 @@ python3 scripts/liveview/serve.py <server>/config/xen/live
 It also shows how the Xens' eyes (Xen Glance) are learning as they play. That learning is kept in
 `config/xen/glance_learned.json`: delete it to start again from the model that comes with the mod.
 
+#### A big brain: any AI with an API (DeepSeek, OpenAI, OpenRouter, local)
+
+Xen's own brain (the DMM: rules, learned habits and reflexes) is fast but simple. Give it a big brain too: any
+chat model with an OpenAI-style API. The big brain thinks slowly, in the background: every minute or so (and right
+after something big: a death, a goal reached, a task that got nowhere, someone talking to it) it reads how the Xen is
+doing (health, gear, bag, team, what just happened, how its last plan went) and the choices its body can take right
+now, and answers with a thought, a plan, a choice, and maybe a line to say. The two are fused, not swapped:
+
+* The choice is checked first: only one the body can take right now counts (else it's told why next time).
+* A good choice leads the old brain's choosing for a few minutes (`brainWeight`); what it says to avoid weighs against.
+* The reflexes stay fast and its own: fighting, fleeing, eating, shelter at night, lava and water never wait on it.
+* Talked to, a Xen answers in its own words, from what it's doing and why; the request itself is done the old,
+  reliable way. With `brainVision`, a vision model sees through its eyes now and then.
+
+Set it up in the game (op) or in `config/xen.json`:
+
+```
+/xen set brainUrl https://api.deepseek.com            (or https://openrouter.ai/api/v1, https://api.openai.com/v1,
+                                                       http://127.0.0.1:11434/v1 for Ollama, ...)
+/xen set brainModel deepseek-chat                     (the model's name as that API knows it)
+/xen brain test                                       (one call: are the URL, model and key right?)
+/xen brain                                            (calls, failures, and each Xen's thought and plan)
+```
+
+The key: put it in `config/xen/brain_key.txt` (first line), or the `XEN_BRAIN_KEY` environment variable, or
+`/xen set brainKey ...` (that one is saved in `config/xen.json`: don't share that file then). Other settings:
+`brainEvery` (seconds between thoughts, 60), `brainPerMinute` (calls a minute for all Xens together, 12: the
+bill), `brainXens` (`all`, or names), `brainTalk`, `brainVision`, `brainTokens` (more for a thinking model),
+`brainTimeout`. `/xen set brainUrl` with nothing after it turns the big brain off.
+
 #### Evolution: 30 days in real Minecraft
 
 With evolution on, every few days the worst quarter of the ownerless Xens
