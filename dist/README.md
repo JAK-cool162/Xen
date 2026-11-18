@@ -1,1697 +1,900 @@
-# Xen Companion (Fabric mod) 2.0.0-beta.49
+# Xen
 
-Xen as a survival companion: a player that joins your world, learns, thinks,
-feels fear and chats. Ask it for things in plain words ("Xen, get me some
-wood", "build a NOT gate") and it does them, or tells you why it won't. It
-makes its own tools, trades with villagers and bargains with you, has goals
-of its own, and talks on its own and with other Xens. Every Xen has its own name,
-skin and personality, and with evolution the ones that do well pass their
-nature on. It plays fair: its mind only knows what it can sense, and it acts
-only through a player's inputs (its luck, a setting, is the one exception: how
-often it happens to wander the right way). Since 2.0.0-beta.48 main Xens decide with **Back to Basics** (below): a
-simple state machine that picks one task and sticks to it, and learns from how its tasks go without a neural
-network. **Xen 2.0**, the learned mind that weighs what it wants against what it fears, is still a setting.
+light weight DMM for Minecraft named Xen
 
-| file | Minecraft | Java |
+Xen is a decision-making model that plays Minecraft. It makes a new decision
+every moment (press keys, mine blocks, fight, eat, place blocks), and it
+learns from everything that happens. It **thinks**: it imagines what its
+options lead to before choosing. It **feels**: pain, fear, curiosity,
+satisfaction and boredom, because fear is how it learns to stay alive.
+
+It **plays fair**. It isn't handed the world like most game AIs. It knows
+everything within 6 blocks of itself, and beyond that only what it *sees* in
+its 90° field of view, up to 8 chunks away. Things behind walls, under the
+ground or behind its back stay unknown, and what it saw before is a belief
+whose confidence fades. (The one exception is its *luck*, a setting: how often
+it happens to wander the right way. Its mind is never told anything by it.)
+
+On top of survival it has skills: it **builds** from templates (roofs, arches,
+houses, towers, bridges), **rates** builds and learns your taste in buildings,
+and **learns redstone** by experimenting. It **chats**: ask it for things in
+plain words ("Xen, get me some wood", "build a shelter", "follow me") and it
+does them, with its own hands and senses. Its own small talk model, trained on
+how players really type ("wsg", "u got iron??", "bro i just died to a creeper"),
+answers like a player would, with only what's true of it, and it only knows
+what Xen knows. In real Minecraft you can bring in as many Xens as the server allows.
+Each one is a real player with its own name, skin and personality, and they
+all share one brain. With evolution, the ones that do well pass their nature
+on.
+
+**Want it in your world?** Get the survival-companion mod from the
+[Releases](https://github.com/JAK-cool162/Xen/releases) page or
+[`dist/`](dist/README.md) (Fabric, Minecraft 1.21.11 and 26.x, x86-64 and
+ARM64, also on Android launchers). The mod has the trained brain inside and
+needs no Python. Settings are in Mod Menu. It's a prototype.
+
+The Python side only needs Python 3.9+ and numpy. No GPU and no deep-learning
+framework.
+
+```
+pip install -r requirements.txt
+python -m xen train --lives 50      # grow up in SimCraft (built-in Minecraft-like world)
+python -m xen watch                 # watch it live, with its inner monologue
+python -m xen evaluate --baseline   # what it learned, compared with a newborn
+python -m xen.ex1.train recordings/*.jsonl   # Xen Ex1: train on recorded play (the gameplay recorder's JSONL, or the mod's own gameplay logs)
+python -m xen.ex1.compare config/xen/gameplay_logs/*.jsonl   # a Xen's play next to a player's
+```
+
+---
+
+## How Xen works
+
+Every tick Xen goes through the same loop (`xen/brain/agent.py`):
+
+| step | brain part | what happens |
 |---|---|---|
-| `xen-companion-2.0.0-beta.49+mc1.21.11.jar` | 1.21.11 (also on phones) | 21 or newer |
-| `xen-companion-2.0.0-beta.49+mc26.x.jar` | 26.1, 26.2, 26.3 | 25 or newer |
+| perceive | `perception.py` | what it knows for sure (every block within 6 blocks, turned so "forward" is where it looks), what it sees (256 rays in a 90° view, up to 128 blocks), what it believes is out there (and how sure it is), and its own body (health, hunger, being hurt...) |
+| feel | `brain/emotions.py` | the **amygdala** predicts how much harm each action leads to; that becomes felt **fear** |
+| think | `brain/cortex.py` | if afraid (or unsure), it **imagines** its best options a few steps ahead with its world model and weighs imagined reward against imagined harm |
+| decide | `brain/agent.py` | picks the action with the best *reward − caution × fear*; when exploring it's curious but cautious |
+| act | `actions.py` | real Minecraft inputs: W/A/S/D, jump, turn, look, mine (hold left click), place, attack, eat |
+| learn | `brain/critic.py`, `brain/memory.py`, `brain/world_model.py` | stores what happened and trains everything, continuously |
 
-Use **one** of them: everything Xen needs is inside (its brain, its talk model and word library). Nothing downloads,
-nothing runs online. This is a prototype, so expect rough edges.
+### What Xen can sense (it can't cheat)
 
-**Every device**: the mod is plain Java with no native code, so the same jar
-runs on x86-64 PCs and ARM64 (phones, Raspberry Pi, Apple Silicon Macs). Every change is checked on both an x86-64 and
-an ARM64 machine (GitHub Actions: the tests and both builds).
+`xen/perception.py` gives Xen the senses of a player, not a map of the world:
 
-How it all works inside (the networks, the training, the numbers) is in
-`TECHNICAL.txt` on the Releases page.
+* **Up close it knows everything.** Every block within 6 blocks (a 13×13×13
+  cube), including what's under its feet and behind it. That's what a player
+  knows from walking around and hearing.
+* **Further away it has to look.** Its eyes cast 256 rays in a 90° field of
+  view, up to 8 chunks (128 blocks). Rays stop at solid blocks and lava and pass
+  through air, water and glass, so it can't see ores inside the hill, caves
+  under the ground or anything behind it. Unloaded chunks are unknown.
+* **Beliefs with confidence.** What it saw goes into a belief map ("coal
+  there, 20 blocks away"). The confidence fades once it looks away: blocks
+  lose half their confidence in 2 minutes, mobs in 3 seconds because they move.
+  When it looks again the belief is corrected, or forgotten if the thing is
+  gone.
+* Its observation is made from that: the full near cube, a coarse picture of
+  its view (distance and what each ray hit, per sector), pointers to the
+  nearest believed treasure, lava and mob with their confidence, and its body.
 
-## Back to Basics: how it decides (the default)
+The same senses run in SimCraft, in the mineflayer bridge (`bridge/xen_bridge.js`)
+and in the mod (`mod/common/java/xen/mod/WorldSenses.java`). The mod's
+`crossCheck` task checks that the Java version gives the same observation as
+the Python one.
 
-One state machine decides what a Xen does: surviving, fighting, doing what it's told, working, exploring or resting.
-What it was told, its reflexes (air, lava, falls, eating) and its fights always come first. The rest of the time it
-picks one task (wood, stone, coal, iron, smelting, food, a shelter, diamonds, enchanting, a home, a look around) from
-simple rules, and does it with the parts it already has: its way-finder (one path to the goal, walking, digging,
-bridging and pillaring, the way Baritone does it), its fighter, crafter and chores. It keeps at that task until it's
-done or fails. A fight in between and it goes back to it.
+### Why Xen needs fear
 
-**The job and the mind.** Getting on in the game (which ore to mine, what to dig or place on the way, the next tool)
-is its job's, like Baritone at the controls: one place it's going till it's there, its way-finder gets it there, no
-hunches, no second thoughts. Its mind (its taste, its nature, its friends) has the rest: its home and what it builds,
-talking, trading, its village. With nothing pressing by day, its mind builds it a home.
+Fear is the signal that teaches it to survive:
 
-**Fights: one call, then it sticks to it.** It deals with the most urgent mob first (a creeper close by, then what's
-hitting it, a baby zombie before the rest, then a skeleton it can get to), weighted by what has hurt it most. Armed,
-12 health or more and one or two on it: it fights, no running. Hurt, outnumbered or unarmed, with none within six
-blocks: it digs in (two down, a block over its head) and stays till they've gone. With them already on it, it stands
-and fights, shield up. A skeleton shooting at it: at it if it can get to it, else out of its sight (a hole is no cover
-from arrows). It only runs from a creeper's blast.
+* **Pain**: harm happening right now (damage, burning, death). This is the teacher.
+* **Fear**: harm it *expects*. The amygdala is a critic trained on harm instead of
+  reward. It learns cue → consequence one step at a time, so fear stays specific
+  (walking *into* lava is terrifying, stepping away from it is not).
+* **Trauma memory**: moments that hurt, together with the moments that led up to
+  them, are replayed far more often than ordinary memories. One burn is enough to
+  start fearing lava (fear conditioning). The latest 1000 of these memories (and
+  of the best moments, its joy memory) are saved with the brain, so they go
+  wherever it goes. A brain that keeps learning in a world where it never meets
+  lava still replays the burns, and doesn't forget to fear it.
+* **Caution**: being hurt makes Xen more careful for a while (sensitisation); safe
+  time calms it down again (habituation).
+* **Exposure**: it sometimes tries even what it fears. Without that, avoidance would
+  keep an unfounded fear alive forever. With it, harmless things stop being scary
+  (extinction).
+* **Fear makes it think**: when afraid, it stops acting on instinct and imagines
+  where each option leads before choosing.
 
-**No risks it doesn't need**: no mining when hurt or with nothing to eat (food first, then it heals); a roof from the
-evening on; with no shelter possible where it is, a hole dug by hand, or on to other ground, never standing about
-in the dark.
+The other feelings: **curiosity** (its world model was surprised) pushes it to
+explore; **joy memory** replays big rewards (a diamond makes digging feel worth
+it); **satisfaction** wears off for things it already has plenty of (the 30th
+cobblestone is worth much less than the first); **boredom** builds up when
+nothing changes around it (turning on the spot doesn't count as a change), so
+it never loops on a pointless action.
 
-How each task went is its learning: Q-learning over a few facts (pickaxe, health, food, night, under the ground,
-danger) and a memory of tries, successes, deaths and time per task, kept in `config/xen/btb.json` and shared by all
-Xens. What it learns only shifts the rules a little. Every few minutes it thinks over its longer goal: gear, then the
-enchanting table, then a home, then the world.
+Watching it (`python -m xen watch`) shows the feelings and the inner monologue:
 
-## Xen 2.0: how it decides (`brain` `"xen2"`)
+```
+pain ---------- fear ######---- curiosity #--------- satisfaction ---------- caution  4.0  mood: afraid
+action: BACK       (thought)
+Xen: I'm afraid; I don't want to walk forward. Thinking it through (step back +0.41, turn left +0.12, ...) -> I'll step back.
+```
 
-Every few seconds a main Xen picks what to do next out of 22 things a player
-does (get wood, get stone, craft, eat, build a house, farm, mine, smelt,
-store, explore, trade, follow, help, guard, fight, flee, sleep, enchant, go on
-an adventure...). It picks with **Xen 2.0**, three small neural networks:
+### SimCraft: where Xen grows up
 
-* a **reward critic** that guesses how much good each choice will bring,
-* a **fear critic** (like an amygdala) that guesses how much harm it risks:
-  a careful Xen weighs that more, a brave one less,
-* a **world model** that imagines a couple of steps ahead when it's unsure or
-  afraid, before it commits.
+`xen/worlds/simcraft.py` is a small, fast voxel world with the parts of Minecraft
+that matter for learning: terrain with trees, dirt and stone; ores that get
+richer (and more dangerous) the deeper it goes; caves; lava (often hidden right
+next to diamonds); water; fall damage; day and night; zombies; hunger and food.
+It uses the same actions and the same perception as the real game, so what Xen
+learns there carries over.
 
-It was trained from scratch over thousands of simulated lives with random
-personalities. Since 1.5.0 it's **Xen 6.0**: Xen 5.2 (two trained versions merged into one
-that dies less and gets iron and diamonds more often) trained on with its seven sins and its own plan as inputs. It **keeps learning in your world** on a background thread
-(`<world>/xen/mind.bin`), so it doesn't slow the game. What it wants comes
-from its nature: kindness, loyalty, power and money pull it different ways.
-It only sees what a player could see. Minions keep the lighter classic brain
-(DMM); set `brain` to `"dmm"` to use that for every Xen.
+```
+python -m xen train --lives 200 --brain xen_brain.npz    # keeps learning where it left off
+python -m xen evaluate --brain xen_brain.npz --baseline
+```
 
-## Requirements
+A pre-trained brain comes with the repo (`brains/xen_simcraft.npz`, 220 lives,
+about 214k decisions, all with the fair senses). Every command starts from it
+when you don't have your own brain file yet (use `train --fresh` for a
+newborn). The mod has the same brain inside.
 
-* **Fabric Loader** 0.16 or newer (tested with 0.19.5): <https://fabricmc.net/use/>
-* **Fabric API** for your Minecraft version (tested: 0.141.6+1.21.11,
-  0.155.3+26.1.2, 0.161.0+26.3): <https://modrinth.com/mod/fabric-api>
-* **Mod Menu** (optional) for the settings screen: <https://modrinth.com/mod/modmenu>
-* **Java**: 21 for Minecraft 1.21.11, 25 for 26.x.
-* **Memory**: 2 GB is enough.
+**What it learned** (reward = value of what it mined and collected in one life,
+while still exploring):
 
-## Install
-
-1. Install Fabric Loader for your Minecraft version.
-2. Put `fabric-api-*.jar` and the matching `xen-companion-*.jar` in `mods/`
-   (and Mod Menu if you want the settings screen).
-3. Start the game. Make a world and type `/xen summon`.
-
-## On a phone (Android)
-
-Android launchers run the Java Edition with Fabric. PojavLauncher itself is no
-longer updated; use its successors **Zalith Launcher 2** or **Amethyst**. Use
-the **1.21.11** jar, which needs Java 21 (these launchers include it).
-
-**Zalith Launcher 2:**
-
-1. Install a new version: Minecraft **1.21.11** with **Fabric** (the launcher
-   has a Fabric installer built in).
-2. Open that version's **Mods** page, tap **Add mod** and pick
-   `fabric-api-...jar`, then `xen-companion-2.0.0-beta.49+mc1.21.11.jar` (and Mod
-   Menu if you like).
-3. In the settings, give Minecraft as much memory as your phone allows (2 GB
-   is fine).
-4. Play, make a world with cheats on if you want `/xen spawn`, and type
-   `/xen summon`.
-
-**PojavLauncher / Amethyst:** in the launcher, **Options → Launch mod installer**,
-pick the Fabric installer jar (from fabricmc.net) and enter 1.21.11. Then copy
-Fabric API and the Xen jar into the game folder's `mods` folder (in
-PojavLauncher that's `games/PojavLauncher/.minecraft/mods` or
-`/sdcard/games/.minecraft/mods`, depending on the version; turn on hidden
-folders in your file manager). Pick the new Fabric version at the bottom of the
-version list.
-
-**On a phone:**
-
-* Slow phone? In Mod Menu (or `config/xen.json`) set **Decisions** to
-  "2 a second" and turn **Learning** off.
-* It was tested on PC servers, in a real (virtual) game client, and in the Java
-  code on ARM64 machines, but not on a phone yet.
-
-## How fast is it?
-
-Measured on a 4-core cloud PC (x86-64):
-
-* **Its brain**: a decision takes about 0.3 ms. A Xen decides 4 times a second
-  (every tick in a fight). Learning (about 60 ms a step, one step every 4
-  decisions) runs on its own thread, not the game's. With 8 Xens, a sped-up
-  server still ran at 110-210 ticks per second (normal speed is 20). With
-  **100 Xens** (`/xen spawn 100`), a tick took about 25 ms on average (the
-  limit is 50), with a catch-up pause of several seconds about every 25
-  seconds; 0.4.1 measured the same, so the new goals, trading, talking and
-  watching cost little (under 3% of the server's time).
-* **Its talk model**: reading a line and picking an answer takes well under a millisecond (a few thousand
-  multiplications); it's 2 MB inside the jar.
-* **XenTalk** (its own words, 2.0.0-beta.34): about 140 ms to write a line, on its own low-priority thread (never the
-  game's), one line at a time for the whole server; 2 MB inside the jar.
-* **Phones** weren't measured. Their cores are slower, but the brain and the talk model are light.
-
-
-## Talking to Xen: it understands and does it
-
-Say its name in chat. Only its owner can give it orders (anyone can, for the
-ownerless Xens from `/xen spawn`). Anyone can chat with it.
-
-| you say (any words like these) | Xen |
-|---|---|
-| "Pip, follow me" / "come here" / "let's go" (typos like "fallow me" work, and Thai: "ตามมา") | follows you (to about 4 blocks), and does things of its own nearby while you're close |
-| "Pip, stay" / "wait here" | stays around here |
-| "Pip, go explore" / "do your thing" | lives its own life |
-| "Pip, get me 5 logs" / "chop some trees" | walks to a tree it knows, chops, climbs a block if it must |
-| "Pip, get stone" / "find coal" / "find iron" / "go mining" | the same for stone, coal, iron or any ore |
-| "Pip, kill a pig" / "get us food" | hunts an animal it sees and picks up the meat |
-| "Pip, give me your wood" / "hand over 12 cobblestone" | walks over and tosses it to you (keeps its tools) |
-| "Pip, craft a boat" / "make me 4 torches" / "craft a chest" / "make me a stone pickaxe" | crafts it with the recipe book (planks and sticks first, a crafting table if needed), or says what's missing |
-| "Pip, build a shelter" / "hide!" | digs into a hill, builds a little hut with room inside (about 28 blocks, on a flat spot close by) or digs a hole and covers it, and stays in until morning |
-| "Pip, get in my boat" / "hop on" / "ride with me" / "get on the horse" / "tame that horse" | gets in your boat (or one it sees), gets on a horse (a wild one bucks until it's tamed; with a saddle it rides after you) |
-| "Pip, get out" / "get off" | gets out of the boat, off the horse |
-| "Pip, light the tnt" / "burn that" / "use the flint and steel" / "bone meal that" / "put that out" | uses the item on the block you're looking at (or TNT it can see), and runs from lit TNT |
-| "Pip, build a NOT gate" / "an OR gate" / "an AND gate" / "a long wire" | builds that redstone circuit from parts it carries |
-| "Pip, eat something" | eats, if it has food and is hungry |
-| "Pip, stop" / "cancel that" | stops what it's doing |
-| "Pip, trade with the villager" | walks up to a villager, opens its trades and takes the good ones ([trading](#trading-villagers-and-you)) |
-| "Pip, how much for your logs?" / "I'll give you 2 iron for 16 logs" | names a price, bargains, and trades with you |
-| "Pip, what are you doing?" / "how are you?" / "what's your dream?" / "what do you have?" / "who are you?" | answers straight from what it knows (nothing made up) |
-| "Pip, what do you see?" / "thanks!" | just talks |
-| "dax come here" (the first 3 letters of its name are enough) | answers from any distance |
-| "I'm hungry" / "can I have some bread?" / "I need a pickaxe" | shares if it can spare it (a kind one more readily) |
-| "Pip, join my team" / "let's be a team" | joins your team if it likes you enough (Xens also pick teams by who they talk to and live near) |
-| "new rule: no fighting" / "from now on everyone works" | the village votes on it; passed rules are kept, broken ones punished |
-| "Pip, build a highway north" / "build an obsidian road east 200" | a tunnel highway in that direction ([more](#building)) |
-| "Pip, build a modern house" / "a house on stilts" / "a tower" / "a cottage" | builds its own design in that style |
-| "Pip, build a place" / "set up your own place" / "build a homestead" | pictures a whole place first (its house, its own pool, sitting area, road, paths and wall, in the style it learned), shows it, then builds it ([more](#a-whole-place-of-its-own-pictured-first-2000-beta19)) |
-| "Pip, decorate your house" / "upgrade your house" / "make your house nicer" | takes its house a [stage](#building) further (basic, simple, good, perfect) |
-| "Pip, help Aria build" / "help them build" | joins a friend's build: the same plan, and every block either of them puts down counts for both |
-| "Pip, where's the nearest village?" / "have you seen a stronghold?" / "what places do you know?" | where it saw one (coordinates, the biome, how far and which way) |
-| "Pip, what biome is this?" | the biome it's in |
-| "Pip, what happened on the server?" / "tell me the lore" | the latest of the world's story (a chronicler tells it; others send you to one) |
-| "yes" / "no" (no name needed) | answers a question it just asked you, or its trade offer |
-| "Pip, watch this!" / "watch me" / "copy me" | keeps its eyes on you for a minute, to [learn from you](#learning-by-watching) |
-
-How it understands: clear keywords decide what it's asked to do; talk is talk (an idea for later, "wanna go mining
-later", is talk too). `/xen status` shows what it's doing right now.
-
-### 2.0.0-beta.41
-
-Xen gets a massive upgrade.
-
-### Xen Ex1 v5 and the cabin palette (2.0.0-beta.40)
-
-Ex1 learned from 55 more minutes of a player's light recordings (F8): building a house. On held-out building play it
-gets the forward key right 89% of the time (79% before) and sprinting 99.5% (84%), and plays about the same as before
-on everything else. Their house is a new palette, **cabin** (oak plank walls in a spruce log frame, a deepslate tile
-roof, spruce trim, lanterns), which Xens building a designed house pick in forests, taiga, snowy places and the plains.
-
-### Focus: Xens keep their eye on the goal (2.0.0-beta.39)
-
-A Xen's goal (wood, stone, ore, a mine, food, a shelter, smelting) gets done by a chore, and a fight, a hit, its gut,
-something to pick up or someone talking to it can cut that short. **Focus** holds on to a goal that was cut off and
-goes back to it when things are quiet again, if it's still worth it: a small model it learns (shared by every Xen in
-the world, saved in the world folder as `xen/focus.tsv`) of how likely a goal like this still comes to something. It lets go below
-25%, after 4 cut-offs, after waiting 20 seconds, or when night falls on outdoor work. A goal that comes to nothing at
-once isn't picked again right away (20 seconds, doubling up to 5 minutes). `/xen status` shows how often it went back
-and how often it let go. In a test, the share of a Xen's choices that came to something went from 26% to 55%.
-
-### Anger, bloodlust and swearing (2.0.0-beta.38)
-
-**Swearing**: Xens swear like players in chat ("oh shit, a creeper", "wtf was that", "Ow, fuck!", "ffs stop!!", and
-from 2.0.0-beta.39 just talking too: "this shit is so far", "hell yeah"), each as much as its mouth is foul (a hidden
-stat: some never do) and more when it's angry. Never a slur. Off: `swearing`
-(Chat tab). Swearing at a Xen counts as an insult.
-
-**Anger** and **bloodlust** are hidden (never shown; you find out from what it does). Anger stacks: a hit (a hard
-one, two), an insult, dying (killed by someone: four), someone getting away from it, now and then a monster's hit;
-each stack is 1 to 6 anger and 1 to 3 bloodlust, so bloodlust climbs about half as fast. Anger cools in about a
-quarter of an hour; bloodlust lingers for an hour or two, and a bloodthirsty Xen (hidden stat) never loses all of it.
-
-| | what it does |
-|---|---|
-| anger | swears more; hits back sooner (from 60%, even at its owner who keeps hitting it); doesn't let a friend's hit go (from 70%) |
-| bloodlust 20% and up | a smaller grudge is reason enough to fight someone (from 60%, any grudge) |
-| bloodlust 50% and up | now and then (up to 3 in 10 a minute) it picks someone near it that it has nothing against and goes after them for two minutes, for no reason |
-| a kill | takes the edge off both |
-
-Never its owner or a close friend for no reason (its own village only from 85%), never in a truce, never with PvP off,
-and only a free Xen (one that follows you or stays doesn't go hunting). It's still its own call.
-
-**Sight** (`sight`, default 128 blocks = 8 chunks): how far Xens see and remember trees, water, lava and houses (before:
-96), and how far the picture of their view goes (before: 64; half of it while no player is near). Never past the
-server's view distance. What it makes of the view (a cave mouth, a village,
-dark ground, what it turns to look at) reads as far as its mind was trained on (64 blocks; 32 with nobody near).
-
-### Getting through the night (2.0.0-beta.37)
-
-A Xen out in the dark that can tell what's coming (Xen Ex1's danger high, monsters close and its health low, or three
-or more around it) is made to dig in by its gut, whatever it was doing: it digs into the ground or a hillside, closes
-the hole, and waits for morning (mining from there if it has a pickaxe, food and health, then mining up when it's
-light). It also digs in when night catches it outside, weaves left and right running from skeletons, and after dying
-at night without a weapon it waits for the day before going back for its things (items only age while a player keeps
-their ground running, so it counts only that time). In a test of 6 Xens over 2 game days: 8 deaths, against 21 in
-2.0.0-beta.36, and 3 Xens alive the whole time, against 1. From 2.0.0-beta.38 having no weapon counts too: at night
-with a monster near and no sword or axe, or just respawned in the dark without one, it digs in (6 deaths in the same
-test, none more than 2 for one Xen).
-
-### Xen Ex1 v4: learned from a player's endgame play (2.0.0-beta.36)
-
-Ex1 (how a person moves, turns and looks, and when a hit is coming) now also learned from 26 minutes of one player's
-recordings: diamond mining at y -55 with fights, an enderman XP farm, a base, a mace and wind charges, elytra. On
-held-out play (the last fifth of each recording, never trained on), against the same network trained on the older
-recordings alone:
-
-| | older recordings alone | Ex1 v4 |
+| lives | average reward per life | survived |
 |---|---|---|
-| that player's play: seeing a hit coming (AUC) | 0.80 | **0.92** |
-| that player's play: forward / jump / attack keys | 85.7% / 86.6% / 88.7% | **91.5% / 88.7% / 90.0%** |
-| the older players' play: seeing a hit coming | 0.844 | **0.856** |
-| the older players' play: forward / jump / attack | 92.7% / 91.7% / 94.8% | 93.1% / 91.2% / 93.3% |
+| 1-44 | 13.1 | 19/44 |
+| 45-88 | 15.2 | 20/44 |
+| 89-132 | 19.2 | 14/44 |
+| 133-176 | 20.2 | 26/44 |
+| 177-220 | 22.8 | 21/44 |
 
-Better at seeing danger on both; on the older play the attack key is 1.5 points worse and where it looks next 0.5 deg
-worse. How that plays in a world wasn't measured.
-
-### Recording your play without the lag (2.0.0-beta.35)
-
-Hours of real play (trial chambers, trading, the End, an XP farm, elytra, a mace fight, looting chests) is what teaches
-Xen Ex1 how people play. Two ways to record it now, both in the form Ex1 learns from as it is (no converting):
-
-* **On your own server, or in singleplayer: nothing on your game at all.** `/xen set gameplayLog players` (an
-  operator; `both` adds the Xens). The server writes what each player does and sees, 4 times a second, to
-  `<server folder>/config/xen/gameplay_logs/` (or the folder `gameplayLogFolder` names): about 30 MB an hour each, no
-  pictures. Your game does nothing extra, so it can't lag you. Players are told when their play is logged. These logs
-  also have your chat in them (what you said and heard); look before you share one.
-* **On someone else's server: F8, now light.** F8 records the same things on your own game, the same way: what you
-  do (keys, where you look, what's in your hands, health, hunger, what you mine and hit) and a small view (14 by 24
-  sight lines twice a second), with no pictures. One file, `.minecraft/xen_recordings/play_<date>.jsonl.gz`, about
-  1 MB an hour. No chat, no names, no server address. Measured on a test client (no real graphics card): 0.42 ms of
-  the game's time a tick on average, against 1.15 ms for the old recording with pictures; your machine may differ.
-  **F7** for the old recording with pictures (for Xen's eyes, and for `/xen tour`; from 2.0.0-beta.36, its own key, so a
-  held or toggled sneak can't pick it by accident).
-* **Notes:** F9 while recording, or `/xen note <what you're doing>` on a server that logs you ("trading with
-  villagers", "XP farm in the End"). A note can come before or after; one recording for one thing is easiest to read.
-
-To send it: zip the `play_*.jsonl.gz` files (or the gameplay logs). `python -m xen.ex1.train recordings/*.jsonl
-<your files>` trains Ex1 on them; recordings from 2.0.0-beta.33 and .34 (session folders) are read too.
-
-### It talks in its own words: XenTalk (2.0.0-beta.34)
-
-Xens now have a small language model of their own, **XenTalk**, made for this and nothing else: 4 layers, about 2
-million numbers, 2 MB in the jar, no download, no GPU, no internet. It reads what's true of the Xen right now (what it's
-doing and why, what it has, what it saw, how it feels, its mood and nature, who it's talking to and how much it trusts
-them, what they just said) and writes a line word by word. Nothing is picked from a list:
+`python -m xen evaluate --lives 8 --baseline` (8 fixed worlds, no exploring,
+and the 30th cobblestone is worth less than the first):
 
 ```
-<mikomisz> hey, Hiemberz__. got wood for my pickaxe.
-<Hiemberz__> got some wood, gonna get stone.
-<mikomisz> um, see you later.
-<soda99> um, i'm bored digging. want to go mining?
-<mikomisz> get more wood for a pickaxe?
-<Hiemberz__> i'm chopping wood for my pickaxe. feeling a bit uneasy at night, now.
-<byte_nova> i'm swimming back to heal. the cave. it's too far out?
+trained  reward per life  33.78 | survived 7/8 (deaths: starvation x1)
+newborn  reward per life   3.96 | survived 1/8 (deaths: zombie x5, lava x2)
 ```
 
-* It speaks in **chats between Xens** (each line answers the last), **its remarks** now and then, and **answers to you**
-  when its word library has nothing that fits.
-* A line that names something that isn't true of it (iron it doesn't have, a creeper that isn't there, a number it
-  doesn't have) is thrown away and it tries again; after 3 tries its old voice answers instead.
-* It works on its own low-priority thread, never the game's: about 140 ms a line on one core of a cloud PC.
-* `xentalk` in the settings turns it off (then everything is as in 2.0.0-beta.33).
-* Honest limits: it's small. Its lines are short (about 9 words), lowercase like a lot of players type, and
-  sometimes don't follow (a reply that ignores what you said, like "get more wood for a pickaxe?" to "want to go
-  mining?"). 91% of its first tries stick to the facts on situations it never trained on, and only those are said.
-  Early on most Xens want the same few things (wood, a pickaxe, stone), so they talk about the same few things.
-* When it talks: two Xens chat when they meet (within 12 blocks); its remarks only when a player is near enough to
-  hear them; answers to you only when its word library has nothing that fits. In a 4-minute test with 10 Xens on a
-  normal world they never met, so there were no chats at all; kept close together, 4 Xens had 9 to 11 chats and 20 to
-  34 remarks in 5 minutes.
-* How it was made: a bigger open model (Qwen2.5-1.5B-Instruct, Apache-2.0) ran once on a computer of ours and wrote
-  replies for situations made from 631 real Xen states on a test server (more things, night, hurt, danger, someone to
-  talk to, a line they heard); replies that named anything not in the facts, ran long or sounded like an assistant
-  were thrown out (about 7 in 10 kept, 4,246 in all). XenTalk learned from those. The big model isn't in the jar and
-  nothing calls out to it. `scripts/xentalk/` (`teach.py`, `train.py`) to make your own.
+Its fear is learned, and it's specific (how much harm the amygdala expects):
 
-**Data without playing for hours: `/xen tour [minutes]`** (operators, or the host in singleplayer). You float through the
-world as a spectator, a new view every 3 seconds: out on the land, inside caves, high over it, your view turning
-slowly, further and further from where you started (1,200 views an hour). Press F7 first (the recording with pictures) and it saves it all
-while you're away from the keyboard. These are marked as spectator views, so they teach
-Xen's eyes (colours, what things look like), not how a person plays. `/xen tour stop` puts you back where you were.
-For how a person plays, a short session doing one thing (10 minutes of caving, with a note or two on F9) teaches more
-than hours of everything. And the Xens' own play can be logged with no one at the keyboard at all
-(`/xen set gameplayLog xens`).
+| situation | trained Xen | newborn |
+|---|---|---|
+| walk forward into lava vs onto ground | 0.167 vs 0.007 | 0.014 vs 0.003 |
+| dig straight down onto lava vs onto stone | 0.063 vs 0.000 | 0.000 vs 0.009 |
+| a zombie in its face vs nothing there | 0.014 vs 0.002 | 0.026 vs 0.032 |
 
-### It sees, writes its own rules, and talks about real things (2.0.0-beta.33)
+It still dies more often than a good player. Deep digging for ore means lava
+and zombies, and more training makes it better.
 
-* **Vision**: a 64 by 36 picture of what it sees from where its head points. Each sight line stops at the first block
-  or creature, so it can't see through walls. Colours are the blocks' map colours (no textures), shaded like the game.
-  From it, simple rules pick out a cave mouth, a drop, a ravine, buildings or a village, dark ground where monsters
-  spawn, a monster behind cover, or a mess near home. These feed its mind, its own rules and its chat, and its head
-  turns to what moves or stands out. About 1 ms of server time per whole view per Xen; `vision` in the settings turns
-  it off.
-* **Its own if/then rules**, written from what worked and what didn't for it ("if monsters are about, then don't get
-  wood"), crossed out again when they stop holding, passed on to other Xens in chats. They lean its choices; they never
-  force them. `/xen rules` lists each Xen's rules.
-* **Loops**: going round in circles (the same choice failing again and again, or minutes stuck in one spot), it notices,
-  leaves that choice for a while and tries something else.
-* **Chats from its real life**: how the last thing went (what really happened), what it's doing and why, asking for
-  what its plan needs (a gift, a promise it keeps when it can, or a no), going somewhere together.
-* **Chests it sees** up to 40 blocks off, it goes and opens; one it can't reach, it leaves alone after.
+### What it learned by itself
 
-**Recording your play for Xen** (training data, for whoever wants to help train it). The recorder is in the same jar,
-on your own game, and off until you press **F7** (since 2.0.0-beta.36; F8 is the light recording above. Press it again to stop; **F9** adds a note, like "going for iron"; both keys
-can be changed in Controls). It saves, a few times a second, a small picture of your screen, what each part of it is,
-Xen's picture of the same view, where you look, your keys, the item in hand, health, hunger and the time of day, and
-what you mine, place and hit, into `.minecraft/xen_recordings/session_.../`. It never records chat, names or the server
-address, and never touches your controls. About 130 MB an hour in a test. To tune Xen's colours to your screen:
-`python -m xen.vision.tune .minecraft/xen_recordings/session_* -o .minecraft/config/xen/vision.txt` (the mod reads it
-when the server starts).
+Nothing below is a rule in Xen's code. SimCraft only has physics, rewards (the
+value of what it mines and eats) and harm. Same situations for the trained
+brain and a newborn, 12 fixed worlds each, no exploring, the choices it made
+most often:
 
-### It goes looking for iron like a player (2.0.0-beta.32)
+| situation | trained Xen | newborn |
+|---|---|---|
+| diamond right in front | mines it (5 of 12) | never mines (eats 6, turns 2) |
+| iron right in front | mines it (4) | never mines (eats 3) |
+| looking down, lava 2 blocks below | **never digs** (walks on 3, looks 2) | digs down (5) |
+| looking down, stone below | digs down (5) | digs (3) |
+| stone in front, already carrying 64 cobblestone | mostly doesn't bother | mines it (3) |
+| a zombie in its face | backs off or sidesteps (4) | random |
+| nothing around | looks down at the ground (7): a miner's habit, that's where ore shows | random |
 
-* **Caves it sees are caves it uses.** A cave mouth, the inside of a cave or a ravine it recognises is remembered for
-  mining, and its next trip for iron heads there: the walls show the ore. A cave it breaks into on its way down it
-  explores for ore instead of digging past.
-* **A look round first.** With no cave known, a curious Xen often has a look round low ground for one before it digs
-  its own staircase; a lazy one seldom does. A cave it could only reach through water it crosses off.
-* **It keeps going down.** Coal it has plenty of and plain stone don't pull it off its staircase any more, and every
-  step down counts as getting somewhere, so it no longer gives up on the way down. Even a lazy one gives a trip about
-  two minutes.
-* **Staircases that look ahead.** Water or daylight on the steps ahead: it turns the staircase another way. Flooded
-  anyway: it starts again on the highest dry ground close by. It leaves stone and ore on a lake's bed alone.
-* **A longer attention span.** Boredom only builds when nothing new is happening (something new keeps it interested),
-  and the mine-entrance hut waits until its mine has paid off.
-* In tests (10 Xens, a cherry grove mountain, against beta.30.2): mining trips given up in the first 10 minutes 10 -> 3,
-  cave trips 0 -> 15; over a whole first day deaths 22 -> 9 and 10.
+So it worked out "don't dig straight down onto lava" (but do dig onto stone),
+that ore is worth taking, and that more stone isn't. It did **not** learn to
+eat when hungry, which is why the mod has an eating instinct.
 
-### It leaves the land the way a player would (2.0.0-beta.30)
+### Training in real Minecraft
 
-* **Pillars come down.** The pillar it jumped up on (to reach the top logs of a tree, to get out of a zombie's reach)
-  comes down again once it's done up there: still on it, it digs the block under its feet and drops down with it; down
-  already, it takes the pillar apart from the ground, the top first, so nothing is left floating. Never in a fight,
-  never with a monster close, never a block that has become part of something or that fills a hole it climbed out of.
-* **Its night's hut, in the morning.** The little dirt hut it put up for the night it may take down again (the blocks go
-  back in its bag), roof first. Not its home, not a fort.
-* **Mines into hillsides.** A new mine starts at the foot of a hillside close by (three or more blocks of stone or earth
-  rising right in front, dry all the way down), a couple of blocks straight in, then the staircase down; not a hole in
-  the flat ground. Flat land all round: where it stands, as before.
-* **Habits, not rules.** Each pillar (and each hut) it weighs once: a diligent Xen nearly always tidies up and walks
-  further for a hillside; a lazy, slothful one leaves a pillar or two and digs where it is.
-* **Houses in clearings.** It picks the open, flattest spot close by, counting the trees and the leaves over the whole
-  footprint, and looks further out (up to 24 blocks) when everything close is forest, instead of wedging the house
-  between trunks.
-* **It finishes what it agreed to build.** "Pip, can you build a house here?", yes: the house is its goal until it's
-  built (a fight, the night or hunger still come first); before, its mind could wander off to other things halfway.
-  Inside its own half-built house it steps out to put its crafting table down (it used to try the same spot forever).
-* **Smaller fixes.** Skins from mineskin.org's gallery that are mostly see-through (test uploads: a face on an empty
-  sheet, drawn black in the game) are left out, so Xens no longer look like shadows. "My farm is planted!" is said once,
-  not each time it looks the farm over.
+The mod keeps learning while it plays. For long runs, `/tick sprint` speeds up
+the game and Xen's learning together, so it stays fair: Xen gets the same
+number of decisions and learning steps per game tick as at normal speed, just
+sooner. Every life is logged in `<world>/xen/lives.csv`.
 
-### It plans what it was never shown, and reads biomes (2.0.0-beta.29)
+* **100 real days (8 Xens)**: it made the brain worse. Real Minecraft rewards
+  are rarer than SimCraft's, and the brain slowly forgot to fear lava because
+  it hardly met any. That's why its trauma and joy memories are now saved with
+  the brain and keep being replayed. With them, a second run kept the fear
+  (0.146 for walking into lava vs 0.013 onto ground).
+* **30 real days with evolution (8 Xens)**: evolution picked brave Xens,
+  and the brain learned to fear zombies but got worse at SimCraft's tests
+  ([the results](#evolution-30-days-in-real-minecraft)).
 
-Xen has know-how: the game's own crafting recipes (whatever the version or data pack), what a furnace makes of what,
-and a few hints a player picks up ("iron ore wants a stone pickaxe", "sand: beaches, deserts, rivers", "string:
-spiders, at night"). Give it a goal, `/xen plan bucket` or "make me a shield" in chat, or let it pick its own (an
-iron pickaxe, a shield, a bucket...), and it works back from what it has to a plan:
+The bundled brain is still the SimCraft one, since it's the best at SimCraft's
+tests. The 30-day brain is an experimental download on the release page.
 
-```
-1. chop a tree (3 logs), 2. craft 12 oak planks, 3. craft a crafting table, 4. craft 4 sticks, 5. craft a wooden
-pickaxe, 6. mine stone (11 cobblestone), 7. craft a stone pickaxe, 8. mine iron ore (3 raw iron), 9. craft a furnace,
-10. smelt 3 raw iron into iron ingots, 11. craft a bucket (about 10 min)
-```
+---
 
-The plan is advice, not an order: its next step weighs in with its other choices (how much: its diligence and how its
-plans have worked out), and its mind decides. It's worked out again whenever what it has changes, so a skipped step,
-a find, a failed way just change the plan. What each kind of step costs it is learned and shared across every plan
-(mining iron for a bucket counts toward the plan for a shield); where there are two ways (coal or planks to burn) it
-takes the cheaper, and a kind of step that keeps coming to nothing it pushes less. `/xen plan` shows the plan.
+## Playing real Minecraft
 
-It reads biomes the way a player reads the land: where its sight lines end it notes the biome and remembers where it
-saw each one, and what each tends to have (a desert or beach: sand; a swamp: clay; badlands: gold; the mountains:
-emeralds and iron). A plan that wants sand it hasn't seen goes to the beach it saw. In lush caves, dripstone caves or
-the deep dark it knows it's in a cave at once (lush caves glow, so dark isn't the clue), and a river biome helps it
-name a river it sees. `/xen g1x` shows the biome it's in and the ones it has seen.
+### Survival companion mod (Fabric, easiest)
 
-### It weighs survival tips (2.0.0-beta.28)
+[`dist/`](dist/README.md) has the mod, with requirements, commands and
+settings:
 
-Xen gets tips the way a new player does, not rules: "can't win this fight: get out of reach (two blocks up) or away,
-heal, then come back", "night's here and you're out working: a roof (or a hole) before it gets worse", "hurt and out
-in the dark: a roof first, heal, then go on", "no sword and it's night: let your things wait till morning". When one
-comes to mind it weighs it (how far it trusts that tip, how bad things look, its nerve: brave, proud or wrathful, it
-goes its own way more; a Xen that believes a warrior never runs mostly stands its ground) and takes it or doesn't.
-Then it sees what happened: it took it and came out fine, or went its own way and got badly hurt ("should've
-listened"), and it trusts the tip more; went its own way and was fine, a little less. `/xen tips` shows it.
+| jar | Minecraft | Java |
+|---|---|---|
+| `dist/xen-companion-2.0.0-beta.41+mc1.21.11.jar` | 1.21.11 (also on phones) | 21+ |
+| `dist/xen-companion-2.0.0-beta.41+mc26.x.jar` | 26.1 - 26.3 | 25+ |
 
-It learns what each kind of mob costs it to beat ("a zombie costs it about 4 health to beat now"), for the sword and
-armor it has, and that's how it sees a fight going badly. Taking the tip, it pillars two blocks up (out of a zombie's
-reach) and hits down at it, heals and comes down; from a skeleton it ducks out of sight (behind a tree, a hill) rather
-than run in the open; and it runs away from all of them at once, one way for a moment, instead of zig-zagging. Its gut
-feeling in a fight goes into that call instead of a step back on the spot. Over two 3-day test worlds (5 Xens each),
-deaths went from 43 to 28 (15 to 8, and 28 to 20; skeleton deaths 10 to 5, zombie deaths 19 to 8).
+Everything Xen needs is inside the jar: nothing to download, nothing online.
 
-### It talks like a player (2.0.0-beta.27)
+The mod is plain Java with no native code, so the same jar
+runs on x86-64 and ARM64 (phones, Raspberry Pi, Apple Silicon). Every push is
+checked on both an x86-64 and an ARM64 machine
+([`.github/workflows/check.yml`](.github/workflows/check.yml)).
 
-Its talk model reads a line the way players type it ("wsg", "wyd", "u got iron??", "bro i just died to a creeper",
-"LMAOOO", "whats ur fav block", typos, stretched letters, with its name or without) and knows about 90 kinds of lines:
-hellos and "how r u", what it's doing and what it has, your news (you died, you found diamonds, you built something),
-invitations ("wanna go mining later"), "are you a bot", favorites, jokes and fun facts, roasts and compliments, "brb",
-"gn", "where are you" (its real coordinates), lag, "are you hacking"... It answers from a library of about 800
-player-style lines, in its own tone, filled in with what's true of it right now:
+Put it in `mods/` with Fabric API and run `/xen summon`. Xen joins as a real
+player next to you and **lives its own life** like another player: tools, its own
+house, a crop farm, mining for iron and diamonds, smelting, armor, a mob farm
+(or it follows you or stays when you ask). Its **path assist** finds the way like
+a good player (sprint, jump gaps, drop down, swim, climb, open doors, dig through,
+bridge, tower out of holes), a **solver** learns ways out when it's stuck (also
+from watching you), fights can end in a **truce**, and `/xen minions` gives it
+sidekicks that don't load chunks and help it build a village. It mines, fights back, swims, eats and learns.
+Since 2.0.0-beta.48 main Xens decide with **Back to Basics**: a simple state machine that
+picks one task and sticks to it, done by its way-finder, fighter, crafter and chores, and that learns from how its
+tasks go with Q-learning and a memory of what worked (no neural network; `config/xen/btb.json`). Before that (and
+still a setting, `brain` `"xen2"`) main Xens decided with **Xen 2.0**: an option-level mind with a reward
+critic, a fear (harm) critic and a world model that imagines ahead, trained from
+scratch in a simulated survival life and still learning in your world (minions keep
+the classic brain). Xens have a hidden nature (aggressive, passive or friendly;
+kindness, loyalty, power and money), pick their own teams, make village rules and
+jobs and punish those who break them, write a tax into their constitution and vote to
+change it (opinions spread as they talk), found faiths whose priests preach and win
+followers (`/xen society` tells it all, like Altera's Project Sid), build houses in styles (modern, on stilts,
+towers, cottages, with ponds and workshops), dig highways (underground, or under the
+Nether roof), and fly with elytras. Right-click it to
+open its bag. `/xen spawn 50` (operators) brings in a crowd of Xens across the
+world, all sharing one brain. Everything runs inside the game (brain,
+learning, senses and chat), with no Python and no bridge. It was tested on
+Fabric servers for 1.21.11, 26.1.2 and 26.3.
+
+**Ask it for things.** Say its name and what you want: follow, stay, explore,
+get wood / stone / coal / iron / ore, hunt for food, give you its items, craft
+something ("craft a boat"), build a shelter, eat, stop (typos like "fallow me" and Thai work too). It goes for
+blocks and animals it knows about (felt within 6 blocks, spotted within 14, or
+seen further away in its view), mines whatever it can see and reach like a
+player, picks up what drops, and looks around when it knows of none. It
+finds its way through the blocks it knows (pathfinding over its 13×13×13 cube)
+and digs only when there's no way. It says what it will do, or exactly why it
+can't. From test runs on a real 1.21.11 server:
 
 ```
-<Alex> u got any iron?            <Xen> no iron yet, just 4 wood lol
-<Alex> bro i just died to a creeper   <Xen> rip. creepers have no chill
-<Alex> whats ur fav block          <Xen> copper for sure. yours?
-<Alex> probably moss lol           <Xen> ooh moss is clean
-<Alex> are you a bot               <Xen> would a bot say no
+<Steve> Xen, get me 2 logs
+<Xen> Okay! I'll get 2 wood from the tree I know is 3 blocks from me.
+<Xen> Got 2 wood!
+<Steve> xen build a shelter
+<Xen> Okay! I'll build a small shelter around myself with 8 blocks.
+<Xen> Done! I'm safe in my little shelter.
+
+<Steve> xen, kill a pig
+<Xen> Okay! I'll hunt the pig I see 3 blocks away for food.
+<Xen> Got some food!
 ```
 
-An answer that would claim something untrue (iron it doesn't have, a death it never had, a place it never found) is
-never picked. It learns which answers land: a laugh or a thanks after one, it says it more; a "what?" or an insult,
-less (config/xen/talk-learned.json). A chat goes on as long as it's fun: laughs and thanks keep it going, and a busy or
-quiet Xen still winds it up after a while. When the model isn't sure what a line means, the rest of Xen's chat answers.
+**Every Xen is someone.** New Xens get a personality (brave or timid,
+curious, chatty or quiet, patient or impatient, and a tone of voice: cheerful,
+calm, grumpy, shy, bold or silly), a name that fits it (a silly one may be
+WobblyNoodle, a grumpy one SaltyBadger; or a gamer tag like Pickle_42, a
+made-up word like Zorbax, or a classic like Pip) and a skin: one of the mod's
+own 61 ([`docs/skins`](docs/skins/README.md), free to use), Minecraft's 18,
+your own PNGs in `config/xen/skins/` (from NameMC, Planet Minecraft or drawn
+yourself: signed once through mineskin.org so everyone sees them), random ones
+from mineskin.org's gallery, or a player's (`/xen set skins player:Name`). With
+**Loop until real player skin** on (`/xen set realSkins true`, next to Skins in the
+settings) it keeps looking until no Xen is left in one of the mod's own skins: each
+gets one a real player made, as soon as there's one (offline, it tries again later). The genes
+really change how it plays: a timid Xen weighs fear up to 1.6x, a curious one
+tries new things up to 1.5x as often, a patient one keeps at a chore longer.
 
-The model was trained (scripts/train_talk.py) on data/talk/corpus.txt: every kind of line, many ways to say each, each
-typed the ways players type. On lines it never trained on it gets the kind right about 9 times in 10 (88% and 93% on
-two held-out sets). The optional AI chat model (SmolLM2) was removed in 2.0.0-beta.27.
+Each Xen also gets **fight genes** (ten 1.9+ PvP skills, starting from one of
+five styles: brawler, rusher, skirmisher, guard or dancer) and a **building
+style** (the shelter it builds is a hut, a fort or a tower, of stone, dirt or
+whatever it has). Children inherit them. Set them by hand with
+`/xen style Pip fight guard` or `/xen style Pip crit 0.9`.
 
-It does it fairly:
+**PvP like a 1.9+ player.** PvP is `own` (the default: its own call, see
+above), `off`, `defend` (always fights back against a player who attacks it or
+its owner with a weapon) or `teams`. It plays by the server's rules
+with a player's inputs: critical hits on the way down with sprint released,
+full-charge swings, sprint hits with S-taps in between, jump resets, spacing
+at the edge of its reach, stepping out of the foe's crit jump, hit selecting,
+shields (raised while recharging, an axe against the foe's), and golden
+apples when badly hurt. Against a scripted fighter with the same sword that
+strikes first, a brawler Xen now wins about half its fights (the last version
+won none).
 
-* It only goes for blocks and animals it knows about: felt within 6 blocks
-  (but not ore buried in stone: nobody can tell that's there), spotted within
-  14 (a trunk between the trees, ore showing in a cliff: only what shows a face
-  to the air), or seen further away in its 90° view. In the dark it can't make
-  out anything unlit beyond 5 blocks, like a player. When it
-  knows of none, it looks around and walks somewhere new. Huge mushrooms aren't
-  trees to it (their stems give no wood).
-* It mines what it can see and reach, like a player: from the side, diagonally,
-  up the trunk, clearing leaves in the way. Then it picks up what dropped.
-* It walks there itself, finding a way through the blocks it knows (up steps,
-  down drops, around obstacles and lava), and digs only when there's no way.
-  With good health it drops down 4 or 5 blocks (a little fall damage, like a
-  player); when it's hurt, 3 at most. In a hole it digs a staircase out.
-* It mines with the real break time and the best tool it has, places only
-  blocks and parts it carries, hits with the normal reach and cooldown, and
-  gives items by tossing them.
-* It answers honestly. For a request it says what it will do, or exactly why
-  it can't ("I need 10 dirt or cobblestone and have 3", "the ground isn't
-  flat", "I need 2 more redstone"). In conversation, anything it claims must
-  be in its own notes. It can't promise things, and it never writes commands.
-* It needs the right tools, like you: stone and coal need a pickaxe, iron a
-  stone one. Ask for stone without one and it gets wood first, makes the
-  pickaxe, then gets the stone.
+**It trains against itself: red against blue.** `/xen arena start 4 40 sword`
+builds an arena in the sky and pits red Xens against blue ones in duels, with
+the same kit. Every few rounds each team evolves its fight genes (children of
+its best replace its worst; a team that falls behind learns from the enemy),
+and new Xens are born with the champions' genes. In a 40-generation run both
+teams found the same way to fight: always crit, swing as soon as the sword
+allows, fight at the edge of reach, S-tap and jump-reset, and never wait or
+back off. Blue started as circling dancers, lost 11 of 12 fights by
+generation 20, then learned from red and caught up (6-6 by generation 31).
+The champion it evolved beats the careful styles, but not yet the best
+aggressive ones: self-play confirmed what works with these skills, without
+yet finding anything better.
 
-## Around people
+**Goals in three tiers.** What it's doing this moment (eating, fighting,
+getting away from a creeper), what it wants in the next minutes when it's free
+(food, a shelter for the night, wood, stone, ore, a trade, exploring: weighed
+by what it needs, its personality and what worked before), and a dream it
+works toward for days (a home, a stockpile, diamonds, being a trader, far
+places, three friends). When a dream comes true it's proud and picks a new one.
 
-* **Talking without its name**: it knows you're talking to it when you're in a
-  conversation with it (it answered you in the last half minute), when you're
-  looking right at it, or when it's your Xen and nobody else is around.
-* **Remembering**: "Pip, remember that the base is by the big oak". Then "what
-  did I tell you?" or "where is the base?". It's saved with the Xen (up to 12
-  things); "forget what I told you" clears yours.
-* **Signs**: it reads the signs it can see, says what a new one says when
-  someone's there, and knows it afterwards.
-* **Greetings**: crouch at it quickly a few times and it crouches back two to four
-  times (you see it crouch, like a player) and trusts you a little more (never
-  fully: anyone can crouch).
-* **Pokes and attacks**: only one light tap with an empty hand while you're
-  talking with it is a poke ("Hey! What's up?"). Anything else is an attack: a
-  weapon, a critical hit (hitting while falling), a crouching hit, a hard hit,
-  a second hit within three seconds, or a hit out of nowhere. It reads how you
-  hit it at that very moment. Its owner gets told off, worse each time ("Ow!
-  What was that for?", "Stop it!", "I'm not fighting you. Stop!"); a wrathful
-  one hits back for a few seconds, a gentle one keeps away. With PvP `own` (the
-  default) it decides what to do about anyone else's attack itself: it fights
-  back against armed attacks on it or its owner, lets a friend's mistake go,
-  and gets away when it's losing.
-* **Boats and horses**: following you, it hops into your boat when there's room
-  and gets out when you do; with no seat, it puts its own boat on the water,
-  paddles after you and takes the boat back at the shore. A wild horse throws it
-  off a few times before it's tamed; with a saddle it rides after you.
-* **Giving**: it thinks for a moment, keeps what it needs (wood for its
-  pickaxe, stone for its tools, 24 blocks for a hut in the evening, a little
-  food when it's hungry) and says so, then tosses the rest at your feet and waits
-  while you pick it up.
-* **In the dark** (caves, tunnels, under a roof) it puts torches on the floor or
-  the walls as it goes, and makes torches from coal when it has none.
+**It crafts its tools** like a new player, with the recipe book: planks,
+sticks, a crafting table, a wooden pickaxe, then stone tools. It mines only
+what's worth it and never digs straight down (it digs a staircase, and one up
+to get out of a hole). **Next to you it gets on with things by itself** (wood,
+stone, food, ore, a shelter at night) and drops them to keep up when you
+leave. With good health it drops down 4 or 5 blocks like a player would.
 
-## Tools: it crafts like a new player
+**It acts like a player around people.** A few quick crouches at it are a
+friendly hello: it crouches back and trusts you a little (never fully). A
+punch with an empty hand just gets its attention ("Hey! What's up?"); only a
+weapon (or poking on and on) is an attack. PvP is its own call by default: it
+fights back against armed attacks on it or its owner, forgives a friend's
+mistake, and runs when it's losing. Asked for its things, it thinks first and
+keeps what it needs ("but keep 10 for a shelter tonight"). You don't need its
+name when it's obvious you're talking to it, it remembers what you tell it
+("remember that the base is by the big oak"), and it reads signs. It takes
+knockback like any player, runs when there's far to go, can't see far in the
+dark (and lights caves with torches), and doesn't know about ore buried in
+stone. Going for iron it does what a player does: heads for a cave it has seen
+(or has a look round for one first), explores the one its staircase breaks
+into, and keeps on down its own staircase, turning it away from water.
 
-Xen makes its own tools the way a new player does: logs into planks, planks
-into sticks and a crafting table, then a wooden pickaxe (three logs are
-enough), and with cobblestone a stone pickaxe, a stone sword and a stone axe.
-It crafts with the recipe book, like you: it clicks the recipe (which puts the
-ingredients in the grid), shift-clicks the result, and puts back what's left.
-Small things in its own 2x2 grid; tools at a crafting table it places next to
-itself (or one that's already there), opened with a right-click. One step at a
-time, so it takes a few seconds. It can't smelt yet, so iron tools are out of
-reach for now.
+**It's unpredictable.** Crouch up and down next to it and it dances along
+(other Xens join in); now and then it shows off a trick ("Watch this!") that
+doesn't always work ("I meant to do that."); in a fight it may take a snack
+break in front of a nearly beaten foe.
 
-## It acts like a player, not a digging machine
+**It knows how mobs behave.** It leaves endermen, piglins and other neutral
+mobs alone unless they come after it, never hits villagers, golems or pets,
+and runs from a hissing creeper.
 
-* **It only mines what's worth it**: wood, ore its pickaxe can mine, stone when
-  it needs blocks. It never digs straight down under itself (it digs a
-  staircase instead, and stops if lava or water is under the next step).
-* **Next to you, it doesn't just stand there**: while you're within about 12
-  blocks it gets on with what it needs (wood, stone, food, ore, a shelter at
-  night: "I'll grab some wood while we're here.") and drops it to keep up when
-  you're more than 24 blocks away ("Coming!"). Otherwise it watches you or
-  looks around. Only a free Xen goes exploring on its own.
-* **It swings only at something hostile in front of it**, never at the air.
-* **It knows how mobs behave**: endermen, piglins, wolves, bees and the like
-  leave you alone unless you provoke them, so it doesn't; spiders are calm in
-  daylight; a mob that's after it or its owner is fought. It never hits
-  villagers, golems or pets, and hunts only cows, pigs, sheep, chickens and
-  rabbits (never a named one or one on a lead).
-* **Creepers**: when one hisses close by, it turns and sprints away (about 4
-  blocks in the 1.5 seconds before the blast, in tests). After hitting one, it
-  always steps back.
+**It trades and bargains.** "Xen, trade with the villager": it opens the
+villager's trading screen and takes the offers that are good for it, with a
+player's clicks. With players it names prices, answers low offers with
+counter-offers (high first, then halfway, then its last offer), walks away
+from bad deals, and gives friends a better price. It remembers whom it trusts:
+someone who hit it or didn't pay gets no deals.
 
-## Learning by watching
+**It can say no**, and says why: when it's badly hurt, scared, needs what you
+ask for, or you hurt it ("No, not now: I'm badly hurt and need to heal
+first."). "Please" changes its mind, unless you hurt it.
 
-Xen watches the players it can see and copies moves that **work out** for
-them, clumsily at first and better each time it sees one done well (and each
-time it pulls it off itself). Say "Pip, watch this!" first, so it keeps its
-eyes on you.
+**It learns by watching you.** When a move works out for you, it copies it,
+clumsily at first and better each time: land a water-bucket clutch in front of
+it and it starts doing water clutches when it falls; win a fight and it fights
+a bit more like you (crits, S-taps, jump resets, the shield).
 
-* **The water clutch (MLG).** Jump from high up with a water bucket and empty
-  it just before you land. If you land in the water unhurt, Xen saw it work:
-  "Whoa, Steve, a water clutch! I want to learn that." From then on, when it
-  falls with a water bucket, it looks down and uses it before it hits the
-  ground, then scoops the water back up. How late it starts clicking depends
-  on its skill, so at first it's often too late ("Too late! I'll get it next
-  time.").
-* **Your fighting style.** When you win a fight in front of it, how you fought
-  (crits on the way down, full-charge swings, S-taps, jump resets, spacing,
-  the shield) pulls its [fight genes](#teams-and-pvp) your way, more for a
-  clean win: "Nice fight, Steve! I'll crit more, on the way down, like you."
+**It talks on its own and with other Xens**, only about what's true for it: it
+greets you, says how its dream is going, and asks yes-or-no questions it acts
+on ("I have lots of wood. Want some?" "yes"). Two Xens that meet chat and tell
+each other where they saw trees and ore, and the other one then knows it.
+Everyday questions ("what are you doing?", "what do you have?") are answered
+straight from what it knows.
 
-It learns only from what it could see you do (your moves, what you hold, a mob
-flinching), never from anything hidden, and it keeps what it learned.
-`/xen status` shows it. Setting: **Learns by watching** (`copy`).
+**It talks like a player** (2.0.0-beta.27). Its talk model reads what was
+said the way players type it (lowercase, "u", "ur", "wsg", "wyd", typos,
+stretched letters, its name or none) and knows about 90 kinds of lines:
+hellos, "how r u", "wyd", "u got any iron?", "bro i just died to a creeper",
+"i found diamonds!!", "wanna go mining later", "are you a bot", "whats ur fav
+block", jokes, roasts, compliments, "gn", "brb"... It answers from a library
+of about 800 player-style lines, in its own tone, filled in only with what's
+true of it ("no iron yet, just 4 wood lol", "getting wood rn", "rip. creepers
+have no chill", "copper for sure. yours?" and it remembers your answer). It
+learns which answers land: a laugh after one, it says it more; a "what?",
+less. A chat goes on as long as it's fun (laughs and thanks keep it going).
+The model is trained by `scripts/train_talk.py` on `data/talk/corpus.txt`;
+on lines it never saw it gets the kind right about 9 times in 10, and when
+it isn't sure, the rest of Xen's chat answers instead.
 
-## Trading: villagers and you
+**It plans what it was never shown** (2.0.0-beta.29). Xen has know-how: the
+game's own crafting recipes, what a furnace makes of what, and a few player
+hints ("iron ore wants a stone pickaxe", "sand: beaches, deserts, rivers",
+"string: spiders, at night"). Give it a goal (`/xen plan bucket`, or "make
+me a shield" in chat) or let it pick its own (an iron pickaxe, a shield, a
+bucket...) and it works back from what it has to a plan: "1. chop a tree,
+2. craft planks, ... 8. mine iron ore with a stone pickaxe, 9. craft a
+furnace, 10. smelt 3 raw iron, 11. craft a bucket". The plan is advice, not
+an order: its next step weighs in with its other choices, and its mind
+decides. It's worked out again whenever what it has changes, so a skipped
+step, a find or a failed way just change the plan. What each kind of step
+has cost it is learned and shared across every plan (iron it mined for a
+bucket counts toward the plan for a shield), and where there are two ways
+(coal or planks to burn) it takes the cheaper one. `/xen plan` shows it.
 
-**Villagers.** "Pip, trade with the villager" (or on its own, when it wants
-to): it walks up, right-clicks the villager, reads the offers on the trading
-screen, and takes the ones that are good for it, with the same clicks a
-player makes. It knows about what things are worth (an emerald is about 15
-coal or 5 bread) and what they're worth to *it* right now (food when it's
-hungry, a tool it lacks, what its dream needs, less for what it has plenty
-of). From a test on a real server:
+**It reads biomes.** Where its sight lines end it notes the biome, and it
+remembers where it saw each one: a desert or beach means sand, a swamp clay,
+badlands gold, the mountains emeralds and iron. A plan that needs sand it
+hasn't seen goes to the beach it saw. In lush caves, dripstone caves or the
+deep dark it knows it's in a cave straight away (lush caves glow, so dark
+isn't the clue), and a river biome helps it name a river it sees.
+`/xen g1x` shows the biome it's in and the ones it has seen.
 
-```
-<Steve> Clover, go trade with the villager
-<Clover> Okay! I'll trade with the farmer 2 blocks away.
-<Clover> I traded with the farmer: gave 30 coal and got 6 bread, 1 emerald.
-```
+**It leaves the land the way a player would** (2.0.0-beta.30). The pillar it
+jumped up on, to reach the top of a tree or to get out of a zombie's reach,
+comes down again once it's done up there: still on it, it digs the block
+under its feet; down already, it takes the pillar apart from the ground, the
+top first. Its night's dirt hut it may take down in the morning. A new mine
+goes into a hillside close by, a couple of blocks straight in and then down,
+not a hole in the flat ground. These are habits, not rules: a diligent Xen
+nearly always tidies up and walks further for a hillside, a lazy, slothful
+one leaves a pillar or two and digs where it stands. A house goes up in a
+clearing rather than wedged between tree trunks under the leaves (it looks
+further out when everything close is forest), a house it was asked to build
+stays its goal until it's done, and inside its own half-built house it steps
+out to put its crafting table down instead of trying the same spot forever.
 
-**You.** Make it an offer, ask its price, or say yes or no to its offer. It
-takes a fair deal, answers a poor one with a counter-offer (a bit high first,
-then halfway, then its last offer), walks away from a bad one, gives friends a
-better price, and never trades away what it needs. With someone it trusts, it
-hands over its part first; otherwise it waits for yours (toss it over).
+**It weighs survival tips** (2.0.0-beta.28). Xen gets tips the way a new
+player does ("can't win this fight? get out of reach or away, heal, then come
+back", "night's here: a roof before it gets worse", "hurt in the dark: a roof
+first", "no sword at night: let your things wait till morning"), not rules.
+When one comes to mind it weighs it (how far it trusts that tip, how bad
+things look, its nerve: a brave or proud Xen goes its own way more) and takes
+it or doesn't. Then it sees how that went and trusts the tip more or less
+("went its own way and died: should've listened"). It also learns what each
+kind of mob costs it to beat ("a zombie costs it about 4 health now"), for
+its sword and armor, and that's how it sees a fight going badly. Taking a
+tip, it pillars two blocks up out of a zombie's reach and hits down at it,
+ducks out of a skeleton's sight instead of running in the open, and runs
+away from all of them at once instead of zig-zagging between them.
+`/xen tips` shows how far each Xen trusts each tip. Over two 3-day test
+worlds (5 Xens each) deaths went from 43 to 28 (15 to 8, and 28 to 20).
 
-```
-<Steve> Clover, how much for your logs?
-<Clover> I'd trade 16 logs for 3 emeralds. Deal?
-<Steve> Clover, i'll give you 2 iron for 16 logs
-<Clover> Let's meet halfway: 16 logs for 6 iron?
-<Steve> ok deal
-<Clover> Deal! I trust you, so here are the 16 logs first. Toss me the 6 iron.
-<Clover> Here you go!
-<Clover> Thanks! Nice doing business with you.
-```
+**Small redstone.** "Xen, build a NOT gate" (also OR, AND and a repeater wire):
+circuits it worked out itself in its redstone lessons, placed part by part by
+hand. Capped at 24 parts by default so nothing big slows the server.
 
-**Trust.** Every Xen remembers how much it trusts each player and Xen it has
-met: kind words, fair deals and chats make it trust them more; hitting it,
-or taking its part of a deal and never paying, makes it trust them less. It
-won't trade with someone who hurt it. Setting: **Trading** (`trading`).
+When nobody it knows is around, Xen leaves notes on signs ("Day 12: Diamonds
+here! -Pip").
 
-## Saying no
+**Settings in Mod Menu** (or `/xen set` on servers), with the categories down
+the left: **How to** (since 2.0.0-beta.30.1: the few commands and chat lines
+to get going, on one short page, right under Basics), Talk (chat, talking on its own and with Xens,
+trading, saying no), Xens (how many, names, personalities, skins), Goals (own
+goals, antics, learning by watching, evolution), PvP, Build (redstone, signs),
+Speed (decisions) and **Experimental**:
 
-Xen can refuse, and it says why:
+* **Custom instructions**: who your Xens are ("You love cats and hate the
+  rain. Pip: you're a pirate and talk like one."). A line starting with a
+  Xen's name is only for that Xen. Xen answers from them ("do you like
+  cats?" "I love cats.").
+* **Custom script**: your own rules, `when <something>: <what to do>`, one per
+  line: `when night: do build a shelter`, `when someone comes: wave`,
+  `when hears hello: say Hi {player}!`, `when sees creeper: say RUN!`,
+  `when every 10 minutes: show off`. When: night, morning, rain, hungry, hurt,
+  attacked, diamonds, someone comes, sees a mob, hears a word, every N
+  minutes. Do: say, any request (`do ...`), dance, spin, wave, show off. The
+  box tells you which lines it can't read. (With `/xen set script`, put `|`
+  between rules.)
 
-* someone who hurt it: "No, I won't, because Alex hurt me." (no matter what;
-  an ownerless Xen takes requests from anyone, an owned one only from its
-  owner, and nobody who hurt it gets a trade);
-* badly hurt: "No, not now: I'm badly hurt and need to heal first.";
-* a timid Xen asked to explore in the dark: "No, I won't go exploring now,
-  because it's dark and I'm scared.";
-* asked for what it needs: its food when it's hungry, the blocks for its home,
-  its emeralds when it dreams of trading ("No, I won't give my cobblestone
-  away, because I need them for my home.");
-* an ownerless Xen asked for its things by a stranger.
+![Xen Companion settings in Mod Menu](docs/screenshots/settings.png)
 
-Saying **please** (or "I insist") changes its mind, except when you hurt it.
-Only its owner can give it orders at all. Setting: **Can say no** (`refuse`).
+![The How to tab: the few commands and chat lines to get going](docs/screenshots/settings_howto.png)
 
-## Redstone (small circuits)
+![The Experimental category: custom instructions and a custom script](docs/screenshots/settings_experimental.png)
 
-Xen builds the circuits it worked out itself in its redstone lessons
-(`xen/redstone`): a NOT gate (5 parts), an OR gate (7), an AND gate (22) and a
-long wire with repeaters (20). It needs the parts in its bag (redstone dust,
-redstone torches, repeaters, levers, lamps, and dirt or cobblestone for the
-blocks), and flat, clear ground in front of it. It places every part by hand,
-facing the right way, and sets the repeaters' delays. Tested in the game: the
-NOT gate lights the lamp with the lever off and turns it off with the lever
-on. **Biggest circuit** (24 parts by default) keeps anything big enough to
-slow a server away. Turn **Redstone** off to disable it.
+The full list of requests, settings and phone launchers (Zalith Launcher 2,
+PojavLauncher, Amethyst) is in [`dist/README.md`](dist/README.md).
 
-## Names, personalities and skins
+#### Watching a Xen live (no Minecraft open)
 
-* **Names**: by default (`accurate`) a Xen you summon by a real account's name
-  (`/xen summon jeb_`), or one listed in `config/xen/real_names.txt`, is that
-  account, with its real skin, like the Carpet mod. Other new Xens get **names
-  like real players have now** (luvhi, MeeroSG, cold_lemon, Brushriver851,
-  xKairox), made up here, never copied from anyone's account. Or names that fit their nature, in the
-  **Name style** (`nameStyle`) you like: `fun` (a silly Xen may be WobblyNoodle or LilPickle,
-  a bold one IronComet, a grumpy one SaltyBadger), `gamer` (Pickle_42,
-  xXWaffleXx, TheSneakyGoose), `fantasy` (Zorbax, Lumika), `classic` (Pip,
-  Nova, Bramble) or `mixed` (all of them). Xen, Xen2... with **Random names**
-  off. `/xen summon <name>` picks the name, and
-  summoning the same name again brings back the same Xen with its nature,
-  skin and things.
-* **Personality**: every Xen is braver or more timid (how much fear holds it
-  back), more or less curious (how often it tries new things), chatty or quiet,
-  patient or impatient (how long it keeps at a chore), and has a tone of voice
-  (cheerful, calm, grumpy, shy, bold, silly) that shows in what it says.
-  `/xen status` and the summon message tell you who it is: "Rune (shy, timid
-  and impatient; a skirmisher (hits and steps back), builds stone forts)".
-* **Fighting**: every Xen has ten fight genes, the 1.9+ PvP skills a player
-  learns (see [PvP](#teams-and-pvp)). They start from one of five styles and
-  are inherited:
-  * `brawler`: trades blows and jumps for critical hits a lot;
-  * `rusher`: rushes in, keeps pressing, and jumps for criticals most;
-  * `skirmisher`: hits, then steps back while its sword recharges, and backs
-    off to heal when badly hurt;
-  * `guard`: holds its ground behind its shield (give it one), waits for
-    full-power swings and lets the foe swing first;
-  * `dancer`: circles around its foe between swings.
-* **Building style** (random, and inherited): the shelter it builds when you
-  ask, a `hut` (2-high walls and a roof, 10 blocks), a `fort` (corners filled
-  in, 18 blocks) or a `tower` (3-high walls, 14 blocks), in its favorite
-  material: `stone` (cobblestone), `earth` (dirt) or `any`. With too few blocks
-  for its style, it builds a hut.
-* **Set them yourself**: `/xen style Pip fight guard` (also `build`,
-  `material`, `tone`; `bravery`, `curiosity`, `chattiness`, `diligence` from 0
-  to 1; and each fight gene: `crit`, `charge`, `spacing`, `wtap`,
-  `jumpreset`, `strafe`, `counter`, `select`, `retreat`, `shield`). Its owner
-  or an operator can do it, and it's saved with the world.
-* **Skins** (`skins`, any mix of these):
-  * `modern` (the default): 48 skins in today's style: shaded hair with
-    volume, hoodies with drawstrings, jackets, sweaters, cargo trousers and
-    sneakers, muted and pastel colours, many with slim arms
-    ([see them](../docs/skins-modern/preview.png); original, free to use, CC0);
-  * `fun`: the funny 61 of earlier versions ([see them](../docs/skins/README.md));
-    `pack`: both. All of them are signed, so everyone sees them, with or without the mod;
-  * `random`: both packs and Minecraft's 18;
-  * `default`: Minecraft's 18 (Steve, Alex, Ari, Efe, Kai, Makena, Noor, Sunny,
-    Zuri, in both arm widths);
-  * `folder`: **your own skins**. Put PNG skin files in `config/xen/skins/`
-    (download them from NameMC, Planet Minecraft, The Skindex, or draw your
-    own). Each one is uploaded once to mineskin.org (unlisted), which signs it,
-    and remembered in `config/xen/skins/signed.json`, so every player sees it;
-  * `mineskin`: random skins from mineskin.org's public gallery (online);
-  * `player:Name`: a Minecraft account's skin (`/xen set skins player:Dream`);
-  * one skin by name (`steve`, `alex:slim`) or `texture:<value>:<signature>`.
-* **Loop until real player skin** (`realSkins`, off at first; next to Skins in the
-  settings): it keeps looking until every Xen wears a skin a real player made
-  (mineskin.org's gallery) instead of one of the mod's own. Offline, or the gallery
-  ran short: it tries again later, further back through the gallery, and a Xen still
-  in a stock skin changes into a real one as soon as there is one (out of the game
-  and straight back in, its things and place kept, no "joined the game"). A Xen named
-  after a real account keeps that account's skin.
-* **Antics** (`antics`): Xens do unpredictable things for fun. Crouch up and
-  down next to one and it dances along (Xens nearby join in); now and then it
-  shows off a trick ("Watch this!": a sprint, a jump and a spin) that doesn't
-  always work ("I meant to do that."); in a fight it may take a snack break in
-  front of a foe that's nearly beaten, taunt it, or fake a retreat. Standing
-  about with nothing to do for a while, it fidgets like a bored player: a
-  jiggle side to side (often crouching, at you), a hop, a few crouches, a look
-  all around, punching the air, flicking through its hotbar, a spin. Silly and
-  cheerful Xens do it most, grumpy ones least; never in danger.
+On a server with nobody on it (a test run, a headless server), you can still see what each Xen is up to.
+Make the folder `config/xen/live` on the server. About once a second, each Xen then writes a picture of what it
+sees there, with its health, gear, goal, what it's doing and the last lines of its journal. The picture is drawn
+on the server from the blocks and mobs in front of its eyes: block colours and the game's shading, no textures.
+Delete the folder to turn it off. To watch, run the page that comes with the repo and open http://localhost:8765:
 
-## Experimental: custom instructions and your own script
-
-Both are in the settings screen's **Experimental** category (or `/xen set
-instructions ...` and `/xen set script ...`).
-
-**Custom instructions** tell Xens who they are and what they should know:
-
-```
-You love cats and hate the rain. You're scared of the dark.
-Pip: you're a pirate and talk like one.
+```bash
+mkdir <server>/config/xen/live
+python3 scripts/liveview/serve.py <server>/config/xen/live
 ```
 
-A line that starts with a Xen's name and a colon is only for that Xen. Xen
-answers from them: "Pip, do you like cats?" "I love cats." "who are you?" ends
-with "I'm a pirate and talk like one."
+It also shows how the Xens' eyes (Xen Glance) are learning as they play. That learning is kept in
+`config/xen/glance_learned.json`: delete it to start again from the model that comes with the mod.
 
-**Custom script**: your own rules, one per line, `when <something>: <what to do>`:
+#### A big brain: any AI with an API (DeepSeek, OpenAI, OpenRouter, local)
+
+Xen's own brain (the DMM: rules, learned habits and reflexes) is fast but simple. Give it a big brain too: any
+chat model with an OpenAI-style API. The big brain thinks slowly, in the background: every minute or so (and right
+after something big: a death, a goal reached, a task that got nowhere, someone talking to it) it reads how the Xen is
+doing (health, gear, bag, team, what just happened, how its last plan went) and the choices its body can take right
+now, and answers with a thought, a plan, a choice, and maybe a line to say. The two are fused, not swapped:
+
+* The choice is checked first: only one the body can take right now counts (else it's told why next time).
+* A good choice leads the old brain's choosing for a few minutes (`brainWeight`); what it says to avoid weighs against.
+* The reflexes stay fast and its own: fighting, fleeing, eating, shelter at night, lava and water never wait on it.
+* Talked to, a Xen answers in its own words, from what it's doing and why; the request itself is done the old,
+  reliable way. With `brainVision`, a vision model sees through its eyes now and then.
+
+Set it up in the game (op) or in `config/xen.json`:
 
 ```
-when night: do build a shelter
-when morning: say Good morning, {player}!
-when someone comes: wave
-when hears hello: dance
-when sees creeper: say RUN!
-when hungry: say I'm starving!
-when every 10 minutes: show off
-# a note
+/xen set brainUrl https://api.deepseek.com            (or https://openrouter.ai/api/v1, https://api.openai.com/v1,
+                                                       http://127.0.0.1:11434/v1 for Ollama, ...)
+/xen set brainModel deepseek-chat                     (the model's name as that API knows it)
+/xen brain test                                       (one call: are the URL, model and key right?)
+/xen brain                                            (calls, failures, and each Xen's thought and plan)
 ```
 
-| when | |
+The key: put it in `config/xen/brain_key.txt` (first line), or the `XEN_BRAIN_KEY` environment variable, or
+`/xen set brainKey ...` (that one is saved in `config/xen.json`: don't share that file then). Other settings:
+`brainEvery` (seconds between thoughts, 60), `brainPerMinute` (calls a minute for all Xens together, 12: the
+bill), `brainXens` (`all`, or names), `brainTalk`, `brainVision`, `brainTokens` (more for a thinking model),
+`brainTimeout`. `/xen set brainUrl off` turns the big brain off.
+
+#### Evolution: 30 days in real Minecraft
+
+With evolution on, every few days the worst quarter of the ownerless Xens
+leave and children of the best half take their places. Each gene comes from
+one of two parents, with a small mutation. All Xens still share one brain:
+what evolves is their nature. Your own Xens are never replaced.
+
+A 30-day run in real Minecraft (8 ownerless Xens, a new generation every 3
+days, sprinted with `/tick sprint`), from `<world>/xen/evolution.csv`, the
+average genes of the Xens alive:
+
+| day | generation | bravery | curiosity | chattiness | patience |
+|---|---|---|---|---|---|
+| 3 | 1 | 0.37 | 0.45 | 0.60 | 0.51 |
+| 6 | 1 | 0.43 | 0.46 | 0.62 | 0.59 |
+| 9 | 2 | 0.62 | 0.48 | 0.57 | 0.64 |
+| 12 | 3 | 0.60 | 0.50 | 0.52 | 0.58 |
+| 15 | 3 | 0.84 | 0.57 | 0.54 | 0.60 |
+| 18 | 3 | 0.86 | 0.51 | 0.47 | 0.64 |
+| 21 | 4 | 0.84 | 0.47 | 0.45 | 0.59 |
+| 24 | 2 | 0.85 | 0.57 | 0.52 | 0.51 |
+| 27 | 4 | 0.84 | 0.52 | 0.52 | 0.53 |
+| 30 | 5 | 0.75 | 0.50 | 0.55 | 0.49 |
+
+* **Bravery is what gets selected**: from 0.37 to about 0.85 in 15 days, and
+  it stayed there. Brave Xens explore and gather more, and that outweighed
+  dying a bit more often.
+* Curiosity and chattiness drifted around 0.5: they don't change how well a
+  Xen does, so nothing selects them. Patience rose while there were chores to
+  finish, then drifted back.
+* All 15 deaths were in the first 10 days (11 drowned, 2 skeletons, 2
+  zombies), none in the last 20. But the Xens also gathered less and less: they
+  learned to stay safe more than to work.
+
+**What 30 real days did to the shared brain** (the same fixed SimCraft
+worlds, no exploring):
+
+| | bundled brain | after 30 real days |
+|---|---|---|
+| reward per life | 32.6 | 2.3 |
+| survived | 6 of 8 | 3 of 8 |
+| fear of walking into lava vs onto ground | 0.167 vs 0.007 | 0.045 vs 0.015 |
+| fear of a zombie in its face vs nothing | 0.014 vs 0.002 | **0.177** vs 0.013 |
+
+It learned to fear zombies (they and skeletons killed it in the real game).
+But real Minecraft pays for mining and little else, so it now mines almost
+anything, even digging down toward lava. So the bundled brain stays the
+SimCraft one. The 30-day brain is on the release page as an experiment
+(`xen-brain-30days-experimental.bin`).
+
+A brain trained in Python can go into the mod: `python -m xen export --brain
+xen_brain.npz --out brain.bin`, then copy it to `<world>/xen/brain.bin`.
+
+### As a mineflayer player (Java Edition 1.21.11; mineflayer also joins 26.1)
+
+Each Xen is a [mineflayer](https://github.com/PrismarineJS/mineflayer) bot: a real
+player connection. The server treats it like anyone else: it shows up in the
+player list, takes damage, has an inventory, can chat, and can be given /op.
+Its perception is the same block cube as in SimCraft, so the trained brain
+works in the real game and keeps learning there.
+
+1. Run a server (or open a single-player world to LAN) with `online-mode=false`
+   in `server.properties`, so Xens can join without Microsoft accounts.
+2. Start the bridge (Node.js 18+):
+   ```
+   cd bridge && npm install
+   node xen_bridge.js --host localhost --port 25565
+   ```
+3. Start Xen:
+   ```
+   python -m xen play --world mineflayer
+   ```
+
+### Swarm: as many Xens as the server holds
+
+```
+python -m xen swarm --count 0 --spread 300
+```
+
+* `--count 0` keeps bringing in new Xens (`Xen`, `Xen_2`, `Xen_3`, ...) until the
+  server is full, then keeps trying now and then as slots free up. Use a
+  number for a fixed swarm. Raise `max-players` in `server.properties` for a
+  bigger swarm.
+* `--spread 300` scatters each new Xen up to 300 blocks away across the world
+  (uses `/spreadplayers`, so the Xens need op; `/op Xen_2` etc., or use the
+  `spawnRadius` gamerule).
+* One brain drives all of them: every body's experience, and every body's pain,
+  trains the same mind, so the swarm learns faster the bigger it gets. Each body
+  still has its own feelings.
+
+### Chat with Xen
+
+Chat is how you ask Xen for things, and it answers. The mod does all of it (see
+above). With the bridge, start Xen with `--chat` (`python -m xen play --chat`,
+`python -m xen swarm --chat`) to have it answer in its own words.
+
+It understands requests from the words (`xen/talk/chat.py`, the same rules in
+the mod's `Chat.java`), typos and chat shorthand too. Questions and thanks are
+always just talk, and so is an idea for later ("wanna go mining later").
+
+It **can talk but can't cheat**:
+
+* what it says comes from Xen's own notes: its feelings, body and inventory,
+  and what it perceives, worded with how sure it is ("You know there is lava 3
+  blocks from you. You think there was iron about 40 blocks away, but you're
+  not sure.");
+* an answer that would claim something that isn't true of it (iron it doesn't
+  have, a death it never had, a place it never found) is never picked;
+* for a request it says its plan in plain words, so it can't misstate what
+  it's doing;
+* it only chats: one line, up to two sentences, never a command (a reply can't
+  start with `/`).
+
+There is no language model to download (the optional SmolLM2 chat model was
+removed in 2.0.0-beta.27): everything is in the mod.
+
+```
+$ python -m xen chat "Xen, what do you see?" "go see what's out there"   # in a SimCraft world
+Xen's notes: You feel calm. You know there is a tree 6 blocks from you.
+<You> Xen, what do you see?
+<Xen> I can see a tree about 6 blocks from me.
+<You> go see what's out there
+  (understood: explore)
+<Xen> I can see a tree about 6 blocks away.
+```
+
+In the mod on a real server (a flat world full of slimes at night):
+
+```
+<Steve> Xen, what do you see?
+<Xen> I can see a hostile mob right next to me, but I'm not sure what kind of monster it is.
+<Steve> xen any diamonds around?
+<Xen> I can see two hostile mobs right next to me. I don't see any diamonds.
+```
+
+Building and redstone commands work with the bridge, with or without the chat
+model. Any player can type:
+
+| chat | what Xen does |
 |---|---|
-| `night`, `morning`, `rain` | it gets dark, light, or starts raining |
-| `hungry`, `hurt`, `attacked`, `diamonds` | its hunger gets low, its health gets low, something hits it, it gets diamonds |
-| `someone comes` | a player it knows comes within 12 blocks |
-| `sees <a mob>` | it sees one (`sees creeper`, `sees cow`) |
-| `hears <a word>` | someone within 16 blocks says it |
-| `every <N> minutes` | now and then |
+| `xen build house gambrel spruce` | builds a house (any roof and palette below) next to itself |
+| `xen build tower` / `bridge` / `arch` | other templates |
+| `xen design` | designs its best house (by its taste) and builds it |
+| `xen rate 8` | your score (0-10) for its last build; it learns your taste |
+| `xen redstone and` | works out an AND gate and builds it (levers on the left, lamp on the right) |
+| `xen roofs`, `xen palettes`, `xen count`, `xen spawn 5`, `xen help` | ... |
 
-| do | |
-|---|---|
-| `say <words>` | says it (`{player}` is the player it's about, `{name}` its own name) |
-| `do <a request>` | anything you could ask it (`do build a shelter`, `do get 5 wood`, `do follow me`), as if its owner asked, so it can still say no |
-| `dance`, `spin`, `wave`, `show off` | antics |
+Building uses `/fill` and `/setblock`, so give the builder op (`/op Xen`). With
+`--build-mode hands` it places blocks by hand like a creative-mode player
+instead.
 
-Each rule runs at most once a minute. The script box shows which lines it
-can't read. With `/xen set script`, put `|` between rules.
-
-## Teams and PvP
-
-* **Teams**: `auto` (default, like an SMP): Xens start and join their own
-  teams (the Iron Wolves, the Night Owls...) and their names take the team's
-  color; anyone not on their team is a rival they may fight (near their base,
-  fighters looking for a duel, bullies), and "1v1 me" starts a duel. Or all
-  Xens on one team, or split into 2-6 colored teams (red, blue, green, yellow,
-  purple, aqua): Xens choose and change teams on their own, by who they talk to
-  and live near. Teammates can hit each other too
-  (`friendlyFire`, on by default): a friend's hit is forgiven, a bully's isn't.
-* **Hidden nature**: each Xen is secretly aggressive, passive or friendly, and
-  trusts each person differently. An aggressive one may pick a fight with
-  someone weaker; a passive one walks away; a friendly one makes up.
-* **PvP**:
-  * `own` (default): its own call. It fights back when a player attacks it
-    or its owner with a weapon, lets a friend's mistake go (someone it trusts,
-    while it's healthy), and gets away instead when it's losing. A poke with an
-    empty hand only gets its attention.
-  * `off`: Xen fights only monsters.
-  * `defend`: it always fights back against a player who attacks it or its
-    owner with a weapon (or keeps poking it). It never fights its owner or a
-    teammate, and it draws its sword when an armed stranger comes close.
-  * `teams`: Xens of different teams also fight each other.
-* **How it fights**: like a 1.9+ player, with only a player's inputs, and by
-  the server's own rules:
-  * **critical hits**: it jumps and strikes on the way down, and lets go of
-    sprint in the air (a crit doesn't count while sprinting);
-  * **full-charge swings**: crits and extra knockback need the swing charged
-    over 90%, so it times its swings;
-  * **sprint hits and S-taps**: it sprints in for extra knockback, then steps
-    back a moment so the next hit is a sprint hit again;
-  * **jump resets**: it jumps toward a hit as it lands, for less knockback;
-  * **spacing**: it keeps near the edge of its reach while its sword recharges;
-  * **reading the foe**: it steps back when the foe jumps in for a crit, and
-    can wait for the foe to swing first and punish it (hit selecting);
-  * **shields**: it raises its shield while recharging, takes out its axe
-    against a raised shield (an axe hit disables it) or circles around it;
-  * **healing**: badly hurt, it backs off and eats a golden apple.
-  It fights back at once when hit, even from behind (it knows everything
-  within 6 blocks). How much of each it does is up to its fight genes.
-* **How good is it?** Against a simple scripted fighter with the same iron
-  sword that strikes first, a brawler Xen now wins about half its fights (6 of
-  10) and a rusher 2 of 5, where the last version won none. A good player will
-  still beat it: it can't combo or dodge arrows, and doesn't use a mace,
-  spear, crystals or pearls yet.
-
-## The PvP arena: red against blue
-
-Xens can train their fighting against each other:
+### With real keyboard and mouse (any edition)
 
 ```
-/xen arena start [xens per team] [generations] [kit]     (operators; e.g. /xen arena start 4 40 sword)
-/tick sprint 1d                                          (optional: much faster)
-/xen arena status
-/xen arena stop
+pip install mss pynput
+python -m xen play --world screen
 ```
 
-* It builds lanes high above you (barrier blocks with colored glass under the
-  floor, so nothing spawns there and nothing gets broken). Red Xens `Red1`...
-  and blue Xens `Blue1`... join, all with the same kit: iron armor, an iron
-  sword and a golden apple (`shield` adds a shield, `axe` a shield and an axe).
-* Every round each red Xen duels a random blue one in its own lane, until one
-  falls (or 30 seconds). The teams swap ends every round, and nobody gets to act
-  first.
-* Every 3 rounds each team evolves: its worst quarter get the fight genes of
-  children of its best (each gene from one of two parents, plus a small
-  mutation). A team that wins under a quarter of its fights also learns from
-  the enemy (one child gets a parent from the other team).
-* Every generation is logged in `<world>/xen/arena.csv`. The best fighters'
-  genes are kept in `arena_champions.json`, and **new Xens are born with
-  them** (a little mutated). Arena Xens don't learn into the shared brain, so
-  duels can't crowd out what it knows about lava and caves.
-
-A 40-generation run (4 against 4, sword kit, about 8 minutes sprinted):
-both teams ended up fighting the same way: always jump for critical hits,
-swing as soon as the sword allows, fight near the edge of reach, S-tap and
-jump-reset a lot, and never wait for the foe to swing or back off. Blue started
-as circling dancers and lost 11 of 12 fights at generation 20; learning from
-red, it caught up and was even (6-6) by generation 31.
-
-How good is the champion it evolved? Against each of the five starting styles,
-3 fights from each side (30 fights, arena kit), it won 15, lost 12 and drew 3.
-It beat the careful styles (dancer 5-0, skirmisher 4-1, guard 3-2) but not the
-aggressive ones (brawler 2-4, rusher 1-5). What the arena evolved is itself an
-aggressive fighter, so self-play confirmed what works best with these ten
-skills, but it hasn't yet found anything better than the best hand-made
-style.
-
-## Evolution
-
-With **Evolution** on, every few days (default 3) the Xens without an owner are
-ranked by how they did: what they gathered, how long they lived, how often
-they died. The worst quarter leave, and children of the best half take their
-places. Each gene (bravery, curiosity, chattiness, patience, tone) comes from
-one of two parents, with a small mutation. All Xens keep sharing one brain
-(what they learned). What evolves is their nature. Each generation is logged
-in `<world>/xen/evolution.csv`. Your own Xens (with an owner) are never
-replaced.
-
-## Its goals: now, soon, and its dream
-
-Every Xen has goals in three tiers (`/xen status` shows all three, and when you
-chat with it, it knows them):
-
-* **Instant** (seconds): staying alive and what it's doing this moment:
-  swimming up for air, eating, fighting, getting away from a creeper, making a
-  tool, keeping up with you.
-* **Short** (minutes), when it's free (nobody to follow, nothing asked of it):
-  find food, build a shelter for the night, get wood, get stone, look for ore,
-  trade with a villager, or explore. It weighs what it needs right now (hungry
-  with no food? dark with no roof? no pickaxe?), its personality (patient Xens
-  like work, brave ones go for ore, curious ones explore), how well each goal
-  has turned out for it before (it learns which it likes), and what its dream
-  needs.
-* **Long** (days): its dream, picked from its personality: build a home, a big
-  stockpile of wood and stone, find diamonds, become a trader with 5
-  emeralds, see places 300 blocks away, or make three friends. The dream
-  steers its short goals (a Xen dreaming of a home gathers blocks, then builds
-  a fort in daylight and remembers where it is). When a dream comes true, it's
-  proud of it, says so, and picks a new one. Dreams are kept with the Xen.
-
-Your requests always come first. Turn short goals off with **Own goals**
-(`wants`).
-
-## A whole place of its own, pictured first (2.0.0-beta.19)
-
-Ask "Pip, build a place" (or "set up your own place", "build a homestead", "lay out a compound"), or let a Xen decide
-on its own (when it builds its home, it sometimes lays out a whole place instead, more in creative and the more it
-likes what goes in one). There's no template, and nothing round the house is a copy: it pictures the place first,
-then builds it.
-
-* **It looks over the ground** round it (about 45 x 45 blocks), the way you would before building: the lie of the
-  land, water, trees, anything someone built, and what it can't see from where it stands. It never builds on someone's
-  build, in water, or where a player is standing.
-* **It pictures it in its head:** where its house goes and which way it faces, where its pool and a sitting area go,
-  a road out from its door with paths off it to each part, and a wall round it all with a gate where the road goes
-  through. It tries thousands of ways in a moment and keeps the one it likes best. What it likes is its own: flat
-  ground, no trees in the way, the door facing the way in (toward you) with open ground in front, a pool close but not
-  in front of the door, a road that doesn't climb, the parts lined up (a tidy Xen) or not, close together or spread
-  out, a straight road or a winding one. Which parts it wants is its own taste too (silly and cheerful Xens like a
-  pool, fort builders a wall, chatty ones a sitting area, careful ones lamps), and it learns from what you say about
-  the place ("nice place!", "that's ugly").
-* **Its own, in a style it learned:** from what it was shown (the road, the walls, the pool, the outdoor decorations)
-  it learned what things are made of (the road of andesite, a wall of andesite with polished andesite posts and a slab
-  on top, a pool rimmed with glazed terracotta, a lantern on a fence post, stairs for chairs, a carpet or plate for a
-  table top, moss or leaves for a bush; for each kind of place: spruce in the snow), and it makes its own to fit the
-  ground there:
-  * **the road** goes in the ground, not on it: the grass dug out and the road laid in its place, the bumps mined down
-    and the dips filled, a slab where it climbs (no jumping), room cleared above it, three wide in creative, lamps
-    along it if it likes them, and on out past the gate. Paths go off it to the pool and the sitting area. In survival,
-    a path made with a shovel.
-  * **the pool** is dug into the ground, the size it likes and has room for: a rim all round, water two deep (a few
-    buckets by the rim, and the rest fills itself, as water does).
-  * **the sitting area:** the ground levelled, a table with a chair either side, a lamp.
-  * **the wall** follows the land all round, two high and capped, a post with a light every few blocks and at the
-    corners, and two tall posts at the gate.
-  * **a garden**, if it likes one: bushes either side of the way to its door, and trees of its own about the place,
-    shaped like the tree it was shown (its trunk, how its leaves narrow going up) but never the same twice.
-* **The house** is one it was shown (its own version: its wood, maybe mirrored) or one of its own designs (its taste
-  decides). Its furniture goes in when the house is done.
-* **You can see what it pictured:** outlines in the world, each part in its colour (gold the house, cyan the pool,
-  pink the sitting area), the road and paths dotted white, the wall grey, the gate purple and the door red, while it
-  pictures it (it looks at where each part goes) and for a minute after. `/xen layout` shows it again (and says what's
-  in it). Its journal has a map of it (H house, D door, # road, + path, P pool, S sitting area, W wall, G gate).
-* It builds it part by part, the house first (then its furniture, the road, the pool, the sitting area, the bushes,
-  the wall), and says when the whole place is done. In survival it's of what it can make (cobblestone for the stone,
-  a torch for a light) and it wants a wall less.
-
-## What Xens were shown (2.0.0-beta.17, more in 2.0.0-beta.19)
-
-Xens were trained on what was marked with the Build Axe: houses (two houses, a big house, a 2 story house, a snowy
-house, a desert house), other builds (a desert blacksmith, a jungle temple, a pillager outpost, two wells, a farm, a
-cage), furniture (two couches, a counter, a table, a bar, a hanging light), things round a house (a pool, a road, a
-path, an entrance, a wall with outdoor decorations, a glass wall, a staircase), a tree, and caves (cave entrances, the
-inside of a cave, ravines, a frozen river) with a plains river. Every Xen knows them:
-
-* Ask for one by name: "build a pool", "build the bar", "make a couch", "build a 2 story house", "build a well".
-* The houses are among the houses a Xen may build on its own (when it likes copying what it has seen). In a whole place
-  of its own it takes one shown where it is first (the snowy house in the snow, the desert house in the desert).
-* When a Xen finishes a house, it puts in a piece of that furniture if one fits inside (in survival, if it has most
-  of the blocks).
-* It builds its own version, not a copy: in its own wood (the wood it has, or in creative the wood it likes), and at
-  some places the other way round (mirrored, left for right). The same place always gets the same version, so a house
-  it comes back to finish is the same house.
-* From all of it, it learned a style for each kind of place (what roads, walls, pools and lamps are made of; in the
-  desert what the buildings there are made of) and a tree's shape (the spruce's trunk and how its leaves narrow): for
-  the places it lays out itself.
-* The caves and the river aren't for building: they're for seeing. From them it learned to tell what it's looking at
-  (a cave entrance, the inside of a cave, a ravine, a river, a frozen river): every few seconds it takes in the spot
-  its eyes are on (the 9 x 9 ground there: water, ice, sand or rock on top, the hollow under it, how steeply it drops),
-  names it if it's one of those, remembers it in its places ("the ravine", "the river 2") and its journal, and now and
-  then says so. On what it was shown it names caves, rivers and frozen rivers right 95 to 100 times in 100, cave
-  entrances and ravines about half the time; anything else is just ground to it.
-* From the caves it also learned what a big cave is like (how much room, nearly all rock round it, a rock roof within
-  19): a cave like those it goes to first for ore. Smaller caves it still notices as before.
-
-The ground they were marked on (the grass and dirt under them) isn't part of them: they go on the ground where
-they're built. A house marked a block too high (the door's lower half left out) gets its bottom row back.
-
-## Build Axe: training data (2.0.0-beta.14, its screen 2.0.0-beta.15, the box in the world 2.0.0-beta.18)
-
-A developer's tool, cheats only. `/xen BuildAxe` gives an enchanted wooden axe:
-
-* **Hit** a block: one corner of the box. Hit another: the other corner, and a screen comes up. With Xen in your game
-  too, the axe reaches 160 blocks: aim at a block far off and click (the box can be marked from outside it).
-* **Right-click** a block: leave it out (it's saved as air: the grass round a tree, a torch you placed). Right-click it
-  again to put it back. **Crouch and right-click**: leave out every block of that kind in the box.
-* **Right-click the air**: the screen again.
-* **See the box** while you hold the axe: its edges in gold dust (seen from far off), the blocks you left out marked
-  in red, and its size above the hotbar ("12 x 6 x 9, left out: 3"). With one corner hit, a cyan box goes from it to
-  the block you're looking at, with its size, so you see how big it will be before the second hit. Red: too big.
-
-The screen shows the box's size and what's left out, its type (tap Build, Tree or Cave, or type your own: house, farm,
-bridge...), its name (a must), and Save or Cancel. (With Xen only on the server and not in your game, there's no
-screen: `/xen BuildAxe type <your type>`, then `/xen BuildAxe save <name>`.) Each type has its own file,
-`config/xen/buildaxe/<type>.jsonl`, one line per thing you save: its type and name, the dimension and biome, its size,
-a palette of the blocks in it (with their states) and one palette index per block (air too), how many you left out,
-and how dark it is and how far under the surface. Up to 256 blocks a side and 4,194,304 blocks in all (256 x 64 x
-256: a village). The axe never breaks or strips anything, and
-nothing about you or where it was is kept. Xens don't learn from it in the game: it's data for training them.
-
-## Picking up what it mined, fidgeting (2.0.0-beta.18)
-
-Whatever a Xen mines, it walks over and picks up (when there's room in its bag): the cobblestone and dirt from
-digging too, not only ore and wood. After chopping a tree it keeps an eye on it for a few minutes and picks up the
-saplings, sticks and apples its leaves drop. Standing about with nothing to do, it fidgets (see Antics).
-
-## Mining like a player (2.0.0-beta.13)
-
-Going down, a Xen digs a staircase (or takes a cave it has seen), not a shaft straight down, and it never digs out the
-block someone is standing on. It walks over to what it mines and picks it up right away. Its way finding only knows
-what the Xen could know: out under the sky the lay of the land, under the ground only what it has seen, what's right
-by it and the way it came (no seeing a lit cave through rock). More of what Xens say is now put in their own words
-(no typed emotes like *crouch*).
-
-## Whispers, unfinished houses (2.0.0-beta.12)
-
-Xens whisper with the game's own `/msg` (only the one it's for sees it): `/msg` a Xen and it whispers back; plot
-warnings and some gossip are whispered. Chats between Xens last as long as they have something to say. A Xen that
-stopped building its house goes back and finishes it when asked for a house again nearby.
-
-## Hardcore, who Xen is, village houses (2.0.0-beta.11)
-
-**Hardcore** (Basics page, `/xen set hardcore auto|on|off`): one life each. A hardcore Xen that dies is gone for good:
-it doesn't come back, nothing of it is kept, and the Xens that knew it remember it. It minds danger more, backs off
-sooner, and won't go off on a risky errand while hurt, however nicely it's asked. `auto` (the default) follows the
-world: hardcore in a hardcore world.
-
-**Who Xen is**: a player living in this world, who knows only what it has seen, remembers or was told, with goals,
-friends and fears of its own.
-
-**Village houses**: a Xen that comes to a village looks at its houses (their style rubs off on its designs) and may
-build a copy of one, out of what it has; "build a village house" asks for one. They're read from the game's own
-structure files in your game, so nothing of Mojang's is in Xen.
-
-**The End**: it counts what its arrows at the flying dragon do and waits for her to land when they miss, waits out her
-breath, backs off to heal when low, uses a bed by the End portal before jumping in, and mines end stone for towers and
-bridges when it's short. It turns its head like a person (fitted to recorded play), and learns where ore is by
-watching you mine it.
-
-## The End, from a recorded fight (2.0.0-beta.10)
-
-A Xen hits the perched dragon from the side (never under her head, where her wings fling you as she takes off),
-glances at her instead of staring, and keeps its eyes off endermen. Flung high, it throws an ender pearl at the ground
-(a pearl clutch); off an edge, it throws one back onto the land it came off.
-
-## Bored, trusting, and a map in its head (2.0.0-beta.9)
-
-A bored Xen does something nobody needs: it makes a big plan out loud, throws a party (Xens who like it come and
-dance), sorts its bag or picks a favourite block. When what it's doing has to be done (food when starving, a shelter
-at night, its first tools), it keeps at it instead, more so when it's diligent. Xens of their own may say no to people
-they hardly know. A dead-flat wall in a cave tells a Xen that knows it there's a trial chamber behind it. In caves it
-goes where it hasn't been, so it doesn't go round in circles. In single player (or a LAN world) every /xen command works
-with cheats off. The settings open on a short Basics page; More settings has the rest.
-
-## What players do (2.0.0-beta.8)
-
-Xens know a player's answers to "how do you survive this?": they block water flooding into a tunnel, cover lava, put a
-block between them and a creeper, dodge skeleton arrows, hide from phantoms and storms, get out of powder snow, and
-put a torch on a spawner, keeping it for a mob farm. Most Xens know most of these; tell one that doesn't, and it
-learns. With a **spear** it jabs from out of a sword's reach (2 to 4.5 blocks). With a **mace** and wind charges it
-goes up and smashes down. A Xen with a ranked player's name fights at that player's PvP tier (`config/xen/tiers.txt`:
-`Name HT1`, or MCTiers online).
-
-## Getting on like a player (2.0.0-beta.7)
-
-* It crafts what needs a table without getting stuck (a furnace no longer stalls it), and mines stone for a furnace
-  instead of waiting.
-* Its first house waits until it has iron (or its second day), and with no stone a house is built of planks, not of
-  whole logs.
-* It goes in when the sun really goes down. In the late afternoon it heads home or gets blocks for a hut.
-* A monster coming for it comes first, before its chore, and it doesn't break off a fight between hits.
-* It doesn't dig into water underground, and goes to see places it has spotted and not been to.
-* It remembers the way it came, so it walks back up its own stairs out of a mine. It doesn't use the stone it needs
-  to climb, and it puts down dirt first.
-* **Accurate names and skins** (the default): summon a Xen by a real account's name (`/xen summon jeb_`), or list
-  names in `config/xen/real_names.txt`, and it gets that account's real skin, like the Carpet mod. Other Xens get
-  realistic made-up names and skins real players made.
-
-## Words, grammar and memory (2.0.0-beta.6)
-
-Without the AI model, a Xen reads what you say with its own vocabulary and grammar (4,000+ words, and it learns new
-ones). It keeps what you tell it as facts and answers questions from them and from the game itself. What it doesn't
-know, it asks back:
-
-* "cats like fish", then "do cats like fish?": "yep, cats like fish (you told me)"
-* "what do cows drop?": "cows drop beef and leather"; "what is a creeper?": "a creeper is a hostile mob"
-* "the village is at 120 64 -30", then "where is the village?": it remembers the place
-* "what do wolves eat?": "not sure what wolves eat. what?"; "bones": "ok so wolves eat bones"
-
-Xens pass on what they were told. A sentence about a thing is something it's told, not a request ("cows drop leather"
-no longer sends it for food).
-
-## Gameplay logs (2.0.0-beta.4.1)
-
-Turn on **Gameplay logs** (`gameplayLog` in the Xen 2.0 tab, or `/xen set gameplayLog both`). The mod then writes each
-Xen's play and each player's play in the gameplay recorder's format, into `config/xen/gameplay_logs/`. Players are
-told when their play is logged. Off by default; about 30 MB an hour each. **Logs go to** (`gameplayLogFolder`)
-picks the folder: `config/xen/gameplay_logs`, `gameplay_logs` in the game folder, or any folder with
-`/xen set gameplayLogFolder <folder>` (a full path for a shared or synced folder).
-
-* Train Xen Ex1 on them: `python -m xen.ex1.train recordings/*.jsonl config/xen/gameplay_logs/*.jsonl` (Xens' own
-  logs are left out unless you add `--with-xen`).
-* Put a Xen next to a player: `python -m xen.ex1.compare config/xen/gameplay_logs/*.jsonl` (moving, sprinting, jumps,
-  hits and their charge, turning to a hit, damage, mining, and how human-like Ex1 finds its play).
-
-## Xen Ex1 v2 (2.0.0-beta.3): an hour more play
-
-* **Xen Ex1 v2** learned from an hour more recorded play (with a friend: mining, chopping, mob fights, a bit of
-  PvP). On minutes it never saw it sprints, jumps and looks more like the player than v1, and it feels danger better
-  (AUC 0.79 vs 0.74).
-* **Reaction time from the recordings**: a player turned to whoever hit them in a median quarter second, so a Xen hit
-  from behind reacts in about 280 to 380 ms now.
-* The trainer reads the new recorder format (1.2). What a world learned on top of the old Ex1 is kept aside as
-  `ex1-learned.json.old`.
-
-## Xen Ex1 (2.0.0-beta.2): trained on recorded play, learning instead of rules
-
-* **Xen Ex1** learned from 22 minutes of a person's recorded survival: how they sprint, sprint-jump and look while
-  walking, and a feeling of danger (will I get hurt in the next two seconds?). It keeps learning from every Xen's own
-  hurts.
-* **Once burnt, twice shy**: no rules about lava or fire. What hurt it, it remembers and keeps away from, and it warns
-  other Xens.
-* **Teaching**: Xens teach each other their skills. Ask one "teach me mining" or "any tips for fighting?". Tell one
-  "lava burns".
-* **Fights**: it talks like it's in one. Crouch after hitting it, and it may forgive you, or "you ain't my friend after
-  attacking me".
-* It sees past leaf litter, glow lichen, grass and torches.
-
-## Xen 2.0 (2.0.0-beta.1): three brains, reaction time, confusion, hidden stats
-
-A first beta of Xen 2.0, to play while gameplay is recorded to train it on.
-
-* **Do it, don't, or later**: a Xen weighs everything it could do with a tool, a block or an animal with three brains.
-  The Doer asks what it gets, the Doubter what could go wrong, the Gut what happens next. With a fishing rod by water
-  it's looking at, it fishes. When it's dark or there's a monster about, it fishes later (up to 30 minutes on).
-* **Mining like a player**: feet and head, a tunnel two high, never straight down into a drop, never a block with lava
-  behind it. A pickaxe too weak: later. Copper is left in the wall.
-* **Facts from the game**: what an animal drops (rolled from the game's own loot tables) and how much food it is. It
-  shears a sheep when it has shears, spares the last two of a kind and animals in a pen, and waits when it isn't
-  hungry.
-* **Its gut takes over to survive**: a step back from lava, into water when on fire, backing off when badly hurt.
-* **Instinct comes first, the gut can be argued with** (2.0.0-beta.22): a clear danger (no air under water, in
-  lava, standing in fire) and its instinct takes over everything at once, every tick. Its gut (the fear it learned)
-  is a feeling it can argue with: asked to go on, at full health, bold, or with only a faint feeling, it sometimes
-  goes on anyway ("My gut says no... going anyway."). Hurt after that, it trusts its gut more; fine, a little less.
-* **Reaction time and confusion**: about a quarter second to notice something, more when it didn't see it coming. A
-  confused Xen hesitates, looks around, sometimes changes its mind.
-* **Hidden stats**: reflexes, composure, humor, typing, appetite, pickiness, love of fishing, night owl, stubbornness;
-  from 2.0.0-beta.38 a foul mouth and bloodthirst too (and anger and bloodlust that come and go, [below](#anger-bloodlust-and-swearing-200-beta38)).
-  Never shown, they shape who it is and pass to its children.
-* **Talks like a player**: "gonna", "ngl", short replies ("lol", "fr"), banter, "this is peak". At most a line every
-  45 seconds on its own, notes on signs when nobody's around ("I died here (skeleton). Careful.").
-* **Blob skins** (new default: simple flat-colour skins) and **real names** (name style "real": the names you list in
-  config/xen/real_names.txt, with their real skins).
-* Settings: the new **Xen 2.0** tab (reaction time, confusion, how much it says, signs).
-
-## No standing about, building that works, chat that remembers (1.9.3)
-
-* **Busy nights**: with a pickaxe it digs down and mines at night instead of standing about.
-* **Never idle long**: with nothing to do for 20 seconds it goes exploring.
-* **Furnaces**: while its iron smelts, it mines what's in reach.
-* **"go explore" means it**, day or night; so does "go explore?".
-* **"go to the cave" / "take me to the village" / "go home"**: it takes you to places it remembers.
-* **Shelters**:
-  * It builds against any block face, and fills a gap under a wall first.
-  * It moves to see where a block goes.
-  * Under the ground it digs in instead of building a hut.
-* **Stone**: it takes stone at its own level, not a crater round its feet.
-* **Skeletons**: between shots it charges in (armed) or gets out of sight.
-* **Chat remembers**:
-  * "do you like pigs?" then "what about cows?", "how do I make a bed?" then "and a chest?".
-  * "and you?", "wbu", and "is it hard?" about what you were just talking about.
-* **Grudges fade**: say sorry after hitting it; old grudges fade by themselves.
-
-## The right tool, useful nights, chat that counts (1.9.2)
-
-* **Tools**: it digs dirt with a shovel, wood with an axe and stone with a pickaxe, taking the tool from its backpack
-  if needed. It never digs with a sword.
-* **A bed before night**: late in the day with no bed, it goes for wool from sheep it can see, or back to where it saw
-  sheep. With three wool it makes a bed (it fetches a log if it has no planks). It puts the bed down wherever there's
-  room and sleeps. Ask it: "get wool for a bed", "make a bed".
-* **Nights**: in its shelter it digs down and mines instead of sitting there till morning. At home it crafts, smelts
-  or sorts its chest. It no longer stands still retrying something it can't do.
-* **Suggestions are requests**: "why don't you build a house", "want to get some iron?", "you should get some wood",
-  "should we go mining?" all make it do the thing.
-* **Harder questions**, answered from what it knows:
-  * "why are you doing that?"
-  * "what should we do tonight?"
-  * "how do I make a bed?", "how do I get diamonds?"
-  * "who's your best friend?"
-  * "iron or diamond?"
-  * "should I go exploring?"
-  * "where are you going?"
-  * "what did you do today?"
-  * "is it safe out here?"
-
-## Its own words (1.9.1)
-
-A Xen talks with its own words. It reads what you said (a hello, a question, what it's about, whether it sounds nice or
-mean, chat shorthand), a tiny network picks what kind of reply fits it, and it builds the sentence from a word library,
-in its tone: shy ones stammer, cheerful ones shout, grumpy ones mutter, bold ones don't hedge, silly ones joke. What it
-thinks of things is its own ("Ugh, creepers. They're sneaky."; "I adore diamonds, they're rare!"). It still does what
-you ask, and says so in its tone. Xens chat with each other the same way, each reading the other's words. A laugh or a
-thanks after a reply teaches it you like that kind of answer. Add your own words, topics and jokes in
-config/xen/words.json (start from the words.json in the mod jar, assets/xen/).
-
-## Eyes on its work, safe at sea, ready for the worst (1.9.0)
-
-* **It looks at what it works on**: it turns to a block before digging it (a quick flick of the view), and its eyes
-  stay on a block it just put down, the table it's using, the chest it opens. It only digs a block it can see and only
-  clicks a face it can see: ground, rock or plants in the way it digs through first, like a player; something someone
-  built it never breaks to get past. Blocks right by its feet (bridging, building up) go down by feel, as a player's do.
-* **At sea**: out in open water it heads for the nearest real shore, or back the way it came (the last dry ground it
-  stood on), or toward the world spawn; exploring doesn't lead it out to sea.
-* **Picking things up**: the best first (diamonds, tools and armor, iron, food, then the rest), near before far, and it
-  sticks with the one it's going for.
-* **Busy, not standing about**: it rests when resting helps (at night, hurt and fed enough to heal), not one breather
-  after another; hurt and hungry, it gets food; a rival just being nearby doesn't stop its plans.
-* **Ready for the worst**: before a trip it packs food, blocks to get out of trouble, and a spare pickaxe for a mine;
-  before a risky one (diamonds, the End) it leaves its valuables and spare tools (never its best ones) in its chest at
-  home. If it dies and its things are gone, it fetches its spares from that chest instead of starting from nothing.
-
-## Why it does what it does (1.8.0)
-
-A Xen's choices come in layers, like a person's: its **role** (its job in its village, or else the kind of player its
-plan makes it: speedrunner, builder, settler, miner, explorer, trader, warrior, survivor), its **purpose** (what that
-role is for), its **goal** right now, and the **action** its hands are on. Ask it: "what's your role?", "why are you
-here?", "what's your village's way?".
-
-* **The leader's way**: a village's leader sets its priorities from its own plan and nature. A **cautious** leader
-  wants food, beds and walls first, an **ambitious** one iron, diamonds and new land, a **builder** good houses. It
-  says so when it takes the lead, the jobs it hands out lean that way, and every member leans the same way as far as it
-  goes along (its loyalty, its trust in the leader). A member whose own plan pulls the other way (a speedrunner under
-  a cautious leader) mostly goes its own way, and now and then says so.
-* **After stone tools**: the obvious next step isn't always iron. It weighs iron, food, wool for a bed, a home and a
-  look around, by how it stands (how much food it has, evening coming, sheep about, a cave it knows, how sure it is
-  where iron is), its plan, its nature and skills, and what its leader wants. It keeps at its choice until that's done
-  or a good while has passed (no dithering), then weighs again; the one it went for counts a little less next time and
-  iron presses more the longer it waits. The journal shows the scores ("stone tools, what next? iron 0.84, food 0.72,
-  a bed 0.38, a home -0.08, exploring 0.23 -> iron (its plan)").
-* **What it knows about ore** (lessons): each Xen believes iron, diamonds and coal are best at some height, with a
-  confidence, where it got that (born with it, its own finds, another Xen, a player) and who told it. A newborn has
-  a rough idea (a later generation a better one). Every ore it breaks moves its belief toward where it finds them; a
-  belief it was told that turns out right makes it trust whoever told it a little more. Tell it ("diamonds are at y
-  -58", "iron is best at y 16") and it takes it in as far as it trusts you. Xens pass on what they've found, or only
-  heard ("Heard from Steve: iron at y 12. Haven't tried it yet."), when they chat, so good and bad tips both spread,
-  and experience corrects them. It mines at the height it believes in. Ask "where do you mine iron?" or "how deep do
-  you find diamonds?".
-* **A first look around**: new in the world, or back after dying, it walks off 10 to 16 blocks the way that looks
-  safest (it weighs eight ways for water, lava, drops and steep climbs against animals, trees and bare stone), at a
-  walk, its head turning to the things it passes and now and then over its shoulder, and then decides. Under a roof or
-  at night it decides at once.
-* **A moment to get ready**: a recipe it has made before takes a moment (4 to 8 ticks), a new one longer while it
-  works it out (14 to 26), each step after a short pause, and a new tool gets a look. When a tool breaks in its hand
-  it stops, looks at its hands, says so, then makes another if it can and carries on. Under pressure (a fight, low
-  health, in water, falling, a monster within 8 blocks) there's no pause at all. Everything counts game ticks: nothing
-  ever waits on a clock.
-
-## Talking on its own, and with other Xens
-
-With **Talks on its own** (`talk`), a Xen says what's on its mind now and
-then, and only what's true for it: that it's hungry, how far along its dream
-is, that it needs wood for a pickaxe, that there's a villager. It greets people
-it knows when they come near. And it asks things you can answer with a plain
-**yes** or **no** in chat (no name needed): "It's dark. Should I build us a
-shelter?", "I have lots of wood. Want some?", "Can I go exploring for a bit?",
-"Want to trade?". Say yes and it does it.
-
-With **Talks with Xens** (`talkToXens`), two Xens that meet have a short chat:
-who they are, what they dream of, and tips about where they saw trees and ore,
-which the other one then knows too (a little less sure than if it had seen it
-itself). They trust each other a bit more after (that counts toward the
-"three friends" dream):
-
-```
-<Clover> Hi! I'm Clover. Who are you?
-<Bramble> I'm Bramble. Nice to meet you, Clover!
-<Clover> I saw coal ore about 48 blocks north of here.
-<Bramble> Thanks! I'll remember that.
-<Clover> See you around!
-```
-
-How often it talks depends on how chatty it is (every minute or two for a
-chatty one), with a limit for all Xens together so chat never floods. Only
-players within 48 blocks hear it.
-
-## Notes on signs
-
-When nobody it knows is around to hear, it leaves notes on signs (if it carries signs): "Day 12: Diamonds here!
--Pip", "Day 13: Careful, lava! -Pip", and a morning note saying what it's up to.
-
-## Its own life
-
-A new Xen starts **free** (`ownLife`), like another player on the server, and gets on in the world the way a
-player does:
-
-1. wood, a crafting table, a wooden pickaxe, stone tools (it takes its table along when it's away from home);
-2. **its own house**: it works out the materials first ("For this cottage I need about 38 logs. I have 12. Getting it
-   all first, like a real builder."), gathers them, levels the ground and builds;
-3. a **crop farm** by the house (tilled with a hoe, one water block in the middle, sown);
-4. **mining**: a staircase down to iron and coal (around y 16), branch tunnels two high and three apart, only the
-   ore it can see in the walls; it lights the way with torches;
-5. **smelting** at a furnace (one it makes from 8 cobblestone), then **iron tools and armor** (it puts armor on);
-6. down to the deepslate for **diamonds**, and a **mob farm** once it has the stone for one.
-
-At night it **sleeps in its bed** at home (or builds a shelter when it has no home yet), it cooks its raw meat and
-fish at the furnace, never looks an Enderman in the eyes, and after dying it goes back for its things. Its dream (a home,
-treasure, a stockpile, far places, friends) pulls it toward some of these more than others. Say "follow me" and it
-comes along (and gets on with things nearby while you're close); "explore" lets it go again.
-
-## Caves, places, and surviving like a player
-
-Xens spot caves they can see (dark openings under the ground), remember them, and go mining in them: in with
-torches, down the cave, mining the ore showing in the walls; they dig their own tunnels only where there's no cave.
-They take any ore they see on the way. They recognize villages, mineshafts, dungeons, ruined portals, temples,
-strongholds, fortresses, bastions, End cities and other people's houses. Starving, they hunt or fish; before night
-with no bed, they hunt sheep for wool; out in the wild they put their bed down and take it with them in the morning;
-their night shelter is a tunnel dug into a hill and sealed behind them. They sprint-jump on long flat stretches.
-Ask "go fishing" (they make a rod from sticks and string), "make a team called Night Owls (with me)".
-
-On a server with several Xens they live like an SMP: they found their own teams and invite friends (each decides),
-build their bases apart, visit each other's bases, and peek into chests they pass (a greedy one takes a little
-when nobody's looking).
-
-## The little human things
-
-Xens nod when they agree, shake their heads when they refuse and wave when they say hi. Grudges fade with time (fast
-for a kind Xen, slowly for an aggressive one). A kind Xen now and then gives a close friend something it has plenty
-of. With a bone and a wild wolf around it tames a dog and names it. Each Xen has a hobby for its free time: picking
-flowers, watching the stars at night, watching the sunset, or dogs. And every 10 days it notices how long it has
-lived in your world.
-
-### Playing like a person on a server
-
-* **Getting its bearings**: new in the world, or back from dying, it looks around for a few seconds first.
-* **Routines**: it notices what it tends to do at each time of day (mining in the morning, building in the afternoon)
-  and leans that way again. Its habits are its own and slowly change; ask "what do you usually do?".
-* **Boredom**: 5 to 15 minutes of the same work (a patient Xen lasts longer, a lazy one less) and it's sick of it
-  ("Enough chopping for now."). It won't pick that again for a few minutes.
-* **Frustration**: dying stings. It grumbles, plays it safer for about ten minutes (fewer fights, less exploring),
-  and after two deaths in a short time it takes a breather first.
-* **Curiosity**: on its way somewhere, it spots a village, a temple, a portal... and a curious Xen takes a short look,
-  then gets back to what it was doing.
-* **A full bag**: it tosses the junk (rotten flesh, gravel, too much dirt, seeds...), keeping a little. A greedy
-  one keeps it all.
-* **Sharing**: spare armor, a second sword or pickaxe, blocks and food it has plenty of go to a Xen close by who needs
-  them: its team, its village or Xens with the same owner get what they lack; others only what shows (missing or
-  weaker armor, bare hands in a fight), from a kind Xen that trusts them. It tosses it to them (only they can pick it
-  up); they put it on and say thanks.
-* **Hungry**: starving with nothing to eat, its errands wait (one you asked for waits once it's down to nothing) and
-  it hunts. With no food on it and an animal right there, it takes it.
-* **Nights**: when night falls out in the open, it drops what it's doing for a roof: home if it has one, a hole in a
-  hillside, a little hut with room inside, or a hole in the ground covered over. Standing under a tree isn't a roof.
-* **Items**: it uses what it carries the way you would: flint and steel (on request, or to light its portal), bone
-  meal, a water bucket, boats. **Griefing** (setting `grief`): a Xen that holds grudges (wrathful, envious or
-  aggressive), badly hurt by someone whose house it knows, may come back and set it on fire while they're away.
-
-## Villages: rules, jobs and punishments
-
-Xens that live together form a village with a **leader** (the one the others trust most). Anyone can propose a rule
-in chat ("new rule: no fighting", "from now on everyone shares food", "rule: curfew at night") and the villagers
-vote; the leader proposes some of its own. Rules it understands: no fighting, share food, everyone works, curfew,
-a tax, no strangers. Every morning the leader hands out **jobs** (woodcutter, miner, farmer, builder, guard,
-trader) and checks who worked; a rule-breaker is warned, then fined, then exiled. Minions have the same hidden
-nature: a disloyal or ambitious one, or one that's treated badly, can walk away from its boss (and even turn on
-it); once free it loads the world around it like any Xen. `/xen tribes` shows the rules, jobs and leader.
-
-## Every world: the Nether, the End and elytras
-
-Xens remember every world they've been to. They make portals and visit the Nether, go for the Ender Dragon when
-they're ready, and afterwards a brave or curious Xen goes back to the End for an **elytra**: through an End gateway
-(an ender pearl thrown into it), out to the outer islands, to an End city's ship. With an elytra and rockets it
-**flies** the long trips like a player (it jumps, opens the elytra, boosts with rockets and glides down where it's
-going). It enchants its gear at an **enchanting table** it makes itself.
+Xen presses W/A/S/D and space, moves the mouse and clicks on your actual
+screen. It sees a downscaled picture of the screen and feels pain when red
+hearts disappear from the health bar. It learns from scratch in this mode (it
+sees pixels, not blocks). Use default controls, put food in hotbar slot 9, and
+turn Raw Input off. The health-bar position can be adjusted in
+`xen/worlds/screen.py` (`ScreenConfig`).
+
+---
 
 ## Building
 
-Ask it ("build a house", "dig an underground base", "build a farm", "build an animal pen", "build a mob farm",
-"build a statue of me") or `/xen build <what>`. It builds block by block with its own hands, in the order a builder works: it clears and
-**levels the ground** (digging bumps away, filling holes), lays the foundation, the frame, the walls, the roof, then
-furnishes it and hangs the door last. In creative it flies and takes blocks from the creative inventory (it finds
-its way through the air around the walls, in by the door, over the roof); in survival it makes the planks, stairs,
-slabs, doors, fences and hoes itself, gets more wood and stone when it runs out, climbs on a pillar for the roof
-(and takes it down), fills a bucket at the nearest water, and leaves out decoration it has nothing to make from.
+```
+python -m xen build house --roof gambrel --palette spruce --out house.mcfunction
+python -m xen build --design            # let Xen design one to its (your) taste
+python -m xen rate house --roof a_frame --score 9     # teach it your taste
+```
 
-* **A house of its own design** (since 0.7.1 there are no house templates): every Xen designs each house itself,
-  choosing the size (7x5 up to 13x9), wall height, the roof (gable, hipped or flat, with overhangs), a stone base or
-  bottom row, a log frame with windows between the posts, shutters, a porch, a chimney with smoke, a loft with a
-  ladder; outside a path to the door (made with a shovel), lamp posts, bushes, flower beds, a woodpile and a fenced
-  yard with a gate, all standing on the ground (it fills holes under them first); inside beds, a crafting table,
-  furnace, chest, barrel, table and chair, carpet, bookshelves, plants and lanterns on a beam. Its choices come from
-  its **taste**, which starts from its personality and learns: from how each build went, from what you say about it
-  ("nice house!", "that's ugly") and from what its tribe says, so a village comes to share a style. Its first
-  survival house is small and cheap; with plenty of wood later it builds a better one and moves in. The look fits
-  the biome in creative (oak, spruce, birch, medieval, stone, desert); in survival it's its own wood (glass when it
-  has some, open windows when not).
-* **Stages, the way builders teach it** (1.7.0): a house goes up the way building guides say to work: **basic**
-  (its shape in one material), **simple** (depth: a log frame, a stone ground floor, log pillars standing out), **good**
-  (details: a light plaster infill between the timbers, darker barge boards on thick roof edges, upside-down stairs
-  under the eaves, window sills, lamps, a stone chimney with its fire in a pot at the top) and **perfect** (polish:
-  flower boxes, bushes, a tree, barrels and hay, moss and cracks in clusters near the ground, a roof with patches of
-  a second wood, and a winding path). A less skilled builder stops at an earlier stage and upgrades later on its own
-  (or when you ask: "decorate your house"): the same house, only more of it.
-* **Its shapes** (1.7.0): not a box. A **front gable** (the gable end facing the way in, the upper floor jutting out
-  over the door on log pillars), a **long house with a cross gable** (a gabled bay in the middle with the door, dormers
-  over a loft) or an **L** (a lower gabled wing at one end, its roof meeting the main one's wall). Roofs meet the way
-  real ones do (in valleys). The place decides some of it: on a slope a narrow house, gable to the front; on flat open
-  ground a long one or an L; on water a house on stilts.
-* **Palettes that fit the place** (1.7.0): white calcite walls, dark oak frames and a teal (warped) roof; cream walls
-  under an orange (acacia) roof in forests and savannas; cherry in a cherry grove; mud brick and mangrove in a swamp;
-  sandstone in the desert; spruce and stone in the snow. A dark frame, a light infill and a roof that stands out:
-  contrast is what makes a build read.
-* **Paths** (1.7.0): two or three wide, winding a little but never broken, of blocks that suit the place laid in
-  patches like a worn path (dirt path, coarse dirt and gravel in a meadow; sandstone in the desert; gravel and cobble
-  in the cold), and along them now and then a bush with a flower, a rock with a smaller stone, a lamp post, a bit of
-  fence or a bench.
-* **Building together** (1.7.0): a Xen whose friend (its village, its team, or someone it trusts) is building close by
-  may lend a hand, a kind one more readily; or ask it ("help Aria build"). They work from the same plan, so a block
-  either one puts down is done for both. It's the friend's house when it's done (the helper doesn't move in), and the
-  chronicle remembers who helped.
-* **Villages have a layout** (1.7.0): the village's leader decides. An orderly, commanding one lays it out **modern**:
-  straight streets with lots in rows on both sides, every house facing the street. A curious, easy-going one lets it
-  grow **freeform** like a Minecraft village: houses scattered round the middle along the paths, facing it.
-* **Underground base**: a staircase down with torches, a door, a room carved in the stone with log pillars, ceiling
-  beams and lanterns, a plank floor, chests, a barrel, a crafting table, furnaces, a bed, a table and chair.
-* **Crop farm** (the wiki's 9x9: one water block in the middle keeps every farmland block wet), a fence, a gate,
-  lanterns; **animal pen** (a fence, a gate, a water trough, hay); **mob farm** (the tower kind players build: an
-  open 17x17 stone-brick platform on a pillar, four spawning floors, a cross of water channels flowing exactly to the
-  hole in the middle, open trapdoors along them (a mob takes one for floor and drops into the water), a 22-block drop
-  that leaves a zombie with half a heart, a hopper into a chest at the foot, and a gap to hit them through; it works
-  at night).
-* **Styles**: ask for "a modern house" (white concrete, big windows, a flat roof), "a house on stilts" (raised on
-  log posts with a stair up), "a tower" (a small footprint, floors on floors with a ladder) or "a cottage"; or it
-  picks one its taste likes. Designs can have a **pond with a pergola**, a **workshop** stall, a fenced yard, flower
-  beds and bushes.
-* **Its mine** has an entrance: a framed doorway in the hillside with lanterns, and it goes back to the same mine.
-* **Highways** ("build a highway north", "an obsidian road east 300"): a tunnel 3 wide and 3 high with a floor of the block
-  you name (stone bricks otherwise) and torches. In the Overworld it runs **underground** (about 12 blocks under the
-  surface where it starts) so it never cuts through anyone's buildings; in the **Nether** it runs 5 blocks under the
-  bedrock roof, the way players build theirs. It builds it 24 blocks at a time, one block after another.
-* **Statue** ("build a statue of me", "of yourself", "of Steve"): a player's skin, one block for every pixel, 32
-  blocks tall, the skin's outer layer (hair, hood, jacket) laid over it, each pixel the closest-coloured block
-  (concrete, terracotta, wool, planks, stone). The skin comes from Mojang's skin server; offline players have none,
-  so then it's a statue of the Xen itself. In survival it only uses blocks it carries.
-
-## Path assist
-
-Its legs find the way (`pathAssist`), its own way-finding (no Baritone code): a search over the moves a player can
-make from where it stands, each costing about the time it takes (and the danger): walk and **sprint**, diagonals,
-jump up a block, **drop down** as far as it dares, **sprint-jump gaps** of up to 3, **swim**, **climb** ladders and
-vines, **open doors** and gates, **dig through** the ground (never through planks, glass or anything built), dig a
-**staircase** up or down, **bridge** across a gap (sneaking at the edge, a block against the side of the one it
-stands on) and **tower up** out of a hole. Its own mind decides where to go and how bold to be: a brave, healthy
-Xen jumps gaps and takes bigger drops; a hurt or scared one takes the long safe way. It only uses what it could
-know: close by it feels everything, further off only what's in the light (a dark cave far away is rock to it until
-it gets there). With many Xens, planning is spread over the server's ticks so it never stutters.
-
-## Places it knows, and the world's story
-
-* **Places** (1.7.0): a Xen remembers where it saw a village, a stronghold, a mineshaft, a dungeon, a ruined portal,
-  a desert or jungle temple, a shipwreck, an ocean monument, an ancient city, a trial chamber, trail ruins, a witch
-  hut, a Nether fortress, a bastion, an End city, a cave, someone's house: each one (the second village is "village
-  2"), with its coordinates and the biome. Ask "where's the nearest village?" or "what places do you know?". It knows
-  the biome it's in ("what biome is this?"), like a player looking at the debug screen.
-* **Lore** (1.7.0): the world keeps its story: who built which house (and who helped), who founded a village and how
-  it's laid out, who found a stronghold or a temple and where, who fell and to what, who killed the dragon. Whether it
-  gets written down is up to the Xens: a **chronicler** (a curious, talkative one) writes what happened since its last
-  volume into a **written book** ("Chronicle, vol. 3", by that Xen) once a day, when there's enough to tell and it has a
-  book and quill (or a book, a feather and an ink sac). Ask it "what happened on the server?"; the others send you to
-  the chronicler, or tell their own part. Kept in the world's `xen/lore.json`.
-
-## The solver and the journal
-
-Both in the settings' **Experimental** tab (with custom instructions and your script).
-
-* **Spawn as Xen** (`spawnAsXen`, 1.7.0): a Xen named after you ("Steve_X") takes your place where you stand, with
-  your things, and you watch through its eyes (a spectator on its camera). It lives its own life: its own goals, its
-  own mind, and it still listens to you. Turn it off to take over again, where it is, with what it has, in your game
-  mode. Single player and a LAN world's host only: it never works on a dedicated (public) server.
-
-* **Runner** (`runner`, 2.0.0-beta.43): free Xens play only the run to the Nether, in order and quick, each step
-  started the moment the last one ends: wood, a table and tools, stone, coal, iron, smelting, food, more iron for iron
-  gear (a shield, a sword, a bucket, a chestplate), sugar cane (the spare planted by the water: a little farm), diamonds,
-  a diamond pickaxe, obsidian (water poured on a lava pool) and the portal. They do each their own usual way: caves
-  they know, only ore that shows in the open, a villager traded with if they come across one (trapped first like
-  players do: a hole three deep, a barrel at the bottom, and the villager drops in going for the job). Monsters in the
-  way they fight as ever. No chats, jokes or tricks on the way. Once in the Nether, back to their own lives. Every
-  runner's play is logged for training: a gameplay log with what it sees (config/xen/gameplay_logs) and its pictures,
-  every view in a fight, for Xen Glance (config/xen/glance_pictures; `python -m xen.vision.glance
-  config/xen/glance_pictures`).
-
-* **The solver** (`solver`): a second little mind for being stuck. When its legs can't find a way, keep failing, or
-  it gets no closer, it looks at where it is (a hole? water? underground? is the goal above or below? blocks? a
-  pickaxe?) and picks a way out: tower up, a staircase up, dig through, a bolder way, go round, back off and look
-  again, swim out, or ask for help. Each try counts as working if it got closer within ten seconds; next time it
-  mostly picks what worked in a place like that (and now and then something else, to find out). It learns from
-  players it trusts too: seeing you tower out of a hole or swim out counts like its own try. All Xens share it
-  (`config/xen/solver.json`), and every try is written down in `config/xen/solver-tries.jsonl`.
-* **The journal** (`journal`): what each Xen sees, thinks, says and hears, how it finds its way and what the solver
-  tries, with the time. **Copy log** puts it on the clipboard, **Save log** writes a file to `config/xen/logs/` (on a
-  server, `/xen log`), to send or to read later: the way to find what to make better.
-
-## Settings: Mod Menu or commands
-
-![Xen Companion settings in Mod Menu](../docs/screenshots/settings.png)
-
-With Mod Menu installed, open **Mods → Xen Companion → settings** (the screenshot
-is from a real game client). New to Xen? The **How to** tab, right under Basics, has the few commands and chat
-lines to get going on one short page (`/xen summon`, "Pip, follow me", "Pip, get me 10 logs", `/xen status`...).
-
-![The How to tab](../docs/screenshots/settings_howto.png)
-
-The categories are down the left side (Talk, Xens,
-Goals, PvP, Build, Speed, Experimental); the settings scroll (mouse wheel) when
-they don't all fit, on a small screen or a phone; hover a setting to read what it does,
-and **Reset** puts the open category back to how it comes. Changes save to `config/xen.json` and apply right
-away in single player. On a server, operators use:
-
-* `/xen settings`: shows every setting;
-* `/xen set <setting> <value>`: changes one (for example `/xen set teams 2`,
-  `/xen set pvp teams`, `/xen set evolution true`, `/xen set skins alex,steve`).
-
-| setting | default | meaning |
-|---|---|---|
-| `chat` | `true` | Xen answers and understands chat |
-| `brain` | `"btb"` | how main Xens decide: `"btb"` (Back to Basics, [above](#back-to-basics-how-it-decides-the-default)), `"xen2"` (Xen 2.0, [above](#xen-20-how-it-decides-brain-xen2)) or `"dmm"` (the classic small brain) |
-| `learn` | `true` | keep learning in the world |
-| `maxPerPlayer` | `1` | Xens one player may summon (0 = no limit; operators have no limit) |
-| `maxXens` | `50` | Xens the whole world may have (0 = no limit) |
-| `ownLife` | `true` | a new Xen starts free and plays its own game ([more](#its-own-life)) |
-| `tribes` | `true` | Xens form tribes and villages: share, teach, stand together, trade with their own money and shops |
-| `loot` | `true` | Xens loot chests out in the world that nobody opened (dungeons, camps, trial chambers) |
-| `vision` | `true` | Xen vision: a picture of what each Xen sees (64 by 36 sight lines, no textures) and what it makes of it, for its mind, its own rules and its chat |
-| `swearing` | `true` | Xens swear like players do ("oh shit", "wtf"), each as much as its mouth is foul (some never do), more when it's angry ([more](#anger-bloodlust-and-swearing-200-beta38)) |
-| `sight` | `128` | how far Xens see, in blocks: their render distance (128 = 8 chunks; the picture of their view: half while no player is near); never past the server's view distance |
-| `xentalk` | `true` | XenTalk, its own small talk model: chats between Xens, remarks and answers in its own words, from what's true of it (off: its classic voice) |
-| `adventures` | `true` | free Xens go for the Ender Dragon on their own when ready, and take on trial chambers |
-| `smartsAtGeneration` | `4` | from this generation of evolution Xens know the Nether portal math (x/8) and triangulating strongholds |
-| `pathAssist` | `true` | its legs find the way: sprint, jump, drop, jump gaps, swim, climb, doors, dig, bridge, tower up ([more](#path-assist)) |
-| `solver` | `true` | (experimental) the [solver](#the-solver-and-the-journal): learns ways out when it's stuck |
-| `journal` | `true` | (experimental) keep the [journal](#the-solver-and-the-journal) of what Xens see, think, say and hear |
-| `randomNames` | `true` | names like Pip and Nova instead of Xen, Xen2... |
-| `personalities` | `true` | each Xen has its own nature |
-| `wants` | `true` | free Xens choose their own goals; following ones do things nearby on their own |
-| `talk` | `true` | Xen talks on its own now and then (remarks, greetings, yes-or-no questions) |
-| `talkToXens` | `true` | Xens that meet chat and share tips |
-| `trading` | `true` | Xen trades with villagers and bargains with players |
-| `refuse` | `true` | Xen may say no (and why) |
-| `copy` | `true` | Xen copies moves that work out for players it watches (the water clutch, a winning fighting style) |
-| `skins` | `["accurate"]` | `accurate` (a real account's skin for a real name, else skins real players made), `blob`, `modern`, `fun`, `pack` (both), `random`, `default`, `folder`, `mineskin`, `player:Name`, skin names or textures ([more](#names-personalities-and-skins)) |
-| `nameStyle` | `"accurate"` | `accurate` (real accounts you name or list, with their skins; else names like real players'), `player` (like real players' names), `mixed`, `fun`, `gamer`, `fantasy`, `classic` or `real` |
-| `antics` | `true` | dancing along, tricks, surprises in fights |
-| `instructions` | `""` | [custom instructions](#experimental-custom-instructions-and-your-own-script) |
-| `script` | `""` | [your own rules](#experimental-custom-instructions-and-your-own-script) |
-| `teams` | `1` | 0 = none, 1 = one team, 2-6 = that many teams |
-| `friendlyFire` | `true` | teammates can hurt each other |
-| `localChat` | `true` | chat reaches only those within `chatRange` blocks (Xens close by overhear) |
-| `chatRange` | `32` | how far local chat and local death messages carry |
-| `localDeaths` | `true` | death messages only reach those within `chatRange` |
-| `hardcore` | `auto` | `on`: one life each (a Xen that dies is gone for good, and minds danger more); `off`; `auto`: as the world |
-| `spawnAsXen` | `false` | Experimental: a Xen plays your character and you watch through its eyes (single player and LAN host only) |
-| `runner` | `false` | Experimental: free Xens play only the run to the Nether, quick and in order (wood, tools, iron, iron gear, sugar cane, diamonds, obsidian, the portal); their play is logged for training ([more](#the-solver-and-the-journal)) |
-| `pvp` | `"own"` | `"own"` (its own call), `"off"`, `"defend"` or `"teams"` ([more](#around-people)) |
-| `killAura` | `true` | a charged swing goes into the nearest hostile mob in reach, even while it mines, eats or digs in, without turning to face it (the normal attack, reach and cooldown; never players, pets or villagers; never in duels). Off: it only hits what it looks at |
-| `grief` | `"revenge"` | `"revenge"` (a mean Xen someone hurt badly may set their house on fire), `"off"`, or `"chaos"` (a mean one may burn a stranger's house too); never its owner's, its village's or a friend's ([more](#the-little-human-things)) |
-| `evolution` | `false` | replace the worst ownerless Xens with children of the best |
-| `generationDays` | `3` | Minecraft days per generation |
-| `redstone` | `true` | Xen may build small circuits |
-| `maxRedstoneParts` | `24` | the biggest circuit it will build |
-| `signs` | `true` | leave notes on signs when nobody it knows is around |
-| `decisionTicks` | `5` | ticks between decisions (5 = four a second; 10 or 20 for slow machines) |
-| `followDistance` | `4` | follow mode: catch up when further than this |
-| `leaveWithOwner` | `true` | Xen leaves when its owner leaves |
-| `saveMinutes` | `5` | how often the brain is saved |
-
-## Schematics
-
-Put Litematica schematics (`.litematic`) in `config/xen/schematics/` (Litematica itself isn't needed). `/xen build
-<name>` has the nearest of your Xens build one where you stand, the way a player builds a machine: what's in the way
-dug out, solid blocks bottom up, sand and gravel once there is something under them, then stairs, slabs, fences and
-doors, then chests, hoppers and furnaces, the redstone after that, and the water, the lava and the switch last. The
-exact block states (facing, half, shape) are the schematic's. A schematic whose bottom layer is ground (grass, dirt,
-stone) goes in place of the ground. In survival it gets what it needs as it goes: wood, stone, hoppers (it mines and
-smelts the iron); what it can't make it leaves out and says so.
-
-A note next to a schematic, the same name ending in `.json`, can say what it is for: `{"makes": "smelted iron"}`.
-
-**It learns from them, not only copies them.** Building one (or `/xen study <name>`) teaches it:
-* from a house, its **style**: which material goes where (the walls, the frame, the base, the roof, the floor, the
-  windows, the door, the lights). Its own houses then use a style it learned now and then, in survival made from what
-  it can get (stone where the style has stone, its own wood where the style has wood);
-* what was **inside** (beds, chests, barrels, lanterns, carpets...): its own houses are furnished that way, along the
-  walls;
-* from a machine or a farm, **how its parts join** ("a hopper pointing down on a furnace", "a chest on a hopper"),
-  counted. Its own smelter is built from those: after studying an auto-smelter it adds the output and the fuel hoppers.
-
-What it learned is kept in `config/xen/btb.json` with the rest of its experience, with what each build took.
-
-**The auto-smelter.** With an auto-smelter (its own, `/xen build smelter`, or one from a schematic) a Xen drops its raw
-iron and fuel off and goes on with its day, and takes the ingots out the next time it's by. A Back to Basics Xen
-builds one on its own once it has the iron for the hoppers.
-
-## Commands
-
-| command | what it does |
-|---|---|
-| `/xen summon [name]` | Xen joins next to you (from the console: on the ground at world spawn, on its own) |
-| `/xen summon random <n>` | n Xens with random names and skins (as many as the limits allow) |
-| `/xen spawn <count> [radius]` | operators: many ownerless Xens, scattered on the surface up to `radius` blocks away (default 300) |
-| `/xen spawn 1 <name>` | operators: one ownerless Xen with that name (a bigger count: that many named after it) |
-| `/xen mode follow\|stay\|free` | the same as asking it to follow, stay or explore |
-| `/xen status` | who it is, health, hunger, mood, what it knows and what it's doing |
-| `/xen layout` | shows the place each Xen pictured (outlines in the world for 45 seconds) and says what's in it |
-| `/xen perf` | where the server's time goes for the Xens over the last half minute: ms a tick in all and for each Xen, and by part (choosing, planning ways, eyes...) |
-| `/xen style <xen> <trait> <value>` | its owner or operators: set a trait by hand, e.g. `/xen style Pip fight skirmisher`, `/xen style Pip crit 0.9`, `/xen style Pip build tower`, `/xen style Pip bravery 0.9` |
-| `/xen arena start [xens] [generations] [kit]`, `stop`, `status` | operators: [the PvP arena](#the-pvp-arena-red-against-blue) |
-| `/xen chat on\|off`, `/xen learn on\|off` | quick switches |
-| `/xen settings`, `/xen set <setting> <value>` | operators: all settings |
-| `/xen save` | save the brain now (it also saves every 5 minutes and on shutdown) |
-| `/xen goto <x> <y> <z>` (or `<x> <z>`) | your Xen walks to that exact block and stays (in chat: "Pip, go to 120 64 -40") (`/xen goto Pip 100 64 200`: just that Xen) |
-| `/xen build <what>` | the same as asking it: `house`, `modern house`, `stilt house`, `tower`, `cottage`, `base`, `farm`, `pen`, `mob farm`, `smelter` (an auto-smelter: furnaces, hoppers, barrels, no redstone) |
-| `/xen build <schematic>` | the nearest of your Xens builds a schematic from `config/xen/schematics/` ([below](#schematics)), its corner where you stand |
-| `/xen schematics` | the schematics in `config/xen/schematics/`: blocks, size, what each makes |
-| `/xen study <schematic>` | it learns from a schematic without building it: the style, what's inside, how a machine's parts join ([below](#schematics)) |
-| `/xen log` | save [the journal](#the-solver-and-the-journal) as a file in `config/xen/logs/` |
-| `/xen knows` | what each Xen knows about how the game works, how it learned it, and what it doesn't know yet |
-| `/xen tribes` | the tribes and villages: members, centre, money, shops, enemies |
-| `/xen time` | where each Xen's time goes: minutes on each kind of thing it chose, how often it got somewhere, deaths |
-| `/xen society` | each village's constitution, tax and amendments, its jobs, and each faith with its followers |
-| `/xen rules` | the if/then rules each Xen wrote itself from what worked and what didn't, and how sure it is of each |
-| `/xen vision` | what each Xen sees right now (a cave mouth, a drop, buildings, dark ground...) and what its eyes cost |
-| `/xen tour [minutes]` | operators: you fly through the world as a spectator, a new view every 3 s (land, caves, high up), for the recorder (F8); `/xen tour stop` ends it |
-| `/xen note <text>` | anyone whose play the server logs (`gameplayLog`): a note in your own gameplay log, like "trading with villagers" |
-| `/xen vision dump` | each Xen's view as a picture (PPM) and what every pixel is (text), in the world's `xen/vision` folder |
-| `/xen dismiss` | it goes home (operators and the console send every Xen home) |
-
-* **Its bag**: right-click your Xen to open its inventory.
-* **Instincts**: it swims up in water, fights back against hostile monsters
-  within reach (not neutral ones), runs from hissing creepers, makes its tools,
-  and eats when it gets hungry.
-* **Death**: it drops its items like a player, respawns at its bed or the
-  world spawn, and remembers what hurt it.
-* **Falling** hurts it like any player (before 0.4.0 it didn't count, which
-  also meant its critical hits never landed).
-
-## What it knows (it can't cheat)
-
-(Except for its **luck** setting: how often it happens to wander the right way.
-Its mind is never told what luck knows, and it still has to see, reach and
-survive whatever it finds. `/xen set luck 0` turns it off.)
-
-* It knows every block **within 6 blocks** of it.
-* Beyond that it only knows what it **sees**: its view is a 90° cone in front
-  of it, up to **8 chunks (128 blocks)**. Walls, hills and the ground block the
-  view. Glass, ice and water don't (leaves do), and unloaded chunks stay
-  unknown.
-* What it has seen becomes a **belief with a confidence** that fades when it
-  looks away (blocks lose half their confidence in 2 minutes, mobs in 3
-  seconds).
-* It's a real server player: it shows in the player list, takes damage, gets
-  hungry and can die.
-
-## Its brain
-
-Xen 2.0's trained mind is inside the jar too; the world's copy, which keeps learning, is `<world>/xen/mind.bin`
-(delete it to start over from the trained one). The classic brain (DMM) is described next.
-
-The trained brain is inside the jar. It carries its latest 1000 trauma and joy
-memories, so learning in a safe world doesn't make it forget what hurt it.
-The world's brain is saved in `<world>/xen/brain.bin`, with `lives.csv` (every
-life), `companions.json` (who each Xen is) and `evolution.csv`. Delete
-`brain.bin` to start over from the pre-trained brain. The release also has
-`xen-brain-30days-experimental.bin`, the same brain after 30 more days in real
-Minecraft with evolution: it fears zombies much more, but it mines almost
-anything (even down toward lava) and does worse on SimCraft's tests. Copy it
-to `<world>/xen/brain.bin` if you want to experiment.
-
-Troubleshooting: start the game with `-Dxen.debug=true` to log every decision.
-
-## Build from source
+**Roof profiles** (`xen/building/templates.py`): `gable`, `gable_low`, `a_frame`,
+`gambrel`, `mansard`, `curved`, `saltbox`, `mono`, `butterfly`, `m_shaped`,
+`clerestory`, `flat`. Each is a height line across the roof, like the classic
+roof-profile charts. Slopes become stairs, flat parts become slabs, steep parts
+become full blocks, and the gable ends and high eaves get walled in.
 
 ```
-cd mod/mc1.21.11     # or mod/mc26
-./gradlew build      # needs JDK 25 to run Gradle; the jar lands in build/libs/
-./gradlew crossCheck # the Java brain, senses, chat rules, paths, memories and talk model against the Python ones
-./gradlew runClient -PuiTest   # a game client that opens Mod Menu and the settings by itself
+gable            gambrel          a_frame (top)    butterfly
+      _             /_\                 _          \\         //
+     /#\          //###\\               |           #\\     //#
+    /###\        /#######\             /#\          ###\\ //###
+   /#####\       |###o###|             |#|          |||||_|||||
+  /###o###\     /#########\           /###\         |#o#*o*#o#|
+ /#########\    |||||||||||           |###|         |#o##D##o#|
+/|||||||||||\  /|#o#*o*#o#|\          ...           |####D####|
+ |#o#*o*#o#|    |#o##D##o#|                         ###########
+```
+
+Also **arches** (`round`, `pointed`, `segmental`, `flat`, `horseshoe`, `tudor`) for
+hallways and bridges, **towers** with cone roofs, **bridges**, and **palettes**
+(`oak`, `spruce`, `birch`, `stone`, `sandstone`, `fantasy`, `medieval`) with
+contrasting log frames, stone bases, windows, doors and lights.
+
+**Rating** (`xen/building/rating.py`) scores any build 0-10 from its blocks alone,
+so it also works on real builds scanned from a world:
+
+* how it looks: roof shape and overhang, window balance and a door, 3-6
+  materials, detail (stairs, slabs, fences, lights, frames), symmetry,
+  proportion, lighting;
+* whether it works: can you shelter inside, and is it connected to the ground.
+
+**Taste** (`xen/building/taste.py`): when you rate a build, Xen compares your
+score with its prediction and adjusts its preferences for roof styles,
+palettes and qualities. The designer then evolves designs towards what you
+like and starts from your favourites.
+
+Any build exports to a `.mcfunction`: put it in a datapack
+(`data/<namespace>/function/`) and run `/function <namespace>:<name>` to paste it
+where you stand.
+
+---
+
+## Redstone
+
+```
+python -m xen redstone all
+python -m xen redstone and --out and.mcfunction
+```
+
+`xen/redstone/sim.py` simulates redstone on a floor, following Java Edition rules:
+dust carries strength 15 and fades 1 per block (a line dies after 15 blocks),
+and only powers what it points into; blocks are weakly powered by dust and
+strongly powered by repeaters; torches invert the block they hang on, one tick
+later; repeaters (1-4 ticks) and comparators (compare/subtract); levers and lamps.
+
+Xen **learns** circuits (`xen/redstone/learn.py`):
+
+1. **By experiment**: it tries circuits, keeps the best, and learns which part
+   belongs on which cell (cross-entropy method). It also learns from near misses:
+   how close the lever-controlled signal gets to the lamp. That's how it works
+   out the NOT gate, OR, and an 18-block wire (it discovers it needs a repeater).
+2. **By combining what it knows**: AND = NOT(OR(NOT a, NOT b)), NAND, NOR... are
+   built from its own NOT and OR modules, joined with repeaters.
+3. It **remembers**: solved circuits go into `xen_redstone.json`, and the parts
+   that worked become a prior that speeds up new tasks.
+
+XOR/XNOR are still being experimented with: the learner tries them, but they
+need signals to branch, which it can't compose yet.
+
+---
+
+## Checked against real Minecraft
+
+`scripts/verify_real_world.py` runs against a real server (vanilla 1.21.11,
+offline mode). The last run:
+
+```
+Redstone: learned circuits, real levers, real lamps
+  not   simulator [1, 0]  real game [1, 0]  OK
+  or    simulator [0, 1, 1, 1]  real game [0, 1, 1, 1]  OK
+  and   simulator [0, 0, 0, 1]  real game [0, 0, 0, 1]  OK
+  nand  simulator [1, 1, 1, 0]  real game [1, 1, 1, 0]  OK
+  nor   simulator [1, 0, 0, 0]  real game [1, 0, 0, 0]  OK
+  wire  simulator [0, 1]  real game [0, 1]  OK
+Building
+  house: 357/357 blocks as designed; the real build rates 9.77/10
+Swarm
+  Xen_2: joined
+  Xen_3: joined
+  Xen_4: joined
+
+ALL GOOD
+```
+
+The swarm test kept adding Xens until the server was full (11 Xens plus one
+human player on a 12-slot server), and they answered chat requests while the
+rest kept playing.
+
+---
+
+## Project layout
+
+```
+xen/
+  actions.py          the actions and the keys/mouse behind them
+  blocks.py           block categories, values, drops
+  perception.py       fair senses: near cube, 90° raycast view, beliefs with confidence
+  brain/
+    agent.py          Xen: perceive, feel, think, decide, learn; save/load
+    critic.py         TD critics (reward = striatum, harm = amygdala), dueling heads
+    emotions.py       pain, fear, caution, curiosity, satisfaction, boredom
+    memory.py         experience + trauma + joy memories
+    world_model.py    imagination (predicts next observation, reward, harm)
+    cortex.py         thinking: imagined rollouts before hard choices
+    nn.py             small numpy neural network + Adam
+  worlds/
+    simcraft.py       the built-in Minecraft-like world
+    mineflayer.py     real Minecraft via the bridge (one Xen)
+    screen.py         real Minecraft via keyboard, mouse and screen pixels
+  swarm.py            many Xens, one brain
+  skills.py           chat commands: build, design, rate, redstone, spawn
+  talk/
+    chat.py           understanding requests, notes from its own senses, honesty filter, safe chat
+  building/           blueprints, templates, rating, taste, designer
+  redstone/           simulator and learner
+  life.py             the continuous life loop
+  cli.py              python -m xen ...
+bridge/xen_bridge.js  mineflayer bots <-> Xen (hosts the whole swarm)
+brains/               pre-trained brain
+mod/                  Fabric mod: Xen Companion
+  common/java/        brain, senses, hands, chores, pathfinding, chat (a Java port of the Python Xen),
+                      personalities, names and skins, teams, evolution, redstone, signs, settings,
+                      Fighter (1.9+ PvP), Arena (red vs blue self-play), Goals (now, soon, its dream),
+                      Crafter (tools with the recipe book), Trader (villagers, bargaining, trust),
+                      Talker (talking on its own and with other Xens), Mimic (learning by watching),
+                      core/Mind + core/SimLife (Xen 2.0 and its trainer), MindSense, Laws (village rules,
+                      jobs, punishments), Needs, Enchanter, Voyager (worlds, elytra), Highway
+  common/java/.../client/  the Mod Menu settings screen (tabs)
+  common/test/        crossCheck: Java == Python for senses, brain, memories, paths, chat rules and the talk model
+  mc1.21.11/          build for Minecraft 1.21.11 (Java 21)
+  mc26/               build for Minecraft 26.x (Java 25); Compat looks up what differs in 26.1 - 26.3
+dist/                 the built mod jars, with install notes and requirements
+docs/screenshots/     the settings screen in a real game client
+.github/workflows/    check.yml: tests and builds on x86-64 and ARM64; release.yml: a pushed version tag
+                      publishes a release (jars, brains)
+data/talk/            the talk model's corpus (kinds of lines, ways to say them, answers) and held-out lines
+scripts/              real-server verification, mod test fixtures, circuits for the mod, train_talk.py (the talk model)
+tests/                python -m unittest discover -s tests -t .
 ```
 
 ## Credits
 
-* The End lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
-  [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft)
-  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). What its End fight showed was turned into Xen's own
-  rules and lessons; none of the data is in Xen.
-* How a Xen turns its head (2.0.0-beta.11): fitted to
-  [OpenBlock-Team/Minecraft-Navigation](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-Navigation) and
-  [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen
-  ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)). Only the fitted numbers are in Xen.
-* Village houses: Minecraft's own structure files, read from the player's game while it runs (not copied into Xen).
-* Everything else Xen learned from: its maker's own recorded play.
+* End fight lessons (2.0.0-beta.11): *Mine AI MCP: the run that beat Minecraft* by AI Bengineering,
+  [aibengineering/beat-the-game-minecraft](https://huggingface.co/datasets/aibengineering/beat-the-game-minecraft),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Turned into Xen's own rules and lessons; no data from it is in the repository.
+* Human head turning (2.0.0-beta.11): fitted to [OpenBlock-Team/Minecraft-Navigation](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-Navigation)
+  and [OpenBlock-Team/Minecraft-ChopTree](https://huggingface.co/datasets/OpenBlock-Team/Minecraft-ChopTree) by NathMen,
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Only the fitted numbers are in the code.
+* Village houses: Minecraft's own structure files, read from the player's game at run time (nothing of Mojang's is included).
+* Survival know-how (2.0.0-beta.41): facts from the [Minecraft Wiki](https://minecraft.wiki/) (mob, item and Tutorial pages),
+  written in our own words in `assets/xen/survival.json`; no wiki text is copied.
+
+## Tests
+
+```
+python -m unittest discover -s tests -t .
+```
+
+The tests cover the network (gradient checks), perception (the near cube,
+field of view, occlusion, beliefs and their confidence), the simulator,
+fear conditioning (Xen learns to fear walking into lava, and only that),
+shared-brain swarms, the real-world protocol against a fake bridge, the
+keyboard/mouse backend against a fake screen, building, taste, redstone rules
+and learning, the chat (understanding requests, honesty filter, safe chat)
+and the command line.
+
+The mod has its own check, which compares the Java port with the Python Xen
+(senses, brain, fear, memories, paths, chat rules and the talk model):
+
+```
+cd mod/mc1.21.11 && ./gradlew crossCheck
+./gradlew runClient -PuiTest     # opens Mod Menu and the settings screen by itself, then closes
+```
+
+GitHub Actions runs all of it on every push, on an x86-64 and an ARM64 machine,
+and also compiles the 26.x mod against 26.3 (the jar is built against 26.1.2).

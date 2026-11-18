@@ -1,7 +1,45 @@
-**Xen Companion 2.0.0-beta.49**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
+**Xen Companion 2.0.0-beta.50**: AI players for Minecraft (Fabric) that live their own lives. They gather, mine, build their
 own houses, farm, trade, form villages with their own rules, make friends and enemies, travel to the Nether and the
 End, and talk with you. Like a real player, a Xen's mind only knows what it can see and it only acts through a
 player's controls.
+
+### 2.0.0-beta.50: a big brain from any AI, and Xens that don't get stuck
+
+* **A big brain, from any AI with an API.** Connect any chat model with an OpenAI-style API: DeepSeek, OpenAI,
+  OpenRouter, Groq, Mistral, or a local Ollama, LM Studio or llama.cpp server. It doesn't replace Xen's own brain, it
+  joins it:
+  * It thinks slowly in the background, every minute or so and right after something big (a death, a goal reached, a
+    task that got nowhere, someone talking to it). It reads how the Xen is doing (health, gear, bag, team, what just
+    happened, how its last plan went) and the choices its body can take right now, and answers with a thought, a
+    plan, a choice and maybe a line to say.
+  * Its choice is checked first (only one the body can take right now counts; a bad one is turned down and it's told
+    why), then it leads Xen's own choosing for a few minutes. What it says to avoid weighs against.
+  * The reflexes stay Xen's own and fast: fighting, fleeing, eating, shelter at night, lava and water never wait on it.
+  * Talked to, a Xen answers in its own words (what it's doing and why); what you ask is still done the reliable way.
+  * With a vision model, it can see through the Xen's eyes now and then.
+  * Set it up on the new **AI brain** tab of the settings screen (API URL, model, key, how often it thinks, calls a
+    minute to keep the bill in hand, how much it leads, a **Test it** button), or with `/xen set brainUrl ...`,
+    `brainModel`, and the key in `config/xen/brain_key.txt` (kept out of `xen.json`). `/xen brain` shows each Xen's
+    thought and plan, `/xen brain test` makes one call. Off until you set a URL.
+* **Xens check themselves.** A task that gets nowhere for a minute and a half (no step, nothing gained, no wear on a
+  tool) is dropped as a waste of time. Making one thing for two minutes with nothing made is let go. Before following
+  anyone, a Xen checks there's someone to follow (a trip whose leader is gone, or one lost over a restart, used to
+  leave Xens standing about for an hour).
+* **Unstuck**: boxed in a hole or a tunnel, a Xen digs a nook for its crafting table; underground with no way up, it
+  digs its own stairs; with no pickaxe deep down, it digs out by hand; far sugar cane is walked to the long way; a
+  respawn moved away from a camped bed only lands on real ground (no more falling out of the world).
+* **Enchanting that gets done**: the table comes first when only the book is missing, sugar cane from the river it
+  knows, teammates share lapis, books, paper and leather, a table one Xen couldn't reach is skipped by all, the way
+  to a book worked out afresh. And once packed and armed for it, the Nether trip comes before another look around.
+* **Teams**: leaders who keep their people (diamonds, lapis, food or a word), betrayal with reasons and consequences,
+  returnee negotiations, team meetings with practice duels (never deadly), team bases from schematics (a house, a
+  wall with towers, a fortress) seen through by whoever took a part up, roles (builders, a resource finder), team
+  sharing, a starter kit brought to a teammate back from a death, fair fights only (both in full diamond).
+* **StockXen**: an optional lone rival with every stat at its max and two chances (its totem, then its life).
+  `/xen stocktarget <team|none>` sets its prey.
+* **Smaller things**: obsidian the player's way (water into a hole beside the lava), running for water when on fire,
+  night shelter first, `/xen planfor <xen> <item>` shows how a Xen would make something, ideas from a list of what it
+  can really do, and the leaders' plans from a language model.
 
 ### 2.0.0-beta.49: Xen gets a massive upgrade
 
