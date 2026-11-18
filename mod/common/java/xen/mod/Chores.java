@@ -1140,9 +1140,16 @@ final class Chores {
 		}
 		boolean forWood = false;
 		for (int k : cats) forWood |= k == Blocks.LOG;
-		if (known == null && forWood && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && !c.player.level().canSeeSky(c.player.blockPosition().above())) {
+		if (known == null && forWood && c.player.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) {
 			BlockPos feet = c.player.blockPosition();                    // trees grow up top: underground, the way up first (Bob looked for trees at y 29 for five minutes)
-			int top = c.player.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+			var lv = c.player.level();
+			int top = lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX(), feet.getZ());
+			if (lv.canSeeSky(feet.above())) {                             // (sky over it, but down a ravine or a pit: the land round it, not its own column, is the surface; Nia looked for trees at the bottom of one at y 4)
+				int rim = top;
+				for (int[] d : new int[][] {{14, 0}, {-14, 0}, {0, 14}, {0, -14}, {10, 10}, {-10, 10}, {10, -10}, {-10, -10}})
+					if (lv.isLoaded(feet.offset(d[0], 0, d[1]))) rim = Math.max(rim, lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, feet.getX() + d[0], feet.getZ() + d[1]));
+				top = rim - feet.getY() > 12 ? rim : feet.getY();           // (a hollow a few blocks deep is just the land: no climb)
+			}
 			if (top - feet.getY() > 6) {
 				doing = "heading up to the surface for trees";
 				return climbUp(feet, top);
