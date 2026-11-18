@@ -285,6 +285,20 @@ final class Leader {
 				String.format(java.util.Locale.ROOT, "%.2f", was), String.format(java.util.Locale.ROOT, "%.2f", m.personality.loyalty));
 	}
 
+	/**
+	 * Not a trip worth making with something for a teammate: too far (more than 96 blocks; 32 at night, when the walk
+	 * itself is the danger), another world, or that teammate already on its way to it with something (Gus and Max each
+	 * walked 32 blocks to the other; Jay set off 195 blocks for Lea, Hal 400 for Ivy).
+	 */
+	private static boolean noTrip(Companion g, Companion m) {
+		var gp = g.player();
+		var mp = m.player();
+		if (gp == null || mp == null || gp.level() != mp.level()) return true;
+		double d = gp.distanceTo(mp);
+		if (d > 96 || gp.level().isDarkOutside() && d > 32) return true;
+		return gp.getUUID().equals(m.chores.givingTo());
+	}
+
 	private static int enchantedPieces(Companion c) {
 		int n = 0;
 		for (var es : new net.minecraft.world.entity.EquipmentSlot[] {net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
@@ -307,7 +321,7 @@ final class Leader {
 			Companion giver = null;
 			int spareBest = 0;
 			for (Companion m : members) {
-				if (m == needy || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || m.player().distanceTo(needy.player()) > 96) continue;
+				if (m == needy || m.fightingNow() || m.chores.kind == Chores.Kind.GIVE || noTrip(m, needy)) continue;
 				int spare = m.btb.invCount("diamond") - Math.max(0, diamondsFor(m)) - 2;   // (two kept back: the team's enchanting table)
 				if (spare > spareBest) {
 					spareBest = spare;
@@ -338,7 +352,7 @@ final class Leader {
 			for (String[] w : wants)
 				for (Companion g : members) {
 					if (g == m || g.player() == null || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().level() != m.player().level()
-							|| g.player().distanceTo(m.player()) > 200) continue;
+							|| noTrip(g, m)) continue;
 					int n = Integer.parseInt(w[1]), keep = Integer.parseInt(w[2]);
 					boolean gTabled = g.enchanter.table() != null || g.crafter.has("enchanting_table");
 					if (w[0].equals("book") || w[0].equals("paper") || w[0].equals("leather")) keep = gTabled ? 0 : (w[0].equals("paper") ? 3 : 1);   // (its own book's makings kept, till it has its table)
@@ -357,7 +371,7 @@ final class Leader {
 			if (kt < kitSent.getOrDefault(m.name, 0L)) continue;                     // (one on its way already: Eve and Lea both set off with a pickaxe for Rex)
 			for (Companion g : members) {
 				if (g == m || g.player() == null || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().level() != m.player().level()
-						|| g.player().distanceTo(m.player()) > 200) continue;
+						|| noTrip(g, m)) continue;
 				String give = null;
 				if (m.crafter.pickTier() < 3 && g.btb.invCount("iron_pickaxe") > 0 && (g.btb.invCount("diamond_pickaxe") > 0 || g.btb.invCount("iron_pickaxe") > 1)) give = "iron_pickaxe";
 				else if (m.btb.invCount("iron_sword") + m.btb.invCount("diamond_sword") + m.btb.invCount("stone_sword") == 0 && g.btb.invCount("iron_sword") > 0 && g.btb.invCount("diamond_sword") > 0) give = "iron_sword";
@@ -383,7 +397,7 @@ final class Leader {
 					if (m.btb.invCount(want[1]) >= 64) continue;
 					for (Companion g : members) {
 						if (g == m || g.btb.invCount(want[1]) < Integer.parseInt(want[2]) || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE
-								|| g.btb.task == Btb.Task.FORT || g.player().level() != m.player().level() || g.player().distanceTo(m.player()) > 160) continue;
+								|| g.btb.task == Btb.Task.FORT || g.player().level() != m.player().level() || noTrip(g, m)) continue;
 						String r = g.chores.give(m.player(), want[0], Integer.parseInt(want[3]));
 						if (r != null && r.startsWith("You will")) {
 							XenMod.LOG.info("{} (leads {}): team share: {} brings {} {} to {} (building the base)", lead.name, team.replace("xen_", ""), g.name, want[3], want[0], m.name);
@@ -409,7 +423,7 @@ final class Leader {
 			long t = m.player().level().getGameTime();
 			if (t < lapisSent.getOrDefault(m.name, 0L)) continue;                 // (one on its way to it already)
 			for (Companion g : members) {
-				if (g == m || g.btb.invCount("lapis_lazuli") < 9 || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || g.player().distanceTo(m.player()) > 200) continue;
+				if (g == m || g.btb.invCount("lapis_lazuli") < 9 || g.fightingNow() || g.chores.kind == Chores.Kind.GIVE || noTrip(g, m)) continue;
 				if (g.enchanter.on || g.btb.task == Btb.Task.ENCHANT || g.btb.goal.equals("enchant") && g.btb.invCount("lapis_lazuli") < 12) continue;   // (its own enchanting first: Bob and Dee left theirs to carry lapis to Jay)
 				String r = g.chores.give(m.player(), "lapis_lazuli", 6);
 				if (r != null && r.startsWith("You will")) {

@@ -375,6 +375,11 @@ final class Chores {
 	 * Asked for its things: it doesn't just hand everything over. It thinks for a moment, keeps what it needs itself
 	 * (and says so), then walks over and tosses the rest.
 	 */
+	/** Whom it's on its way to give something to (null: nobody). */
+	UUID givingTo() {
+		return kind == Kind.GIVE ? forWhom : null;
+	}
+
 	String give(ServerPlayer to, String item, int amount) {
 		int have = item.equals("all") ? giveable().size() : count(item);
 		if (have == 0) return item.equals("all") ? "You have nothing to give." : "You have no " + named(item, 2) + " to give.";
