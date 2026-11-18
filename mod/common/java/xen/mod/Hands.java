@@ -651,7 +651,8 @@ public final class Hands {
 	 * player digs 5 times slower, and it can get down first)? In creative everything breaks at once.
 	 */
 	private boolean tooSlow(float progressPerTick) {
-		return !p.isCreative() && progressPerTick * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) < 1f / 200;
+		boolean deepBare = p.companion != null && p.companion.crafter.pickTier() == 0 && p.getY() < 50;   // (no pickaxe at all, down deep: twenty seconds a block by hand, as the walker allows; Bob was stuck 2945 times on deepslate it had planned through)
+		return !p.isCreative() && progressPerTick * (p.onGround() ? 1 : 5) * (p.isUnderWater() ? 5 : 1) < (deepBare ? 1f / 400 : 1f / 200);
 	}
 
 	/**
